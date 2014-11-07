@@ -1,13 +1,13 @@
+__author__ = "Mikael Mortensen <mikaem@math.uio.no>"
+__date__ = "2014-11-07"
+__copyright__ = "Copyright (C) 2014 " + __author__
+__license__  = "GNU Lesser GPL version 3 or any later version"
+
 from numpy import *
 from pylab import *
 import time
-from commands import getoutput
-from os import getpid, path
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
-
-num_processes = comm.Get_size()
-rank = comm.Get_rank()
 
 try:
     import pyfftw
@@ -25,14 +25,18 @@ try:
         return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype)
 
 except:
-    warning("Install pyfftw, it is much faster than numpy fft")
-    
+    Warning("Install pyfftw, it is much faster than numpy fft")
+
+# Set the size of the triply periodic box N**3
 M = 6
 N = 2**M
 
-if not num_processes in [2**i for i in range(5)]:
+num_processes = comm.Get_size()
+rank = comm.Get_rank()
+if not num_processes in [2**i for i in range(M)]:
     raise IOError("Number of cpus must be in ", [2**i for i in range(M)])
 
+# Each cpu gets ownership of Np slices
 Np = N / num_processes
 
 # The x index is split between processes and each process owns Np 2D slices, 
@@ -57,17 +61,18 @@ Np = N / num_processes
 # Responsibility for performing remaining one-dimensional fft in x-direction
 # is also split between processes. This is done by allocating slices to
 # processes just like the regular ownership, but in z-direction. Of the global
-# matrix the following responsibility is given
+# matrix the following responsibilities are given
 #
 #  process 0:  U[:, :, :Np]  
-#  process 1:  U[:, :, Np:2*Np]   (fft(U[:, :, Np:2*Np], axis=0)
+#  process 1:  U[:, :, Np:2*Np]
 #  etc
+#
 # To perform the operations in x-direction the following matrix is needed
 #
 #  Ut[:, :, Np]
 #
 # where fft is performed along axis 0 fft(Ut, axis=0)
-#
+#        
 
 L = 2 * pi
 dx = L / N
@@ -76,6 +81,7 @@ dt = 0.01
 nu = 0.000625
 plot_result = 1000
 T = 0.1
+# Choose convection scheme
 convection = {0: "Standard",
               1: "Divergence",
               2: "Skewed",
@@ -85,20 +91,21 @@ convection = {0: "Standard",
 #conv = convection.get(eval(sys.argv[-1]), "Standard")
 conv = convection[4]
 
+# Create the mesh
 x = linspace(0, L, N+1)[:-1]
-y = x.copy()
-z = x.copy()
-[X, Y, Z] = meshgrid(x[rank*Np:(rank+1)*Np], y, z, indexing='ij')
+[X, Y, Z] = meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij')
 
 # Solution arrays
 U = empty((Np, N, N))
 V = empty((Np, N, N))
 W = empty((Np, N, N))
-U_hat = empty((Np, N, N), dtype="complex")
+
+# Fourier coefficients
+U_hat = empty((Np, N, N), dtype="complex") 
 V_hat = empty((Np, N, N), dtype="complex")
 W_hat = empty((Np, N, N), dtype="complex")
 
-# Arrays for mpi
+# Arrays for mpi communication
 U_sendc = empty((num_processes, Np, N, Np), dtype="complex")
 U_recvc = empty((num_processes, Np, N, Np), dtype="complex")
 U_send = empty((num_processes, Np, N, Np))
@@ -127,12 +134,9 @@ Ut = empty((N, N, Np))
 curl = empty((3, Np, N, N))
 
 kx = (mod(0.5+arange(0, N, dtype="float")/N, 1)-0.5)*2*pi/dx
-ky = (mod(0.5+arange(0, N, dtype="float")/N, 1)-0.5)*2*pi/dx
-kz = (mod(0.5+arange(0, N, dtype="float")/N, 1)-0.5)*2*pi/dx
-
-[KX, KY, KZ] = meshgrid(kx[rank*Np:(rank+1)*Np], ky, kz, indexing='ij')
+[KX, KY, KZ] = meshgrid(kx[rank*Np:(rank+1)*Np], kx, kx, indexing='ij')
 KK = KX**2 + KY**2 + KZ**2
-dealias = array((abs(KX) < (2./3.)*max(kx))*(abs(KY) < (2./3.)*max(ky))*(abs(KZ) < (2./3.)*max(kz)), dtype=int)
+dealias = array((abs(KX) < (2./3.)*max(kx))*(abs(KY) < (2./3.)*max(kx))*(abs(KZ) < (2./3.)*max(kx)), dtype=int)
 Ksq = where(KK==0, 1, KK)
 
 # RK4 parameters
