@@ -55,17 +55,8 @@ dealias = array((abs(KX) < (2./3.)*max(kx))*(abs(KY) < (2./3.)*max(ky)), dtype=i
 Ksq = where(KK==0, 1, KK)
 
 # RK parameters
-a1= 1./6.; a2 = 1./3.; a3 = 1./3.; a4 = 1./6.
-b1=0.5; b2=0.5; b3=1.; b4=1.;
-a=[a1, a2, a3, a4]
-b=[b1, b2, b3, b4]
-
-#Umax = 0.1;
-#kmax = 8;
-#U[:]  = -Umax*cos(kmax*X)*sin(kmax*Y)
-#V[:] = Umax*sin(kmax*X)*cos(kmax*Y)
-#U[:] = -Umax*cos(kmax*X*V)*sin(kmax*Y*U)
-#V[:] = Umax*sin(kmax*X*U)*cos(kmax*Y*V)
+a=[1./6., 1./3., 1./3., 1./6.]
+b=[0.5, 0.5, 1., 1.]
 
 #w=exp(-((X-pi)**2+(Y-pi+pi/4)**2)/(0.2))+exp(-((X-pi)**2+(Y-pi-pi/4)**2)/(0.2))-0.5*exp(-((X-pi-pi/4)**2+(Y-pi-pi/4)**2)/(0.4))
 #w_hat = fft2(w)
