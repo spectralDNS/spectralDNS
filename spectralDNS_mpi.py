@@ -21,7 +21,7 @@ try:
     # Keep fft objects in cache for efficiency
     pyfftw.interfaces.cache.enable()
     pyfftw.interfaces.cache.set_keepalive_time(1000)
-    def empty(N, dtype="float", bytes=16):
+    def empty(N, dtype="float", bytes=32):
         return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype)
 
 except:
@@ -47,12 +47,12 @@ Np = N / num_processes
 #         .
 # process rank owns rank*Np:(rank+1)*Np
 #
-# The variables are globally U[N, N, N], V[N, N, N], etc.,
-# where indices are laid out in x, y, z direction.
+# The variables are globally U[3, N, N, N], etc.,
+# where the last three indices are laid out in x, y, z direction.
 # Chunks of the global matrices live on each process
 #
-#   U[0:Np,    :, :] lives on process 0
-#   U[Np:2*Np, :, :] lives on process 1
+#   U[:, 0:Np,    :, :] lives on process 0
+#   U[:, Np:2*Np, :, :] lives on process 1
 #   etc.
 #
 # Convection requires communication.
@@ -88,22 +88,18 @@ convection = {0: "Standard",
               3: "VortexI",
               4: "VortexII"}
 
-#conv = convection.get(eval(sys.argv[-1]), "Standard")
-conv = convection[4]
+conv = convection.get(eval(sys.argv[-1]), "Standard")
+#conv = convection[4]
 
 # Create the mesh
 x = linspace(0, L, N+1)[:-1]
 [X, Y, Z] = meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij')
 
-# Solution arrays
-U = empty((Np, N, N))
-V = empty((Np, N, N))
-W = empty((Np, N, N))
+# Solution array
+U = empty((3, Np, N, N))
 
 # Fourier coefficients
-U_hat = empty((Np, N, N), dtype="complex") 
-V_hat = empty((Np, N, N), dtype="complex")
-W_hat = empty((Np, N, N), dtype="complex")
+U_hat = empty((3, Np, N, N), dtype="complex") 
 
 # Arrays for mpi communication
 U_sendc = empty((num_processes, Np, N, Np), dtype="complex")
@@ -111,23 +107,15 @@ U_recvc = empty((num_processes, Np, N, Np), dtype="complex")
 U_send = empty((num_processes, Np, N, Np))
 U_recv = empty((num_processes, Np, N, Np))
 
-# RK4 
-U_hatold = empty((Np, N, N), dtype="complex")
-V_hatold = empty((Np, N, N), dtype="complex")
-W_hatold = empty((Np, N, N), dtype="complex")
-U_hatc = empty((Np, N, N), dtype="complex")
-V_hatc = empty((Np, N, N), dtype="complex")
-W_hatc = empty((Np, N, N), dtype="complex")
-dU = empty((Np, N, N), dtype="complex")
-dV = empty((Np, N, N), dtype="complex")
-dW = empty((Np, N, N), dtype="complex")
+# RK4 arrays
+U_hatold = empty((3, Np, N, N), dtype="complex")
+U_hatc = empty((3, Np, N, N), dtype="complex")
+dU = empty((3, Np, N, N), dtype="complex")
 
 # work arrays
-U_tmp = empty((Np, N, N))
-V_tmp = empty((Np, N, N))
-U_hat_tmp = empty((Np, N, N), dtype="complex")
-V_hat_tmp = empty((Np, N, N), dtype="complex")
-W_hat_tmp = empty((Np, N, N), dtype="complex")
+U_tmp = empty((3, Np, N, N))
+U_hat_tmp = empty((3, Np, N, N), dtype="complex")
+Uc_hat = empty((Np, N, N), dtype="complex")
 Utc = empty((N, N, Np), dtype="complex")
 Ut = empty((N, N, Np))
 
@@ -146,160 +134,177 @@ a=[a1, a2, a3, a4]
 b=[b1, b2, b3, b4]
 
 # Taylor-Green
-U[:] = sin(X)*cos(Y)*cos(Z)
-V[:] =-cos(X)*sin(Y)*cos(Z)
-W[:] = 0 
+U[0] = sin(X)*cos(Y)*cos(Z)
+U[1] =-cos(X)*sin(Y)*cos(Z)
+U[2] = 0 
 
 #def pressure():
-    #U[:] = real(ifftn(U_hat))
-    #V[:] = real(ifftn(V_hat))
     #p_hat = (1j*KX*fftn(U*ifftn(1j*KX*U_hat) + V*ifftn(1j*KY*U_hat) + W*ifftn(1j*KZ*U_hat))
             #+1j*KY*fftn((U*ifftn(1j*KX*V_hat)) + V*ifftn(1j*KY*V_hat) + W*ifftn(1j*KZ*V_hat))
             #+1j*KZ*fftn((U*ifftn(1j*KX*W_hat)) + V*ifftn(1j*KY*W_hat) + W*ifftn(1j*KZ*W_hat))) / Ksq
     
     #return real(ifftn(p_hat))
 
-def project(xU, xV, xW):
-    U_hat_tmp[:] = (KX*xU + KY*xV + KZ*xW)*KX / Ksq
-    V_hat_tmp[:] = (KX*xU + KY*xV + KZ*xW)*KY / Ksq
-    W_hat_tmp[:] = (KX*xU + KY*xV + KZ*xW)*KZ / Ksq
-    xU[:] = xU - U_hat_tmp
-    xV[:] = xV - V_hat_tmp
-    xW[:] = xW - W_hat_tmp
+def project(xU):
+    U_hat_tmp[0] = (KX*xU[0] + KY*xU[1] + KZ*xU[2]) / Ksq
+    xU[0] = xU[0] - U_hat_tmp[0]*KX
+    xU[1] = xU[1] - U_hat_tmp[0]*KY
+    xU[2] = xU[2] - U_hat_tmp[0]*KZ
     
 def ifftn_mpi(fu, u):
     # Do 2D ifft2 in y-z directions on owned data
-    U_hat_tmp[:] = ifft2(fu)
+    Uc_hat[:] = ifft2(fu)
     
     # Set up for communicating intermediate result 
     for i in range(num_processes):
-        U_sendc[i, :, :, :] = U_hat_tmp[:, :, i*Np:(i+1)*Np]
+        U_sendc[i] = Uc_hat[:, :, i*Np:(i+1)*Np]
         
     # Communicate all values
     comm.Alltoall(U_sendc, U_recvc)
     
     # Place received data in chunk Utc
     for i in range(num_processes):
-        Utc[i*Np:(i+1)*Np, :, :] = U_recvc[i, :, :, :]
+        Utc[i*Np:(i+1)*Np] = U_recvc[i]
         
     # Do ifft for final direction        
     Ut[:] = real(ifft(Utc, axis=0))
     
     # Return to owner
     for i in range(num_processes):
-        U_send[i, :, :, :] = Ut[i*Np:(i+1)*Np, :, :]
+        U_send[i] = Ut[i*Np:(i+1)*Np]
     
     # Communicate all values
     comm.Alltoall(U_send, U_recv)
 
     # Copy to final array
     for i in range(num_processes):
-        u[:, :, i*Np:(i+1)*Np] = U_recv[i, :, :, :]
+        u[:, :, i*Np:(i+1)*Np] = U_recv[i]
 
 def fftn_mpi(u, fu):
     # Do 2D fft2 in y-z directions on owned data
-    U_hat_tmp[:] = fft2(u)
+    Uc_hat[:] = fft2(u)
     
     # Set up for communicating intermediate result 
     for i in range(num_processes):
-        U_sendc[i, :, :, :] = U_hat_tmp[:, :, i*Np:(i+1)*Np]
+        U_sendc[i] = Uc_hat[:, :, i*Np:(i+1)*Np]
         
     # Communicate all values
     comm.Alltoall(U_sendc, U_recvc)
     
     # Place in chunk Utc
     for i in range(num_processes):
-        Utc[i*Np:(i+1)*Np, :, :] = U_recvc[i, :, :, :]
+        Utc[i*Np:(i+1)*Np] = U_recvc[i]
         
     # Do fft for final direction        
     Utc[:] = fft(Utc, axis=0)
     
     # Return to owner
     for i in range(num_processes):
-        U_sendc[i, :, :, :] = Utc[i*Np:(i+1)*Np, :, :]
+        U_sendc[i] = Utc[i*Np:(i+1)*Np]
     
     # Communicate all values
     comm.Alltoall(U_sendc, U_recvc)
 
     # Copy to final array 
     for i in range(num_processes):
-        fu[:, :, i*Np:(i+1)*Np] = U_recvc[i, :, :, :]
+        fu[:, :, i*Np:(i+1)*Np] = U_recvc[i]
         
-def ComputeRHS(dU, dV, dW, rk):
+def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U, V, W
-        ifftn_mpi(U_hat, U)
-        ifftn_mpi(V_hat, V)
-        ifftn_mpi(W_hat, W)
+        for i in range(3):
+            ifftn_mpi(U_hat[i], U[i])
     
     if conv == "Standard":
-        pass
-        #dU[:] = -dealias*(fftn(U*ifftn(1j*KX*U_hat)) + fftn(V*ifftn(1j*KY*U_hat)) + fftn(W*ifftn(1j*KZ*U_hat)))*dt
-        #dV[:] = -dealias*(fftn(U*ifftn(1j*KX*V_hat)) + fftn(V*ifftn(1j*KY*V_hat)) + fftn(W*ifftn(1j*KZ*V_hat)))*dt
-        #dW[:] = -dealias*(fftn(U*ifftn(1j*KX*W_hat)) + fftn(V*ifftn(1j*KY*W_hat)) + fftn(W*ifftn(1j*KZ*W_hat)))*dt
+        for i in range(3):
+            ifftn_mpi(1j*KX*U_hat[i], U_tmp[0])
+            ifftn_mpi(1j*KY*U_hat[i], U_tmp[1])
+            ifftn_mpi(1j*KZ*U_hat[i], U_tmp[2])
+            fftn_mpi(U[0]*U_tmp[0], U_hat_tmp[0])
+            fftn_mpi(U[1]*U_tmp[1], U_hat_tmp[1])
+            fftn_mpi(U[2]*U_tmp[2], U_hat_tmp[2])
+            dU[i] = -dealias*(U_hat_tmp[0] + U_hat_tmp[1] + U_hat_tmp[2])*dt
         
     elif conv == "Divergence":
-        pass
-        #fftUV[:] = fftn(U*V)    
-        #dU[:] = -dealias*(1j*KX*fftn(U*U) + 1j*KY*fftUV + 1j*KZ*fftn(U*W))*dt  
-        #dV[:] = -dealias*(1j*KX*fftUV + 1j*KY*fftn(V*V) + 1j*KZ*fftn(V*W))*dt
-        #dW[:] = -dealias*(1j*KX*fftn(U*W) + 1j*KY*fftn(V*W) + 1j*KZ*fftn(W*W))*dt
+        fftn_mpi(U[0]*U[0], U_hat_tmp[0])
+        fftn_mpi(U[0]*U[1], U_hat_tmp[1])
+        fftn_mpi(U[0]*U[2], U_hat_tmp[2])
+        dU[0] = 1j*KX*U_hat_tmp[0] + 1j*KY*U_hat_tmp[1] + 1j*KZ*U_hat_tmp[2]
+        dU[1] = 1j*KX*U_hat_tmp[1]
+        dU[2] = 1j*KX*U_hat_tmp[2]
+        fftn_mpi(U[1]*U[1], U_hat_tmp[0])
+        fftn_mpi(U[1]*U[2], U_hat_tmp[1])
+        fftn_mpi(U[2]*U[2], U_hat_tmp[2])
+        dU[1] += (1j*KY*U_hat_tmp[0] + 1j*KZ*U_hat_tmp[1])
+        dU[2] += (1j*KY*U_hat_tmp[1] + 1j*KZ*U_hat_tmp[2])
+        dU[:] = -dealias*dU[:]*dt
 
     elif conv == "Skewed":
-        pass
-        #fftUV[:] = fftn(U*V)    
-        #dU[:] = -dealias*(1j*KX*fftn(U*U) + 1j*KY*fftUV + 1j*KZ*fftn(U*W) +
-                #fftn(U*ifftn(1j*KX*U_hat)) + fftn(V*ifftn(1j*KY*U_hat)) + fftn(W*ifftn(1j*KZ*U_hat)))*dt/2.
-                
-        #dV[:] = -dealias*(1j*KX*fftUV + 1j*KY*fftn(V*V) + 1j*KZ*fftn(V*W) +
-                #fftn(U*ifftn(1j*KX*V_hat)) + fftn(V*ifftn(1j*KY*V_hat)) + fftn(W*ifftn(1j*KZ*V_hat)))*dt/2.
-
-        #dW[:] = -dealias*(1j*KX*fftn(U*W) + 1j*KY*fftn(V*W) + 1j*KZ*fftn(W*W) +
-                #fftn(U*ifftn(1j*KX*W_hat)) + fftn(V*ifftn(1j*KY*W_hat)) + fftn(W*ifftn(1j*KZ*W_hat)))*dt/2.
+        for i in range(3):
+            ifftn_mpi(1j*KX*U_hat[i], U_tmp[0])
+            ifftn_mpi(1j*KY*U_hat[i], U_tmp[1])
+            ifftn_mpi(1j*KZ*U_hat[i], U_tmp[2])
+            fftn_mpi(U[0]*U_tmp[0], U_hat_tmp[0])
+            fftn_mpi(U[1]*U_tmp[1], U_hat_tmp[1])
+            fftn_mpi(U[2]*U_tmp[2], U_hat_tmp[2])
+            dU[i] = U_hat_tmp[0] + U_hat_tmp[1] + U_hat_tmp[2]
+        fftn_mpi(U[0]*U[0], U_hat_tmp[0])
+        fftn_mpi(U[0]*U[1], U_hat_tmp[1])
+        fftn_mpi(U[0]*U[2], U_hat_tmp[2])
+        dU[0] += (1j*KX*U_hat_tmp[0] + 1j*KY*U_hat_tmp[1] + 1j*KZ*U_hat_tmp[2])
+        dU[1] += 1j*KX*U_hat_tmp[1]
+        dU[2] += 1j*KX*U_hat_tmp[2]
+        fftn_mpi(U[1]*U[1], U_hat_tmp[0])
+        fftn_mpi(U[1]*U[2], U_hat_tmp[1])
+        fftn_mpi(U[2]*U[2], U_hat_tmp[2])
+        dU[1] += (1j*KY*U_hat_tmp[0] + 1j*KZ*U_hat_tmp[1])
+        dU[2] += (1j*KY*U_hat_tmp[1] + 1j*KZ*U_hat_tmp[2])
+        dU[:] = -dealias*dU[:]*dt/2.
 
     elif conv == "VortexI":    
-        pass
-        #curl[2, :, :, :] = real(ifftn(1j*KX*V_hat))-real(ifftn(1j*KY*U_hat))
-        #curl[1, :, :, :] = real(ifftn(1j*KZ*U_hat))-real(ifftn(1j*KX*W_hat))
-        #curl[0, :, :, :] = real(ifftn(1j*KY*W_hat))-real(ifftn(1j*KZ*V_hat))
-        
-        #fftUV[:] = fftn(0.5*(U*U+V*V+W*W))
-        #dU[:] = dealias*(fftn(V*curl[2, :]-W*curl[1, :]) - 1j*KX*fftUV)*dt
-        #dV[:] = dealias*(fftn(W*curl[0, :]-U*curl[2, :]) - 1j*KY*fftUV)*dt
-        #dW[:] = dealias*(fftn(U*curl[1, :]-V*curl[0, :]) - 1j*KY*fftUV)*dt
+        ifftn_mpi(1j*KX*U_hat[1], curl[2])
+        ifftn_mpi(1j*KY*U_hat[0], U_tmp[0])
+        curl[2] -= U_tmp[0]
+        ifftn_mpi(1j*KZ*U_hat[0], curl[1])
+        ifftn_mpi(1j*KX*U_hat[2], U_tmp[0])
+        curl[1] -= U_tmp[0]
+        ifftn_mpi(1j*KY*U_hat[2], curl[0])
+        ifftn_mpi(1j*KZ*U_hat[1], U_tmp[0])
+        curl[0] -= U_tmp[0]
+        fftn_mpi(0.5*(U[0]*U[0]+U[1]*U[1]+U[2]*U[2]), U_hat_tmp[0])        
+        fftn_mpi(U[1]*curl[2]-U[2]*curl[1], dU[0])
+        fftn_mpi(U[2]*curl[0]-U[0]*curl[2], dU[1])
+        fftn_mpi(U[0]*curl[1]-U[1]*curl[0], dU[2])        
+        dU[0] = (dU[0]-1j*KX*U_hat_tmp[0])*dealias*dt
+        dU[1] = (dU[1]-1j*KY*U_hat_tmp[0])*dealias*dt
+        dU[2] = (dU[2]-1j*KZ*U_hat_tmp[0])*dealias*dt
         
     elif conv == "VortexII":
-        ifftn_mpi(1j*KX*V_hat, V_tmp)
-        ifftn_mpi(1j*KY*U_hat, U_tmp)
-        curl[2, :, :, :] = V_tmp-U_tmp
-        ifftn_mpi(1j*KZ*U_hat, V_tmp)
-        ifftn_mpi(1j*KX*W_hat, U_tmp)
-        curl[1, :, :, :] = V_tmp-U_tmp
-        ifftn_mpi(1j*KY*W_hat, V_tmp)
-        ifftn_mpi(1j*KZ*V_hat, U_tmp)
-        curl[0, :, :, :] = V_tmp-U_tmp
-        
-        fftn_mpi(V*curl[2, :]-W*curl[1, :], V_hat_tmp)        
-        dU[:] = dealias*V_hat_tmp*dt
-        fftn_mpi(W*curl[0, :]-U*curl[2, :], V_hat_tmp)
-        dV[:] = dealias*V_hat_tmp*dt
-        fftn_mpi(U*curl[1, :]-V*curl[0, :], V_hat_tmp)
-        dW[:] = dealias*V_hat_tmp*dt
+        ifftn_mpi(1j*KX*U_hat[1], curl[2])
+        ifftn_mpi(1j*KY*U_hat[0], U_tmp[0])
+        curl[2] -= U_tmp[0]
+        ifftn_mpi(1j*KZ*U_hat[0], curl[1])
+        ifftn_mpi(1j*KX*U_hat[2], U_tmp[0])
+        curl[1] -= U_tmp[0]
+        ifftn_mpi(1j*KY*U_hat[2], curl[0])
+        ifftn_mpi(1j*KZ*U_hat[1], U_tmp[0])
+        curl[0] -= U_tmp[0]        
+        fftn_mpi(U[1]*curl[2]-U[2]*curl[1], dU[0])
+        fftn_mpi(U[2]*curl[0]-U[0]*curl[2], dU[1])
+        fftn_mpi(U[0]*curl[1]-U[1]*curl[0], dU[2])
+        dU[:] *= dealias*dt
 
     else:
         raise TypeError, "Wrong type of convection"
                  
     # Add contribution from diffusion
-    dU[:] += -nu*dt*KK*U_hat
-    dV[:] += -nu*dt*KK*V_hat
-    dW[:] += -nu*dt*KK*W_hat
+    dU[:] += -nu*dt*KK*U_hat[:]
 
 # Transform initial data
-fftn_mpi(U, U_hat)
-fftn_mpi(V, V_hat)
-fftn_mpi(W, W_hat)
+for i in range(3):
+    fftn_mpi(U[i], U_hat[i])
        
 # Make it divergence free in case it is not
-project(U_hat, V_hat, W_hat)
+project(U_hat)
 
 tic = time.time()
 t = 0.0
@@ -316,30 +321,19 @@ while t < T:
     t += dt
     tstep += 1
     U_hatold[:] = U_hat
-    V_hatold[:] = V_hat
-    W_hatold[:] = W_hat
     U_hatc[:] = U_hat
-    V_hatc[:] = V_hat
-    W_hatc[:] = W_hat
     for rk in range(4):
-        ComputeRHS(dU, dV, dW, rk)
-        project(dU, dV, dW) 
+        ComputeRHS(dU, rk)
+        project(dU)
 
         if rk < 3:
             U_hat[:] = U_hatold+b[rk]*dU
-            V_hat[:] = V_hatold+b[rk]*dV
-            W_hat[:] = W_hatold+b[rk]*dW
         U_hatc[:] = U_hatc+a[rk]*dU
-        V_hatc[:] = V_hatc+a[rk]*dV
-        W_hatc[:] = W_hatc+a[rk]*dW
         
     U_hat[:] = U_hatc[:]
-    V_hat[:] = V_hatc[:]
-    W_hat[:] = W_hatc[:]
-    project(U_hat, V_hat, W_hat)
-    ifftn_mpi(U_hat, U)
-    ifftn_mpi(V_hat, V)
-    ifftn_mpi(W_hat, W)
+    project(U_hat)
+    for i in range(3):
+        ifftn_mpi(U_hat[i], U[i])
     
     #if mod(tstep, plot_result) == 0:
         #if rank == 0:
@@ -348,13 +342,14 @@ while t < T:
             #im.autoscale()  
             #plt.pause(1e-6)  
 
-    kk = comm.reduce(0.5*sum(U*U+V*V+W*W)*dx*dx*dx/L**3)
+    kk = comm.reduce(0.5*sum(U*U)*dx*dx*dx/L**3)
     if rank == 0:
         k.append(kk)
         #print t
 
 if rank == 0:
     print "Time = ", time.time()-tic
+    print conv
     figure()
     k = array(k)
     dkdt = (k[1:]-k[:-1])/dt
