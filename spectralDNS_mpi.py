@@ -18,7 +18,7 @@ try:
     ifft2 = pyfftw.interfaces.numpy_fft.ifft2
     # Keep fft objects in cache for efficiency
     pyfftw.interfaces.cache.enable()
-    pyfftw.interfaces.cache.set_keepalive_time(1000)
+    pyfftw.interfaces.cache.set_keepalive_time(1e8)
     def empty(N, dtype="float", bytes=32):
         return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype)
 
