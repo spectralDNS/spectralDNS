@@ -26,13 +26,13 @@ except:
     Warning("Install pyfftw, it is much faster than numpy fft")
 
 # Set the size of the triply periodic box N**3
-M = 6
+M = 5
 N = 2**M
 
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
-if not num_processes in [2**i for i in range(M)]:
-    raise IOError("Number of cpus must be in ", [2**i for i in range(M)])
+if not num_processes in [2**i for i in range(M+1)]:
+    raise IOError("Number of cpus must be in ", [2**i for i in range(M+1)])
 
 # Each cpu gets ownership of Np slices
 Np = N / num_processes     
@@ -45,13 +45,13 @@ nu = 0.000625
 plot_result = 1000
 T = 0.1
 # Choose convection scheme
-convection = {0: "Standard",
-              1: "Divergence",
-              2: "Skewed",
-              3: "VortexI",
-              4: "VortexII"}
+conv = {0: "Standard",
+        1: "Divergence",
+        2: "Skewed",
+        3: "VortexI",
+        4: "VortexII"}.get(eval(sys.argv[-1]), "Standard")
 
-conv = convection.get(eval(sys.argv[-1]), "Standard")
+#conv = convection.get(eval(sys.argv[-1]), "Standard")
 #conv = convection[4]
 
 # Create the mesh
@@ -189,7 +189,7 @@ def ComputeRHS(dU, rk):
         
     elif conv == "Divergence":
         for i in range(3):
-            fftn_mpi(U[0]*U[j], U_hat_tmp[j])
+            fftn_mpi(U[0]*U[i], U_hat_tmp[i])
         dU[0] = 1j*KX[0]*U_hat_tmp[0] + 1j*KX[1]*U_hat_tmp[1] + 1j*KX[2]*U_hat_tmp[2]
         dU[1] = 1j*KX[0]*U_hat_tmp[1]
         dU[2] = 1j*KX[0]*U_hat_tmp[2]
