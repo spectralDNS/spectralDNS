@@ -10,27 +10,19 @@ from mpi4py import MPI
 comm = MPI.COMM_WORLD
 
 try:
-    import pyfftw
-    # Monkey patches for fft
-    ifft = pyfftw.interfaces.numpy_fft.ifft
-    fft = pyfftw.interfaces.numpy_fft.fft
-    fft2 = pyfftw.interfaces.numpy_fft.fft2
-    ifft2 = pyfftw.interfaces.numpy_fft.ifft2
-    # Keep fft objects in cache for efficiency
-    pyfftw.interfaces.cache.enable()
-    pyfftw.interfaces.cache.set_keepalive_time(1e8)
-    def empty(N, dtype="float", bytes=32):
-        return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype)
-
+    from wrappyfftw import *
+    
 except:
-    Warning("Install pyfftw, it is much faster than numpy fft")
+    print Warning("Install pyfftw, it is much faster than numpy fft")
 
 # Set the size of the triply periodic box N**3
-M = 5
+M = 6
 N = 2**M
 
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
+threads = 2
+
 if not num_processes in [2**i for i in range(M+1)]:
     raise IOError("Number of cpus must be in ", [2**i for i in range(M+1)])
 
@@ -39,11 +31,17 @@ Np = N / num_processes
 
 L = 2 * pi
 dx = L / N
-#dt = eval(sys.argv[-2])
-dt = 0.01
+dt = 0.005
 nu = 0.000625
-plot_result = 1000
 T = 0.1
+from HDF5Writer import HDF5Writer
+hdf5file = HDF5Writer(comm, dt, N)
+
+# Set some switches for doing postprocessing
+write_result = 1e8       # Write to HDF5 every..
+compute_energy = 2      # Compute solution energy every..
+plot_result = 1e8        # Show an image every..
+
 # Choose convection scheme
 conv = {0: "Standard",
         1: "Divergence",
@@ -51,17 +49,12 @@ conv = {0: "Standard",
         3: "VortexI",
         4: "VortexII"}.get(eval(sys.argv[-1]), "Standard")
 
-#conv = convection.get(eval(sys.argv[-1]), "Standard")
-#conv = convection[4]
-
 # Create the mesh
 x = linspace(0, L, N+1)[:-1]
 X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'))
 
-# Solution array
+# Solution array and Fourier coefficients
 U = empty((3, Np, N, N))
-
-# Fourier coefficients
 U_hat = empty((3, Np, N, N), dtype="complex") 
 
 # Arrays for mpi communication
@@ -81,41 +74,46 @@ U_hat_tmp = empty((3, Np, N, N), dtype="complex")
 Uc_hat = empty((Np, N, N), dtype="complex")
 Utc = empty((N, N, Np), dtype="complex")
 Ut = empty((N, N, Np))
-
 curl = empty((3, Np, N, N))
 
-kx = (mod(0.5+arange(0, N, dtype="float")/N, 1)-0.5)*2*pi/dx
+# Set wavenumbers in grid
+kx = (mod(0.5 + arange(0, N, dtype="float")/N, 1) - 0.5)*2*pi/dx
 KX = array(meshgrid(kx[rank*Np:(rank+1)*Np], kx, kx, indexing='ij'))
-KK = KX[0]**2 + KX[1]**2 + KX[2]**2
-dealias = array((abs(KX[0]) < (2./3.)*max(kx))*(abs(KX[1]) < (2./3.)*max(kx))*(abs(KX[2]) < (2./3.)*max(kx)), dtype=int)
+KK = sum(KX*KX, 0)
 Ksq = where(KK==0, 1, KK)
+KX_over_Ksq = KX.copy()
+for j in range(3):
+    KX_over_Ksq[j] /= Ksq
+
+# Filter for dealiasing nonlinear convection
+dealias = array((abs(KX[0]) < (2./3.)*max(kx))*(abs(KX[1]) < (2./3.)*max(kx))*(abs(KX[2]) < (2./3.)*max(kx)), dtype=int)
 
 # RK4 parameters
-a=[1./6., 1./3., 1./3., 1./6.]
-b=[0.5, 0.5, 1., 1.]
+a = [1./6., 1./3., 1./3., 1./6.]
+b = [0.5, 0.5, 1.]
 
 def pressure():
+    """Pressure is not really used, but may be recovered from the velocity.
+    """
     p = zeros((Np, N, N))
     for i in range(3):
         for j in range(3):
             ifftn_mpi(1j*KX[j]*U_hat[i], U_tmp[j])
-        fftn_mpi(U[0]*U_tmp[0] + U[1]*U_tmp[1] + U[2]*U_tmp[2], U_hat_tmp[i])
-    p_hat = (1j*KX[0]*U_hat_tmp[0]
-            +1j*KX[1]*U_hat_tmp[1]
-            +1j*KX[2]*U_hat_tmp[2]) / Ksq    
+        fftn_mpi(sum(U*U_tmp, 0), U_hat_tmp[i])
+    p_hat = 1j*sum(KX_over_Ksq*U_hat_tmp, 0)
     ifftn_mpi(p_hat, p)
     return p
 
 def project(xU):
-    Uc_hat[:] = (KX[0]*xU[0] + KX[1]*xU[1] + KX[2]*xU[2]) / Ksq
+    Uc_hat[:] = sum(KX*xU, 0)
     for i in range(3):
-        xU[i] = xU[i] - Uc_hat*KX[i]
+        xU[i] = xU[i] - Uc_hat*KX_over_Ksq[i]
     
 def ifftn_mpi(fu, u):
     """ifft in three directions using mpi
     """
     # Do 2D ifft2 in y-z directions on owned data
-    Uc_hat[:] = ifft2(fu)
+    Uc_hat[:] = ifft2(fu)    
     
     # Set up for communicating intermediate result 
     for i in range(num_processes):
@@ -131,7 +129,7 @@ def ifftn_mpi(fu, u):
     # Do ifft for final direction        
     Ut[:] = real(ifft(Utc, axis=0))
     
-    # Return to owner
+    # Store values to be sent
     for i in range(num_processes):
         U_send[i] = Ut[i*Np:(i+1)*Np]
     
@@ -162,7 +160,7 @@ def fftn_mpi(u, fu):
     # Do fft for final direction        
     Utc[:] = fft(Utc, axis=0)
     
-    # Return to owner
+    # Store values to be sent
     for i in range(num_processes):
         U_sendc[i] = Utc[i*Np:(i+1)*Np]
     
@@ -172,90 +170,86 @@ def fftn_mpi(u, fu):
     # Copy to final array 
     for i in range(num_processes):
         fu[:, :, i*Np:(i+1)*Np] = U_recvc[i]
-        
+            
+def standardConvection(c):   
+    """c_i = u_j du_i/dx_j"""
+    for i in range(3):
+        for j in range(3):
+            ifftn_mpi(1j*KX[j]*U_hat[i], U_tmp[j])
+        for j in range(3):
+            fftn_mpi(U[j]*U_tmp[j], U_hat_tmp[j])
+        c[i] = sum(U_hat_tmp, axis=0)
+
+def divergenceConvection(c, add=False):
+    """c_i = div(u_i u_j)"""
+    if not add: c.fill(0)
+    for i in range(3):
+        fftn_mpi(U[0]*U[i], U_hat_tmp[i])
+    c[0] += 1j*sum(KX*U_hat_tmp, 0)
+    c[1] += 1j*KX[0]*U_hat_tmp[1]
+    c[2] += 1j*KX[0]*U_hat_tmp[2]
+    fftn_mpi(U[1]*U[1], U_hat_tmp[0])
+    fftn_mpi(U[1]*U[2], U_hat_tmp[1])
+    fftn_mpi(U[2]*U[2], U_hat_tmp[2])
+    c[1] += (1j*KX[1]*U_hat_tmp[0] + 1j*KX[2]*U_hat_tmp[1])
+    c[2] += (1j*KX[1]*U_hat_tmp[1] + 1j*KX[2]*U_hat_tmp[2])
+    
+def Cross(a, b, c):
+    """c = U x w"""
+    fftn_mpi(a[1]*b[2]-a[2]*b[1], c[0])
+    fftn_mpi(a[2]*b[0]-a[0]*b[2], c[1])
+    fftn_mpi(a[0]*b[1]-a[1]*b[0], c[2])        
+
+def Curl(a, c):
+    """c = curl(a)"""
+    ifftn_mpi(1j*(KX[0]*a[1]-KX[1]*a[0]), c[2])
+    ifftn_mpi(1j*(KX[2]*a[0]-KX[0]*a[2]), c[1])
+    ifftn_mpi(1j*(KX[1]*a[2]-KX[2]*a[1]), c[0])
+
+def Div(a, c):
+    """c = div(a)"""
+    ifftn_mpi(1j*(KX[0]*a[0]+KX[1]*a[1]+KX[2]*a[2]), c)
+    
 def ComputeRHS(dU, rk):
-    # Compute U from U_hat
     if rk > 0: # For rk=0 the correct values are already in U, V, W
         for i in range(3):
             ifftn_mpi(U_hat[i], U[i])
     
     if conv == "Standard":
-        for i in range(3):
-            for j in range(3):
-                ifftn_mpi(1j*KX[j]*U_hat[i], U_tmp[j])
-            for j in range(3):
-                fftn_mpi(U[j]*U_tmp[j], U_hat_tmp[j])
-            dU[i] = -dealias*(sum(U_hat_tmp, axis=0))*dt
+        standardConvection(dU)
         
     elif conv == "Divergence":
-        for i in range(3):
-            fftn_mpi(U[0]*U[i], U_hat_tmp[i])
-        dU[0] = 1j*KX[0]*U_hat_tmp[0] + 1j*KX[1]*U_hat_tmp[1] + 1j*KX[2]*U_hat_tmp[2]
-        dU[1] = 1j*KX[0]*U_hat_tmp[1]
-        dU[2] = 1j*KX[0]*U_hat_tmp[2]
-        fftn_mpi(U[1]*U[1], U_hat_tmp[0])
-        fftn_mpi(U[1]*U[2], U_hat_tmp[1])
-        fftn_mpi(U[2]*U[2], U_hat_tmp[2])
-        dU[1] += (1j*KX[1]*U_hat_tmp[0] + 1j*KX[2]*U_hat_tmp[1])
-        dU[2] += (1j*KX[1]*U_hat_tmp[1] + 1j*KX[2]*U_hat_tmp[2])
-        dU[:] = -dealias*dU[:]*dt
+        divergenceConvection(dU)        
 
     elif conv == "Skewed":
-        for i in range(3):
-            for j in range(3):
-                ifftn_mpi(1j*KX[j]*U_hat[i], U_tmp[j])
-            for j in range(3):
-                fftn_mpi(U[j]*U_tmp[j], U_hat_tmp[j])
-            dU[i] = sum(U_hat_tmp, axis=0)
-        for i in range(3):
-            fftn_mpi(U[0]*U[i], U_hat_tmp[i])
-        dU[0] += (1j*KX[0]*U_hat_tmp[0] + 1j*KX[1]*U_hat_tmp[1] + 1j*KX[2]*U_hat_tmp[2])
-        dU[1] += 1j*KX[0]*U_hat_tmp[1]
-        dU[2] += 1j*KX[0]*U_hat_tmp[2]
-        fftn_mpi(U[1]*U[1], U_hat_tmp[0])
-        fftn_mpi(U[1]*U[2], U_hat_tmp[1])
-        fftn_mpi(U[2]*U[2], U_hat_tmp[2])
-        dU[1] += (1j*KX[1]*U_hat_tmp[0] + 1j*KX[2]*U_hat_tmp[1])
-        dU[2] += (1j*KX[1]*U_hat_tmp[1] + 1j*KX[2]*U_hat_tmp[2])
-        dU[:] = -dealias*dU[:]*dt/2.
+        standardConvection(dU)
+        divergenceConvection(dU, add=True)        
+        dU[:] = dU/2
 
     elif conv == "VortexI":    
-        ifftn_mpi(1j*KX[0]*U_hat[1], curl[2])
-        ifftn_mpi(1j*KX[1]*U_hat[0], U_tmp[0])
-        curl[2] -= U_tmp[0]
-        ifftn_mpi(1j*KX[2]*U_hat[0], curl[1])
-        ifftn_mpi(1j*KX[0]*U_hat[2], U_tmp[0])
-        curl[1] -= U_tmp[0]
-        ifftn_mpi(1j*KX[1]*U_hat[2], curl[0])
-        ifftn_mpi(1j*KX[2]*U_hat[1], U_tmp[0])
-        curl[0] -= U_tmp[0]
-        fftn_mpi(0.5*(U[0]*U[0]+U[1]*U[1]+U[2]*U[2]), U_hat_tmp[0])        
-        fftn_mpi(U[1]*curl[2]-U[2]*curl[1], dU[0])
-        fftn_mpi(U[2]*curl[0]-U[0]*curl[2], dU[1])
-        fftn_mpi(U[0]*curl[1]-U[1]*curl[0], dU[2])        
+        Curl(U_hat, curl)
+        Cross(U, curl, dU)
+        fftn_mpi(0.5*sum(U**2, 0), U_hat_tmp[0])        
         for i in range(3):
-            dU[i] = (dU[i]-1j*KX[i]*U_hat_tmp[0])*dealias*dt
+            dU[i] -= 1j*KX[i]*U_hat_tmp[0]
         
     elif conv == "VortexII":
-        ifftn_mpi(1j*KX[0]*U_hat[1], curl[2])
-        ifftn_mpi(1j*KX[1]*U_hat[0], U_tmp[0])
-        curl[2] -= U_tmp[0]
-        ifftn_mpi(1j*KX[2]*U_hat[0], curl[1])
-        ifftn_mpi(1j*KX[0]*U_hat[2], U_tmp[0])
-        curl[1] -= U_tmp[0]
-        ifftn_mpi(1j*KX[1]*U_hat[2], curl[0])
-        ifftn_mpi(1j*KX[2]*U_hat[1], U_tmp[0])
-        curl[0] -= U_tmp[0]        
-        fftn_mpi(U[1]*curl[2]-U[2]*curl[1], dU[0])
-        fftn_mpi(U[2]*curl[0]-U[0]*curl[2], dU[1])
-        fftn_mpi(U[0]*curl[1]-U[1]*curl[0], dU[2])
-        dU[:] *= dealias*dt
+        Curl(U_hat, curl)
+        Cross(U, curl, dU)
 
     else:
         raise TypeError, "Wrong type of convection"
+    
+    ## Add pressure gradient
+    #Uc_hat[:] = sum(dU*KX, 0)/Ksq
+    #for i in range(3):
+        #dU[i] -= Uc_hat*KX[i]
+
+    # Dealias the nonlinear convection
+    dU[:] *= dealias*dt
                  
     # Add contribution from diffusion
-    dU[:] += -nu*dt*KK*U_hat[:]
+    dU[:] += -nu*dt*KK*U_hat
 
 # Taylor-Green initialization
 U[0] = sin(X[0])*cos(X[1])*cos(X[2])
@@ -273,19 +267,20 @@ tic = time.time()
 t = 0.0
 tstep = 0
 
-# initialize plot
+# initialize plot and list k for storing energy
 if rank == 0:
-    #im = plt.imshow(zeros((N, N)))
-    #plt.colorbar(im)
-    #plt.draw()
+    im = plt.imshow(zeros((N, N)))
+    plt.colorbar(im)
+    plt.draw()
     k = []
+
 # RK loop in time
 while t < T:
     t += dt; tstep += 1
     U_hatold[:] = U_hat
     U_hatc[:] = U_hat
     for rk in range(4):
-        ComputeRHS(dU, rk)
+        ComputeRHS(dU, rk)        
         project(dU)
 
         if rk < 3:
@@ -293,27 +288,34 @@ while t < T:
         U_hatc[:] = U_hatc+a[rk]*dU
         
     U_hat[:] = U_hatc[:]
-    project(U_hat)
+        
     for i in range(3):
         ifftn_mpi(U_hat[i], U[i])
     
-    #if mod(tstep, plot_result) == 0:
-        #if rank == 0:
-            ##im.set_data(curl[2, 0, :, :])
-            #im.set_data(U[1,:,:]*U[1,:,:])
-            #im.autoscale()  
-            #plt.pause(1e-6)  
+    # From here on it's only postprocessing
+    if tstep % plot_result == 0:
+        p = pressure()
+        if rank == 0:
+            im.set_data(p[Np/2])
+            im.autoscale()  
+            plt.pause(1e-6) 
+            
+    if tstep % write_result == 0:
+        hdf5file.write(U, pressure(), tstep)
 
-    kk = comm.reduce(0.5*sum(U*U)*dx*dx*dx/L**3)
-    if rank == 0:
-        k.append(kk)
-        #print t
+    if tstep % compute_energy == 0:
+        kk = comm.reduce(0.5*sum(U*U)*dx*dx*dx/L**3)
+        if rank == 0:
+            k.append(kk)
+            print t, kk
+
+hdf5file.close()
 
 if rank == 0:
     print "Time = ", time.time()-tic
-    print conv
-    figure()
-    k = array(k)
-    dkdt = (k[1:]-k[:-1])/dt
-    plot(-dkdt)
-    show()
+    #figure()
+    #k = array(k)
+    #dkdt = (k[1:]-k[:-1])/dt
+    #plot(-dkdt)
+    #show()
+
