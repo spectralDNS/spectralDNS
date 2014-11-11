@@ -31,16 +31,21 @@ Np = N / num_processes
 
 L = 2 * pi
 dx = L / N
-dt = 0.005
+dt = 0.01
 nu = 0.000625
 T = 0.1
-from HDF5Writer import HDF5Writer
-hdf5file = HDF5Writer(comm, dt, N)
+
+try:
+    from HDF55Writer import HDF5Writer
+    hdf5file = HDF5Writer(comm, dt, N)
+    
+except:
+    hdf5file = None
 
 # Set some switches for doing postprocessing
-write_result = 1e8       # Write to HDF5 every..
+write_result = 2        # Write to HDF5 every..
 compute_energy = 2      # Compute solution energy every..
-plot_result = 1e8        # Show an image every..
+plot_result = 1e8       # Show an image every..
 
 # Choose convection scheme
 conv = {0: "Standard",
@@ -54,39 +59,39 @@ x = linspace(0, L, N+1)[:-1]
 X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'))
 
 # Solution array and Fourier coefficients
-U = empty((3, Np, N, N))
+U     = empty((3, Np, N, N))
 U_hat = empty((3, Np, N, N), dtype="complex") 
 
 # Arrays for mpi communication
 U_sendc = empty((num_processes, Np, N, Np), dtype="complex")
 U_recvc = empty((num_processes, Np, N, Np), dtype="complex")
-U_send = empty((num_processes, Np, N, Np))
-U_recv = empty((num_processes, Np, N, Np))
+U_send  = empty((num_processes, Np, N, Np))
+U_recv  = empty((num_processes, Np, N, Np))
 
 # RK4 arrays
-U_hatold = empty((3, Np, N, N), dtype="complex")
-U_hatc = empty((3, Np, N, N), dtype="complex")
-dU = empty((3, Np, N, N), dtype="complex")
+U_hatold= empty((3, Np, N, N), dtype="complex")
+U_hatc  = empty((3, Np, N, N), dtype="complex")
+dU      = empty((3, Np, N, N), dtype="complex")
 
 # work arrays
-U_tmp = empty((3, Np, N, N))
 U_hat_tmp = empty((3, Np, N, N), dtype="complex")
-Uc_hat = empty((Np, N, N), dtype="complex")
-Utc = empty((N, N, Np), dtype="complex")
-Ut = empty((N, N, Np))
-curl = empty((3, Np, N, N))
+U_tmp   = empty((3, Np, N, N))
+Uc_hat  = empty((Np, N, N), dtype="complex")
+Utc     = empty((N, N, Np), dtype="complex")
+Ut      = empty((N, N, Np))
+curl    = empty((3, Np, N, N))
 
 # Set wavenumbers in grid
 kx = (mod(0.5 + arange(0, N, dtype="float")/N, 1) - 0.5)*2*pi/dx
 KX = array(meshgrid(kx[rank*Np:(rank+1)*Np], kx, kx, indexing='ij'))
 KK = sum(KX*KX, 0)
-Ksq = where(KK==0, 1, KK)
+U_tmp[0] = where(KK==0, 1, KK)
 KX_over_Ksq = KX.copy()
 for j in range(3):
-    KX_over_Ksq[j] /= Ksq
+    KX_over_Ksq[j] /= U_tmp[0]
 
 # Filter for dealiasing nonlinear convection
-dealias = array((abs(KX[0]) < (2./3.)*max(kx))*(abs(KX[1]) < (2./3.)*max(kx))*(abs(KX[2]) < (2./3.)*max(kx)), dtype=int)
+dealias = array((abs(KX[0]) < 2./3.*max(kx))*(abs(KX[1]) < 2./3.*max(kx))*(abs(KX[2]) < 2./3.*max(kx)), dtype=int)
 
 # RK4 parameters
 a = [1./6., 1./3., 1./3., 1./6.]
@@ -176,9 +181,7 @@ def standardConvection(c):
     for i in range(3):
         for j in range(3):
             ifftn_mpi(1j*KX[j]*U_hat[i], U_tmp[j])
-        for j in range(3):
-            fftn_mpi(U[j]*U_tmp[j], U_hat_tmp[j])
-        c[i] = sum(U_hat_tmp, axis=0)
+        fftn_mpi(sum(U*U_tmp, 0), c[i])
 
 def divergenceConvection(c, add=False):
     """c_i = div(u_i u_j)"""
@@ -240,16 +243,16 @@ def ComputeRHS(dU, rk):
     else:
         raise TypeError, "Wrong type of convection"
     
-    ## Add pressure gradient
-    #Uc_hat[:] = sum(dU*KX, 0)/Ksq
-    #for i in range(3):
-        #dU[i] -= Uc_hat*KX[i]
-
     # Dealias the nonlinear convection
     dU[:] *= dealias*dt
+    
+    # Add pressure gradient
+    Uc_hat[:] = sum(dU*KX_over_Ksq, 0)
+    for i in range(3):
+        dU[i] -= Uc_hat*KX[i]
                  
     # Add contribution from diffusion
-    dU[:] += -nu*dt*KK*U_hat
+    dU[:] -= nu*dt*KK*U_hat
 
 # Taylor-Green initialization
 U[0] = sin(X[0])*cos(X[1])*cos(X[2])
@@ -274,7 +277,7 @@ if rank == 0:
     plt.draw()
     k = []
 
-# RK loop in time
+# RK4 loop in time
 while t < T:
     t += dt; tstep += 1
     U_hatold[:] = U_hat
@@ -284,15 +287,14 @@ while t < T:
         project(dU)
 
         if rk < 3:
-            U_hat[:] = U_hatold+b[rk]*dU
-        U_hatc[:] = U_hatc+a[rk]*dU
+            U_hat[:] = U_hatold + b[rk]*dU
+        U_hatc[:] = U_hatc + a[rk]*dU
         
-    U_hat[:] = U_hatc[:]
-        
+    U_hat[:] = U_hatc[:]        
     for i in range(3):
         ifftn_mpi(U_hat[i], U[i])
     
-    # From here on it's only postprocessing
+    # Postprocessing intermediate results
     if tstep % plot_result == 0:
         p = pressure()
         if rank == 0:
@@ -300,7 +302,7 @@ while t < T:
             im.autoscale()  
             plt.pause(1e-6) 
             
-    if tstep % write_result == 0:
+    if tstep % write_result == 0 and hdf5file:
         hdf5file.write(U, pressure(), tstep)
 
     if tstep % compute_energy == 0:
@@ -309,7 +311,7 @@ while t < T:
             k.append(kk)
             print t, kk
 
-hdf5file.close()
+if hdf5file: hdf5file.close()
 
 if rank == 0:
     print "Time = ", time.time()-tic

@@ -96,7 +96,7 @@ def ComputeRHS(dU, rk):
 U[0] = sin(X[0])*cos(X[1])
 U[1] =-cos(X[0])*sin(X[1])
 
-# Initialize two vortices
+# Initialize two vortices<
 #w=exp(-((X[0]-pi)**2+(X[1]-pi+pi/4)**2)/(0.2))+exp(-((X[0]-pi)**2+(X[1]-pi-pi/4)**2)/(0.2))-0.5*exp(-((X[0]-pi-pi/4)**2+(X[1]-pi-pi/4)**2)/(0.4))
 #w_hat = fft2(w)
 #psi_hat = w_hat / Ksq
@@ -143,10 +143,9 @@ while t < T:
         plt.pause(1e-6) 
             
 print "Time = ", time.time()-tic
-print time.time() - tic
-print "Energy numeric = ", sum(U*U)*dx*dx/L**2
-u0=sin(X[0])*cos(X[1])*exp(-2.*nu*t)
-u1=-sin(X[1])*cos(X[0])*exp(-2.*nu*t)
-print "Energy exact   = ", sum(u0*u0+u1*u1)*dx*dx/L**2
-print "Error   = ", sum((U[0]-u0)**2+(U[1]-u1)**2)*dx*dx/L**2
+#print "Energy numeric = ", sum(U*U)*dx*dx/L**2
+#u0=sin(X[0])*cos(X[1])*exp(-2.*nu*t)
+#u1=-sin(X[1])*cos(X[0])*exp(-2.*nu*t)
+#print "Energy exact   = ", sum(u0*u0+u1*u1)*dx*dx/L**2
+#print "Error   = ", sum((U[0]-u0)**2+(U[1]-u1)**2)*dx*dx/L**2
 
