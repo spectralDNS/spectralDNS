@@ -263,10 +263,10 @@ for i in range(3):
 # Make it divergence free in case it is not
 project(U_hat)
 
-tic = time.time()
 t = 0.0
 tstep = 0
-
+fastest_time = 1e8
+slowest_time = 0.0
 # initialize plot and list k for storing energy
 if rank == 0:
     im = plt.imshow(zeros((N, N)))
@@ -275,6 +275,7 @@ if rank == 0:
     k = []
 
 # RK4 loop in time
+tic = t0 = time.time()
 while t < T:
     t += dt; tstep += 1
     U_hat1[:] = U_hat0[:] = U_hat
@@ -306,11 +307,22 @@ while t < T:
         if rank == 0:
             k.append(kk)
             print t, kk
+            
+    tt = time.time()-t0
+    t0 = time.time()
+    if tstep > 1:
+        fastest_time = min(tt, fastest_time)
+        slowest_time = max(tt, slowest_time)
 
 if hdf5file: hdf5file.close()
 
+fast = comm.reduce(fastest_time, op=MPI.MIN, root=0)
+slow = comm.reduce(slowest_time, op=MPI.MAX, root=0)
+
 if rank == 0:
     print "Time = ", time.time()-tic
+    print "Fastest = ", fast
+    print "Slowest = ", slow
     #figure()
     #k = array(k)
     #dkdt = (k[1:]-k[:-1])/dt
