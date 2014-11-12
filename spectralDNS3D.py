@@ -21,8 +21,6 @@ N = 2**M
 
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
-threads = 2
-
 if not num_processes in [2**i for i in range(M+1)]:
     raise IOError("Number of cpus must be in ", [2**i for i in range(M+1)])
 
@@ -69,12 +67,12 @@ U_send  = empty((num_processes, Np, N, Np))
 U_recv  = empty((num_processes, Np, N, Np))
 
 # RK4 arrays
-U_hatold= empty((3, Np, N, N), dtype="complex")
-U_hatc  = empty((3, Np, N, N), dtype="complex")
+U_hat0  = empty((3, Np, N, N), dtype="complex")
+U_hat1  = empty((3, Np, N, N), dtype="complex")
 dU      = empty((3, Np, N, N), dtype="complex")
 
 # work arrays
-U_hat_tmp = empty((3, Np, N, N), dtype="complex")
+F_tmp   = empty((3, Np, N, N), dtype="complex")
 U_tmp   = empty((3, Np, N, N))
 Uc_hat  = empty((Np, N, N), dtype="complex")
 Utc     = empty((N, N, Np), dtype="complex")
@@ -104,9 +102,8 @@ def pressure():
     for i in range(3):
         for j in range(3):
             ifftn_mpi(1j*KX[j]*U_hat[i], U_tmp[j])
-        fftn_mpi(sum(U*U_tmp, 0), U_hat_tmp[i])
-    p_hat = 1j*sum(KX_over_Ksq*U_hat_tmp, 0)
-    ifftn_mpi(p_hat, p)
+        fftn_mpi(sum(U*U_tmp, 0), F_tmp[i])
+    ifftn_mpi(1j*sum(KX_over_Ksq*F_tmp, 0), p)
     return p
 
 def project(xU):
@@ -187,15 +184,15 @@ def divergenceConvection(c, add=False):
     """c_i = div(u_i u_j)"""
     if not add: c.fill(0)
     for i in range(3):
-        fftn_mpi(U[0]*U[i], U_hat_tmp[i])
-    c[0] += 1j*sum(KX*U_hat_tmp, 0)
-    c[1] += 1j*KX[0]*U_hat_tmp[1]
-    c[2] += 1j*KX[0]*U_hat_tmp[2]
-    fftn_mpi(U[1]*U[1], U_hat_tmp[0])
-    fftn_mpi(U[1]*U[2], U_hat_tmp[1])
-    fftn_mpi(U[2]*U[2], U_hat_tmp[2])
-    c[1] += (1j*KX[1]*U_hat_tmp[0] + 1j*KX[2]*U_hat_tmp[1])
-    c[2] += (1j*KX[1]*U_hat_tmp[1] + 1j*KX[2]*U_hat_tmp[2])
+        fftn_mpi(U[0]*U[i], F_tmp[i])
+    c[0] += 1j*sum(KX*F_tmp, 0)
+    c[1] += 1j*KX[0]*F_tmp[1]
+    c[2] += 1j*KX[0]*F_tmp[2]
+    fftn_mpi(U[1]*U[1], F_tmp[0])
+    fftn_mpi(U[1]*U[2], F_tmp[1])
+    fftn_mpi(U[2]*U[2], F_tmp[2])
+    c[1] += (1j*KX[1]*F_tmp[0] + 1j*KX[2]*F_tmp[1])
+    c[2] += (1j*KX[1]*F_tmp[1] + 1j*KX[2]*F_tmp[2])
     
 def Cross(a, b, c):
     """c = U x w"""
@@ -232,9 +229,9 @@ def ComputeRHS(dU, rk):
     elif conv == "VortexI":    
         Curl(U_hat, curl)
         Cross(U, curl, dU)
-        fftn_mpi(0.5*sum(U**2, 0), U_hat_tmp[0])        
+        fftn_mpi(0.5*sum(U**2, 0), F_tmp[0])        
         for i in range(3):
-            dU[i] -= 1j*KX[i]*U_hat_tmp[0]
+            dU[i] -= 1j*KX[i]*F_tmp[0]
         
     elif conv == "VortexII":
         Curl(U_hat, curl)
@@ -280,17 +277,16 @@ if rank == 0:
 # RK4 loop in time
 while t < T:
     t += dt; tstep += 1
-    U_hatold[:] = U_hat
-    U_hatc[:] = U_hat
+    U_hat1[:] = U_hat0[:] = U_hat
     for rk in range(4):
         ComputeRHS(dU, rk)        
         project(dU)
 
         if rk < 3:
-            U_hat[:] = U_hatold + b[rk]*dU
-        U_hatc[:] = U_hatc + a[rk]*dU
+            U_hat[:] = U_hat0 + b[rk]*dU
+        U_hat1[:] = U_hat1 + a[rk]*dU
         
-    U_hat[:] = U_hatc[:]        
+    U_hat[:] = U_hat1[:]        
     for i in range(3):
         ifftn_mpi(U_hat[i], U[i])
     

@@ -28,28 +28,28 @@ x = linspace(0, L, N+1)[:-1]
 X = array(meshgrid(x, x, indexing='ij'))
 
 # Solution array and Fourier coefficients
-U = empty((2, N, N))
+U     = empty((2, N, N))
 U_hat = empty((2, N, N), dtype="complex") 
 
 # RK4 arrays
-U_hatold = empty((2, N, N), dtype="complex")
-U_hatc = empty((2, N, N), dtype="complex")
-dU = empty((2, N, N), dtype="complex")
+U_hat0 = empty((2, N, N), dtype="complex")
+U_hat1 = empty((2, N, N), dtype="complex")
+dU     = empty((2, N, N), dtype="complex")
 
 # work arrays
-U_tmp = empty((2, N, N))
-U_hat_tmp = empty((2, N, N), dtype="complex")
+U_tmp  = empty((2, N, N))
+F_tmp  = empty((2, N, N), dtype="complex")
 Uc_hat = empty((N, N), dtype="complex")
-curl = empty((N, N))
+curl   = empty((N, N))
 
 # Set wavenumbers in grid
 kx = (mod(0.5 + arange(0, N, dtype="float")/N, 1) - 0.5)*2*pi/dx
 KX = array(meshgrid(kx, kx, indexing='ij'))
 KK = sum(KX*KX, 0)
-Ksq = where(KK==0, 1, KK)
+U_tmp[0] = where(KK==0, 1, KK)
 KX_over_Ksq = KX.copy()
 for j in range(2):
-    KX_over_Ksq[j] /= Ksq
+    KX_over_Ksq[j] /= U_tmp[0]
     
 # Filter for dealiasing nonlinear convection
 dealias = array((abs(KX[0]) < (2./3.)*max(kx))*(abs(KX[1]) < (2./3.)*max(kx)), dtype=int)
@@ -64,8 +64,8 @@ def pressure():
     for i in range(2):
         for j in range(2):
             U_tmp[j] = real(ifft2(1j*KX[j]*U_hat[i]))
-        U_hat_tmp[i] = fft2(sum(U*U_tmp, 0))
-    return real(ifft2(1j*sum(KX_over_Ksq*U_hat_tmp, 0)))
+        F_tmp[i] = fft2(sum(U*U_tmp, 0))
+    return real(ifft2(1j*sum(KX_over_Ksq*F_tmp, 0)))
 
 def project(xU):
     Uc_hat[:] = sum(KX*xU, 0)
@@ -119,18 +119,17 @@ im = plt.imshow(zeros((N, N)))
 plt.colorbar(im)
 plt.draw()
 
-# RK loop in time
+# RK4 loop in time
 while t < T:
     t += dt; tstep += 1
-    U_hatold[:] = U_hat
-    U_hatc[:] = U_hat
+    U_hat1[:] = U_hat0[:] = U_hat
     for rk in range(4):
         ComputeRHS(dU, rk)        
         project(dU)
         if rk < 3:
-            U_hat[:] = U_hatold + b[rk]*dU
-        U_hatc[:] = U_hatc + a[rk]*dU        
-    U_hat[:] = U_hatc[:]        
+            U_hat[:] = U_hat0 + b[rk]*dU
+        U_hat1[:] = U_hat1 + a[rk]*dU        
+    U_hat[:] = U_hat1[:]        
     for i in range(2):
         U[i] = real(ifft2(U_hat[i]))
     

@@ -1,6 +1,6 @@
 import pyfftw
 
-nthreads = 2
+nthreads = 1
 # Keep fft objects in cache for efficiency
 pyfftw.interfaces.cache.enable()
 pyfftw.interfaces.cache.set_keepalive_time(1e8)
