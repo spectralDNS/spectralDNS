@@ -56,37 +56,36 @@ conv = {0: "Standard",
 x = linspace(0, L, N+1)[:-1]
 X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'))
 
-# Solution array and Fourier coefficients
+# Solution array and Fourier coefficients. 
+# Solution U is real, fft(U)(k) = conv(fft(U)(-k)) and N/2+1 coefficients are sufficient
+Nf = N/2+1
 U     = empty((3, Np, N, N))
-U_hat = empty((3, Np, N, N), dtype="complex") 
+U_hat = empty((3, Np, Nf, N), dtype="complex") 
 
 # Arrays for mpi communication
-U_sendc = empty((num_processes, Np, N, Np), dtype="complex")
-U_recvc = empty((num_processes, Np, N, Np), dtype="complex")
-U_send  = empty((num_processes, Np, N, Np))
-U_recv  = empty((num_processes, Np, N, Np))
+U_sendc = empty((num_processes, Np, Nf, Np), dtype="complex")
+U_recvc = empty((num_processes, Np, Nf, Np), dtype="complex")
 
 # RK4 arrays
-U_hat0  = empty((3, Np, N, N), dtype="complex")
-U_hat1  = empty((3, Np, N, N), dtype="complex")
-dU      = empty((3, Np, N, N), dtype="complex")
+U_hat0  = empty((3, Np, Nf, N), dtype="complex")
+U_hat1  = empty((3, Np, Nf, N), dtype="complex")
+dU      = empty((3, Np, Nf, N), dtype="complex")
 
 # work arrays
-F_tmp   = empty((3, Np, N, N), dtype="complex")
+F_tmp   = empty((3, Np, Nf, N), dtype="complex")
 U_tmp   = empty((3, Np, N, N))
-Uc_hat  = empty((Np, N, N), dtype="complex")
-Utc     = empty((N, N, Np), dtype="complex")
-Ut      = empty((N, N, Np))
+Uc      = empty((Np, N, N))
+Uc_hat  = empty((Np, Nf, N), dtype="complex")
+Utc     = empty((N, Nf, Np), dtype="complex")
 curl    = empty((3, Np, N, N))
 
 # Set wavenumbers in grid
 kx = fftfreq(N, 1./N)
-KX = array(meshgrid(kx[rank*Np:(rank+1)*Np], kx, kx, indexing='ij'))
+KX = array(meshgrid(kx[rank*Np:(rank+1)*Np], kx[:Nf], kx, indexing='ij'))
 KK = sum(KX*KX, 0)
-U_tmp[0] = where(KK==0, 1, KK)
 KX_over_Ksq = KX.copy()
 for j in range(3):
-    KX_over_Ksq[j] /= U_tmp[0]
+    KX_over_Ksq[j] /= where(KK==0, 1, KK)
 
 # Filter for dealiasing nonlinear convection
 dealias = array((abs(KX[0]) < 2./3.*max(kx))*(abs(KX[1]) < 2./3.*max(kx))*(abs(KX[2]) < 2./3.*max(kx)), dtype=int)
@@ -110,12 +109,17 @@ def project(xU):
     Uc_hat[:] = sum(KX*xU, 0)
     for i in range(3):
         xU[i] = xU[i] - Uc_hat*KX_over_Ksq[i]
-    
+
 def ifftn_mpi(fu, u):
     """ifft in three directions using mpi
     """
-    # Do 2D ifft2 in y-z directions on owned data
-    Uc_hat[:] = ifft2(fu)    
+    # Need to do ifft in reversed order of fft
+    if num_processes == 1:
+        u[:] = irfft(ifft(ifft(fu, 2), 0), 1)
+        return
+        
+    # Do 2D ifft2 in z directions on owned data
+    Uc_hat[:] = ifft(fu, 2)    
     
     # Set up for communicating intermediate result 
     for i in range(num_processes):
@@ -129,24 +133,32 @@ def ifftn_mpi(fu, u):
         Utc[i*Np:(i+1)*Np] = U_recvc[i]
         
     # Do ifft for final direction        
-    Ut[:] = real(ifft(Utc, axis=0))
+    Utc[:] = ifft(Utc, 0)
     
     # Store values to be sent
     for i in range(num_processes):
-        U_send[i] = Ut[i*Np:(i+1)*Np]
+        U_sendc[i] = Utc[i*Np:(i+1)*Np]
     
     # Communicate all values
-    comm.Alltoall(U_send, U_recv)
+    comm.Alltoall(U_sendc, U_recvc)
 
     # Copy to final array
     for i in range(num_processes):
-        u[:, :, i*Np:(i+1)*Np] = U_recv[i]
-
+        Uc_hat[:, :, i*Np:(i+1)*Np] = U_recvc[i]
+        
+    # Do last direction
+    u[:] = irfft(Uc_hat, 1)
+    
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
+    Order y, x, z
     """
+    if num_processes == 1:
+        fu[:] = fft(fft(rfft(u, 1), 0), 2)
+        return
+    
     # Do 2D fft2 in y-z directions on owned data
-    Uc_hat[:] = fft2(u)
+    Uc_hat[:] = rfft(u, 1)
     
     # Set up for communicating intermediate result 
     for i in range(num_processes):
@@ -159,8 +171,8 @@ def fftn_mpi(u, fu):
     for i in range(num_processes):
         Utc[i*Np:(i+1)*Np] = U_recvc[i]
         
-    # Do fft for final direction        
-    Utc[:] = fft(Utc, axis=0)
+    # Do fft for x-direction        
+    Utc[:] = fft(Utc, 0)
     
     # Store values to be sent
     for i in range(num_processes):
@@ -171,7 +183,10 @@ def fftn_mpi(u, fu):
 
     # Copy to final array 
     for i in range(num_processes):
-        fu[:, :, i*Np:(i+1)*Np] = U_recvc[i]
+        fu[:, :, i*Np:(i+1)*Np] = U_recvc[i]    
+    
+    # Do final direction
+    fu[:] = fft(fu, 2)
 
 def standardConvection(c):   
     """c_i = u_j du_i/dx_j"""
@@ -214,6 +229,7 @@ def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U, V, W
         for i in range(3):
             ifftn_mpi(U_hat[i], U[i])
+        #U[:] = irfftn(U_hat, axes=(-3,-2,-1))
     
     if conv == "Standard":
         standardConvection(dU)
@@ -258,7 +274,7 @@ U[2] = 0
 
 # Transform initial data
 for i in range(3):
-    fftn_mpi(U[i], U_hat[i])
+   fftn_mpi(U[i], U_hat[i])
        
 # Make it divergence free in case it is not
 project(U_hat)
@@ -276,7 +292,7 @@ if rank == 0:
 
 # RK4 loop in time
 tic = t0 = time.time()
-while t < T:
+while t < T-1e-8:
     t += dt; tstep += 1
     U_hat1[:] = U_hat0[:] = U_hat
     for rk in range(4):
@@ -290,7 +306,7 @@ while t < T:
     U_hat[:] = U_hat1[:]        
     for i in range(3):
         ifftn_mpi(U_hat[i], U[i])
-    
+        
     # Postprocessing intermediate results
     if tstep % plot_result == 0:
         p = pressure()

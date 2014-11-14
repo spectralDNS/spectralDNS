@@ -28,7 +28,7 @@ x = linspace(0, L, N+1)[:-1]
 X = array(meshgrid(x, x, indexing='ij'))
 
 # Solution array and Fourier coefficients
-# Because of real transforms and symmetries, N/2+1 coefficients are sufficient
+# Solution U is real, fft(U)(k) = conv(fft(U)(-k)) and N/2+1 coefficients are sufficient
 Nf = N/2+1
 U     = empty((2, N, N))
 U_hat = empty((2, N, Nf), dtype="complex")
