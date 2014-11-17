@@ -5,7 +5,9 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from numpy import *
 from pylab import *
-import time
+#from numpy import array, meshgrid, linspace, empty, zeros, sin, cos, pi, where, sum
+#from pylab import fftfreq, fft2, rfft, ifft, ifft2, irfft
+import time, sys
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 
@@ -16,7 +18,7 @@ except:
     print Warning("Install pyfftw, it is much faster than numpy fft")
 
 # Set the size of the triply periodic box N**3
-M = 6
+M = 5
 N = 2**M
 
 num_processes = comm.Get_size()
@@ -41,7 +43,7 @@ except:
     hdf5file = None
 
 # Set some switches for doing postprocessing
-write_result = 2        # Write to HDF5 every..
+write_result = 1e8        # Write to HDF5 every..
 compute_energy = 2      # Compute solution energy every..
 plot_result = 1e8       # Show an image every..
 
@@ -59,36 +61,38 @@ X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'))
 # Solution array and Fourier coefficients. 
 # Solution U is real, fft(U)(k) = conv(fft(U)(-k)) and N/2+1 coefficients are sufficient
 Nf = N/2+1
-U     = empty((3, Np, N, N))
-U_hat = empty((3, Np, Nf, N), dtype="complex") 
+U     = empty((3, Np, N, N))                  
+U_hat = empty((3, N, Nf, Np), dtype="complex")
 
 # Arrays for mpi communication
 U_sendc = empty((num_processes, Np, Nf, Np), dtype="complex")
 U_recvc = empty((num_processes, Np, Nf, Np), dtype="complex")
 
 # RK4 arrays
-U_hat0  = empty((3, Np, Nf, N), dtype="complex")
-U_hat1  = empty((3, Np, Nf, N), dtype="complex")
-dU      = empty((3, Np, Nf, N), dtype="complex")
+U_hat0  = empty((3, N, Nf, Np), dtype="complex")
+U_hat1  = empty((3, N, Nf, Np), dtype="complex")
+dU      = empty((3, N, Nf, Np), dtype="complex")
 
 # work arrays
-F_tmp   = empty((3, Np, Nf, N), dtype="complex")
+F_tmp   = empty((3, N, Nf, Np), dtype="complex")
 U_tmp   = empty((3, Np, N, N))
 Uc      = empty((Np, N, N))
-Uc_hat  = empty((Np, Nf, N), dtype="complex")
+Uc_hat  = empty((N, Nf, Np), dtype="complex")
+Uc_hatT = empty((Np, Nf, N), dtype="complex")
 Utc     = empty((N, Nf, Np), dtype="complex")
 curl    = empty((3, Np, N, N))
 
 # Set wavenumbers in grid
 kx = fftfreq(N, 1./N)
-KX = array(meshgrid(kx[rank*Np:(rank+1)*Np], kx[:Nf], kx, indexing='ij'))
+ky = kx[:Nf]; ky[-1] *= -1
+KX = array(meshgrid(kx, ky, kx[rank*Np:(rank+1)*Np], indexing='ij'))
 KK = sum(KX*KX, 0)
 KX_over_Ksq = KX.copy()
 for j in range(3):
     KX_over_Ksq[j] /= where(KK==0, 1, KK)
 
 # Filter for dealiasing nonlinear convection
-dealias = array((abs(KX[0]) < 2./3.*max(kx))*(abs(KX[1]) < 2./3.*max(kx))*(abs(KX[2]) < 2./3.*max(kx)), dtype=int)
+dealias = array((abs(KX[0]) < 2./3.*max(kx))*(abs(KX[1]) < 2./3.*max(ky))*(abs(KX[2]) < 2./3.*max(kx)), dtype=int)
 
 # RK4 parameters
 a = [1./6., 1./3., 1./3., 1./6.]
@@ -115,78 +119,49 @@ def ifftn_mpi(fu, u):
     """
     # Need to do ifft in reversed order of fft
     if num_processes == 1:
-        u[:] = irfft(ifft(ifft(fu, 2), 0), 1)
+        u[:] = irfft(ifft(ifft(fu, 0), 2), 1)[:]
         return
         
-    # Do 2D ifft2 in z directions on owned data
-    Uc_hat[:] = ifft(fu, 2)    
+    Uc_hat[:] = ifft(fu, 0)[:]
     
     # Set up for communicating intermediate result 
     for i in range(num_processes):
-        U_sendc[i] = Uc_hat[:, :, i*Np:(i+1)*Np]
+        U_sendc[i] = Uc_hat[i*Np:(i+1)*Np]
         
     # Communicate all values
     comm.Alltoall(U_sendc, U_recvc)
     
     # Place received data in chunk Utc
     for i in range(num_processes):
-        Utc[i*Np:(i+1)*Np] = U_recvc[i]
-        
-    # Do ifft for final direction        
-    Utc[:] = ifft(Utc, 0)
-    
-    # Store values to be sent
-    for i in range(num_processes):
-        U_sendc[i] = Utc[i*Np:(i+1)*Np]
-    
-    # Communicate all values
-    comm.Alltoall(U_sendc, U_recvc)
-
-    # Copy to final array
-    for i in range(num_processes):
-        Uc_hat[:, :, i*Np:(i+1)*Np] = U_recvc[i]
-        
+        Uc_hatT[:, :, i*Np:(i+1)*Np] = U_recvc[i]
+                
     # Do last direction
-    u[:] = irfft(Uc_hat, 1)
-    
+    u[:] = irfft(ifft(Uc_hatT, 2), 1)
+
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     Order y, x, z
     """
     if num_processes == 1:
-        fu[:] = fft(fft(rfft(u, 1), 0), 2)
+        fu[:] = fft(fft(rfft(u, 1), 2), 0)       
         return
     
     # Do 2D fft2 in y-z directions on owned data
-    Uc_hat[:] = rfft(u, 1)
+    Uc_hatT[:] = fft(rfft(u, 1), 2)[:]
     
     # Set up for communicating intermediate result 
     for i in range(num_processes):
-        U_sendc[i] = Uc_hat[:, :, i*Np:(i+1)*Np]
+        U_sendc[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
         
     # Communicate all values
     comm.Alltoall(U_sendc, U_recvc)
     
-    # Place in chunk Utc
+    # Place in chunk
     for i in range(num_processes):
-        Utc[i*Np:(i+1)*Np] = U_recvc[i]
+        fu[i*Np:(i+1)*Np] = U_recvc[i]
         
-    # Do fft for x-direction        
-    Utc[:] = fft(Utc, 0)
-    
-    # Store values to be sent
-    for i in range(num_processes):
-        U_sendc[i] = Utc[i*Np:(i+1)*Np]
-    
-    # Communicate all values
-    comm.Alltoall(U_sendc, U_recvc)
-
-    # Copy to final array 
-    for i in range(num_processes):
-        fu[:, :, i*Np:(i+1)*Np] = U_recvc[i]    
-    
-    # Do final direction
-    fu[:] = fft(fu, 2)
+    # Do fft for last direction 
+    fu[:] = fft(fu, 0)
 
 def standardConvection(c):   
     """c_i = u_j du_i/dx_j"""
@@ -229,7 +204,6 @@ def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U, V, W
         for i in range(3):
             ifftn_mpi(U_hat[i], U[i])
-        #U[:] = irfftn(U_hat, axes=(-3,-2,-1))
     
     if conv == "Standard":
         standardConvection(dU)
@@ -275,7 +249,7 @@ U[2] = 0
 # Transform initial data
 for i in range(3):
    fftn_mpi(U[i], U_hat[i])
-       
+
 # Make it divergence free in case it is not
 project(U_hat)
 
@@ -285,9 +259,9 @@ fastest_time = 1e8
 slowest_time = 0.0
 # initialize plot and list k for storing energy
 if rank == 0:
-    im = plt.imshow(zeros((N, N)))
-    plt.colorbar(im)
-    plt.draw()
+    #im = plt.imshow(zeros((N, N)))
+    #plt.colorbar(im)
+    #plt.draw()
     k = []
 
 # RK4 loop in time
@@ -308,12 +282,12 @@ while t < T-1e-8:
         ifftn_mpi(U_hat[i], U[i])
         
     # Postprocessing intermediate results
-    if tstep % plot_result == 0:
-        p = pressure()
-        if rank == 0:
-            im.set_data(p[Np/2])
-            im.autoscale()  
-            plt.pause(1e-6) 
+    #if tstep % plot_result == 0:
+        #p = pressure()
+        #if rank == 0:
+            #im.set_data(p[Np/2])
+            #im.autoscale()  
+            #plt.pause(1e-6) 
             
     if tstep % write_result == 0 and hdf5file:
         hdf5file.write(U, pressure(), tstep)
