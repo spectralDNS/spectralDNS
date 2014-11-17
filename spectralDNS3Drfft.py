@@ -18,7 +18,7 @@ except:
     print Warning("Install pyfftw, it is much faster than numpy fft")
 
 # Set the size of the triply periodic box N**3
-M = 5
+M = eval(sys.argv[-2])
 N = 2**M
 
 num_processes = comm.Get_size()
@@ -129,7 +129,7 @@ def ifftn_mpi(fu, u):
         U_sendc[i] = Uc_hat[i*Np:(i+1)*Np]
         
     # Communicate all values
-    comm.Alltoall(U_sendc, U_recvc)
+    comm.Alltoall([U_sendc, MPI.DOUBLE_COMPLEX], [U_recvc, MPI.DOUBLE_COMPLEX])
     
     # Place received data in chunk Utc
     for i in range(num_processes):
@@ -154,7 +154,7 @@ def fftn_mpi(u, fu):
         U_sendc[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
         
     # Communicate all values
-    comm.Alltoall(U_sendc, U_recvc)
+    comm.Alltoall([U_sendc, MPI.DOUBLE_COMPLEX], [U_recvc, MPI.DOUBLE_COMPLEX])
     
     # Place in chunk
     for i in range(num_processes):
