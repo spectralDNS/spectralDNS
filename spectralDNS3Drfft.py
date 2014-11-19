@@ -3,6 +3,7 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
+from numba import jit
 from numpy import *
 from pylab import *
 #from numpy import array, meshgrid, linspace, empty, zeros, sin, cos, pi, where, sum
@@ -58,8 +59,17 @@ conv = {0: "Standard",
 x = linspace(0, L, N+1)[:-1]
 X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'))
 
-# Solution array and Fourier coefficients. 
-# Solution U is real, fft(U)(k) = conv(fft(U)(-k)) and N/2+1 coefficients are sufficient
+"""
+  Solution array and Fourier coefficients. 
+  Solution U is real and as such its transform, U_hat = fft(U)(k), 
+  is such that fft(U)(k) = conv(fft(U)(-k)) and thus it is sufficient 
+  to store N/2+1 Fourier coefficients in the first transformed direction (y).
+  For means of efficient MPI communication, the physical box (N^3) is
+  shared by processors along the first direction, whereas the Fourier 
+  coefficients are shared along the third direction. The y-direction
+  is N/2+1 in Fourier space.
+"""
+
 Nf = N/2+1
 U     = empty((3, Np, N, N))                  
 U_hat = empty((3, N, Nf, Np), dtype="complex")
@@ -76,10 +86,8 @@ dU      = empty((3, N, Nf, Np), dtype="complex")
 # work arrays
 F_tmp   = empty((3, N, Nf, Np), dtype="complex")
 U_tmp   = empty((3, Np, N, N))
-Uc      = empty((Np, N, N))
 Uc_hat  = empty((N, Nf, Np), dtype="complex")
 Uc_hatT = empty((Np, Nf, N), dtype="complex")
-Utc     = empty((N, Nf, Np), dtype="complex")
 curl    = empty((3, Np, N, N))
 
 # Set wavenumbers in grid
@@ -115,32 +123,32 @@ def project(xU):
         xU[i] = xU[i] - Uc_hat*KX_over_Ksq[i]
 
 def ifftn_mpi(fu, u):
-    """ifft in three directions using mpi
+    """ifft in three directions using mpi.
+    Need to do ifft in reversed order of fft
     """
-    # Need to do ifft in reversed order of fft
     if num_processes == 1:
         u[:] = irfft(ifft(ifft(fu, 0), 2), 1)[:]
         return
         
     Uc_hat[:] = ifft(fu, 0)[:]
     
-    # Set up for communicating intermediate result 
-    for i in range(num_processes):
-        U_sendc[i] = Uc_hat[i*Np:(i+1)*Np]
-        
     # Communicate all values
-    comm.Alltoall([U_sendc, MPI.DOUBLE_COMPLEX], [U_recvc, MPI.DOUBLE_COMPLEX])
-    
-    # Place received data in chunk Utc
+    #comm.Alltoall([Uc_hat.reshape((num_processes, Np, Nf, Np)), MPI.DOUBLE_COMPLEX], [U_recvc, MPI.DOUBLE_COMPLEX])
+    #for i in range(num_processes): 
+        #Uc_hatT[:, :, i*Np:(i+1)*Np] = U_recvc[i]
+        
+    ft = Uc_hat.reshape((num_processes, Np, Nf, Np))
     for i in range(num_processes):
-        Uc_hatT[:, :, i*Np:(i+1)*Np] = U_recvc[i]
-                
+       if not i == rank:
+          comm.Sendrecv_replace(ft[i], i, 0, i, 0)   
+    for i in range(num_processes): 
+        Uc_hatT[:, :, i*Np:(i+1)*Np] = ft[i]
+    
     # Do last direction
     u[:] = irfft(ifft(Uc_hatT, 2), 1)
 
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
-    Order y, x, z
     """
     if num_processes == 1:
         fu[:] = fft(fft(rfft(u, 1), 2), 0)       
@@ -150,16 +158,18 @@ def fftn_mpi(u, fu):
     Uc_hatT[:] = fft(rfft(u, 1), 2)[:]
     
     # Set up for communicating intermediate result 
-    for i in range(num_processes):
-        U_sendc[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
+    ft = fu.reshape(num_processes, Np, Nf, Np)
+    #for i in range(num_processes): 
+    #    U_sendc[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
         
     # Communicate all values
-    comm.Alltoall([U_sendc, MPI.DOUBLE_COMPLEX], [U_recvc, MPI.DOUBLE_COMPLEX])
-    
-    # Place in chunk
+    #comm.Alltoall([U_sendc, MPI.DOUBLE_COMPLEX], [ft, MPI.DOUBLE_COMPLEX])
+
+    for i in range(num_processes): ft[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
     for i in range(num_processes):
-        fu[i*Np:(i+1)*Np] = U_recvc[i]
-        
+        if not i == rank:
+           comm.Sendrecv_replace(ft[i], i, 0, i, 0)   
+                
     # Do fft for last direction 
     fu[:] = fft(fu, 0)
 
@@ -249,7 +259,7 @@ U[2] = 0
 # Transform initial data
 for i in range(3):
    fftn_mpi(U[i], U_hat[i])
-
+   
 # Make it divergence free in case it is not
 project(U_hat)
 
