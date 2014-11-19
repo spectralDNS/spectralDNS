@@ -33,7 +33,7 @@ L = 2 * pi
 dx = L / N
 dt = 0.01
 nu = 0.000625
-T = 0.1
+T = 0.2
 
 try:
     from HDF55Writer import HDF5Writer
@@ -44,7 +44,7 @@ except:
 
 # Set some switches for doing postprocessing
 write_result = 1e8        # Write to HDF5 every..
-compute_energy = 2      # Compute solution energy every..
+compute_energy = 2000      # Compute solution energy every..
 plot_result = 1e8       # Show an image every..
 
 # Choose convection scheme
