@@ -3,7 +3,6 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from numba import jit
 from numpy import *
 from pylab import *
 #from numpy import array, meshgrid, linspace, empty, zeros, sin, cos, pi, where, sum
