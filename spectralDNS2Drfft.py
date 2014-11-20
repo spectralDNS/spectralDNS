@@ -6,22 +6,26 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from numpy import *
 from pylab import *
 import time
+from wrappyfftw import *
+from commandline import *
 
-try:
-    from wrappyfftw import *
-    
-except:
-    print Warning("Install pyfftw, it is much faster than numpy fft")
+params = {
+    'M': 5,
+    'temporal': 'RK4',
+    'plot_result': 2,         # Show an image every..
+    'nu': 0.000625,
+    'dt': 0.001,
+    'T': 1.0
+}
+commandline_kwargs = parse_command_line(sys.argv[1:])
+params.update(commandline_kwargs)
+assert params['temporal'] in ['RK4']
+vars().update(params)
 
 # Set the size of the doubly periodic box N**2
-M = 9
 N = 2**M
 L = 2 * pi
 dx = L / N
-dt = 0.01
-nu = 0.001
-T = 1
-plot_result = 10
 
 # Create the mesh
 x = linspace(0, L, N+1)[:-1]

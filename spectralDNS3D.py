@@ -13,23 +13,31 @@ comm = MPI.COMM_WORLD
 from commandline import *
 from wrappyfftw import *
 from HDF5Writer import HDF5Writer
+#from numba import jit, complex128, int64
+#import numexpr
 
 params = {
-    'conv': 'Vortex',
+    'convection': 'Vortex',
     'M': 5,
     'temporal': 'RK4',
-    'write_result': 2,        # Write to HDF5 every..
+    'write_result': 1e8,        # Write to HDF5 every..
     'compute_energy': 2,        # Compute solution energy every..
     'plot_result': 2,         # Show an image every..
+    'nu': 0.000625,
+    'dt': 0.01,
+    'T': 0.1
 }
 
 commandline_kwargs = parse_command_line(sys.argv[1:])
 params.update(commandline_kwargs)
-assert params['conv'] in ['Standard', 'Divergence', 'Skewed', 'Vortex']
+assert params['convection'] in ['Standard', 'Divergence', 'Skewed', 'Vortex']
 assert params['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
 vars().update(params)
 
 N = 2**M
+L = 2 * pi
+dx = L / N
+
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
 if not num_processes in [2**i for i in range(M+1)]:
@@ -38,14 +46,9 @@ if not num_processes in [2**i for i in range(M+1)]:
 # Each cpu gets ownership of Np slices
 Np = N / num_processes     
 
-L = 2 * pi
-dx = L / N
-dt = 0.01
-nu = 0.000625
-T = 0.1
 if HDF5Writer: hdf5file = HDF5Writer(comm, dt, N)
 
-# Create the mesh
+# Create the physical mesh
 x = linspace(0, L, N+1)[:-1]
 X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'))
 
@@ -64,16 +67,12 @@ Nf = N/2+1
 U     = empty((3, Np, N, N))                  
 U_hat = empty((3, N, Nf, Np), dtype="complex")
 
-# Arrays for mpi communication
-U_sendc = empty((num_processes, Np, Nf, Np), dtype="complex")
-U_recvc = empty((num_processes, Np, Nf, Np), dtype="complex")
-
-# RK4 arrays
+# Temporal storage arrays (Not required by all temporal integrators)
 U_hat0  = empty((3, N, Nf, Np), dtype="complex")
 U_hat1  = empty((3, N, Nf, Np), dtype="complex")
 dU      = empty((3, N, Nf, Np), dtype="complex")
 
-# work arrays
+# work arrays (Not required by all convection methods)
 F_tmp   = empty((3, N, Nf, Np), dtype="complex")
 U_tmp   = empty((3, Np, N, N))
 Uc_hat  = empty((N, Nf, Np), dtype="complex")
@@ -85,9 +84,7 @@ kx = fftfreq(N, 1./N)
 ky = kx[:Nf]; ky[-1] *= -1
 KX = array(meshgrid(kx, ky, kx[rank*Np:(rank+1)*Np], indexing='ij'))
 KK = sum(KX*KX, 0)
-KX_over_Ksq = KX.copy()
-for j in range(3):
-    KX_over_Ksq[j] /= where(KK==0, 1, KK)
+KX_over_Ksq = KX.copy() / where(KK==0, 1, KK)
 
 # Filter for dealiasing nonlinear convection
 dealias = array((abs(KX[0]) < 2./3.*max(kx))*(abs(KX[1]) < 2./3.*max(ky))*(abs(KX[2]) < 2./3.*max(kx)), dtype=int)
@@ -107,10 +104,9 @@ def pressure():
     ifftn_mpi(1j*sum(KX_over_Ksq*F_tmp, 0), p)
     return p
 
-def project(xU):
-    Uc_hat[:] = sum(KX*xU, 0)
-    for i in range(3):
-        xU[i] = xU[i] - Uc_hat*KX_over_Ksq[i]
+def project(u):
+    """Project u onto divergence free space"""
+    u[:] = u - sum(KX*u, 0)*KX_over_Ksq
 
 def ifftn_mpi(fu, u):
     """ifft in three directions using mpi.
@@ -119,14 +115,11 @@ def ifftn_mpi(fu, u):
     if num_processes == 1:
         u[:] = irfft(ifft(ifft(fu, 0), 2), 1)[:]
         return
-        
+    
+    # Do first owned direction
     Uc_hat[:] = ifft(fu, 0)[:]
     
     # Communicate all values
-    #comm.Alltoall([Uc_hat.reshape((num_processes, Np, Nf, Np)), MPI.DOUBLE_COMPLEX], [U_recvc, MPI.DOUBLE_COMPLEX])
-    #for i in range(num_processes): 
-        #Uc_hatT[:, :, i*Np:(i+1)*Np] = U_recvc[i]
-        
     ft = Uc_hat.reshape((num_processes, Np, Nf, Np))
     for i in range(num_processes):
        if not i == rank:
@@ -134,7 +127,7 @@ def ifftn_mpi(fu, u):
     for i in range(num_processes): 
         Uc_hatT[:, :, i*Np:(i+1)*Np] = ft[i]
     
-    # Do last direction
+    # Do last two directions
     u[:] = irfft(ifft(Uc_hatT, 2), 1)
 
 def fftn_mpi(u, fu):
@@ -147,15 +140,9 @@ def fftn_mpi(u, fu):
     # Do 2D fft2 in y-z directions on owned data
     Uc_hatT[:] = fft(rfft(u, 1), 2)[:]
     
-    # Set up for communicating intermediate result 
+    # Communicating intermediate result 
     ft = fu.reshape(num_processes, Np, Nf, Np)
-    #for i in range(num_processes): 
-    #    U_sendc[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
-        
-    # Communicate all values
-    #comm.Alltoall([U_sendc, MPI.DOUBLE_COMPLEX], [ft, MPI.DOUBLE_COMPLEX])
-
-    for i in range(num_processes): ft[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
+    rstack(ft, Uc_hatT, Np, num_processes)        
     for i in range(num_processes):
         if not i == rank:
            comm.Sendrecv_replace(ft[i], i, 0, i, 0)   
@@ -163,6 +150,11 @@ def fftn_mpi(u, fu):
     # Do fft for last direction 
     fu[:] = fft(fu, 0)
 
+#@jit((complex128[:,:,:,:], complex128[:,:,:], int64, int64))
+def rstack(f, u, Np, num_processes):
+    for i in range(num_processes): 
+        f[i] = u[:, :, i*Np:(i+1)*Np]
+    
 def standardConvection(c):   
     """c_i = u_j du_i/dx_j"""
     for i in range(3):
@@ -183,7 +175,7 @@ def divergenceConvection(c, add=False):
     fftn_mpi(U[2]*U[2], F_tmp[2])
     c[1] += (1j*KX[1]*F_tmp[0] + 1j*KX[2]*F_tmp[1])
     c[2] += (1j*KX[1]*F_tmp[1] + 1j*KX[2]*F_tmp[2])
-    
+
 def Cross(a, b, c):
     """c = U x w"""
     fftn_mpi(a[1]*b[2]-a[2]*b[1], c[0])
@@ -205,32 +197,27 @@ def ComputeRHS(dU, rk):
         for i in range(3):
             ifftn_mpi(U_hat[i], U[i])
     
-    if conv == "Standard":
+    if convection == "Standard":
         standardConvection(dU)
         
-    elif conv == "Divergence":
+    elif convection == "Divergence":
         divergenceConvection(dU)        
 
-    elif conv == "Skewed":
+    elif convection == "Skewed":
         standardConvection(dU)
         divergenceConvection(dU, add=True)        
         dU[:] = dU/2
         
-    elif conv == "Vortex":
+    elif convection == "Vortex":
         Curl(U_hat, curl)
         Cross(U, curl, dU)
-
-    else:
-        raise TypeError, "Wrong type of convection"
     
     # Dealias the nonlinear convection
     dU[:] *= dealias*dt
     
     # Add pressure gradient
-    Uc_hat[:] = sum(dU*KX_over_Ksq, 0)
-    for i in range(3):
-        dU[i] -= Uc_hat*KX[i]
-                 
+    dU[:] -= sum(dU*KX_over_Ksq, 0)*KX
+
     # Add contribution from diffusion
     dU[:] -= nu*dt*KK*U_hat
 
@@ -266,11 +253,9 @@ while t < T-1e-8:
         for rk in range(4):
             ComputeRHS(dU, rk)        
             project(dU)
-
             if rk < 3:
                 U_hat[:] = U_hat0 + b[rk]*dU
-            U_hat1[:] = U_hat1 + a[rk]*dU
-            
+            U_hat1[:] = U_hat1 + a[rk]*dU            
         U_hat[:] = U_hat1[:]
         
     elif temporal == "ForwardEuler" or tstep == 1:  
@@ -326,4 +311,3 @@ if rank == 0:
     #dkdt = (k[1:]-k[:-1])/dt
     #plot(-dkdt)
     #show()
-
