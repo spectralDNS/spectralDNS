@@ -3,21 +3,23 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from numpy import *
-from pylab import *
-#from numpy import array, meshgrid, linspace, empty, zeros, sin, cos, pi, where, sum
-#from pylab import fftfreq, fft2, rfft, ifft, ifft2, irfft
+#from numpy import *
+#from pylab import *
+from numpy import array, meshgrid, linspace, empty, zeros, sin, cos, pi, where, sum
+from pylab import fftfreq, fft2, rfft, ifft, ifft2, irfft
 import time, sys
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 from commandline import *
 from wrappyfftw import *
 from HDF5Writer import HDF5Writer
+import cProfile, pstats, StringIO
 #from numba import jit, complex128, int64
 #import numexpr
 
 params = {
     'convection': 'Vortex',
+    'make_profile': 0,
     'M': 5,
     'temporal': 'RK4',
     'write_result': 1e8,        # Write to HDF5 every..
@@ -43,6 +45,8 @@ rank = comm.Get_rank()
 if not num_processes in [2**i for i in range(M+1)]:
     raise IOError("Number of cpus must be in ", [2**i for i in range(M+1)])
 
+if make_profile: profile = cProfile.Profile()
+
 # Each cpu gets ownership of Np slices
 Np = N / num_processes     
 
@@ -53,14 +57,13 @@ x = linspace(0, L, N+1)[:-1]
 X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'))
 
 """
-  Solution array and Fourier coefficients. 
-  Solution U is real and as such its transform, U_hat = fft(U)(k), 
-  is such that fft(U)(k) = conv(fft(U)(-k)) and thus it is sufficient 
-  to store N/2+1 Fourier coefficients in the first transformed direction (y).
-  For means of efficient MPI communication, the physical box (N^3) is
-  shared by processors along the first direction, whereas the Fourier 
-  coefficients are shared along the third direction. The y-direction
-  is N/2+1 in Fourier space.
+Solution U is real and as such its transform, U_hat = fft(U)(k), 
+is such that fft(U)(k) = conv(fft(U)(-k)) and thus it is sufficient 
+to store N/2+1 Fourier coefficients in the first transformed direction (y).
+For means of efficient MPI communication, the physical box (N^3) is
+shared by processors along the first direction, whereas the Fourier 
+coefficients are shared along the third direction. The y-direction
+is N/2+1 in Fourier space.
 """
 
 Nf = N/2+1
@@ -77,6 +80,9 @@ F_tmp   = empty((3, N, Nf, Np), dtype="complex")
 U_tmp   = empty((3, Np, N, N))
 Uc_hat  = empty((N, Nf, Np), dtype="complex")
 Uc_hatT = empty((Np, Nf, N), dtype="complex")
+#Uc_send = Uc_hat.reshape((num_processes, Np, Nf, Np))
+U_recvc = Uc_hat.reshape((num_processes, Np, Nf, Np))
+U_sendc = Uc_hat.reshape((num_processes, Np, Nf, Np))
 curl    = empty((3, Np, N, N))
 
 # Set wavenumbers in grid
@@ -120,12 +126,15 @@ def ifftn_mpi(fu, u):
     Uc_hat[:] = ifft(fu, 0)[:]
     
     # Communicate all values
-    ft = Uc_hat.reshape((num_processes, Np, Nf, Np))
-    for i in range(num_processes):
-       if not i == rank:
-          comm.Sendrecv_replace(ft[i], i, 0, i, 0)   
+    comm.Alltoall([Uc_hat.reshape((num_processes, Np, Nf, Np)), MPI.DOUBLE_COMPLEX], [U_recvc, MPI.DOUBLE_COMPLEX])
     for i in range(num_processes): 
-        Uc_hatT[:, :, i*Np:(i+1)*Np] = ft[i]
+        Uc_hatT[:, :, i*Np:(i+1)*Np] = U_recvc[i]
+
+    #for i in range(num_processes):
+       #if not i == rank:
+          #comm.Sendrecv_replace(Uc_send[i], i, 0, i, 0)   
+    #for i in range(num_processes): 
+        #Uc_hatT[:, :, i*Np:(i+1)*Np] = Uc_send[i]
     
     # Do last two directions
     u[:] = irfft(ifft(Uc_hatT, 2), 1)
@@ -142,10 +151,16 @@ def fftn_mpi(u, fu):
     
     # Communicating intermediate result 
     ft = fu.reshape(num_processes, Np, Nf, Np)
-    rstack(ft, Uc_hatT, Np, num_processes)        
-    for i in range(num_processes):
-        if not i == rank:
-           comm.Sendrecv_replace(ft[i], i, 0, i, 0)   
+    #rstack(ft, Uc_hatT, Np, num_processes)        
+    #for i in range(num_processes):
+    #    if not i == rank:
+    #       comm.Sendrecv_replace(ft[i], i, 0, i, 0)   
+           
+    for i in range(num_processes): 
+        U_sendc[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
+        
+    # Communicate all values
+    comm.Alltoall([U_sendc, MPI.DOUBLE_COMPLEX], [ft, MPI.DOUBLE_COMPLEX])           
                 
     # Do fft for last direction 
     fu[:] = fft(fu, 0)
@@ -296,16 +311,38 @@ while t < T-1e-8:
     if tstep > 1:
         fastest_time = min(tt, fastest_time)
         slowest_time = max(tt, slowest_time)
+        
+    if tstep == 1 and make_profile:
+        #Enable profiling after first step is finished
+        profile.enable()
 
 if hdf5file: hdf5file.close()
 
 fast = comm.reduce(fastest_time, op=MPI.MIN, root=0)
 slow = comm.reduce(slowest_time, op=MPI.MAX, root=0)
 
+if make_profile:
+    profile.disable()
+    ps = pstats.Stats(profile).sort_stats('cumulative')
+    ps.print_stats(make_profile)
+    
+    results = {}
+    for item in ['fftn_mpi', 
+                 'ifftn_mpi', 
+                 '_Xfftn',
+                 'Alltoall']:
+        for key, val in ps.stats.iteritems():
+            if item in key[2]:
+                results[item] = (comm.reduce(val[2], op=MPI.MIN, root=0),
+                                 comm.reduce(val[2], op=MPI.MAX, root=0),
+                                 comm.reduce(val[3], op=MPI.MIN, root=0),
+                                 comm.reduce(val[3], op=MPI.MAX, root=0),)
 if rank == 0:
     print "Time = ", time.time()-tic
     print "Fastest = ", fast
     print "Slowest = ", slow
+    if make_profile: print results
+
     #figure()
     #k = array(k)
     #dkdt = (k[1:]-k[:-1])/dt
