@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 #from numpy import *
 #from pylab import *
-from numpy import array, meshgrid, linspace, empty, zeros, sin, cos, pi, where, sum
+from numpy import array, meshgrid, linspace, empty, zeros, sin, cos, pi, where, sum, int, float, bool
 from pylab import fftfreq, fft2, rfft, ifft, ifft2, irfft
 import time, sys
 from mpi4py import MPI
@@ -87,12 +87,12 @@ curl    = empty((3, Np, N, N))
 # Set wavenumbers in grid
 kx = fftfreq(N, 1./N)
 ky = kx[:Nf]; ky[-1] *= -1
-KX = array(meshgrid(kx, ky, kx[rank*Np:(rank+1)*Np], indexing='ij'))
+KX = array(meshgrid(kx, ky, kx[rank*Np:(rank+1)*Np], indexing='ij'), dtype=int)
 KK = sum(KX*KX, 0)
-KX_over_Ksq = KX.copy() / where(KK==0, 1, KK)
+KX_over_Ksq = array(KX, dtype=float) / where(KK==0, 1, KK)
 
 # Filter for dealiasing nonlinear convection
-dealias = array((abs(KX[0]) < 2./3.*max(kx))*(abs(KX[1]) < 2./3.*max(ky))*(abs(KX[2]) < 2./3.*max(kx)), dtype=int)
+dealias = array((abs(KX[0]) < 2./3.*max(kx))*(abs(KX[1]) < 2./3.*max(ky))*(abs(KX[2]) < 2./3.*max(kx)), dtype=bool)
 
 # RK4 parameters
 a = [1./6., 1./3., 1./3., 1./6.]
@@ -108,21 +108,22 @@ def pressure():
         fftn_mpi(sum(U*U_tmp, 0), F_tmp[i])
     ifftn_mpi(1j*sum(KX_over_Ksq*F_tmp, 0), p)
     return p
-
 def project(u):
     """Project u onto divergence free space"""
-    u[:] = u - sum(KX*u, 0)*KX_over_Ksq
+    u[:] -= sum(KX_over_Ksq*u, 0)*KX
+    #Uc_hat[:] = sum(numexpr.evaluate("KX_over_Ksq*u"), 0)
+    #u[:] = numexpr.evaluate("u - Uc_hat*KX")
 
 def ifftn_mpi(fu, u):
     """ifft in three directions using mpi.
     Need to do ifft in reversed order of fft
     """
     if num_processes == 1:
-        u[:] = irfft(ifft(ifft(fu, 0), 2), 1)[:]
+        u[:] = irfft(ifft(ifft(fu, 0), 2), 1)
         return
     
     # Do first owned direction
-    Uc_hat[:] = ifft(fu, 0)[:]
+    Uc_hat[:] = ifft(fu, 0)
     
     # Communicate all values
     comm.Alltoall([Uc_hat, MPI.DOUBLE_COMPLEX], [U_mpi, MPI.DOUBLE_COMPLEX])
@@ -145,7 +146,7 @@ def fftn_mpi(u, fu):
         return
     
     # Do 2D fft2 in y-z directions on owned data
-    Uc_hatT[:] = fft(rfft(u, 1), 2)[:]
+    Uc_hatT[:] = fft(rfft(u, 1), 2)
     
     # Communicating intermediate result 
     #ft = fu.reshape(num_processes, Np, Nf, Np)
@@ -229,7 +230,7 @@ def ComputeRHS(dU, rk):
     dU[:] *= dealias*dt
     
     # Add pressure gradient
-    dU[:] -= sum(dU*KX_over_Ksq, 0)*KX
+    dU[:] -= sum(dU*KX_over_Ksq, 0)*KX    
 
     # Add contribution from diffusion
     dU[:] -= nu*dt*KK*U_hat
@@ -268,20 +269,20 @@ while t < T-1e-8:
             project(dU)
             if rk < 3:
                 U_hat[:] = U_hat0 + b[rk]*dU
-            U_hat1[:] = U_hat1 + a[rk]*dU            
+            U_hat1[:] += a[rk]*dU            
         U_hat[:] = U_hat1[:]
         
     elif temporal == "ForwardEuler" or tstep == 1:  
         ComputeRHS(dU, 0)        
         project(dU)
-        U_hat[:] = U_hat + dU
+        U_hat[:] += dU
         if temporal == "AB2":
             U_hat0[:] = dU
         
     else:
         ComputeRHS(dU, 0)
         project(dU)
-        U_hat[:] = U_hat + 1.5*dU - 0.5*U_hat0
+        U_hat[:] += 1.5*dU - 0.5*U_hat0
         U_hat0[:] = dU
 
     for i in range(3):
@@ -332,6 +333,7 @@ if make_profile:
                  '_Xfftn',
                  'Alltoall',
                  'Sendrecv_replace',
+                 'Curl',
                  'project',
                  'ComputeRHS']:
         for key, val in ps.stats.iteritems():
