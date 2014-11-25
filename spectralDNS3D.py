@@ -13,7 +13,7 @@ comm = MPI.COMM_WORLD
 from commandline import *
 from wrappyfftw import *
 from HDF5Writer import HDF5Writer
-import cProfile, pstats, StringIO
+import cProfile, pstats
 #from numba import jit, complex128, int64
 #import numexpr
 
@@ -80,9 +80,8 @@ F_tmp   = empty((3, N, Nf, Np), dtype="complex")
 U_tmp   = empty((3, Np, N, N))
 Uc_hat  = empty((N, Nf, Np), dtype="complex")
 Uc_hatT = empty((Np, Nf, N), dtype="complex")
-#Uc_send = Uc_hat.reshape((num_processes, Np, Nf, Np))
-U_recvc = Uc_hat.reshape((num_processes, Np, Nf, Np))
-U_sendc = Uc_hat.reshape((num_processes, Np, Nf, Np))
+Uc_send = Uc_hat.reshape((num_processes, Np, Nf, Np))
+U_mpi   = empty((num_processes, Np, Nf, Np), dtype="complex")
 curl    = empty((3, Np, N, N))
 
 # Set wavenumbers in grid
@@ -126,15 +125,15 @@ def ifftn_mpi(fu, u):
     Uc_hat[:] = ifft(fu, 0)[:]
     
     # Communicate all values
-    comm.Alltoall([Uc_hat.reshape((num_processes, Np, Nf, Np)), MPI.DOUBLE_COMPLEX], [U_recvc, MPI.DOUBLE_COMPLEX])
-    for i in range(num_processes): 
-        Uc_hatT[:, :, i*Np:(i+1)*Np] = U_recvc[i]
-
-    #for i in range(num_processes):
-       #if not i == rank:
-          #comm.Sendrecv_replace(Uc_send[i], i, 0, i, 0)   
+    #comm.Alltoall([Uc_hat, MPI.DOUBLE_COMPLEX], [U_mpi, MPI.DOUBLE_COMPLEX])
     #for i in range(num_processes): 
-        #Uc_hatT[:, :, i*Np:(i+1)*Np] = Uc_send[i]
+    #   Uc_hatT[:, :, i*Np:(i+1)*Np] = U_mpi[i]
+
+    for i in range(num_processes):
+       if not i == rank:
+          comm.Sendrecv_replace(Uc_send[i], i, 0, i, 0)   
+    for i in range(num_processes): 
+        Uc_hatT[:, :, i*Np:(i+1)*Np] = Uc_send[i]
     
     # Do last two directions
     u[:] = irfft(ifft(Uc_hatT, 2), 1)
@@ -151,16 +150,16 @@ def fftn_mpi(u, fu):
     
     # Communicating intermediate result 
     ft = fu.reshape(num_processes, Np, Nf, Np)
-    #rstack(ft, Uc_hatT, Np, num_processes)        
-    #for i in range(num_processes):
-    #    if not i == rank:
-    #       comm.Sendrecv_replace(ft[i], i, 0, i, 0)   
+    rstack(ft, Uc_hatT, Np, num_processes)        
+    for i in range(num_processes):
+        if not i == rank:
+           comm.Sendrecv_replace(ft[i], i, 0, i, 0)   
            
-    for i in range(num_processes): 
-        U_sendc[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
+    #for i in range(num_processes): 
+    #   U_mpi[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
         
     # Communicate all values
-    comm.Alltoall([U_sendc, MPI.DOUBLE_COMPLEX], [ft, MPI.DOUBLE_COMPLEX])           
+    #comm.Alltoall([U_mpi, MPI.DOUBLE_COMPLEX], [ft, MPI.DOUBLE_COMPLEX])           
                 
     # Do fft for last direction 
     fu[:] = fft(fu, 0)
@@ -316,6 +315,8 @@ while t < T-1e-8:
         #Enable profiling after first step is finished
         profile.enable()
 
+toc = time.time()-tic
+
 if hdf5file: hdf5file.close()
 
 fast = comm.reduce(fastest_time, op=MPI.MIN, root=0)
@@ -324,13 +325,14 @@ slow = comm.reduce(slowest_time, op=MPI.MAX, root=0)
 if make_profile:
     profile.disable()
     ps = pstats.Stats(profile).sort_stats('cumulative')
-    ps.print_stats(make_profile)
+    #ps.print_stats(make_profile)
     
     results = {}
     for item in ['fftn_mpi', 
                  'ifftn_mpi', 
                  '_Xfftn',
-                 'Alltoall']:
+                 'Alltoall',
+                 'Sendrecv_replace']:
         for key, val in ps.stats.iteritems():
             if item in key[2]:
                 results[item] = (comm.reduce(val[2], op=MPI.MIN, root=0),
@@ -338,7 +340,7 @@ if make_profile:
                                  comm.reduce(val[3], op=MPI.MIN, root=0),
                                  comm.reduce(val[3], op=MPI.MAX, root=0),)
 if rank == 0:
-    print "Time = ", time.time()-tic
+    print "Time = ", toc
     print "Fastest = ", fast
     print "Slowest = ", slow
     if make_profile: print results
