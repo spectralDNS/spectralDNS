@@ -12,7 +12,7 @@ from mpi4py import MPI
 comm = MPI.COMM_WORLD
 from commandline import *
 from wrappyfftw import *
-from HDF5Writer import HDF5Writer
+#from HDF5Writer import HDF5Writer
 import cProfile, pstats
 #from numba import jit, complex128, int64
 #import numexpr
@@ -50,7 +50,7 @@ if make_profile: profile = cProfile.Profile()
 # Each cpu gets ownership of Np slices
 Np = N / num_processes     
 
-if HDF5Writer: hdf5file = HDF5Writer(comm, dt, N)
+#if HDF5Writer: hdf5file = HDF5Writer(comm, dt, N)
 
 # Create the physical mesh
 x = linspace(0, L, N+1)[:-1]
@@ -125,16 +125,15 @@ def ifftn_mpi(fu, u):
     Uc_hat[:] = ifft(fu, 0)[:]
     
     # Communicate all values
-    #comm.Alltoall([Uc_hat, MPI.DOUBLE_COMPLEX], [U_mpi, MPI.DOUBLE_COMPLEX])
-    #for i in range(num_processes): 
-    #   Uc_hatT[:, :, i*Np:(i+1)*Np] = U_mpi[i]
-
-    for i in range(num_processes):
-       if not i == rank:
-          comm.Sendrecv_replace(Uc_send[i], i, 0, i, 0)   
+    comm.Alltoall([Uc_hat, MPI.DOUBLE_COMPLEX], [U_mpi, MPI.DOUBLE_COMPLEX])
     for i in range(num_processes): 
-        Uc_hatT[:, :, i*Np:(i+1)*Np] = Uc_send[i]
-    
+        Uc_hatT[:, :, i*Np:(i+1)*Np] = U_mpi[i]
+
+    #for i in range(num_processes):
+    #    if not i == rank:
+    #        comm.Sendrecv_replace([Uc_send[i], MPI.DOUBLE_COMPLEX], i, 0, i, 0)   
+    #    Uc_hatT[:, :, i*Np:(i+1)*Np] = Uc_send[i]
+           
     # Do last two directions
     u[:] = irfft(ifft(Uc_hatT, 2), 1)
 
@@ -149,17 +148,17 @@ def fftn_mpi(u, fu):
     Uc_hatT[:] = fft(rfft(u, 1), 2)[:]
     
     # Communicating intermediate result 
-    ft = fu.reshape(num_processes, Np, Nf, Np)
-    rstack(ft, Uc_hatT, Np, num_processes)        
-    for i in range(num_processes):
-        if not i == rank:
-           comm.Sendrecv_replace(ft[i], i, 0, i, 0)   
+    #ft = fu.reshape(num_processes, Np, Nf, Np)
+    #rstack(ft, Uc_hatT, Np, num_processes)        
+    #for i in range(num_processes):
+    #    if not i == rank:
+    #       comm.Sendrecv_replace([ft[i], MPI.DOUBLE_COMPLEX], i, 0, i, 0)   
            
-    #for i in range(num_processes): 
-    #   U_mpi[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
+    for i in range(num_processes): 
+        U_mpi[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
         
     # Communicate all values
-    #comm.Alltoall([U_mpi, MPI.DOUBLE_COMPLEX], [ft, MPI.DOUBLE_COMPLEX])           
+    comm.Alltoall([U_mpi, MPI.DOUBLE_COMPLEX], [fu, MPI.DOUBLE_COMPLEX])  
                 
     # Do fft for last direction 
     fu[:] = fft(fu, 0)
@@ -296,8 +295,8 @@ while t < T-1e-8:
             #im.autoscale()  
             #plt.pause(1e-6) 
             
-    if tstep % write_result == 0 and hdf5file:
-        hdf5file.write(U, pressure(), tstep)
+    #if tstep % write_result == 0 and hdf5file:
+    #    hdf5file.write(U, pressure(), tstep)
 
     if tstep % compute_energy == 0:
         kk = comm.reduce(0.5*sum(U*U)*dx*dx*dx/L**3)
@@ -317,7 +316,7 @@ while t < T-1e-8:
 
 toc = time.time()-tic
 
-if hdf5file: hdf5file.close()
+#if hdf5file: hdf5file.close()
 
 fast = comm.reduce(fastest_time, op=MPI.MIN, root=0)
 slow = comm.reduce(slowest_time, op=MPI.MAX, root=0)
@@ -332,7 +331,9 @@ if make_profile:
                  'ifftn_mpi', 
                  '_Xfftn',
                  'Alltoall',
-                 'Sendrecv_replace']:
+                 'Sendrecv_replace',
+                 'project',
+                 'ComputeRHS']:
         for key, val in ps.stats.iteritems():
             if item in key[2]:
                 results[item] = (comm.reduce(val[2], op=MPI.MIN, root=0),
