@@ -7,13 +7,14 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 #from pylab import *
 from numpy import array, meshgrid, linspace, empty, zeros, sin, cos, pi, where, sum, int, float, bool
 from pylab import fftfreq, fft2, rfft, ifft, ifft2, irfft
-import time, sys
+import time, sys, pprint
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 from commandline import *
 from wrappyfftw import *
+from create_profile import create_profile
+import cProfile
 #from HDF5Writer import HDF5Writer
-import cProfile, pstats
 #from numba import jit, complex128, int64
 #import numexpr
 
@@ -108,11 +109,12 @@ def pressure():
         fftn_mpi(sum(U*U_tmp, 0), F_tmp[i])
     ifftn_mpi(1j*sum(KX_over_Ksq*F_tmp, 0), p)
     return p
+
 def project(u):
     """Project u onto divergence free space"""
     u[:] -= sum(KX_over_Ksq*u, 0)*KX
     #Uc_hat[:] = sum(numexpr.evaluate("KX_over_Ksq*u"), 0)
-    #u[:] = numexpr.evaluate("u - Uc_hat*KX")
+    #u[:] -= numexpr.evaluate("Uc_hat*KX")
 
 def ifftn_mpi(fu, u):
     """ifft in three directions using mpi.
@@ -319,34 +321,19 @@ toc = time.time()-tic
 
 #if hdf5file: hdf5file.close()
 
+if make_profile:
+    results = create_profile(**vars())
+
 fast = comm.reduce(fastest_time, op=MPI.MIN, root=0)
 slow = comm.reduce(slowest_time, op=MPI.MAX, root=0)
 
-if make_profile:
-    profile.disable()
-    ps = pstats.Stats(profile).sort_stats('cumulative')
-    #ps.print_stats(make_profile)
-    
-    results = {}
-    for item in ['fftn_mpi', 
-                 'ifftn_mpi', 
-                 '_Xfftn',
-                 'Alltoall',
-                 'Sendrecv_replace',
-                 'Curl',
-                 'project',
-                 'ComputeRHS']:
-        for key, val in ps.stats.iteritems():
-            if item in key[2]:
-                results[item] = (comm.reduce(val[2], op=MPI.MIN, root=0),
-                                 comm.reduce(val[2], op=MPI.MAX, root=0),
-                                 comm.reduce(val[3], op=MPI.MIN, root=0),
-                                 comm.reduce(val[3], op=MPI.MAX, root=0),)
 if rank == 0:
     print "Time = ", toc
     print "Fastest = ", fast
     print "Slowest = ", slow
-    if make_profile: print results
+    if make_profile: 
+        print "Printing total min/max cumulative min/max:"
+        pprint.pprint(results)
 
     #figure()
     #k = array(k)

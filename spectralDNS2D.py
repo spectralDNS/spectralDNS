@@ -14,8 +14,8 @@ params = {
     'temporal': 'RK4',
     'plot_result': 10,         # Show an image every..
     'nu': 0.001,
-    'dt': 0.01,
-    'T': 100.0
+    'dt': 0.005,
+    'T': 50.0
 }
 commandline_kwargs = parse_command_line(sys.argv[1:])
 params.update(commandline_kwargs)
@@ -50,13 +50,12 @@ curl   = empty((N, N))
 
 # Set wavenumbers in grid
 kx = fftfreq(N, 1./N)
-KX = array(meshgrid(kx, kx[:Nf], indexing='ij'))
+KX = array(meshgrid(kx, kx[:Nf], indexing='ij'), dtype=int)
 KK = sum(KX*KX, 0)
-KX_over_Ksq = KX.copy()
-KX_over_Ksq = KX.copy() / where(KK==0, 1, KK)
+KX_over_Ksq = array(KX, dtype=float) / where(KK==0, 1, KK)
 
 # Filter for dealiasing nonlinear convection
-dealias = array((abs(KX[0]) < (2./3.)*max(kx))*(abs(KX[1]) < (2./3.)*max(kx)), dtype=int)
+dealias = array((abs(KX[0]) < (2./3.)*max(kx))*(abs(KX[1]) < (2./3.)*max(kx)), dtype=bool)
 
 # RK4 parameters
 a = [1./6., 1./3., 1./3., 1./6.]
@@ -72,7 +71,7 @@ def pressure():
     return irfft2(1j*sum(KX_over_Ksq*F_tmp, 0))
 
 def project(u):
-    u[:] = u - sum(KX*u, 0)*KX_over_Ksq
+    u[:] -= sum(KX*u, 0)*KX_over_Ksq
             
 def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U, V, W
@@ -92,8 +91,8 @@ def ComputeRHS(dU, rk):
     dU[:] += -nu*dt*KK*U_hat
     
 # Taylor-Green initialization
-U[0] = sin(X[0])*cos(X[1])
-U[1] =-cos(X[0])*sin(X[1])
+#U[0] = sin(X[0])*cos(X[1])
+#U[1] =-cos(X[0])*sin(X[1])
 
 # Initialize two vortices
 #w=exp(-((X[0]-pi)**2+(X[1]-pi+pi/4)**2)/(0.2))+exp(-((X[0]-pi)**2+(X[1]-pi-pi/4)**2)/(0.2))-0.5*exp(-((X[0]-pi-pi/4)**2+(X[1]-pi-pi/4)**2)/(0.4))
@@ -128,20 +127,20 @@ while t < T:
             project(dU)
             if rk < 3:
                 U_hat[:] = U_hat0 + b[rk]*dU
-            U_hat1[:] = U_hat1 + a[rk]*dU        
+            U_hat1[:] += a[rk]*dU        
         U_hat[:] = U_hat1[:]
         
     elif temporal == 'ForwardEuler' or tstep == 1:
         ComputeRHS(dU, 0)
         project(dU)
-        U_hat[:] = U_hat + dU
+        U_hat[:] += dU
         if temporal == "AB2":
             U_hat0[:] = dU
         
     else:
         ComputeRHS(dU, 0)
         project(dU)
-        U_hat[:] = U_hat + 1.5*dU - 0.5*U_hat0
+        U_hat[:] += 1.5*dU - 0.5*U_hat0
         U_hat0[:] = dU
 
     U[:] = irfft2(U_hat)
@@ -149,16 +148,19 @@ while t < T:
     # From here on it's only postprocessing
     if tstep % plot_result == 0:
         curl[:] = irfft2(1j*KX[0]*U_hat[1]-1j*KX[1]*U_hat[0])
-        im.set_data(curl[::-1, :])
+        im.set_data(curl[:, :])
         im.autoscale()  
         plt.pause(1e-6) 
         
-    #print time.time()-t0
+    print tstep, time.time()-t0
     t0 = time.time()
             
 print "Time = ", time.time()-tic
-print "Energy numeric = ", sum(U*U)*dx*dx/L**2
-u0 = sin(X[0])*cos(X[1])*exp(-2.*nu*t)
-u1 =-sin(X[1])*cos(X[0])*exp(-2.*nu*t)
-print "Energy exact   = ", sum(u0*u0+u1*u1)*dx*dx/L**2
-print "Error   = ", sum(sqrt((U[0]-u0)**2+(U[1]-u1)**2))*dx*dx/L**2
+plt.figure()
+plt.quiver(X[0,::2,::2], X[1,::2,::2], U[0,::2,::2], U[1,::2,::2], pivot='mid', scale=2)
+plt.draw();plt.show()
+#print "Energy numeric = ", sum(U*U)*dx*dx/L**2
+#u0 = sin(X[0])*cos(X[1])*exp(-2.*nu*t)
+#u1 =-sin(X[1])*cos(X[0])*exp(-2.*nu*t)
+#print "Energy exact   = ", sum(u0*u0+u1*u1)*dx*dx/L**2
+#print "Error   = ", sum(sqrt((U[0]-u0)**2+(U[1]-u1)**2))*dx*dx/L**2
