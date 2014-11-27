@@ -7,7 +7,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 #from pylab import *
 from numpy import array, meshgrid, linspace, empty, zeros, sin, cos, pi, where, sum, int, float, bool
 from pylab import fftfreq, fft2, rfft, ifft, ifft2, irfft
-import time, sys, pprint
+import time, sys
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 from commandline import *
@@ -321,9 +321,6 @@ toc = time.time()-tic
 
 #if hdf5file: hdf5file.close()
 
-if make_profile:
-    results = create_profile(**vars())
-
 fast = comm.reduce(fastest_time, op=MPI.MIN, root=0)
 slow = comm.reduce(slowest_time, op=MPI.MAX, root=0)
 
@@ -331,12 +328,13 @@ if rank == 0:
     print "Time = ", toc
     print "Fastest = ", fast
     print "Slowest = ", slow
-    if make_profile: 
-        print "Printing total min/max cumulative min/max:"
-        pprint.pprint(results)
 
     #figure()
     #k = array(k)
     #dkdt = (k[1:]-k[:-1])/dt
     #plot(-dkdt)
     #show()
+    
+if make_profile:
+    results = create_profile(**vars())
+    

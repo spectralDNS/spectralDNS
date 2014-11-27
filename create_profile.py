@@ -1,6 +1,7 @@
 import pstats
+import pprint
 
-def create_profile(profile, comm, MPI, **params):
+def create_profile(profile, comm, MPI, rank, **params):
     profile.disable()
     ps = pstats.Stats(profile).sort_stats('cumulative')
     #ps.print_stats(make_profile)
@@ -20,5 +21,9 @@ def create_profile(profile, comm, MPI, **params):
                                  comm.reduce(val[2], op=MPI.MAX, root=0),
                                  comm.reduce(val[3], op=MPI.MIN, root=0),
                                  comm.reduce(val[3], op=MPI.MAX, root=0))
+    if rank == 0:
+        print "Printing profiling for total min/max cumulative min/max:"
+        pprint.pprint(results)
+
     return results
 
