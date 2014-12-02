@@ -50,7 +50,8 @@ curl   = empty((N, N))
 
 # Set wavenumbers in grid
 kx = fftfreq(N, 1./N)
-KX = array(meshgrid(kx, kx[:Nf], indexing='ij'), dtype=int)
+ky = kx[:Nf].copy(); ky[-1] *= -1
+KX = array(meshgrid(kx, ky, indexing='ij'), dtype=int)
 KK = sum(KX*KX, 0)
 KX_over_Ksq = array(KX, dtype=float) / where(KK==0, 1, KK)
 

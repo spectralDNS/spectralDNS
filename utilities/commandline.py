@@ -24,7 +24,7 @@ def parse_command_line(cline):
         if s.count('=') == 1:
             key, value = s.split('=', 1)
         else:
-            raise TypeError(s+" Only kwargs separated with '=' sign allowed. See NSdefault_hooks for a range of parameters. Your problem file should contain problem specific parameters.")
+            raise TypeError(s+" Only kwargs separated with '=' sign allowed. See NSdefault_hooks for a range of parameters.")
         try:
             value = json.loads(value) 
                         

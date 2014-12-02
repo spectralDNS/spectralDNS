@@ -1,9 +1,9 @@
 import pstats
 import pprint
 
-def create_profile(profile, comm, MPI, rank, **params):
-    profile.disable()
-    ps = pstats.Stats(profile).sort_stats('cumulative')
+def create_profile(profiler, comm, MPI, rank, **params):
+    profiler.disable()
+    ps = pstats.Stats(profiler).sort_stats('cumulative')
     #ps.print_stats(make_profile)
     
     results = {}

@@ -3,20 +3,19 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-#from numpy import *
-#from pylab import *
-from numpy import array, meshgrid, linspace, empty, zeros, sin, cos, pi, where, sum, int, float, bool
-from pylab import fftfreq, fft2, rfft, ifft, ifft2, irfft
-import time, sys
+import time, sys, cProfile
+
+from numpy import *
+from pylab import *
+#from numpy import array, meshgrid, linspace, empty, zeros, sin, cos, pi, where, sum, int, float, bool
+#from pylab import fftfreq, fft2, rfft, ifft, ifft2, irfft
 from mpi4py import MPI
-comm = MPI.COMM_WORLD
-from commandline import *
-from wrappyfftw import *
-from create_profile import create_profile
-import cProfile
-#from HDF5Writer import HDF5Writer
+from utilities import *
+from h5io import *
 #from numba import jit, complex128, int64
 #import numexpr
+
+comm = MPI.COMM_WORLD
 
 params = {
     'convection': 'Vortex',
@@ -24,8 +23,9 @@ params = {
     'M': 5,
     'temporal': 'RK4',
     'write_result': 1e8,        # Write to HDF5 every..
+    'write_yz_slice': [0, 1e8], # Write slice 0 (or higher) in y-z plance every..
     'compute_energy': 2,        # Compute solution energy every..
-    'plot_result': 2,         # Show an image every..
+    'plot_result': 2,           # Show an image every..
     'nu': 0.000625,
     'dt': 0.01,
     'T': 0.1
@@ -46,12 +46,12 @@ rank = comm.Get_rank()
 if not num_processes in [2**i for i in range(M+1)]:
     raise IOError("Number of cpus must be in ", [2**i for i in range(M+1)])
 
-if make_profile: profile = cProfile.Profile()
+if make_profile: profiler = cProfile.Profile()
 
 # Each cpu gets ownership of Np slices
 Np = N / num_processes     
 
-#if HDF5Writer: hdf5file = HDF5Writer(comm, dt, N)
+hdf5file = HDF5Writer(comm, dt, N, params)
 
 # Create the physical mesh
 x = linspace(0, L, N+1)[:-1]
@@ -70,6 +70,8 @@ is N/2+1 in Fourier space.
 Nf = N/2+1
 U     = empty((3, Np, N, N))                  
 U_hat = empty((3, N, Nf, Np), dtype="complex")
+P     = empty((Np, N, N))
+P_hat = empty((N, Nf, Np), dtype="complex")
 
 # Temporal storage arrays (Not required by all temporal integrators)
 U_hat0  = empty((3, N, Nf, Np), dtype="complex")
@@ -87,7 +89,7 @@ curl    = empty((3, Np, N, N))
 
 # Set wavenumbers in grid
 kx = fftfreq(N, 1./N)
-ky = kx[:Nf]; ky[-1] *= -1
+ky = kx[:Nf].copy(); ky[-1] *= -1
 KX = array(meshgrid(kx, ky, kx[rank*Np:(rank+1)*Np], indexing='ij'), dtype=int)
 KK = sum(KX*KX, 0)
 KX_over_Ksq = array(KX, dtype=float) / where(KK==0, 1, KK)
@@ -113,9 +115,7 @@ def pressure():
 def project(u):
     """Project u onto divergence free space"""
     u[:] -= sum(KX_over_Ksq*u, 0)*KX
-    #Uc_hat[:] = sum(numexpr.evaluate("KX_over_Ksq*u"), 0)
-    #u[:] -= numexpr.evaluate("Uc_hat*KX")
-
+#@profile
 def ifftn_mpi(fu, u):
     """ifft in three directions using mpi.
     Need to do ifft in reversed order of fft
@@ -139,7 +139,8 @@ def ifftn_mpi(fu, u):
            
     # Do last two directions
     u[:] = irfft(ifft(Uc_hatT, 2), 1)
-
+    
+#@profile
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """
@@ -206,7 +207,7 @@ def Curl(a, c):
 
 def Div(a, c):
     """c = div(a)"""
-    ifftn_mpi(1j*(KX[0]*a[0]+KX[1]*a[1]+KX[2]*a[2]), c)
+    ifftn_mpi(1j*(sum(KX*a, 0), c))
     
 def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U, V, W
@@ -227,12 +228,14 @@ def ComputeRHS(dU, rk):
     elif convection == "Vortex":
         Curl(U_hat, curl)
         Cross(U, curl, dU)
-    
+    # Compute pressure (except the imaginary 1j)
+    P_hat[:] = sum(dU*KX_over_Ksq, 0)
+        
     # Dealias the nonlinear convection
     dU[:] *= dealias*dt
     
     # Add pressure gradient
-    dU[:] -= sum(dU*KX_over_Ksq, 0)*KX    
+    dU[:] -= P_hat*KX    
 
     # Add contribution from diffusion
     dU[:] -= nu*dt*KK*U_hat
@@ -298,8 +301,9 @@ while t < T-1e-8:
             #im.autoscale()  
             #plt.pause(1e-6) 
             
-    #if tstep % write_result == 0 and hdf5file:
-    #    hdf5file.write(U, pressure(), tstep)
+    if tstep % params['write_result'] == 0 or tstep % params['write_yz_slice'][1] == 0:
+        ifftn_mpi(P_hat*1j, P)
+        hdf5file.write(U, P, tstep)
 
     if tstep % compute_energy == 0:
         kk = comm.reduce(0.5*sum(U*U)*dx*dx*dx/L**3)
@@ -315,11 +319,9 @@ while t < T-1e-8:
         
     if tstep == 1 and make_profile:
         #Enable profiling after first step is finished
-        profile.enable()
+        profiler.enable()
 
 toc = time.time()-tic
-
-#if hdf5file: hdf5file.close()
 
 fast = comm.reduce(fastest_time, op=MPI.MIN, root=0)
 slow = comm.reduce(slowest_time, op=MPI.MAX, root=0)
@@ -337,4 +339,7 @@ if rank == 0:
     
 if make_profile:
     results = create_profile(**vars())
+    
+hdf5file.generate_xdmf()    
+hdf5file.close()
     

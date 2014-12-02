@@ -3,6 +3,8 @@ __date__ = "2014-11-19"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
+__all__ = ['fft', 'ifft', 'fft2', 'ifft2', 'fftn', 'ifftn',
+           'rfft', 'irfft', 'rfft2', 'irfft2', 'rfftn', 'irfftn',]
 try:
     import pyfftw
 
