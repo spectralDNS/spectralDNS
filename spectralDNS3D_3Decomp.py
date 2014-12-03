@@ -153,17 +153,22 @@ def ifftn_mpi(fu, u):
     # Communicate in xz-plane and do fft in x-direction
     commxz.Alltoall([Uc_hat_x, MPI.DOUBLE_COMPLEX], [Uc_hat_xr, MPI.DOUBLE_COMPLEX])
     Uc_hat_x[:] = ifft(Uc_hat_xr, 0)
+        
     if xyrank == P1-1:
         commxz.Alltoall([xz_plane, MPI.DOUBLE_COMPLEX], [xz_planer, MPI.DOUBLE_COMPLEX])
         xz_plane[:] = ifft(xz_planer, 0)    
     
     # Communicate in xy-plane
-    commxy.Alltoall([Uc_hat_x, MPI.DOUBLE_COMPLEX], [Uc_hat_xr, MPI.DOUBLE_COMPLEX])
-    commxy.Scatter(xz_plane, xz_recv, root=P1-1)    
-    Uc_hat_y[:, -1, :] = xz_recv[:]
-    for i in range(P1):
-        Uc_hat_y[:, i*N1/2:(i+1)*N1/2] = Uc_hat_xr[i*N1:(i+1)*N1]
-    
+    if P1 > 1:
+        commxy.Alltoall([Uc_hat_x, MPI.DOUBLE_COMPLEX], [Uc_hat_xr, MPI.DOUBLE_COMPLEX])
+        commxy.Scatter(xz_plane, xz_recv, root=P1-1)            
+        Uc_hat_y[:, -1, :] = xz_recv[:]
+        for i in range(P1):
+            Uc_hat_y[:, i*N1/2:(i+1)*N1/2] = Uc_hat_xr[i*N1:(i+1)*N1]
+    else:
+        Uc_hat_y[:, -1, :] = xz_plane[:]
+        Uc_hat_y[:, :N1/2] = Uc_hat_x[:N1]
+            
     # Do fft for ydirection
     u[:] = irfft(Uc_hat_y, 1)
         
@@ -198,11 +203,12 @@ def fftn_mpi(u, fu):
     for i in range(P1):
         Uc_hat_x[i*N1:(i+1)*N1] = Uc_hat_y[:, i*N1/2:(i+1)*N1/2]
     
-    # Communicate 
-    commxy.Alltoall([Uc_hat_x, MPI.DOUBLE_COMPLEX], [Uc_hat_xr, MPI.DOUBLE_COMPLEX])
-
-    # Do fft in x-direction
-    Uc_hat_x[:] = fft(Uc_hat_xr, 0)
+    # Communicate and do fft in x-direction
+    if P1 > 1:
+        commxy.Alltoall([Uc_hat_x, MPI.DOUBLE_COMPLEX], [Uc_hat_xr, MPI.DOUBLE_COMPLEX])
+        Uc_hat_x[:] = fft(Uc_hat_xr, 0)
+    else:
+        Uc_hat_x[:] = fft(Uc_hat_x, 0)
     
     # Take care of k=N/2 plane
     # Now both k=0 and k=N/2 are contained in 
@@ -211,9 +217,13 @@ def fftn_mpi(u, fu):
         xz_plane2[:] = vstack((xz_plane[0].real, 0.5*(xz_plane[1:N/2]+conj(xz_plane[:N/2:-1])), xz_plane[N/2].real))
         Uc_hat_x[:, 0, :] = vstack((xz_plane2, conj(xz_plane2[(N/2-1):0:-1])))
         xz_plane[:] = vstack((xz_plane[0].imag, -0.5*1j*(xz_plane[1:N/2]-conj(xz_plane[:N/2:-1])), xz_plane[N/2].imag, conj(xz_plane[(N/2-1):0:-1])))
-        commxy.Send([xz_plane, MPI.DOUBLE_COMPLEX], dest=commxy.Get_size()-1, tag=77)
-        
-    if xyrank == P1-1:
+        if P1 > 1:
+            commxy.Send([xz_plane, MPI.DOUBLE_COMPLEX], dest=P1-1, tag=77)
+        else:
+            for i in range(P2):
+                Uc_hat_z[:, -1, i*N2:(i+1)*N2] = xz_plane[i*N2:(i+1)*N2]
+    
+    if xyrank == P1-1 and P1 > 1:
         commxy.Recv([xz_plane, MPI.DOUBLE_COMPLEX], source=0, tag=77)
         for i in range(P2):
             Uc_hat_z[:, -1, i*N2:(i+1)*N2] = xz_plane[i*N2:(i+1)*N2]
