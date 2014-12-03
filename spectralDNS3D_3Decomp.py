@@ -45,7 +45,8 @@ rank = comm.Get_rank()
 
 if make_profile: profiler = cProfile.Profile()
 
-# Each cpu gets ownership of Np slices
+# Each cpu gets ownership of a pencil of size N1*N2*N in real space
+# and (N1/2+1)*N2*N in Fourier space
 P2 = num_processes / P1
 N1 = N/P1
 N2 = N/P2
@@ -95,7 +96,7 @@ U_hat0  = empty((3, N2, N1f, N), dtype="complex")
 U_hat1  = empty((3, N2, N1f, N), dtype="complex")
 dU      = empty((3, N2, N1f, N), dtype="complex")
 
-# work arrays (Not required by all convection methods)
+# work arrays
 Uc_hat_y  = empty((N1, Nf, N2), dtype="complex")
 Uc_hat_x  = empty((N, N1/2, N2), dtype="complex")
 Uc_hat_xr = empty((N, N1/2, N2), dtype="complex")
