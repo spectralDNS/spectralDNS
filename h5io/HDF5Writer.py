@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 """Wrap call to hdf5 to allow running without installing h5py
 """
-__all__ = ['HDF5Writer', 'generate_xdmf']
+__all__ = ['HDF5Writer']
 from numpy import pi
 
 xdmffile = """<?xml version="1.0" encoding="utf-8"?>
