@@ -18,7 +18,6 @@ from h5io import *
 comm = MPI.COMM_WORLD
 
 params = {
-    'convection': 'Vortex',
     'make_profile': 0,
     'M': 5,
     'P1': 1,
@@ -34,7 +33,6 @@ params = {
 
 commandline_kwargs = parse_command_line(sys.argv[1:])
 params.update(commandline_kwargs)
-assert params['convection'] in ['Standard', 'Divergence', 'Skewed', 'Vortex']
 assert params['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
 vars().update(params)
 
@@ -44,8 +42,6 @@ dx = L / N
 
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
-if not num_processes in [2**i for i in range(M+1)]:
-    raise IOError("Number of cpus must be in ", [2**i for i in range(M+1)])
 
 if make_profile: profiler = cProfile.Profile()
 
@@ -54,7 +50,14 @@ P2 = num_processes / P1
 N1 = N/P1
 N2 = N/P2
 
+if not (num_processes % 2 == 0 or num_processes == 1):
+    raise IOError("Number of cpus must be even")
+
+if not ((P1 == 1 or P1 % 2 == 0) and (P2 == 1 or P2 % 2 == 0)):
+    raise IOError("Number of cpus in each direction must be even")
+
 # Create two communicator groups for each rank
+# The goups correspond to chunks in the xy-plane and the xz-plane
 procxz = arange(num_processes)[rank%P1::P1]
 procxy = arange(num_processes)[(rank/P1)*P1:(rank/P1+1)*P1]
 group1 = comm.Get_group()
@@ -64,10 +67,13 @@ group2 = comm.Get_group()
 groupxz = MPI.Group.Incl(group2, procxz)
 commxz = comm.Create(groupxz)
 
+xyrank = commxy.Get_rank() # Local rank in P1
+xzrank = commxz.Get_rank() # Local rank in P2
+
 # Create the physical mesh
 x = linspace(0, L, N+1)[:-1]
-x1 = slice((rank%P1) * N1, (rank%P1+1) * N1, 1)
-x2 = slice((rank/P1) * N2, (rank/P1+1) * N2, 1)
+x1 = slice(xyrank * N1, (xyrank+1) * N1, 1)
+x2 = slice(xzrank * N2, (xzrank+1) * N2, 1)
 X = array(meshgrid(x[x1], x, x[x2], indexing='ij'))
 
 """
@@ -77,11 +83,10 @@ to store N/2+1 Fourier coefficients in the first transformed direction (y).
 """
 
 Nf = N/2+1 # Total points in y-direction
-N1f = N1/2 if (P1>1 and rank%P1 == P1-1) else N1/2+1
+N1f = N1/2 if (P1>1 and xyrank == P1-1) else N1/2+1
 
-U       = empty((3, N1, N, N2))
-U_hat   = empty((3, N2, N1f, N), dtype="complex")
-
+U     = empty((3, N1, N, N2))
+U_hat = empty((3, N2, N1f, N), dtype="complex")
 P     = empty((N1, N, N2))
 P_hat = empty((N2, N1f, N), dtype="complex")
 
@@ -91,25 +96,22 @@ U_hat1  = empty((3, N2, N1f, N), dtype="complex")
 dU      = empty((3, N2, N1f, N), dtype="complex")
 
 # work arrays (Not required by all convection methods)
-#F_tmp   = empty((3, N, Nf, Np), dtype="complex")
-#U_tmp   = empty((3, Np, N, N))
 Uc_hat_y  = empty((N1, Nf, N2), dtype="complex")
-Uc_hat_yr = empty((N1, Nf, N2), dtype="complex")
-Uc_hat_x  = empty((N, N1/2, N2), dtype="complex") # k=N/2 in complex part of k=0
+Uc_hat_x  = empty((N, N1/2, N2), dtype="complex")
 Uc_hat_xr = empty((N, N1/2, N2), dtype="complex")
-Uc_hat_xf  = empty((N, N1f, N2), dtype="complex") # k=N/2 in complex part of k=0
-Uc_hat_xrf = empty((N, N1f, N2), dtype="complex")
 Uc_hat_z  = empty((N2, N1f, N), dtype="complex")
-c_plane = empty((N, N2), dtype="complex")
-c_plane2 = empty((N/2+1, N2), dtype="complex")
+xz_plane   = empty((N, N2), dtype="complex")
+xz_planer  = empty((N, N2), dtype="complex")
+xz_plane2  = empty((N/2+1, N2), dtype="complex")
+xz_recv   = zeros((N1, N2), dtype="complex")
 
 curl    = empty((3, N1, N, N2))
 
 # Set wavenumbers in grid
 kx = fftfreq(N, 1./N)
 ky = kx[:Nf].copy(); ky[-1] *= -1
-k1 = slice((rank/P1) * N2, (rank/P1+1) * N2, 1)
-k2 = slice((rank%P1) * N1/2, (rank%P1) * N1/2+N1f, 1)
+k1 = slice(xzrank*N2, (xzrank+1)*N2, 1)
+k2 = slice(xyrank*N1/2, xyrank*N1/2 + N1f, 1)
 
 KX = array(meshgrid(kx[k1], ky[k2], kx, indexing='ij'), dtype=int)
 KK = sum(KX*KX, 0)
@@ -138,70 +140,32 @@ def ifftn_mpi(fu, u):
     # Do first owned direction
     Uc_hat_z[:] = ifft(fu, 2)
 
+    # Transpose all but k=N/2
     for i in range(P2): 
-        Uc_hat_xf[i*N2:(i+1)*N2] = Uc_hat_z[:, :, i*N2:(i+1)*N2]
-        
-    # Communicate
-    commxz.Alltoall([Uc_hat_xf, MPI.DOUBLE_COMPLEX], [Uc_hat_xrf, MPI.DOUBLE_COMPLEX])
-        
-    Uc_hat_xf[:] = ifft(Uc_hat_xrf, 0)
-    Uc_hat_x[:] = Uc_hat_xf[:, :N1/2, :]
+        Uc_hat_x[i*N2:(i+1)*N2] = Uc_hat_z[:, :N1/2, i*N2:(i+1)*N2]
     
-    # Communicate
+    # Transpose k=N/2
+    if xyrank == P1-1:
+        for i in range(P2): 
+            xz_plane[i*N2:(i+1)*N2] = Uc_hat_z[:, -1, i*N2:(i+1)*N2]
+    
+    # Communicate in xz-plane and do fft in x-direction
+    commxz.Alltoall([Uc_hat_x, MPI.DOUBLE_COMPLEX], [Uc_hat_xr, MPI.DOUBLE_COMPLEX])
+    Uc_hat_x[:] = ifft(Uc_hat_xr, 0)
+    if xyrank == P1-1:
+        commxz.Alltoall([xz_plane, MPI.DOUBLE_COMPLEX], [xz_planer, MPI.DOUBLE_COMPLEX])
+        xz_plane[:] = ifft(xz_planer, 0)    
+    
+    # Communicate in xy-plane
     commxy.Alltoall([Uc_hat_x, MPI.DOUBLE_COMPLEX], [Uc_hat_xr, MPI.DOUBLE_COMPLEX])
-
+    commxy.Scatter(xz_plane, xz_recv, root=P1-1)    
+    Uc_hat_y[:, -1, :] = xz_recv[:]
     for i in range(P1):
         Uc_hat_y[:, i*N1/2:(i+1)*N1/2] = Uc_hat_xr[i*N1:(i+1)*N1]
     
-    # Take care of k=N/2 plane
-    s = Uc_hat_xf[:, -1, :].copy() # All real   
-    recv = zeros((N1, N2), dtype="complex")
-    commxy.Scatter(s, recv, root=0)
-    Uc_hat_y[:, -1, :] = recv[:]
-
-    # Do last two directions
+    # Do fft for ydirection
     u[:] = irfft(Uc_hat_y, 1)
-    
-#def fftn_mpi(u, fu):
-    #"""fft in three directions using mpi
-    #"""
-    #if num_processes == 1:
-        #fu[:] = fft(fft(rfft(u, 1), 0), 2) 
-        #return
-    
-    ## Do fft in y direction on owned data
-    #Uc_hat_y[:] = rfft(u, 1)
-    
-    ## Transform (except k=N/2)
-    #for i in range(P1):
-        #Uc_hat_x[i*N1:(i+1)*N1] = Uc_hat_y[:, i*N1/2:(i+1)*N1/2]
-
-    ## Communicate 
-    #commxy.Alltoall([Uc_hat_x, MPI.DOUBLE_COMPLEX], [Uc_hat_xr, MPI.DOUBLE_COMPLEX])
-    #Uc_hat_xf[:, :N1/2, :] = Uc_hat_xr[:] 
-    
-    #if commxy.Get_rank() < commxy.Get_size()-1:
-        #s = Uc_hat_y[:, -1, :].copy()
-        #commxy.Send(s, dest=commxy.Get_size()-1, tag=5)
-    
-    #else:
-        #for p in range(commxy.Get_size()-1):
-            #recv = zeros((N1, N2), dtype="complex")
-            #commxy.Recv(recv, source=p, tag=5)
-            #Uc_hat_xf[p*N1:(p+1)*N1, -1] = recv[:]    
-
-    ## Do fft in x-direction
-    #Uc_hat_xf[:] = fft(Uc_hat_xf, 0)
-    
-    ## Communicate 
-    #commxz.Alltoall([Uc_hat_xf, MPI.DOUBLE_COMPLEX], [Uc_hat_xrf, MPI.DOUBLE_COMPLEX])
-
-    #for i in range(P2): 
-        #Uc_hat_z[:, :, i*N2:(i+1)*N2] = Uc_hat_xrf[i*N2:(i+1)*N2]
-
-    ## Do fft for last direction 
-    #fu[:] = fft(Uc_hat_z, 2)
-    
+        
 #@profile
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
@@ -212,13 +176,12 @@ def fftn_mpi(u, fu):
         f0[:, 0, :] += 1j*f0[:, -1, :]
         ff = f0[:, :N/2, :].copy()
         fx = fft(ff, 0)
-        s = fx[:, 0, :].copy()
-        t = vstack((s[0].real, 0.5*(s[1:N/2]+conj(s[:N/2:-1])), s[N/2].real))
+        xz_plane[:] = fx[:, 0, :]
+        xz_plane2[:] = vstack((xz_plane[0].real, 0.5*(xz_plane[1:N/2]+conj(xz_plane[:N/2:-1])), xz_plane[N/2].real))
         f0[:, :N/2, :] = fx[:]
-        f0[:, 0, :] = vstack((t, conj(t[N/2-1:0:-1])))
-        ss = s.copy()
-        ss[:] = vstack((s[0].imag, -0.5*1j*(s[1:N/2]-conj(s[:N/2:-1])), s[N/2].imag, conj(s[(N/2-1):0:-1])))
-        f0[:, -1, :] = ss[:]    
+        f0[:, 0, :] = vstack((xz_plane2, conj(xz_plane2[N/2-1:0:-1])))
+        xz_plane[:] = vstack((xz_plane[0].imag, -0.5*1j*(xz_plane[1:N/2]-conj(xz_plane[:N/2:-1])), xz_plane[N/2].imag, conj(xz_plane[(N/2-1):0:-1])))
+        f0[:, -1, :] = xz_plane[:]    
         fu[:] = fft(f0, 2)
         return
     
@@ -241,17 +204,18 @@ def fftn_mpi(u, fu):
     Uc_hat_x[:] = fft(Uc_hat_xr, 0)
     
     # Take care of k=N/2 plane
-    if commxy.Get_rank() == 0:
-        c_plane[:] = Uc_hat_xr[:, 0, :]
-        c_plane2[:] = vstack((c_plane[0].real, 0.5*(c_plane[1:N/2]+conj(c_plane[:N/2:-1])), c_plane[N/2].real))
-        Uc_hat_xr[:, 0, :] = vstack((c_plane2, conj(c_plane2[(N/2-1):0:-1])))
-        c_plane[:] = vstack((c_plane[0].imag, -0.5*1j*(c_plane[1:N/2]-conj(c_plane[:N/2:-1])), c_plane[N/2].imag, conj(c_plane[(N/2-1):0:-1])))
-        commxy.Send([c_plane, MPI.DOUBLE_COMPLEX], dest=commxy.Get_size()-1, tag=77)
+    # Now both k=0 and k=N/2 are contained in 
+    if xyrank == 0:
+        xz_plane[:] = Uc_hat_x[:, 0, :]
+        xz_plane2[:] = vstack((xz_plane[0].real, 0.5*(xz_plane[1:N/2]+conj(xz_plane[:N/2:-1])), xz_plane[N/2].real))
+        Uc_hat_x[:, 0, :] = vstack((xz_plane2, conj(xz_plane2[(N/2-1):0:-1])))
+        xz_plane[:] = vstack((xz_plane[0].imag, -0.5*1j*(xz_plane[1:N/2]-conj(xz_plane[:N/2:-1])), xz_plane[N/2].imag, conj(xz_plane[(N/2-1):0:-1])))
+        commxy.Send([xz_plane, MPI.DOUBLE_COMPLEX], dest=commxy.Get_size()-1, tag=77)
         
-    if commxy.Get_rank() == commxy.Get_size()-1:
-        commxy.Recv([c_plane, MPI.DOUBLE_COMPLEX], source=0, tag=77)
+    if xyrank == P1-1:
+        commxy.Recv([xz_plane, MPI.DOUBLE_COMPLEX], source=0, tag=77)
         for i in range(P2):
-            Uc_hat_z[:, -1, i*N2:(i+1)*N2] = c_plane[i*N2:(i+1)*N2]
+            Uc_hat_z[:, -1, i*N2:(i+1)*N2] = xz_plane[i*N2:(i+1)*N2]
      
     # Communicate 
     commxz.Alltoall([Uc_hat_x, MPI.DOUBLE_COMPLEX], [Uc_hat_xr, MPI.DOUBLE_COMPLEX])
