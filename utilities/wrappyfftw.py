@@ -7,7 +7,7 @@ __all__ = ['fft', 'ifft', 'fft2', 'ifft2', 'fftn', 'ifftn',
            'rfft', 'irfft', 'rfft2', 'irfft2', 'rfftn', 'irfftn',]
 try:
     import pyfftw
-
+    from numpy import zeros as nzeros
 
     # Keep fft objects in cache for efficiency
     nthreads = 1
@@ -16,6 +16,9 @@ try:
     def empty(N, dtype="float", bytes=16):
         return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype)
 
+    def zeros(N, dtype="float", bytes=16):
+        return pyfftw.n_byte_align(nzeros(N, dtype=dtype), bytes)
+    
     # Monkey patches for fft
     #ifft = pyfftw.interfaces.numpy_fft.ifft
     #fft = pyfftw.interfaces.numpy_fft.fft

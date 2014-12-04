@@ -101,17 +101,6 @@ dealias = array((abs(KX[0]) < 2./3.*max(kx))*(abs(KX[1]) < 2./3.*max(ky))*(abs(K
 a = [1./6., 1./3., 1./3., 1./6.]
 b = [0.5, 0.5, 1.]
 
-def pressure():
-    """Pressure is not really used, but may be recovered from the velocity.
-    """
-    p = zeros((Np, N, N))
-    for i in range(3):
-        for j in range(3):
-            ifftn_mpi(1j*KX[j]*U_hat[i], U_tmp[j])
-        fftn_mpi(sum(U*U_tmp, 0), F_tmp[i])
-    ifftn_mpi(1j*sum(KX_over_Ksq*F_tmp, 0), p)
-    return p
-
 def project(u):
     """Project u onto divergence free space"""
     u[:] -= sum(KX_over_Ksq*u, 0)*KX
@@ -148,7 +137,7 @@ def fftn_mpi(u, fu):
         fu[:] = fft(fft(rfft(u, 1), 2), 0)       
         return
     
-    # Do 2D fft2 in y-z directions on owned data
+    # Do 2 ffts in y-z directions on owned data
     Uc_hatT[:] = fft(rfft(u, 1), 2)
     
     # Communicating intermediate result 
@@ -157,7 +146,8 @@ def fftn_mpi(u, fu):
     #for i in range(num_processes):
     #    if not i == rank:
     #       comm.Sendrecv_replace([ft[i], MPI.DOUBLE_COMPLEX], i, 0, i, 0)   
-           
+      
+    # Transform data to align with x-direction  
     for i in range(num_processes): 
         U_mpi[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
         
@@ -228,12 +218,13 @@ def ComputeRHS(dU, rk):
     elif convection == "Vortex":
         Curl(U_hat, curl)
         Cross(U, curl, dU)
-    # Compute pressure (except the imaginary 1j)
-    P_hat[:] = sum(dU*KX_over_Ksq, 0)
-        
+
     # Dealias the nonlinear convection
     dU[:] *= dealias*dt
     
+    # Compute pressure (To get actual pressure multiply by 1j/dt)
+    P_hat[:] = sum(dU*KX_over_Ksq, 0)
+        
     # Add pressure gradient
     dU[:] -= P_hat*KX    
 
@@ -295,14 +286,14 @@ while t < T-1e-8:
         
     # Postprocessing intermediate results
     #if tstep % plot_result == 0:
-        #p = pressure()
+        #ifftn_mpi(P_hat*1j/dt, P)
         #if rank == 0:
-            #im.set_data(p[Np/2])
+            #im.set_data(P[0])
             #im.autoscale()  
             #plt.pause(1e-6) 
             
     if tstep % params['write_result'] == 0 or tstep % params['write_yz_slice'][1] == 0:
-        ifftn_mpi(P_hat*1j, P)
+        ifftn_mpi(P_hat*1j/dt, P)
         hdf5file.write(U, P, tstep)
 
     if tstep % compute_energy == 0:

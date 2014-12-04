@@ -81,15 +81,18 @@ def ComputeRHS(dU, rk):
     curl[:] = irfft2(1j*(KX[0]*U_hat[1] - KX[1]*U_hat[0]))
     dU[0] = rfft2(U[1]*curl)
     dU[1] = rfft2(-U[0]*curl)
-        
+    
     # Dealias the nonlinear convection
     dU[:] *= dealias*dt
-        
+            
+    # Compute pressure (To get actual pressure multiply by 1j/dt)
+    P_hat[:] = sum(dU*KX_over_Ksq, 0)
+
     # Add pressure gradient
-    dU[:] -= sum(dU*KX_over_Ksq, 0)*KX
+    dU[:] -= P_hat*KX
     
     # Add contribution from diffusion
-    dU[:] += -nu*dt*KK*U_hat
+    dU[:] -= nu*dt*KK*U_hat
     
 # Taylor-Green initialization
 #U[0] = sin(X[0])*cos(X[1])
