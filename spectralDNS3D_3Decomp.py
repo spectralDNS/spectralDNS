@@ -123,7 +123,7 @@ def project(u):
     """Project u onto divergence free space"""
     u[:] -= sum(KX_over_Ksq*u, 0)*KX
     
-@profile
+#@profile
 def ifftn_mpi(fu, u):
     """ifft in three directions using mpi.
     Need to do ifft in reversed order of fft
@@ -148,7 +148,7 @@ def ifftn_mpi(fu, u):
     Uc_hat_y[:, -1, :] = 0
     u[:] = irfft(Uc_hat_y, 1)
         
-@profile
+#@profile
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """    
