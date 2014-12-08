@@ -36,17 +36,14 @@ X = array(meshgrid(x, x, indexing='ij'))
 Nf = N/2+1
 U     = empty((2, N, N))
 U_hat = empty((2, N, Nf), dtype="complex")
+P     = empty((N, N))
+P_hat = empty((N, Nf), dtype="complex")
+curl   = empty((N, N))
 
 # RK4 arrays
 U_hat0 = empty((2, N, Nf), dtype="complex")
 U_hat1 = empty((2, N, Nf), dtype="complex")
 dU     = empty((2, N, Nf), dtype="complex")
-
-# work arrays
-U_tmp  = empty((2, N, N))
-F_tmp  = empty((2, N, Nf), dtype="complex")
-Uc_hat = empty((N, Nf), dtype="complex")
-curl   = empty((N, N))
 
 # Set wavenumbers in grid
 kx = fftfreq(N, 1./N)
@@ -56,20 +53,12 @@ KK = sum(KX*KX, 0)
 KX_over_Ksq = array(KX, dtype=float) / where(KK==0, 1, KK)
 
 # Filter for dealiasing nonlinear convection
-dealias = array((abs(KX[0]) < (2./3.)*max(kx))*(abs(KX[1]) < (2./3.)*max(kx)), dtype=bool)
+kmax = 2./3.*(N/2+1)
+dealias = array((abs(KX[0]) < kmax)*(abs(KX[1]) < kmax), dtype=bool)
 
 # RK4 parameters
 a = [1./6., 1./3., 1./3., 1./6.]
 b = [0.5, 0.5, 1.]
-
-def pressure():
-    """Pressure is not really used, but may be recovered from the velocity.
-    """
-    for i in range(2):
-        for j in range(2):
-            U_tmp[j] = irfft2(1j*KX[j]*U_hat[i])
-        F_tmp[i] = rfft2(sum(U*U_tmp, 0))
-    return irfft2(1j*sum(KX_over_Ksq*F_tmp, 0))
 
 def project(u):
     u[:] -= sum(KX*u, 0)*KX_over_Ksq
@@ -99,10 +88,10 @@ def ComputeRHS(dU, rk):
 #U[1] =-cos(X[0])*sin(X[1])
 
 # Initialize two vortices
-#w=exp(-((X[0]-pi)**2+(X[1]-pi+pi/4)**2)/(0.2))+exp(-((X[0]-pi)**2+(X[1]-pi-pi/4)**2)/(0.2))-0.5*exp(-((X[0]-pi-pi/4)**2+(X[1]-pi-pi/4)**2)/(0.4))
-#w_hat = rfft2(w)
-#U[0] = irfft2(1j*KX_over_Ksq[1]*w_hat)
-#U[1] = irfft2(-1j*KX_over_Ksq[0]*w_hat)
+w=exp(-((X[0]-pi)**2+(X[1]-pi+pi/4)**2)/(0.2))+exp(-((X[0]-pi)**2+(X[1]-pi-pi/4)**2)/(0.2))-0.5*exp(-((X[0]-pi-pi/4)**2+(X[1]-pi-pi/4)**2)/(0.4))
+w_hat = rfft2(w)
+U[0] = irfft2(1j*KX_over_Ksq[1]*w_hat)
+U[1] = irfft2(-1j*KX_over_Ksq[0]*w_hat)
 
 # Transform initial data
 U_hat[:] = rfft2(U)
@@ -128,7 +117,7 @@ while t < T:
         U_hat1[:] = U_hat0[:] = U_hat
         for rk in range(4):
             ComputeRHS(dU, rk)        
-            project(dU)
+            #project(dU)
             if rk < 3:
                 U_hat[:] = U_hat0 + b[rk]*dU
             U_hat1[:] += a[rk]*dU        
@@ -136,14 +125,14 @@ while t < T:
         
     elif temporal == 'ForwardEuler' or tstep == 1:
         ComputeRHS(dU, 0)
-        project(dU)
+        #project(dU)
         U_hat[:] += dU
         if temporal == "AB2":
             U_hat0[:] = dU
         
     else:
         ComputeRHS(dU, 0)
-        project(dU)
+        #project(dU)
         U_hat[:] += 1.5*dU - 0.5*U_hat0
         U_hat0[:] = dU
 

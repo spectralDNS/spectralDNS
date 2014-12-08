@@ -18,19 +18,20 @@ from h5io import *
 comm = MPI.COMM_WORLD
 
 params = {
-    'convection': 'Vortex',
-    'make_profile': 0,
-    'M': 5,
-    'temporal': 'RK4',
+    'convection': 'Vortex',     # ['Standard', 'Divergence', 'Skewed', 'Vortex']
+    'make_profile': 0,          # Enable cProfile profiler
+    'M': 5,                     # Mesh size
+    'temporal': 'RK4',          # Integrator ("RK4", "ForwardEuler", "AB2")
     'write_result': 1e8,        # Write to HDF5 every..
     'write_yz_slice': [0, 1e8], # Write slice 0 (or higher) in y-z plance every..
     'compute_energy': 2,        # Compute solution energy every..
     'plot_result': 2,           # Show an image every..
-    'nu': 0.000625,
-    'dt': 0.01,
-    'T': 0.1
+    'nu': 0.000625,             # Viscosity
+    'dt': 0.01,                 # Time step
+    'T': 0.1                    # End time
 }
 
+# Parse parameters from the command line 
 commandline_kwargs = parse_command_line(sys.argv[1:])
 params.update(commandline_kwargs)
 assert params['convection'] in ['Standard', 'Divergence', 'Skewed', 'Vortex']
@@ -59,7 +60,7 @@ X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'))
 
 """
 Solution U is real and as such its transform, U_hat = fft(U)(k), 
-is such that fft(U)(k) = conv(fft(U)(-k)) and thus it is sufficient 
+is such that fft(U)(k) = conj(fft(U)(N-k)) and thus it is sufficient 
 to store N/2+1 Fourier coefficients in the first transformed direction (y).
 For means of efficient MPI communication, the physical box (N^3) is
 shared by processors along the first direction, whereas the Fourier 
@@ -95,7 +96,9 @@ KK = sum(KX*KX, 0)
 KX_over_Ksq = array(KX, dtype=float) / where(KK==0, 1, KK)
 
 # Filter for dealiasing nonlinear convection
-dealias = array((abs(KX[0]) < 2./3.*max(kx))*(abs(KX[1]) < 2./3.*max(ky))*(abs(KX[2]) < 2./3.*max(kx)), dtype=bool)
+kmax = 2./3.*(N/2+1)
+dealias = array((abs(KX[0]) < kmax)*(abs(KX[1]) < kmax)*
+                (abs(KX[2]) < kmax), dtype=bool)
 
 # RK4 parameters
 a = [1./6., 1./3., 1./3., 1./6.]
@@ -104,17 +107,18 @@ b = [0.5, 0.5, 1.]
 def project(u):
     """Project u onto divergence free space"""
     u[:] -= sum(KX_over_Ksq*u, 0)*KX
+
 #@profile
 def ifftn_mpi(fu, u):
     """ifft in three directions using mpi.
     Need to do ifft in reversed order of fft
     """
     if num_processes == 1:
-        u[:] = irfft(ifft(ifft(fu, 0), 2), 1)
+        u[:] = irfft(ifft(ifft(fu, axis=0), axis=2), axis=1)
         return
     
     # Do first owned direction
-    Uc_hat[:] = ifft(fu, 0)
+    Uc_hat[:] = ifft(fu, axis=0)
     
     # Communicate all values
     comm.Alltoall([Uc_hat, MPI.DOUBLE_COMPLEX], [U_mpi, MPI.DOUBLE_COMPLEX])
@@ -127,35 +131,39 @@ def ifftn_mpi(fu, u):
     #    Uc_hatT[:, :, i*Np:(i+1)*Np] = Uc_send[i]
            
     # Do last two directions
-    u[:] = irfft(ifft(Uc_hatT, 2), 1)
+    u[:] = irfft(ifft(Uc_hatT, axis=2), axis=1)
     
 #@profile
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """
     if num_processes == 1:
-        fu[:] = fft(fft(rfft(u, 1), 2), 0)       
+        fu[:] = fft(fft(rfft(u, axis=1), axis=2), axis=0)       
         return
     
     # Do 2 ffts in y-z directions on owned data
-    Uc_hatT[:] = fft(rfft(u, 1), 2)
+    #ft = fu.transpose(2,1,0)
+    #ft[:] = fft(rfft(u, axis=1), axis=2)
+    Uc_hatT[:] = fft(rfft(u, axis=1), axis=2)
     
-    # Communicating intermediate result 
-    #ft = fu.reshape(num_processes, Np, Nf, Np)
-    #rstack(ft, Uc_hatT, Np, num_processes)        
+    ## Communicating intermediate result 
+    ##rstack(ft, Uc_hatT, Np, num_processes)       
+    #fu_send = fu.reshape((num_processes, Np, Nf, Np))
     #for i in range(num_processes):
-    #    if not i == rank:
-    #       comm.Sendrecv_replace([ft[i], MPI.DOUBLE_COMPLEX], i, 0, i, 0)   
+        #if not i == rank:
+           #comm.Sendrecv_replace([fu_send[i], MPI.DOUBLE_COMPLEX], i, 0, i, 0)   
+    #fu_send[:] = fu_send.transpose(0,3,2,1)
       
     # Transform data to align with x-direction  
     for i in range(num_processes): 
+        #U_mpi[i] = ft[:, :, i*Np:(i+1)*Np]
         U_mpi[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
         
     # Communicate all values
     comm.Alltoall([U_mpi, MPI.DOUBLE_COMPLEX], [fu, MPI.DOUBLE_COMPLEX])  
                 
     # Do fft for last direction 
-    fu[:] = fft(fu, 0)
+    fu[:] = fft(fu, axis=0)
 
 #@jit((complex128[:,:,:,:], complex128[:,:,:], int64, int64))
 def rstack(f, u, Np, num_processes):
@@ -184,13 +192,13 @@ def divergenceConvection(c, add=False):
     c[2] += (1j*KX[1]*F_tmp[1] + 1j*KX[2]*F_tmp[2])
 
 def Cross(a, b, c):
-    """c = U x w"""
+    """c_k = F_k(a x b)"""
     fftn_mpi(a[1]*b[2]-a[2]*b[1], c[0])
     fftn_mpi(a[2]*b[0]-a[0]*b[2], c[1])
     fftn_mpi(a[0]*b[1]-a[1]*b[0], c[2])
 
 def Curl(a, c):
-    """c = curl(a)"""
+    """c = F_inv(curl(a))"""
     ifftn_mpi(1j*(KX[0]*a[1]-KX[1]*a[0]), c[2])
     ifftn_mpi(1j*(KX[2]*a[0]-KX[0]*a[2]), c[1])
     ifftn_mpi(1j*(KX[1]*a[2]-KX[2]*a[1]), c[0])
@@ -240,9 +248,7 @@ U[2] = 0
 for i in range(3):
    fftn_mpi(U[i], U_hat[i])
    
-# Make it divergence free in case it is not
-project(U_hat)
-
+# Set some timers
 t = 0.0
 tstep = 0
 fastest_time = 1e8
@@ -254,15 +260,14 @@ if rank == 0:
     #plt.draw()
     k = []
 
-# RK4 loop in time
+# Forward equations in time
 tic = t0 = time.time()
 while t < T-1e-8:
     t += dt; tstep += 1
     if temporal == "RK4":
         U_hat1[:] = U_hat0[:] = U_hat
         for rk in range(4):
-            ComputeRHS(dU, rk)        
-            project(dU)
+            ComputeRHS(dU, rk)
             if rk < 3:
                 U_hat[:] = U_hat0 + b[rk]*dU
             U_hat1[:] += a[rk]*dU            
@@ -270,14 +275,12 @@ while t < T-1e-8:
         
     elif temporal == "ForwardEuler" or tstep == 1:  
         ComputeRHS(dU, 0)        
-        project(dU)
         U_hat[:] += dU
         if temporal == "AB2":
             U_hat0[:] = dU
         
     else:
         ComputeRHS(dU, 0)
-        project(dU)
         U_hat[:] += 1.5*dU - 0.5*U_hat0
         U_hat0[:] = dU
 
