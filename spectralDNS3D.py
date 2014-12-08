@@ -11,7 +11,7 @@ comm = MPI.COMM_WORLD
 
 from numpy import *
 from numpy.fft import fftfreq, fft, ifft, rfft, irfft
-from h5io import *
+#from h5io import *
 
 mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
 
@@ -49,7 +49,7 @@ if make_profile: profiler = cProfile.Profile()
 # Each cpu gets ownership of Np slices
 Np = N / num_processes     
 
-hdf5file = HDF5Writer(comm, dt, N, params)
+#hdf5file = HDF5Writer(comm, dt, N, params)
 
 # Create the physical mesh
 x = linspace(0, L, N+1)[:-1]
@@ -284,9 +284,9 @@ while t < T-1e-8:
     for i in range(3):
         ifftn_mpi(U_hat[i], U[i])
         
-    if tstep % params['write_result'] == 0 or tstep % params['write_yz_slice'][1] == 0:
-        ifftn_mpi(P_hat*1j/dt, P)
-        hdf5file.write(U, P, tstep)
+    #if tstep % params['write_result'] == 0 or tstep % params['write_yz_slice'][1] == 0:
+        #ifftn_mpi(P_hat*1j/dt, P)
+        #hdf5file.write(U, P, tstep)
 
     if tstep % compute_energy == 0:
         kk = comm.reduce(0.5*sum(U*U)*dx*dx*dx/L**3)
@@ -325,6 +325,6 @@ if make_profile:
 
 mem("End")
     
-hdf5file.generate_xdmf()    
-hdf5file.close()
+#hdf5file.generate_xdmf()    
+#hdf5file.close()
     

@@ -11,7 +11,7 @@ comm = MPI.COMM_WORLD
 
 from numpy import *
 from numpy.fft import fftfreq, fft, ifft, rfft, irfft
-from h5io import *
+#from h5io import *
 
 mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
 
