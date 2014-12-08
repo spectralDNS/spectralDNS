@@ -5,17 +5,15 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 import time, sys, cProfile
 
-#from numpy import *
-#from pylab import *
-from numpy import array, meshgrid, linspace, empty, zeros, sin, cos, pi, where, sum, int, float, bool, arange, vstack, conj
-from pylab import fftfreq, fft2, rfft, ifft, ifft2, irfft
 from mpi4py import MPI
 from utilities import *
-from h5io import *
-#from numba import jit, complex128, int64
-#import numexpr
-
 comm = MPI.COMM_WORLD
+
+from numpy import *
+from numpy.fft import fftfreq, fft, ifft, rfft, irfft
+from h5io import *
+
+mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
 
 params = {
     'make_profile': 0,
@@ -25,7 +23,6 @@ params = {
     'write_result': 1e8,        # Write to HDF5 every..
     'write_yz_slice': [0, 1e8], # Write slice 0 (or higher) in y-z plance every..
     'compute_energy': 2,        # Compute solution energy every..
-    'plot_result': 2,           # Show an image every..
     'nu': 0.000625,
     'dt': 0.01,
     'T': 0.1
@@ -113,6 +110,7 @@ KX_over_Ksq = array(KX, dtype=float) / where(KK==0, 1, KK)
 # Filter for dealiasing nonlinear convection
 kmax = 2./3.*(N/2+1)
 dealias = array((abs(KX[0]) < kmax)*(abs(KX[1]) < kmax)*(abs(KX[2]) < kmax), dtype=bool)
+mem("Arrays")
 
 # RK4 parameters
 a = [1./6., 1./3., 1./3., 1./6.]
@@ -216,17 +214,15 @@ U[2] = 0
 for i in range(3):
    fftn_mpi(U[i], U_hat[i])
    
+mem("After first FFT")
+   
 # Set some timers
 t = 0.0
 tstep = 0
 fastest_time = 1e8
 slowest_time = 0.0
-# initialize plot and list k for storing energy
-if rank == 0:
-    #im = plt.imshow(zeros((N, N)))
-    #plt.colorbar(im)
-    #plt.draw()
-    k = []
+# initialize k for storing energy
+if rank == 0: k = []
 
 # Forward equations in time
 tic = t0 = time.time()
@@ -257,15 +253,7 @@ while t < T-1e-8:
 
     for i in range(3):
         ifftn_mpi(U_hat[i], U[i])
-        
-    # Postprocessing intermediate results
-    #if tstep % plot_result == 0:
-        #ifftn_mpi(P_hat*1j/dt, P)
-        #if rank == 0:
-            #im.set_data(P[N2/2])
-            #im.autoscale()  
-            #plt.pause(1e-6) 
-            
+                    
     #if tstep % params['write_result'] == 0 or tstep % params['write_yz_slice'][1] == 0:
         #ifftn_mpi(P_hat*1j/dt, P)
         #hdf5file.write(U, P, tstep)
@@ -285,7 +273,7 @@ while t < T-1e-8:
     if tstep == 1 and make_profile:
         #Enable profiling after first step is finished
         profiler.enable()
-
+        
 toc = time.time()-tic
 
 fast = comm.reduce(fastest_time, op=MPI.MIN, root=0)
@@ -305,6 +293,8 @@ if rank == 0:
 if make_profile:
     results = create_profile(**vars())
     
+mem("End")
+
 #hdf5file.generate_xdmf()    
 #hdf5file.close()
     
