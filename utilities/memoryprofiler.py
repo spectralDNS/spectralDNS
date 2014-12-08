@@ -1,4 +1,4 @@
-from commands import getoutput
+import subprocess
 from os import getpid
 
 __all__ = ['MemoryUsage']
@@ -6,9 +6,9 @@ __all__ = ['MemoryUsage']
 def getMemoryUsage(rss=True):
     mypid = getpid()
     if rss:
-        mymemory = getoutput("ps -o rss %s" % mypid).split()[1]
+        mymemory = subprocess.check_output(["ps -o rss %s" % mypid], shell=True).split()[1]
     else:
-        mymemory = getoutput("ps -o vsz %s" % mypid).split()[1]
+        mymemory = subprocess.check_output(["ps -o vsz %s" % mypid], shell=True).split()[1]
     return eval(mymemory) / 1024
 
 class MemoryUsage:
