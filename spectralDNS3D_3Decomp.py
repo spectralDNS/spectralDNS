@@ -43,7 +43,8 @@ rank = comm.Get_rank()
 if make_profile: profiler = cProfile.Profile()
 
 # Each cpu gets ownership of a pencil of size N1*N2*N in real space
-# and (N1/2+1)*N2*N in Fourier space
+# and (N1/2+1)*N2*N in Fourier space. However, the Nyquist mode is
+# neglected and as such the real number is N1/2*N2*N in Fourier space.
 P2 = num_processes / P1
 N1 = N/P1
 N2 = N/P2
@@ -65,8 +66,8 @@ group2 = comm.Get_group()
 groupxz = MPI.Group.Incl(group2, procxz)
 commxz = comm.Create(groupxz)
 
-xyrank = commxy.Get_rank() # Local rank in P1
-xzrank = commxz.Get_rank() # Local rank in P2
+xyrank = commxy.Get_rank() # Local rank in xy-plane
+xzrank = commxz.Get_rank() # Local rank in xz-plane
 
 # Create the physical mesh
 x = linspace(0, L, N+1)[:-1]
@@ -77,7 +78,10 @@ X = array(meshgrid(x[x1], x, x[x2], indexing='ij'))
 """
 Solution U is real and as such its transform, U_hat = fft(U)(k), 
 is such that fft(U)(k) = conj(fft(U)(N-k)) and thus it is sufficient 
-to store N/2+1 Fourier coefficients in the first transformed direction (y).
+to store N/2+1 Fourier coefficients in the first transformed direction 
+(y). However, the Nyquist mode (k=N/2+1) is neglected in the 3D fft.
+The Nyquist mode in included in temporary arrays simply because rfft/irfft 
+expect N/2+1 modes.
 """
 
 Nf = N/2+1 # Total Fourier coefficients in y-direction

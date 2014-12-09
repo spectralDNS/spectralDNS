@@ -10,7 +10,7 @@ from utilities import *
 comm = MPI.COMM_WORLD
 
 from numpy import *
-from numpy.fft import fftfreq, fft, ifft, rfft, irfft
+from numpy.fft import fftfreq, fft, ifft, rfft, irfft, rfft2, irfft2, rfftn, irfftn
 #from h5io import *
 
 mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
@@ -113,7 +113,8 @@ def ifftn_mpi(fu, u):
     Need to do ifft in reversed order of fft
     """
     if num_processes == 1:
-        u[:] = irfft(ifft(ifft(fu, axis=0), axis=2), axis=1)
+        #u[:] = irfft(ifft(ifft(fu, axis=0), axis=2), axis=1)
+        u[:] = irfftn(fu, axes=(0,2,1))
         return
     
     # Do first owned direction
@@ -130,20 +131,22 @@ def ifftn_mpi(fu, u):
     #    Uc_hatT[:, :, i*Np:(i+1)*Np] = Uc_send[i]
            
     # Do last two directions
-    u[:] = irfft(ifft(Uc_hatT, axis=2), axis=1)
+    #u[:] = irfft(ifft(Uc_hatT, axis=2), axis=1)
+    u[:] = irfft2(Uc_hatT, axes=(2,1))
     
 #@profile
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """
     if num_processes == 1:
-        fu[:] = fft(fft(rfft(u, axis=1), axis=2), axis=0)       
+        #fu[:] = fft(fft(rfft(u, axis=1), axis=2), axis=0)  
+        fu[:] = rfftn(u, axes=(0,2,1))
         return
     
     # Do 2 ffts in y-z directions on owned data
     #ft = fu.transpose(2,1,0)
     #ft[:] = fft(rfft(u, axis=1), axis=2)
-    Uc_hatT[:] = fft(rfft(u, axis=1), axis=2)
+    Uc_hatT[:] = rfft2(u, axes=(2,1))
     
     ## Communicating intermediate result 
     ##rstack(ft, Uc_hatT, Np, num_processes)       
