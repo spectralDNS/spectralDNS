@@ -3,21 +3,24 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-import time, sys, cProfile
+from MPI_knee import mpi_import
 
-from mpi4py import MPI
-from utilities import *
+with mpi_import():
+    import time, sys, cProfile
+
+    from mpi4py import MPI
+
+    from numpy import *
+    from numpy.fft import fftfreq, fft, ifft, rfft, irfft, rfft2, irfft2, rfftn, irfftn
+    ##from h5io import *
+    from utilities import *
+    
 comm = MPI.COMM_WORLD
-
-from numpy import *
-from numpy.fft import fftfreq, fft, ifft, rfft, irfft, rfft2, irfft2, rfftn, irfftn
-#from h5io import *
-
-mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
 
 params = {
     'convection': 'Vortex',     # ['Standard', 'Divergence', 'Skewed', 'Vortex']
     'make_profile': 0,          # Enable cProfile profiler
+    'mem_profile': False,       # Check memory use
     'M': 5,                     # Mesh size
     'temporal': 'RK4',          # Integrator ("RK4", "ForwardEuler", "AB2")
     'write_result': 1e8,        # Write to HDF5 every..
@@ -25,7 +28,8 @@ params = {
     'compute_energy': 2,        # Compute solution energy every..
     'nu': 0.000625,             # Viscosity
     'dt': 0.01,                 # Time step
-    'T': 0.1                    # End time
+    'T': 0.1,                   # End time
+    'precision': "double"       # single or double precision
 }
 
 # Parse parameters from the command line 
@@ -35,9 +39,14 @@ assert params['convection'] in ['Standard', 'Divergence', 'Skewed', 'Vortex']
 assert params['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
 vars().update(params)
 
+if mem_profile: mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
+
+ftype, ctype, mpitype = {"single": (float32, complex64, MPI.F_FLOAT_COMPLEX),
+                         "double": (float, complex, MPI.F_DOUBLE_COMPLEX)}[precision]
+
 N = 2**M
-L = 2 * pi
-dx = L / N
+L = ftype(2 * pi)
+dx = ftype(L / N)
 
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
@@ -52,8 +61,8 @@ Np = N / num_processes
 #hdf5file = HDF5Writer(comm, dt, N, params)
 
 # Create the physical mesh
-x = linspace(0, L, N+1)[:-1]
-X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'))
+x = linspace(0, L, N+1).astype(ftype)[:-1]
+X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'), dtype=ftype)
 
 """
 Solution U is real and as such its transform, U_hat = fft(U)(k), 
@@ -66,42 +75,42 @@ is N/2+1 in Fourier space.
 """
 
 Nf = N/2+1
-U     = empty((3, Np, N, N))                  
-U_hat = empty((3, N, Nf, Np), dtype="complex")
-P     = empty((Np, N, N))
-P_hat = empty((N, Nf, Np), dtype="complex")
+U     = empty((3, Np, N, N), dtype=ftype)  
+U_hat = empty((3, N, Nf, Np), dtype=ctype)
+P     = empty((Np, N, N), dtype=ftype)
+P_hat = empty((N, Nf, Np), dtype=ctype)
 
 # Temporal storage arrays (Not required by all temporal integrators)
-U_hat0  = empty((3, N, Nf, Np), dtype="complex")
-U_hat1  = empty((3, N, Nf, Np), dtype="complex")
-dU      = empty((3, N, Nf, Np), dtype="complex")
+U_hat0  = empty((3, N, Nf, Np), dtype=ctype)
+U_hat1  = empty((3, N, Nf, Np), dtype=ctype)
+dU      = empty((3, N, Nf, Np), dtype=ctype)
 
 # work arrays (Not required by all convection methods)
-F_tmp   = empty((3, N, Nf, Np), dtype="complex")
-U_tmp   = empty((3, Np, N, N))
-Uc_hat  = empty((N, Nf, Np), dtype="complex")
-Uc_hatT = empty((Np, Nf, N), dtype="complex")
+F_tmp   = empty((3, N, Nf, Np), dtype=ctype)
+U_tmp   = empty((3, Np, N, N), dtype=ftype)
+Uc_hat  = empty((N, Nf, Np), dtype=ctype)
+Uc_hatT = empty((Np, Nf, N), dtype=ctype)
 Uc_send = Uc_hat.reshape((num_processes, Np, Nf, Np))
-U_mpi   = empty((num_processes, Np, Nf, Np), dtype="complex")
-curl    = empty((3, Np, N, N))
+U_mpi   = empty((num_processes, Np, Nf, Np), dtype=ctype)
+curl    = empty((3, Np, N, N), dtype=ftype)
 
 # Set wavenumbers in grid
-kx = fftfreq(N, 1./N)
+kx = fftfreq(N, 1./N).astype(int)
 ky = kx[:Nf].copy(); ky[-1] *= -1
 KX = array(meshgrid(kx, ky, kx[rank*Np:(rank+1)*Np], indexing='ij'), dtype=int)
-KK = sum(KX*KX, 0)
-KX_over_Ksq = array(KX, dtype=float) / where(KK==0, 1, KK)
+KK = sum(KX*KX, 0, dtype=int)
+KX_over_Ksq = KX.astype(ftype) / where(KK==0, 1, KK).astype(ftype)
 
 # Filter for dealiasing nonlinear convection
 kmax = 2./3.*(N/2+1)
 dealias = array((abs(KX[0]) < kmax)*(abs(KX[1]) < kmax)*
                 (abs(KX[2]) < kmax), dtype=bool)
 
-mem("Arrays")
+if mem_profile: mem("Arrays")
 
 # RK4 parameters
-a = [1./6., 1./3., 1./3., 1./6.]
-b = [0.5, 0.5, 1.]
+a = array([1./6., 1./3., 1./3., 1./6.], dtype=ftype)
+b = array([0.5, 0.5, 1.], dtype=ftype)
 
 def project(u):
     """Project u onto divergence free space"""
@@ -121,17 +130,16 @@ def ifftn_mpi(fu, u):
     Uc_hat[:] = ifft(fu, axis=0)
     
     # Communicate all values
-    comm.Alltoall([Uc_hat, MPI.DOUBLE_COMPLEX], [U_mpi, MPI.DOUBLE_COMPLEX])
+    comm.Alltoall([Uc_hat, mpitype], [U_mpi, mpitype])
     for i in range(num_processes): 
         Uc_hatT[:, :, i*Np:(i+1)*Np] = U_mpi[i]
 
     #for i in range(num_processes):
-    #    if not i == rank:
-    #        comm.Sendrecv_replace([Uc_send[i], MPI.DOUBLE_COMPLEX], i, 0, i, 0)   
-    #    Uc_hatT[:, :, i*Np:(i+1)*Np] = Uc_send[i]
+       #if not i == rank:
+           #comm.Sendrecv_replace([Uc_send[i], mpitype], i, 0, i, 0)   
+       #Uc_hatT[:, :, i*Np:(i+1)*Np] = Uc_send[i]
            
     # Do last two directions
-    #u[:] = irfft(ifft(Uc_hatT, axis=2), axis=1)
     u[:] = irfft2(Uc_hatT, axes=(2,1))
     
 #@profile
@@ -144,33 +152,26 @@ def fftn_mpi(u, fu):
         return
     
     # Do 2 ffts in y-z directions on owned data
-    #ft = fu.transpose(2,1,0)
-    #ft[:] = fft(rfft(u, axis=1), axis=2)
     Uc_hatT[:] = rfft2(u, axes=(2,1))
+    # Transform data to align with x-direction  
+    for i in range(num_processes): 
+       #U_mpi[i] = ft[:, :, i*Np:(i+1)*Np]
+       U_mpi[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
+        
+    # Communicate all values
+    comm.Alltoall([U_mpi, mpitype], [fu, mpitype])  
     
     ## Communicating intermediate result 
-    ##rstack(ft, Uc_hatT, Np, num_processes)       
+    #ft = fu.transpose(2,1,0)
+    #ft[:] = rfft2(u, axes=(2,1))
     #fu_send = fu.reshape((num_processes, Np, Nf, Np))
     #for i in range(num_processes):
         #if not i == rank:
-           #comm.Sendrecv_replace([fu_send[i], MPI.DOUBLE_COMPLEX], i, 0, i, 0)   
+            #comm.Sendrecv_replace([fu_send[i], mpitype], i, 0, i, 0)   
     #fu_send[:] = fu_send.transpose(0,3,2,1)
-      
-    # Transform data to align with x-direction  
-    for i in range(num_processes): 
-        #U_mpi[i] = ft[:, :, i*Np:(i+1)*Np]
-        U_mpi[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
-        
-    # Communicate all values
-    comm.Alltoall([U_mpi, MPI.DOUBLE_COMPLEX], [fu, MPI.DOUBLE_COMPLEX])  
-                
+                      
     # Do fft for last direction 
     fu[:] = fft(fu, axis=0)
-
-#@jit((complex128[:,:,:,:], complex128[:,:,:], int64, int64))
-def rstack(f, u, Np, num_processes):
-    for i in range(num_processes): 
-        f[i] = u[:, :, i*Np:(i+1)*Np]
     
 def standardConvection(c):   
     """c_i = u_j du_i/dx_j"""
@@ -250,7 +251,7 @@ U[2] = 0
 for i in range(3):
    fftn_mpi(U[i], U_hat[i])
 
-mem("After first FFT")
+if mem_profile: mem("After first FFT")
    
 # Set some timers
 t = 0.0
@@ -292,10 +293,10 @@ while t < T-1e-8:
         #hdf5file.write(U, P, tstep)
 
     if tstep % compute_energy == 0:
-        kk = comm.reduce(0.5*sum(U*U)*dx*dx*dx/L**3)
+        kk = comm.reduce(sum(U.astype(float)*U.astype(float))*dx*dx*dx/L**3/2) # Compute energy with double precision
         if rank == 0:
             k.append(kk)
-            print t, kk
+            print t, ftype(kk)
             
     tt = time.time()-t0
     t0 = time.time()
@@ -326,7 +327,7 @@ if rank == 0:
 if make_profile:
     results = create_profile(**vars())
 
-mem("End")
+if mem_profile: mem("End")
     
 #hdf5file.generate_xdmf()    
 #hdf5file.close()

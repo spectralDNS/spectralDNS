@@ -13,10 +13,10 @@ try:
     nthreads = 1
     pyfftw.interfaces.cache.enable()
     pyfftw.interfaces.cache.set_keepalive_time(1e8)
-    def empty(N, dtype="float", bytes=16):
+    def empty(N, dtype=float, bytes=16):
         return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype)
 
-    def zeros(N, dtype="float", bytes=16):
+    def zeros(N, dtype=float, bytes=16):
         return pyfftw.n_byte_align(nzeros(N, dtype=dtype), bytes)
     
     # Monkey patches for fft

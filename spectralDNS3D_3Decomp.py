@@ -3,35 +3,42 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-import time, sys, cProfile
+from MPI_knee import mpi_import
 
-from mpi4py import MPI
-from utilities import *
+with mpi_import():
+    import time, sys, cProfile
+    from mpi4py import MPI
+    from utilities import *
+    from numpy import *
+    from numpy.fft import fftfreq, fft, ifft, rfft, irfft
+    #from h5io import *
+
 comm = MPI.COMM_WORLD
 
-from numpy import *
-from numpy.fft import fftfreq, fft, ifft, rfft, irfft
-#from h5io import *
-
-mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
-
 params = {
-    'make_profile': 0,
+    'make_profile': 0,          # Enable cProfile profiler
+    'mem_profile': False,       # Check memory use
     'M': 5,
     'P1': 1,
     'temporal': 'RK4',
     'write_result': 1e8,        # Write to HDF5 every..
     'write_yz_slice': [0, 1e8], # Write slice 0 (or higher) in y-z plance every..
     'compute_energy': 2,        # Compute solution energy every..
-    'nu': 0.000625,
-    'dt': 0.01,
-    'T': 0.1
+    'nu': 0.000625,             # Viscosity
+    'dt': 0.01,                 # Time step
+    'T': 0.1,                   # End time
+    'precision': "double"       # single or double precision
 }
 
 commandline_kwargs = parse_command_line(sys.argv[1:])
 params.update(commandline_kwargs)
 assert params['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
 vars().update(params)
+
+if mem_profile: mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
+
+ftype, ctype, mpitype = {"single": (float32, complex64, MPI.F_FLOAT_COMPLEX),
+                         "double": (float, complex, MPI.F_DOUBLE_COMPLEX)}[precision]
 
 N = 2**M
 L = 2 * pi
@@ -70,10 +77,10 @@ xyrank = commxy.Get_rank() # Local rank in xy-plane
 xzrank = commxz.Get_rank() # Local rank in xz-plane
 
 # Create the physical mesh
-x = linspace(0, L, N+1)[:-1]
+x = linspace(0, L, N+1).astype(ftype)[:-1]
 x1 = slice(xyrank * N1, (xyrank+1) * N1, 1)
 x2 = slice(xzrank * N2, (xzrank+1) * N2, 1)
-X = array(meshgrid(x[x1], x, x[x2], indexing='ij'))
+X = array(meshgrid(x[x1], x, x[x2], indexing='ij'), dtype=ftype)
 
 """
 Solution U is real and as such its transform, U_hat = fft(U)(k), 
@@ -85,40 +92,41 @@ expect N/2+1 modes.
 """
 
 Nf = N/2+1 # Total Fourier coefficients in y-direction
-U     = empty((3, N1, N, N2))
-U_hat = empty((3, N2, N1/2, N), dtype="complex")
-P     = empty((N1, N, N2))
-P_hat = empty((N2, N1/2, N), dtype="complex")
+U     = empty((3, N1, N, N2), dtype=ftype)
+U_hat = empty((3, N2, N1/2, N), dtype=ctype)
+P     = empty((N1, N, N2), dtype=ftype)
+P_hat = empty((N2, N1/2, N), dtype=ctype)
 
 # Temporal storage arrays (Not required by all temporal integrators)
-U_hat0  = empty((3, N2, N1/2, N), dtype="complex")
-U_hat1  = empty((3, N2, N1/2, N), dtype="complex")
-dU      = empty((3, N2, N1/2, N), dtype="complex")
+U_hat0  = empty((3, N2, N1/2, N), dtype=ctype)
+U_hat1  = empty((3, N2, N1/2, N), dtype=ctype)
+dU      = empty((3, N2, N1/2, N), dtype=ctype)
 
 # work arrays
-Uc_hat_y  = empty((N1, Nf, N2), dtype="complex")
-Uc_hat_x  = empty((N, N1/2, N2), dtype="complex")
-Uc_hat_xr = empty((N, N1/2, N2), dtype="complex")
-Uc_hat_z  = zeros((N2, N1/2, N), dtype="complex")
+Uc_hat_y  = empty((N1, Nf, N2), dtype=ctype)
+Uc_hat_x  = empty((N, N1/2, N2), dtype=ctype)
+Uc_hat_xr = empty((N, N1/2, N2), dtype=ctype)
+Uc_hat_z  = zeros((N2, N1/2, N), dtype=ctype)
 
 curl    = empty((3, N1, N, N2))
 
 # Set wavenumbers in grid
-kx = fftfreq(N, 1./N)
+kx = fftfreq(N, 1./N).astype(int)
 k1 = slice(xzrank*N2, (xzrank+1)*N2, 1)
 k2 = slice(xyrank*N1/2, (xyrank+1)*N1/2, 1)
 KX = array(meshgrid(kx[k1], kx[k2], kx, indexing='ij'), dtype=int)
-KK = sum(KX*KX, 0)
-KX_over_Ksq = array(KX, dtype=float) / where(KK==0, 1, KK)
+KK = sum(KX*KX, 0, dtype=int)
+KX_over_Ksq = KX.astype(ftype) / where(KK==0, 1, KK).astype(ftype)
 
 # Filter for dealiasing nonlinear convection
 kmax = 2./3.*(N/2+1)
 dealias = array((abs(KX[0]) < kmax)*(abs(KX[1]) < kmax)*(abs(KX[2]) < kmax), dtype=bool)
-mem("Arrays")
+
+if mem_profile: mem("Arrays")
 
 # RK4 parameters
-a = [1./6., 1./3., 1./3., 1./6.]
-b = [0.5, 0.5, 1.]
+a = array([1./6., 1./3., 1./3., 1./6.], dtype=ftype)
+b = array([0.5, 0.5, 1.], dtype=ftype)
 
 def project(u):
     """Project u onto divergence free space"""
@@ -137,11 +145,11 @@ def ifftn_mpi(fu, u):
         Uc_hat_x[i*N2:(i+1)*N2] = Uc_hat_z[:, :, i*N2:(i+1)*N2]
         
     # Communicate in xz-plane and do fft in x-direction
-    commxz.Alltoall([Uc_hat_x, MPI.DOUBLE_COMPLEX], [Uc_hat_xr, MPI.DOUBLE_COMPLEX])
+    commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
     Uc_hat_x[:] = ifft(Uc_hat_xr, axis=0)
         
     # Communicate and transform in xy-plane
-    commxy.Alltoall([Uc_hat_x, MPI.DOUBLE_COMPLEX], [Uc_hat_xr, MPI.DOUBLE_COMPLEX])
+    commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
     for i in range(P1):
         Uc_hat_y[:, i*N1/2:(i+1)*N1/2] = Uc_hat_xr[i*N1:(i+1)*N1]
             
@@ -161,11 +169,11 @@ def fftn_mpi(u, fu):
         Uc_hat_x[i*N1:(i+1)*N1] = Uc_hat_y[:, i*N1/2:(i+1)*N1/2]
     
     # Communicate and do fft in x-direction
-    commxy.Alltoall([Uc_hat_x, MPI.DOUBLE_COMPLEX], [Uc_hat_xr, MPI.DOUBLE_COMPLEX])
+    commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
     Uc_hat_x[:] = fft(Uc_hat_xr, axis=0)        
     
     # Communicate and transform to final z-direction
-    commxz.Alltoall([Uc_hat_x, MPI.DOUBLE_COMPLEX], [Uc_hat_xr, MPI.DOUBLE_COMPLEX])    
+    commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])    
     for i in range(P2): 
         Uc_hat_z[:, :, i*N2:(i+1)*N2] = Uc_hat_xr[i*N2:(i+1)*N2]
                                    
@@ -218,7 +226,7 @@ U[2] = 0
 for i in range(3):
    fftn_mpi(U[i], U_hat[i])
    
-mem("After first FFT")
+if mem_profile: mem("After first FFT")
    
 # Set some timers
 t = 0.0
@@ -263,10 +271,10 @@ while t < T-1e-8:
         #hdf5file.write(U, P, tstep)
 
     if tstep % compute_energy == 0:
-        kk = comm.reduce(0.5*sum(U*U)*dx*dx*dx/L**3)
+        kk = comm.reduce(0.5*sum(U.astype(float)*U.astype(float))*dx*dx*dx/L**3) # Compute energy with double precision
         if rank == 0:
             k.append(kk)
-            print t, kk
+            print t, ftype(kk)
             
     tt = time.time()-t0
     t0 = time.time()
@@ -297,7 +305,7 @@ if rank == 0:
 if make_profile:
     results = create_profile(**vars())
     
-mem("End")
+if mem_profile: mem("End")
 
 #hdf5file.generate_xdmf()    
 #hdf5file.close()
