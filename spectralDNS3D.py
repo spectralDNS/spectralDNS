@@ -3,18 +3,31 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from MPI_knee import mpi_import
+#from MPI_knee import mpi_import
 
-with mpi_import():
-    import time, sys, cProfile
+#with mpi_import():
+    #import time, sys, cProfile
 
-    from mpi4py import MPI
+    #from mpi4py import MPI
 
-    from numpy import *
-    from numpy.fft import fftfreq, fft, ifft, rfft, irfft, rfft2, irfft2, rfftn, irfftn
-    ##from h5io import *
-    from utilities import *
-    
+    #from numpy import *
+    #from numpy.fft import fftfreq, fft, ifft, rfft, irfft, rfft2, irfft2, rfftn, irfftn
+    ###from h5io import *
+    #from utilities import *
+
+import sys,os
+scriptpath = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.dirname(scriptpath)) # path to cached_import.py
+from cached_import import mpi4py_finder
+sys.meta_path.append(mpi4py_finder())
+
+import time, sys, cProfile
+from mpi4py import MPI
+from numpy import *
+from numpy.fft import fftfreq, fft, ifft, rfft, irfft, rfft2, irfft2, rfftn, irfftn
+##from h5io import *
+from utilities import *
+
 comm = MPI.COMM_WORLD
 
 params = {
