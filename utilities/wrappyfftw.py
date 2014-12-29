@@ -5,10 +5,14 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 __all__ = ['fft', 'ifft', 'fft2', 'ifft2', 'fftn', 'ifftn',
            'rfft', 'irfft', 'rfft2', 'irfft2', 'rfftn', 'irfftn', 
-           'empty', 'zeros']
+           'fftfreq', 'empty', 'zeros']
+
+from numpy import zeros, empty
+from numpy.fft import fftfreq, fft, ifft, fftn, ifftn, rfft, irfft, rfft2, irfft2, rfftn, irfftn, fft2, ifft2
+
 try:
     import pyfftw
-    from numpy import zeros as nzeros
+    nzeros = zeros
 
     # Keep fft objects in cache for efficiency
     nthreads = 1
@@ -108,6 +112,4 @@ try:
                                                 #threads=nthreads)
 
 except:    
-    from numpy import zeros, empty
-    from numpy.fft import fftfreq, fft, ifft, fftn, ifftn, rfft, irfft, rfft2, irfft2, rfftn, irfftn, fft2, ifft2    
     print Warning("Install pyfftw, it is much faster than numpy fft")

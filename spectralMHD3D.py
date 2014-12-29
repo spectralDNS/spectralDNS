@@ -10,7 +10,6 @@ with mpi_import():
     import sys, cProfile
     from h5io import *
     from numpy import *
-    from numpy.fft import fftfreq, fft, ifft, rfft, irfft, rfft2, irfft2, rfftn, irfftn
     from utilities import *
 
 #import time
@@ -19,7 +18,6 @@ with mpi_import():
 #from h5io import *
 #from mpi4py import MPI
 #from numpy import *
-#from numpy.fft import fftfreq, fft, ifft, rfft, irfft, rfft2, irfft2, rfftn, irfftn
 #from utilities import *
 
 comm = MPI.COMM_WORLD

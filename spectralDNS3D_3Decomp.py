@@ -3,15 +3,14 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from MPI_knee import mpi_import
-
+from MPI_knee import mpi_import, MPI
 with mpi_import():
-    import time, sys, cProfile
-    from mpi4py import MPI
-    from utilities import *
+    import time
+    t0 = time.time()
+    import sys, cProfile
+    from h5io import *
     from numpy import *
-    from numpy.fft import fftfreq, fft, ifft, rfft, irfft
-    #from h5io import *
+    from utilities import *
 
 comm = MPI.COMM_WORLD
 
@@ -82,7 +81,6 @@ x1 = slice(xyrank * N1, (xyrank+1) * N1, 1)
 x2 = slice(xzrank * N2, (xzrank+1) * N2, 1)
 X = array(meshgrid(x[x1], x, x[x2], indexing='ij'), dtype=float)
 
-print X.shape, N1, N2
 """
 Solution U is real and as such its transform, U_hat = fft(U)(k), 
 is such that fft(U)(k) = conj(fft(U)(N-k)) and thus it is sufficient 
