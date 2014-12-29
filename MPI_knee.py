@@ -149,7 +149,7 @@ def load_next(mod, altmod, name, buf):
     if buf != '':
         buf += '.'
     buf += subname
-
+ 
     result = import_submodule(mod, subname, buf)
     if result is None and mod != altmod:
         result = import_submodule(altmod, subname, subname)

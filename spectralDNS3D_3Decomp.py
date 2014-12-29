@@ -37,8 +37,8 @@ vars().update(params)
 
 if mem_profile: mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
 
-ftype, ctype, mpitype = {"single": (float32, complex64, MPI.F_FLOAT_COMPLEX),
-                         "double": (float, complex, MPI.F_DOUBLE_COMPLEX)}[precision]
+float, complex, mpitype = {"single": (float32, complex64, MPI.F_FLOAT_COMPLEX),
+                           "double": (float64, complex128, MPI.F_DOUBLE_COMPLEX)}[precision]
 
 N = 2**M
 L = 2 * pi
@@ -77,11 +77,12 @@ xyrank = commxy.Get_rank() # Local rank in xy-plane
 xzrank = commxz.Get_rank() # Local rank in xz-plane
 
 # Create the physical mesh
-x = linspace(0, L, N+1).astype(ftype)[:-1]
+x = linspace(0, L, N+1).astype(float)[:-1]
 x1 = slice(xyrank * N1, (xyrank+1) * N1, 1)
 x2 = slice(xzrank * N2, (xzrank+1) * N2, 1)
-X = array(meshgrid(x[x1], x, x[x2], indexing='ij'), dtype=ftype)
+X = array(meshgrid(x[x1], x, x[x2], indexing='ij'), dtype=float)
 
+print X.shape, N1, N2
 """
 Solution U is real and as such its transform, U_hat = fft(U)(k), 
 is such that fft(U)(k) = conj(fft(U)(N-k)) and thus it is sufficient 
@@ -92,21 +93,21 @@ expect N/2+1 modes.
 """
 
 Nf = N/2+1 # Total Fourier coefficients in y-direction
-U     = empty((3, N1, N, N2), dtype=ftype)
-U_hat = empty((3, N2, N1/2, N), dtype=ctype)
-P     = empty((N1, N, N2), dtype=ftype)
-P_hat = empty((N2, N1/2, N), dtype=ctype)
+U     = empty((3, N1, N, N2), dtype=float)
+U_hat = empty((3, N2, N1/2, N), dtype=complex)
+P     = empty((N1, N, N2), dtype=float)
+P_hat = empty((N2, N1/2, N), dtype=complex)
 
 # Temporal storage arrays (Not required by all temporal integrators)
-U_hat0  = empty((3, N2, N1/2, N), dtype=ctype)
-U_hat1  = empty((3, N2, N1/2, N), dtype=ctype)
-dU      = empty((3, N2, N1/2, N), dtype=ctype)
+U_hat0  = empty((3, N2, N1/2, N), dtype=complex)
+U_hat1  = empty((3, N2, N1/2, N), dtype=complex)
+dU      = empty((3, N2, N1/2, N), dtype=complex)
 
 # work arrays
-Uc_hat_y  = empty((N1, Nf, N2), dtype=ctype)
-Uc_hat_x  = empty((N, N1/2, N2), dtype=ctype)
-Uc_hat_xr = empty((N, N1/2, N2), dtype=ctype)
-Uc_hat_z  = zeros((N2, N1/2, N), dtype=ctype)
+Uc_hat_y  = empty((N1, Nf, N2), dtype=complex)
+Uc_hat_x  = empty((N, N1/2, N2), dtype=complex)
+Uc_hat_xr = empty((N, N1/2, N2), dtype=complex)
+Uc_hat_z  = zeros((N2, N1/2, N), dtype=complex)
 
 curl    = empty((3, N1, N, N2))
 
@@ -116,7 +117,7 @@ k1 = slice(xzrank*N2, (xzrank+1)*N2, 1)
 k2 = slice(xyrank*N1/2, (xyrank+1)*N1/2, 1)
 KX = array(meshgrid(kx[k1], kx[k2], kx, indexing='ij'), dtype=int)
 KK = sum(KX*KX, 0, dtype=int)
-KX_over_Ksq = KX.astype(ftype) / where(KK==0, 1, KK).astype(ftype)
+KX_over_Ksq = KX.astype(float) / where(KK==0, 1, KK).astype(float)
 
 # Filter for dealiasing nonlinear convection
 kmax = 2./3.*(N/2+1)
@@ -125,8 +126,8 @@ dealias = array((abs(KX[0]) < kmax)*(abs(KX[1]) < kmax)*(abs(KX[2]) < kmax), dty
 if mem_profile: mem("Arrays")
 
 # RK4 parameters
-a = array([1./6., 1./3., 1./3., 1./6.], dtype=ftype)
-b = array([0.5, 0.5, 1.], dtype=ftype)
+a = array([1./6., 1./3., 1./3., 1./6.], dtype=float)
+b = array([0.5, 0.5, 1.], dtype=float)
 
 def project(u):
     """Project u onto divergence free space"""
@@ -197,11 +198,11 @@ def Div(a, c):
     ifftn_mpi(1j*(sum(KX*a, 0), c))
     
 def ComputeRHS(dU, rk):
-    if rk > 0: # For rk=0 the correct values are already in U, V, W
+    if rk > 0: # For rk=0 the correct values are already in U
         for i in range(3):
             ifftn_mpi(U_hat[i], U[i])
     
-    # Compute convection
+    # Compute convective term and place in dU
     Curl(U_hat, curl)
     Cross(U, curl, dU)
     
@@ -271,10 +272,10 @@ while t < T-1e-8:
         #hdf5file.write(U, P, tstep)
 
     if tstep % compute_energy == 0:
-        kk = comm.reduce(0.5*sum(U.astype(float)*U.astype(float))*dx*dx*dx/L**3) # Compute energy with double precision
+        kk = comm.reduce(0.5*sum(U.astype(float64)*U.astype(float64))*dx*dx*dx/L**3) # Compute energy with double precision
         if rank == 0:
             k.append(kk)
-            print t, ftype(kk)
+            print t, float(kk)
             
     tt = time.time()-t0
     t0 = time.time()

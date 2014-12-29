@@ -4,7 +4,8 @@ __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 __all__ = ['fft', 'ifft', 'fft2', 'ifft2', 'fftn', 'ifftn',
-           'rfft', 'irfft', 'rfft2', 'irfft2', 'rfftn', 'irfftn',]
+           'rfft', 'irfft', 'rfft2', 'irfft2', 'rfftn', 'irfftn', 
+           'empty', 'zeros']
 try:
     import pyfftw
     from numpy import zeros as nzeros
@@ -107,4 +108,6 @@ try:
                                                 #threads=nthreads)
 
 except:    
+    from numpy import zeros, empty
+    from numpy.fft import fftfreq, fft, ifft, fftn, ifftn, rfft, irfft, rfft2, irfft2, rfftn, irfftn, fft2, ifft2    
     print Warning("Install pyfftw, it is much faster than numpy fft")

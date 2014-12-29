@@ -11,39 +11,37 @@ from numpy import pi
 xdmffile = """<?xml version="1.0" encoding="utf-8"?>
 <Xdmf xmlns:xi="http://www.w3.org/2001/XInclude" Version="2.1">
   <Domain>
-    <Grid Name="Structured Grid">
+    <Grid Name="Structured Grid" GridType="Collection" CollectionType="Temporal">
 """
+timeattr = """      <Time TimeType="List"><DataItem Format="XML" Dimensions="3"> {0} </DataItem></Time>"""
 attribute3D = """
-      <Attribute Name="{0}" Center="Node">
-        <DataItem Format="HDF" NumberType="Float" Precision="4" Dimensions="{1} {1} {1}">
-         {2}:/3D/{3}/{4}
-        </DataItem>
-      </Attribute>"""
+        <Attribute Name="{0}" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="4" Dimensions="{1} {1} {1}">
+            {2}:/3D/{3}/{4}
+          </DataItem>
+        </Attribute>"""
 
 attribute2D = """
-      <Attribute Name="{0}" Center="Node">
-        <DataItem Format="HDF" NumberType="Float" Precision="4" Dimensions="1 {1} {1}">
-         {2}:/2D/{3}/{4}
-        </DataItem>
-      </Attribute>"""
+        <Attribute Name="{0}" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="4" Dimensions="1 {1} {1}">
+            {2}:/2D/{3}/{4}
+          </DataItem>
+        </Attribute>"""
 
 try:
     import h5py
     class HDF5Writer(object):
     
         def __init__(self, comm, dt, N, params, filename="U.h5"):
-            self.f = h5py.File("U.h5", "w", driver="mpio", comm=comm)
+            self.f = h5py.File(filename, "w", driver="mpio", comm=comm)
             self.comm = comm
+            self.components = components = ["U", "V", "W", "P"]
+            if "eta" in params: components += ["Bx", "By", "Bz"]
             self.f.create_group("3D")
-            self.f["3D"].create_group("U")
-            self.f["3D"].create_group("V")
-            self.f["3D"].create_group("W")
-            self.f["3D"].create_group("P")
             self.f.create_group("2D")
-            self.f["2D"].create_group("U")
-            self.f["2D"].create_group("V")
-            self.f["2D"].create_group("W")
-            self.f["2D"].create_group("P")
+            for c in components:
+                self.f["3D"].create_group(c)
+                self.f["2D"].create_group(c)
             self.f.attrs.create("dt", dt)
             self.f.attrs.create("N", N)    
             self.fname = filename
@@ -58,13 +56,17 @@ try:
                 assert N == P.shape[-1]
                 Np =  N / self.comm.Get_size()
                 
-                for comp in ["U", "V", "W", "P"]:
+                for comp in self.components:
                     self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype="float")
                                     
                 self.f["3D/U/%d"%tstep][rank*Np:(rank+1)*Np] = U[0]
                 self.f["3D/V/%d"%tstep][rank*Np:(rank+1)*Np] = U[1]
                 self.f["3D/W/%d"%tstep][rank*Np:(rank+1)*Np] = U[2]
                 self.f["3D/P/%d"%tstep][rank*Np:(rank+1)*Np] = P
+                if len(self.components) == 7:
+                    self.f["3D/Bx/%d"%tstep][rank*Np:(rank+1)*Np] = U[3]
+                    self.f["3D/By/%d"%tstep][rank*Np:(rank+1)*Np] = U[4]
+                    self.f["3D/Bz/%d"%tstep][rank*Np:(rank+1)*Np] = U[5]
                 
             if tstep % self.params['write_yz_slice'][1] == 0:
                 i = self.params['write_yz_slice'][0]
@@ -72,7 +74,7 @@ try:
                 N = self.f.attrs["N"]
                 assert N == P.shape[-1]
                 Np =  N / self.comm.Get_size()     
-                for comp in ["U", "V", "W", "P"]:
+                for comp in self.components:
                     self.f["2D/"+comp].create_dataset(str(tstep), shape=(1, N, N), dtype="float")
                                     
                 if i >= rank*Np and i < (rank+1)*Np:
@@ -80,56 +82,75 @@ try:
                     self.f["2D/V/%d"%tstep][:] = U[1, i-rank*Np]
                     self.f["2D/W/%d"%tstep][:] = U[2, i-rank*Np]
                     self.f["2D/P/%d"%tstep][:] = P[i-rank*Np]
+                    if len(self.components) == 7:
+                        self.f["2D/Bx/%d"%tstep][:] = U[3, i-rank*Np]
+                        self.f["2D/By/%d"%tstep][:] = U[4, i-rank*Np]
+                        self.f["2D/Bz/%d"%tstep][:] = U[5, i-rank*Np]
                             
         def close(self):
             self.f.close()
             
         def generate_xdmf(self):
-            global xdmffile
-            N = self.f.attrs["N"]
-            xdmffile += """      <Geometry Type="ORIGIN_DXDYDZ">
-        <DataItem DataType="UInt" Dimensions="3" Format="XML" Precision="4">0 0 0</DataItem>
-        <DataItem DataType="Float" Dimensions="3" Format="XML" Precision="4">{0} {0} {0}</DataItem>
-      </Geometry>""".format(2*pi)
+            if self.comm.Get_rank() == 0:
+                global xdmffile
+                timesteps = self.f["3D/U"].keys()
+                N = self.f.attrs["N"]
+                tt = ""
+                for i in timesteps:
+                    tt += "%s " %i
+                
+                xdmffile += timeattr.format(tt)
+            
+                for tstep in timesteps:
+                    xdmffile += """
+      <Grid GridType="Uniform">
+        <Geometry Type="ORIGIN_DXDYDZ">
+          <DataItem DataType="UInt" Dimensions="3" Format="XML" Precision="4">0 0 0</DataItem>
+          <DataItem DataType="Float" Dimensions="3" Format="XML" Precision="4">{0} {0} {0}</DataItem>
+        </Geometry>""".format(2*pi)
 
-            xdmffile += """
-      <Topology Dimensions="{0} {0} {0}" Type="3DCoRectMesh"/>""".format(N)
+                    xdmffile += """
+        <Topology Dimensions="{0} {0} {0}" Type="3DCoRectMesh"/>""".format(N)
     
-            for comp in self.f["3D"]:
-                for tstep, dset in self.f["3D/"+comp].iteritems():
-                    xdmffile += attribute3D.format(comp, N, self.fname, comp, tstep)
-                                                
-            xdmffile += """  
-    </Grid>"""
-            xdmffile += """
-    <Grid Name="Structured Grid 3D">
-      <Geometry Type="ORIGIN_DXDYDZ">
-        <DataItem DataType="UInt" Dimensions="3" Format="XML" Precision="4">{1} 0 0</DataItem>
-        <DataItem DataType="Float" Dimensions="3" Format="XML" Precision="4">{1} {0} {0}</DataItem>
-      </Geometry>""".format(2*pi, self.params['write_yz_slice'][0]*2*pi/self.f.attrs['N'])
+                    for comp in self.f["3D"]:
+                        dset = self.f["3D/"+comp][tstep]
+                        xdmffile += attribute3D.format(comp, N, self.fname, comp, tstep)
+                    xdmffile += """  
+      </Grid>
+"""
 
-            xdmffile += """
-      <Topology Dimensions="1 {0} {0}" Type="3DCoRectMesh"/>""".format(N)
+# No slicing for now                                                
+            #xdmffile += """  
+    #</Grid>"""
+    
+            #xdmffile += """
+    #<Grid Name="Structured Grid 3D">
+      #<Geometry Type="ORIGIN_DXDYDZ">
+        #<DataItem DataType="UInt" Dimensions="3" Format="XML" Precision="4">{1} 0 0</DataItem>
+        #<DataItem DataType="Float" Dimensions="3" Format="XML" Precision="4">{1} {0} {0}</DataItem>
+      #</Geometry>""".format(2*pi, self.params['write_yz_slice'][0]*2*pi/self.f.attrs['N'])
 
-            for comp in self.f["2D"]:
-                for tstep, dset in self.f["2D/"+comp].iteritems():
-                    xdmffile += attribute2D.format(comp, N, self.fname, comp, tstep)
-                        
-            xdmffile += """  
+            #xdmffile += """
+      #<Topology Dimensions="1 {0} {0}" Type="3DCoRectMesh"/>""".format(N)
+
+            #for comp in self.f["2D"]:
+                #for tstep, dset in self.f["2D/"+comp].iteritems():
+                    #xdmffile += attribute2D.format(comp, N, self.fname, comp, tstep)                        
+                xdmffile += """  
     </Grid>
   </Domain>
 </Xdmf>"""
-            xf = open(self.fname[:-2]+"xdmf", "w")
-            xf.write(xdmffile)
-            xf.close()
+                xf = open(self.fname[:-2]+"xdmf", "w")
+                xf.write(xdmffile)
+                xf.close()
 
 except:
     class HDF5Writer(object):
-        def __init__(self, comm, dt, N, filename="U.h5"):
+        def __init__(self, comm, dt, N, params, filename="U.h5"):
             if comm.Get_rank() == 0:
                 print Warning("Need to install h5py to allow storing results")
         
-        def write(self):
+        def write(self, U, P, tstep):
             pass
         
         def close(self):
