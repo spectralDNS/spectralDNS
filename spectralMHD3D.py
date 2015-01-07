@@ -29,7 +29,8 @@ params = {
     'make_profile': 0,          # Enable cProfile profiler
     'mem_profile': False,       # Check memory use
     'M': 5,                     # Mesh size
-    'temporal': 'RK4',          # Integrator ("RK4", "ForwardEuler", "AB2")
+    'temporal': 'RK4',      
+    # Integrator ("RK4", "ForwardEuler", "AB2")
     'write_result': 1e8,        # Write to HDF5 every..
     'write_yz_slice': [0, 1e8], # Write slice 0 (or higher) in y-z plance every..
     'compute_energy': 2,        # Compute solution energy every..
@@ -65,7 +66,7 @@ if make_profile: profiler = cProfile.Profile()
 # Each cpu gets ownership of Np slices
 Np = N / num_processes     
 
-hdf5file = HDF5Writer(comm, dt, N, params, filename="UB.h5")
+hdf5file = HDF5Writer(comm, dt, N, params, float, filename="UB.h5")
 
 # Create the physical mesh
 x = linspace(0, L, N+1).astype(float)[:-1]
@@ -158,24 +159,24 @@ def fftn_mpi(u, fu):
         fu[:] = rfftn(u, axes=(0,2,1))
         return
     
-    ## Do 2 ffts in y-z directions on owned data
-    #Uc_hatT[:] = rfft2(u, axes=(2,1))
-    ## Transform data to align with x-direction  
-    #for i in range(num_processes): 
-       ##U_mpi[i] = ft[:, :, i*Np:(i+1)*Np]
-       #U_mpi[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
+    # Do 2 ffts in y-z directions on owned data
+    Uc_hatT[:] = rfft2(u, axes=(2,1))
+    # Transform data to align with x-direction  
+    for i in range(num_processes): 
+       #U_mpi[i] = ft[:, :, i*Np:(i+1)*Np]
+       U_mpi[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
         
-    ## Communicate all values
-    #comm.Alltoall([U_mpi, mpitype], [fu, mpitype])  
+    # Communicate all values
+    comm.Alltoall([U_mpi, mpitype], [fu, mpitype])  
     
-    # Communicating intermediate result 
-    ft = fu.transpose(2,1,0)
-    ft[:] = rfft2(u, axes=(2,1))
-    fu_send = fu.reshape((num_processes, Np, Nf, Np))
-    for i in range(num_processes):
-        if not i == rank:
-            comm.Sendrecv_replace([fu_send[i], mpitype], i, 0, i, 0)   
-    fu_send[:] = fu_send.transpose(0,3,2,1)
+    ## Communicating intermediate result 
+    #ft = fu.transpose(2,1,0)
+    #ft[:] = rfft2(u, axes=(2,1))
+    #fu_send = fu.reshape((num_processes, Np, Nf, Np))
+    #for i in range(num_processes):
+        #if not i == rank:
+            #comm.Sendrecv_replace([fu_send[i], mpitype], i, 0, i, 0)   
+    #fu_send[:] = fu_send.transpose(0,3,2,1)
                       
     # Do fft for last direction 
     fu[:] = fft(fu, axis=0)

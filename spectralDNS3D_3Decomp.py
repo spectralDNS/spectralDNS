@@ -15,6 +15,7 @@ with mpi_import():
 comm = MPI.COMM_WORLD
 
 params = {
+    'decomposition': 'pencil', 
     'make_profile': 0,          # Enable cProfile profiler
     'mem_profile': False,       # Check memory use
     'M': 5,
