@@ -1,6 +1,10 @@
 #include "fftw3-mpi.h"
 #include <math.h>
-#include <boost/math/constants/constants.hpp>
+#include <iostream> 
+#include <iomanip>
+#include <complex>
+#include <vector>
+
 using namespace std;
 
 // mpic++ -std=c++11 -O3 spectralDNS.cpp -o spectralDNS
@@ -17,7 +21,7 @@ int main( int argc, char *argv[] )
   
   num_processes = MPI::COMM_WORLD.Get_size ( );
   rank = MPI::COMM_WORLD.Get_rank ( );
-  double pi = boost::math::constants::pi<double>();
+  double pi = 3.141592653589793238;
   ptrdiff_t alloc_local, local_n0, local_0_start, local_n1, local_1_start, i, j, k;
 
   nu = 0.000625;
@@ -28,7 +32,7 @@ int main( int argc, char *argv[] )
   L = 2*pi;
   Np = N / num_processes;
   dx = L / N;
-  std::cout << std::scientific << std::setprecision(numeric_limits<double>::digits10);
+  std::cout << std::scientific << std::setprecision(16);
   
   vector<double> a {1./6., 1./3., 1./3., 1./6.};
   vector<double> b {0.5, 0.5, 1.0};

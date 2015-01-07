@@ -88,7 +88,6 @@ while t < T-1e-8:
     U_hat1[:] = U_hat0[:] = U_hat
     for rk in range(4):
         ComputeRHS(dU, rk)        
-        
         if rk < 3: U_hat[:] = U_hat0 + b[rk]*dU
         U_hat1[:] += a[rk]*dU            
     U_hat[:] = U_hat1[:]
