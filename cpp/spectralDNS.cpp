@@ -28,7 +28,7 @@ int main( int argc, char *argv[] )
   T = 0.1;
   dt = 0.01;
   M = 7;
-  N = pow(2, M);
+  N = std::pow(2, M);
   L = 2*pi;
   Np = N / num_processes;
   dx = L / N;
