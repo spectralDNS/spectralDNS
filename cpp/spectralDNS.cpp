@@ -34,8 +34,10 @@ int main( int argc, char *argv[] )
   dx = L / N;
   std::cout << std::scientific << std::setprecision(16);
   
-  vector<double> a {1./6., 1./3., 1./3., 1./6.};
-  vector<double> b {0.5, 0.5, 1.0};
+  vector<double> a(4);
+  a[0] = 1./6.; a[1] = 1./3.; a[2] = 1./3.; a[3] = 1./6.;
+  vector<double> b(3);
+  b[0] = 0.5; b[1] = 0.5; b[2] = 1.0;
   int tot = N*N*N;
   Nf = N/2+1;
   alloc_local = fftw_mpi_local_size_3d_transposed(N, N, Nf, MPI::COMM_WORLD,
