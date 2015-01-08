@@ -28,7 +28,10 @@ int main( int argc, char *argv[] )
   T = 0.1;
   dt = 0.01;
   M = 7;
-  N = pow(static_cast<int>(2), M);
+//   N = pow(static_cast<int>(2), M);
+  N = 1;
+  for (int i=0; i<M;i++)
+      N *= 2;
   L = 2*pi;
   Np = N / num_processes;
   dx = L / N;
