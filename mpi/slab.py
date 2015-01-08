@@ -32,28 +32,28 @@ def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid,
 
     Nf = N/2+1
     U     = empty((3, Np, N, N), dtype=float)  
-    U_hat = empty((3, N, Nf, Np), dtype=complex)
+    U_hat = empty((3, N, Np, Nf), dtype=complex)
     P     = empty((Np, N, N), dtype=float)
-    P_hat = empty((N, Nf, Np), dtype=complex)
+    P_hat = empty((N, Np, Nf), dtype=complex)
 
     # Temporal storage arrays (Not required by all temporal integrators)
-    U_hat0  = empty((3, N, Nf, Np), dtype=complex)
-    U_hat1  = empty((3, N, Nf, Np), dtype=complex)
-    dU      = empty((3, N, Nf, Np), dtype=complex)
+    U_hat0  = empty((3, N, Np, Nf), dtype=complex)
+    U_hat1  = empty((3, N, Np, Nf), dtype=complex)
+    dU      = empty((3, N, Np, Nf), dtype=complex)
 
     # work arrays (Not required by all convection methods)
     if convection in ('Standard', 'Skewed'):
         U_tmp = empty((3, Np, N, N), dtype=float)
     if convection in ('Divergence', 'Skewed'):
-        F_tmp   = empty((3, N, Nf, Np), dtype=complex)
+        F_tmp   = empty((3, N, Np, Nf), dtype=complex)
     curl    = empty((3, Np, N, N), dtype=float)    
 
     init_fft(**locals())
         
     # Set wavenumbers in grid
     kx = fftfreq(N, 1./N).astype(int)
-    ky = kx[:Nf].copy(); ky[-1] *= -1
-    KX = array(meshgrid(kx, ky, kx[rank*Np:(rank+1)*Np], indexing='ij'), dtype=int)
+    kz = kx[:Nf].copy(); kz[-1] *= -1
+    KX = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
     KK = sum(KX*KX, 0, dtype=int)
     KX_over_Ksq = KX.astype(float) / where(KK==0, 1, KK).astype(float)
 
@@ -67,10 +67,10 @@ def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid,
 def init_fft(N, Nf, Np, complex, num_processes, comm, communication,
              rank, mpitype, **kwargs):
     # Initialize MPI work arrays globally
-    Uc_hat  = empty((N, Nf, Np), dtype=complex)
-    Uc_hatT = empty((Np, Nf, N), dtype=complex)
-    Uc_send = Uc_hat.reshape((num_processes, Np, Nf, Np))
-    U_mpi   = empty((num_processes, Np, Nf, Np), dtype=complex)
+    Uc_hat  = empty((N, Np, Nf), dtype=complex)
+    Uc_hatT = empty((Np, N, Nf), dtype=complex)
+    Uc_send = Uc_hat.reshape((num_processes, Np, Np, Nf))
+    U_mpi   = empty((num_processes, Np, Np, Nf), dtype=complex)
     globals().update(locals())
     
 def ifftn_mpi(fu, u):
@@ -78,7 +78,7 @@ def ifftn_mpi(fu, u):
     Need to do ifft in reversed order of fft
     """
     if num_processes == 1:
-        u[:] = irfftn(fu, axes=(0,2,1))
+        u[:] = irfftn(fu, axes=(0,1,2))
         return
     
     # Do first owned direction
@@ -88,45 +88,45 @@ def ifftn_mpi(fu, u):
         # Communicate all values
         comm.Alltoall([Uc_hat, mpitype], [U_mpi, mpitype])
         for i in range(num_processes): 
-            Uc_hatT[:, :, i*Np:(i+1)*Np] = U_mpi[i]
+            Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
     
     else:
         #Uc_send = fu.reshape((num_processes, Np, Nf, Np))
         for i in range(num_processes):
             if not i == rank:
                 comm.Sendrecv_replace([Uc_send[i], mpitype], i, 0, i, 0)   
-            Uc_hatT[:, :, i*Np:(i+1)*Np] = Uc_send[i]
+            Uc_hatT[:, i*Np:(i+1)*Np] = Uc_send[i]
         
     # Do last two directions
-    u[:] = irfft2(Uc_hatT, axes=(2,1))
+    u[:] = irfft2(Uc_hatT, axes=(1,2))
     
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """
     if num_processes == 1:
-        fu[:] = rfftn(u, axes=(0,2,1))
+        fu[:] = rfftn(u, axes=(0,1,2))
         return
     
     if communication == 'alltoall':
         # Do 2 ffts in y-z directions on owned data
-        Uc_hatT[:] = rfft2(u, axes=(2,1))
+        Uc_hatT[:] = rfft2(u, axes=(1,2))
         # Transform data to align with x-direction  
         for i in range(num_processes): 
-            #U_mpi[i] = ft[:, :, i*Np:(i+1)*Np]
-            U_mpi[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
+            #U_mpi[i] = ft[:, i*Np:(i+1)*Np]
+            U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
             
         # Communicate all values
         comm.Alltoall([U_mpi, mpitype], [fu, mpitype])  
     
     else:
         # Communicating intermediate result 
-        ft = fu.transpose(2,1,0)
-        ft[:] = rfft2(u, axes=(2,1))
-        fu_send = fu.reshape((num_processes, Np, Nf, Np))
+        ft = fu.transpose(1,0,2)
+        ft[:] = rfft2(u, axes=(1,2))
+        fu_send = fu.reshape((num_processes, Np, Np, Nf))
         for i in range(num_processes):
             if not i == rank:
                 comm.Sendrecv_replace([fu_send[i], mpitype], i, 0, i, 0)   
-        fu_send[:] = fu_send.transpose(0,3,2,1)
+        fu_send[:] = fu_send.transpose(0,2,1,3)
                       
     # Do fft for last direction 
     fu[:] = fft(fu, axis=0)

@@ -10,7 +10,7 @@ from mpi4py import MPI
 nu = 0.000625
 T = 0.1
 dt = 0.01
-M = 5
+M = 6
 N = 2**M
 L = 2 * pi
 dx = L / N
@@ -22,20 +22,20 @@ x = linspace(0, L, N+1)[:-1]
 X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'))
 Nf = N/2+1
 U     = empty((3, Np, N, N))                  
-U_hat = empty((3, N, Nf, Np), dtype="complex")
+U_hat = empty((3, N, Np, Nf), dtype="complex")
 P     = empty((Np, N, N))
-P_hat = empty((N, Nf, Np), dtype="complex")
-U_hat0  = empty((3, N, Nf, Np), dtype="complex")
-U_hat1  = empty((3, N, Nf, Np), dtype="complex")
-dU      = empty((3, N, Nf, Np), dtype="complex")
-Uc_hat  = empty((N, Nf, Np), dtype="complex")
-Uc_hatT = empty((Np, Nf, N), dtype="complex")
-U_mpi   = empty((num_processes, Np, Nf, Np), dtype="complex")
+P_hat = empty((N, Np, Nf), dtype="complex")
+U_hat0  = empty((3, N, Np, Nf), dtype="complex")
+U_hat1  = empty((3, N, Np, Nf), dtype="complex")
+dU      = empty((3, N, Np, Nf), dtype="complex")
+Uc_hat  = empty((N, Np, Nf), dtype="complex")
+Uc_hatT = empty((Np, N, Nf), dtype="complex")
+U_mpi   = empty((num_processes, Np, Np, Nf), dtype="complex")
 curl    = empty((3, Np, N, N))
 
 kx = fftfreq(N, 1./N)
-ky = kx[:Nf].copy(); ky[-1] *= -1
-KX = array(meshgrid(kx, ky, kx[rank*Np:(rank+1)*Np], indexing='ij'), dtype=int)
+kz = kx[:Nf].copy(); kz[-1] *= -1
+KX = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
 KK = sum(KX*KX, 0, dtype=int)
 KX_over_Ksq = KX.astype(float) / where(KK==0, 1, KK).astype(float)
 kmax = 2./3.*(N/2+1)
@@ -47,13 +47,13 @@ def ifftn_mpi(fu, u):
     Uc_hat[:] = ifft(fu, axis=0)
     comm.Alltoall([Uc_hat, MPI.DOUBLE_COMPLEX], [U_mpi, MPI.DOUBLE_COMPLEX])
     for i in range(num_processes): 
-        Uc_hatT[:, :, i*Np:(i+1)*Np] = U_mpi[i]
-    u[:] = irfft2(Uc_hatT, axes=(2,1))
+        Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
+    u[:] = irfft2(Uc_hatT, axes=(1,2))
     
 def fftn_mpi(u, fu):
-    Uc_hatT[:] = rfft2(u, axes=(2,1))
+    Uc_hatT[:] = rfft2(u, axes=(1,2))
     for i in range(num_processes): 
-        U_mpi[i] = Uc_hatT[:, :, i*Np:(i+1)*Np]
+        U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
     comm.Alltoall([U_mpi, MPI.DOUBLE_COMPLEX], [fu, MPI.DOUBLE_COMPLEX])  
     fu[:] = fft(fu, axis=0)
 
