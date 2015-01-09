@@ -7,28 +7,28 @@
 
 using namespace std;
 
-// mpic++ -std=c++11 -O3 spectralDNS.cpp -o spectralDNS
+//mpic++ -std=c++11 -O3 spectralDNS.cpp -o spectralDNS
+//mpixlcxx_r -qsmp -O3 spectralDNS.cpp -o spectralDNS $FFTW3_INC $FFTW3_LIB
 
 int main( int argc, char *argv[] )
 {
   int rank, num_processes, M, N, Np, Nf;
   double wtime, nu, T, dt, L, dx;
-  double t0, t1;
+  double t0, t1, fastest_time, slowest_time, start_time;
   MPI::Init ( argc, argv );
   fftw_mpi_init();
-  
-  t0 = MPI::Wtime();
-  
-  num_processes = MPI::COMM_WORLD.Get_size ( );
-  rank = MPI::COMM_WORLD.Get_rank ( );
+    
+  num_processes = MPI::COMM_WORLD.Get_size();
+  rank = MPI::COMM_WORLD.Get_rank();
   double pi = 3.141592653589793238;
   ptrdiff_t alloc_local, local_n0, local_0_start, local_n1, local_1_start, i, j, k;
+  vector<double> s_in(1), s_out(1), vs_in(2), vs_out(2);
 
   nu = 0.000625;
   T = 0.1;
   dt = 0.01;
-  M = 7;
-//   N = pow(static_cast<int>(2), M);
+  M = 6;
+//   N = pow(static_cast<int>(2), M); // Not accepted by Shaheen
   N = 1;
   for (int i=0; i<M;i++)
       N *= 2;
@@ -74,6 +74,11 @@ int main( int argc, char *argv[] )
   vector<complex<double> > curlY(alloc_local);
   vector<complex<double> > curlZ(alloc_local);
   
+  // Starting time
+  MPI::COMM_WORLD.Barrier();
+  t0 = MPI::Wtime();
+  start_time = t0;
+
   vector<double> kx(N);
   vector<double> kz(Nf);
   for (int i=0; i<N/2; i++)
@@ -110,6 +115,8 @@ int main( int argc, char *argv[] )
   complex<double> one(0, 1); 
   double t=0.0;
   int tstep = 0;
+  fastest_time = 1e8;
+  slowest_time = 0;
   while (t < T-1e-8)
   {
      t += dt;
@@ -232,28 +239,45 @@ int main( int argc, char *argv[] )
             V_hat[z] = V_hat1[z];
             W_hat[z] = W_hat1[z];
         }     
+        
+    t1 = MPI::Wtime();
+    if (tstep > 1)
+    {
+        fastest_time = min(t1-t0, fastest_time);
+        slowest_time = max(t1-t0, slowest_time);
+    }   
+    t0 = t1;
 }
 
-  vector<double> s(1), ss(1);
-  s[0] = 0.0;
+  s_in[0] = 0.0;
   for (int i=0; i<local_n0; i++)
     for (int j=0; j<N; j++)
       for (int k=0; k<N; k++)
       {
         int z = (i*N+j)*2*Nf+k;
-        s[0] += (U[z]*U[z] + V[z]*V[z] + W[z]*W[z]);
+        s_in[0] += (U[z]*U[z] + V[z]*V[z] + W[z]*W[z]);
       }
-  s[0] *= (0.5*dx*dx*dx/L/L/L);
+  s_in[0] *= (0.5*dx*dx*dx/L/L/L);
 
-  MPI::COMM_WORLD.Reduce(s.data(), ss.data(), 1, MPI::DOUBLE, MPI::SUM, 0);  
-  std::cout << " k = " << ss[0] << std::endl;
+  MPI::COMM_WORLD.Reduce(s_in.data(), s_out.data(), 1, MPI::DOUBLE, MPI::SUM, 0);  
+  if (rank==0)
+    std::cout << " k = " << s_out[0] << std::endl;
 
-  std::cout << MPI::Wtime()-t0 << std::endl;
+  MPI::COMM_WORLD.Barrier();
+  t1 = MPI::Wtime();
+  if (rank == 0)  
+    std::cout << "Time = " << t1 - start_time  << std::endl;
+  
   fftw_destroy_plan(rfftn);
   fftw_destroy_plan(irfftn);
+  vs_in[0] = fastest_time;
+  vs_in[1] = slowest_time;
+  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::DOUBLE, MPI::MIN, 0);
+  if (rank==0)
+      std::cout << "Fastest = " << vs_out[0] << ", " << vs_out[1] << std::endl; 
+  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::DOUBLE, MPI::MAX, 0);
+  if (rank==0)
+      std::cout << "Slowest = " << vs_out[0] << ", " << vs_out[1] << std::endl; 
   
-//
-//  Terminate MPI.
-//
   MPI::Finalize ( );
 }
