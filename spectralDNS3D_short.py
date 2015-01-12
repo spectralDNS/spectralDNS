@@ -18,8 +18,7 @@ comm = MPI.COMM_WORLD
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
 Np = N / num_processes     
-x = linspace(0, L, N+1)[:-1]
-X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'))
+X = mgrid[rank*Np:(rank+1)*Np, :N, :N].astype(float)*L/N
 Nf = N/2+1
 U     = empty((3, Np, N, N))                  
 U_hat = empty((3, N, Np, Nf), dtype="complex")

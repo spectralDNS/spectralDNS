@@ -220,8 +220,8 @@ toc = time.time()-tic
 
 # Get min/max of fastest and slowest process
 fast = (comm.reduce(fastest_time, op=MPI.MIN, root=0),
-        comm.reduce(fastest_time, op=MPI.MAX, root=0))
-slow = (comm.reduce(slowest_time, op=MPI.MIN, root=0),
+        comm.reduce(slowest_time, op=MPI.MIN, root=0))
+slow = (comm.reduce(fastest_time, op=MPI.MAX, root=0),
         comm.reduce(slowest_time, op=MPI.MAX, root=0))
 
 if rank == 0:

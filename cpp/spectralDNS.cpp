@@ -7,7 +7,7 @@
 
 using namespace std;
 
-//mpic++ -std=c++11 -O3 spectralDNS.cpp -o spectralDNS
+//mpic++ -std=c++11 -O3 spectralDNS.cpp -o spectralDNS -lfftw3_mpi -lfftw3
 //mpixlcxx_r -qsmp -O3 spectralDNS.cpp -o spectralDNS $FFTW3_INC $FFTW3_LIB
 
 int main( int argc, char *argv[] )
@@ -27,7 +27,7 @@ int main( int argc, char *argv[] )
   nu = 0.000625;
   T = 0.1;
   dt = 0.01;
-  M = 6;
+  M = 7;
 //   N = pow(static_cast<int>(2), M); // Not accepted by Shaheen
   N = 1;
   for (int i=0; i<M;i++)
@@ -56,10 +56,12 @@ int main( int argc, char *argv[] )
   vector<double> CU(2*alloc_local);
   vector<double> CV(2*alloc_local);
   vector<double> CW(2*alloc_local);  
+  vector<double> P(2*alloc_local);
+  vector<int> dealias(2*alloc_local);
+  vector<double> kk(2*alloc_local);
   vector<complex<double> > U_hat(alloc_local);
   vector<complex<double> > V_hat(alloc_local);
   vector<complex<double> > W_hat(alloc_local);
-  vector<double> P(2*alloc_local);
   vector<complex<double> > P_hat(alloc_local);
   vector<complex<double> > U_hat0(alloc_local);
   vector<complex<double> > V_hat0(alloc_local);
@@ -101,7 +103,7 @@ int main( int argc, char *argv[] )
     for (int j=0; j<N; j++)
       for (int k=0; k<N; k++)
       {
-        int z = (i*N+j)*2*Nf+k;
+        const int z = (i*N+j)*2*Nf+k;
         U[z] = sin(dx*(i+local_0_start))*cos(dx*j)*cos(dx*k);
         V[z] = -cos(dx*(i+local_0_start))*sin(dx*j)*cos(dx*k);
         W[z] = 0.0;
@@ -110,8 +112,25 @@ int main( int argc, char *argv[] )
   fftw_mpi_execute_dft_r2c( rfftn, U.data(), reinterpret_cast<fftw_complex*>(U_hat.data()));
   fftw_mpi_execute_dft_r2c( rfftn, V.data(), reinterpret_cast<fftw_complex*>(V_hat.data()));
   fftw_mpi_execute_dft_r2c( rfftn, W.data(), reinterpret_cast<fftw_complex*>(W_hat.data()));
-      
+    
   double kmax = 2./3.*(N/2+1);  
+  for (int i=0; i<local_n1; i++)
+    for (int j=0; j<N; j++)
+      for (int k=0; k<Nf; k++)
+      {
+        const int z = (i*N+j)*Nf+k;             
+        dealias[z] = (abs(kx[i+local_1_start])<kmax)*(abs(kx[j])<kmax)*(abs(kx[k])<kmax) == true ? 1 : 0;      
+      }
+        
+  for (int i=0; i<local_n1; i++)
+    for (int j=0; j<N; j++)
+      for (int k=0; k<Nf; k++)
+      {
+        const int z = (i*N+j)*Nf+k;
+        int m = kx[i+local_1_start]*kx[i+local_1_start] + kx[j]*kx[j] + kx[k]*kx[k];
+        kk[z] = m > 0 ? m : 1;
+      }       
+  
   complex<double> one(0, 1); 
   double t=0.0;
   int tstep = 0;
@@ -125,7 +144,7 @@ int main( int argc, char *argv[] )
        for (int j=0; j<N; j++)
          for (int k=0; k<Nf; k++)
          {
-             int z = (i*N+j)*Nf+k;
+             const int z = (i*N+j)*Nf+k;
              U_hat0[z] = U_hat[z];
              V_hat0[z] = V_hat[z];
              W_hat0[z] = W_hat[z];
@@ -133,31 +152,37 @@ int main( int argc, char *argv[] )
              V_hat1[z] = V_hat[z];
              W_hat1[z] = W_hat[z];
         }
-        
+//      std::copy(U_hat.begin(), U_hat.end(), U_hat0.begin());
+//      std::copy(V_hat.begin(), V_hat.end(), V_hat0.begin());
+//      std::copy(W_hat.begin(), W_hat.end(), W_hat0.begin());
+//      std::copy(U_hat.begin(), U_hat.end(), U_hat1.begin());
+//      std::copy(U_hat.begin(), U_hat.end(), U_hat1.begin());
+//      std::copy(U_hat.begin(), U_hat.end(), U_hat1.begin());
+     
      for (int rk=0; rk<4; rk++)
      {
         if (rk > 0)
         {
-            fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(U_hat.data()), U.data());
-            fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(V_hat.data()), V.data());
-            fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(W_hat.data()), W.data());
-            for (int k=0; k<U.size(); k++)
-            {
-                U[k] /= tot;
-                V[k] /= tot;
-                W[k] /= tot;
-            }
+           fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(U_hat.data()), U.data());
+           fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(V_hat.data()), V.data());
+           fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(W_hat.data()), W.data());
+           for (int k=0; k<U.size(); k++)
+           {
+             U[k] /= tot;
+             V[k] /= tot;
+             W[k] /= tot;
+           }
         }
         // Compute curl
         for (int i=0; i<local_n1; i++)
           for (int j=0; j<N; j++)
             for (int k=0; k<Nf; k++)
             {
-                int z = (i*N+j)*Nf+k;
-                curlZ[z] = one*(kx[i+local_1_start]*V_hat[z]-kx[j]*U_hat[z]);
-                curlY[z] = one*(kz[k]*U_hat[z]-kx[i+local_1_start]*W_hat[z]);
-                curlX[z] = one*(kx[j]*W_hat[z]-kz[k]*V_hat[z]);
-            }                        
+               const int z = (i*N+j)*Nf+k;
+               curlZ[z] = one*(kx[i+local_1_start]*V_hat[z]-kx[j]*U_hat[z]);
+               curlY[z] = one*(kz[k]*U_hat[z]-kx[i+local_1_start]*W_hat[z]);
+               curlX[z] = one*(kx[j]*W_hat[z]-kz[k]*V_hat[z]);
+            }
         fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(curlX.data()), CU.data());
         fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(curlY.data()), CV.data());
         fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(curlZ.data()), CW.data());
@@ -170,14 +195,14 @@ int main( int argc, char *argv[] )
         
         // Cross
         for (int i=0; i<local_n0; i++)
-            for (int j=0; j<N; j++)
-                for (int k=0; k<N; k++)
-                {
-                  int z = (i*N+j)*2*Nf+k;
-                  U_tmp[z] = V[z]*CW[z]-W[z]*CV[z];
-                  V_tmp[z] = W[z]*CU[z]-U[z]*CW[z];
-                  W_tmp[z] = U[z]*CV[z]-V[z]*CU[z];      
-                }
+          for (int j=0; j<N; j++)
+            for (int k=0; k<N; k++)
+            {
+              const int z = (i*N+j)*2*Nf+k;
+              U_tmp[z] = V[z]*CW[z]-W[z]*CV[z];
+              V_tmp[z] = W[z]*CU[z]-U[z]*CW[z];
+              W_tmp[z] = U[z]*CV[z]-V[z]*CU[z];      
+            }
                 
         fftw_mpi_execute_dft_r2c( rfftn, U_tmp.data(), reinterpret_cast<fftw_complex*>(dU.data()));
         fftw_mpi_execute_dft_r2c( rfftn, V_tmp.data(), reinterpret_cast<fftw_complex*>(dV.data()));
@@ -187,24 +212,21 @@ int main( int argc, char *argv[] )
           for (int j=0; j<N; j++)
             for (int k=0; k<Nf; k++)
             {
-              int z = (i*N+j)*Nf+k;
-              int zero_or_one = (abs(kx[i+local_1_start])<kmax)*(abs(kx[j])<kmax)*(abs(kx[k])<kmax) == true ? 1 : 0;
-              dU[z] *= (zero_or_one*dt);
-              dV[z] *= (zero_or_one*dt);
-              dW[z] *= (zero_or_one*dt);             
+              const int z = (i*N+j)*Nf+k;
+              dU[z] *= (dealias[z]*dt);
+              dV[z] *= (dealias[z]*dt);
+              dW[z] *= (dealias[z]*dt);
             }
         // 
         for (int i=0; i<local_n1; i++)
           for (int j=0; j<N; j++)
             for (int k=0; k<Nf; k++)
             {
-                int z = (i*N+j)*Nf+k;
-                double kk = kx[i+local_1_start]*kx[i+local_1_start] + kx[j]*kx[j] + kx[k]*kx[k];
-                kk = kk > 0 ? kk : 1;
-                P_hat[z] = (dU[z]*kx[i+local_1_start] + dV[z]*kx[j] + dW[z]*kz[k])/kk;
-                dU[z] -= (P_hat[z]*kx[i+local_1_start] + nu*dt*kk*U_hat[z]);
-                dV[z] -= (P_hat[z]*kx[j] + nu*dt*kk*V_hat[z]);
-                dW[z] -= (P_hat[z]*kz[k] + nu*dt*kk*W_hat[z]);
+                const int z = (i*N+j)*Nf+k;
+                P_hat[z] = (dU[z]*kx[i+local_1_start] + dV[z]*kx[j] + dW[z]*kz[k])/kk[z];
+                dU[z] -= (P_hat[z]*kx[i+local_1_start] + nu*dt*kk[z]*U_hat[z]);
+                dV[z] -= (P_hat[z]*kx[j] + nu*dt*kk[z]*V_hat[z]);
+                dW[z] -= (P_hat[z]*kz[k] + nu*dt*kk[z]*W_hat[z]);
             }
             
         if (rk < 3)
@@ -213,7 +235,7 @@ int main( int argc, char *argv[] )
             for (int j=0; j<N; j++)
                 for (int k=0; k<Nf; k++)
                 {
-                   int z = (i*N+j)*Nf+k;
+                   const int z = (i*N+j)*Nf+k;
                    U_hat[z] = U_hat0[z] + b[rk]*dU[z];
                    V_hat[z] = V_hat0[z] + b[rk]*dV[z];
                    W_hat[z] = W_hat0[z] + b[rk]*dW[z];
@@ -224,7 +246,7 @@ int main( int argc, char *argv[] )
           for (int j=0; j<N; j++)
             for (int k=0; k<Nf; k++)
             {
-                int z = (i*N+j)*Nf+k;
+                const int z = (i*N+j)*Nf+k;
                 U_hat1[z] += a[rk]*dU[z];
                 V_hat1[z] += a[rk]*dV[z];
                 W_hat1[z] += a[rk]*dW[z];
@@ -234,7 +256,7 @@ int main( int argc, char *argv[] )
       for (int j=0; j<N; j++)
         for (int k=0; k<Nf; k++)
         {
-            int z = (i*N+j)*Nf+k;
+            const int z = (i*N+j)*Nf+k;
             U_hat[z] = U_hat1[z];
             V_hat[z] = V_hat1[z];
             W_hat[z] = W_hat1[z];

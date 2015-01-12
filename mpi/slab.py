@@ -7,7 +7,7 @@ from wrappyfftw import *
 
 __all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
-def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid,
+def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgrid,
           sum, where, num_processes, rank, convection, communication, **kwargs):
     
     if not num_processes in [2**i for i in range(M+1)]:
@@ -17,8 +17,9 @@ def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid,
     Np = N / num_processes     
 
     # Create the physical mesh
-    x = linspace(0, L, N+1).astype(float)[:-1]
-    X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'), dtype=float)
+    #x = linspace(0, L, N+1).astype(float)[:-1]
+    #X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'), dtype=float)
+    X = mgrid[rank*Np:(rank+1)*Np, :N, :N].astype(float)*L/N
 
     """
     Solution U is real and as such its transform, U_hat = fft(U)(k), 
