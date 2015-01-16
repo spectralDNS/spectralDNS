@@ -6,11 +6,12 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from numpy import *
 from numpy.fft import fftfreq, fft, ifft, irfft2, rfft2, rfftn, irfftn
 from mpi4py import MPI
+from mpi.wrappyfftw import *
 
 nu = 0.000625
 T = 0.1
 dt = 0.01
-M = 6
+M = 4
 N = 2**M
 L = 2 * pi
 dx = L / N
