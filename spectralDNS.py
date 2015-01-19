@@ -3,22 +3,13 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from MPI_knee import mpi_import, MPI
-with mpi_import():
-    import time
-    t0 = time.time()
-    import sys, cProfile
-    from h5io import *
-    from numpy import *
-    from utilities import *
-
-#import time
-#t0 = time.time()
-#import sys, cProfile
-#from mpi4py import MPI
-#from numpy import *
-#from h5io import *
-#from utilities import *
+import time
+t0 = time.time()
+import sys, cProfile
+from mpi4py import MPI
+from numpy import *
+from h5io import *
+from utilities import *
 
 comm = MPI.COMM_WORLD
 comm.barrier()
@@ -66,8 +57,7 @@ hdf5file = HDF5Writer(comm, dt, N, params, float)
 if make_profile: profiler = cProfile.Profile()
 
 # Import decomposed mesh, wavenumber mesh and FFT routines with either slab or pencil decomposition
-with mpi_import():
-    exec("from mpi.{} import *".format(decomposition))
+exec("from mpi.{0} import *".format(decomposition))
 vars().update(setup(**vars()))
 
 if mem_profile: mem("Arrays")
@@ -201,7 +191,8 @@ while t < T-1e-8:
         hdf5file.write(U, P, tstep)
 
     if tstep % compute_energy == 0:
-        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx*dx/L**3/2) # Compute energy with double precision
+        #kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx*dx/L**3/2) # Compute energy with double precision
+        kk = 0
         if rank == 0:
             k.append(kk)
             print t, float(kk)

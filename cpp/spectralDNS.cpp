@@ -25,9 +25,9 @@ int main( int argc, char *argv[] )
   vector<double> s_in(1), s_out(1), vs_in(2), vs_out(2);
 
   nu = 0.000625;
-  T = 0.1;
-  dt = 0.01;
-  M = 7;
+  T = 0.05;
+  dt = 0.005;
+  M = 10;
 //   N = pow(static_cast<int>(2), M); // Not accepted by Shaheen
   N = 1;
   for (int i=0; i<M;i++)
@@ -269,7 +269,6 @@ int main( int argc, char *argv[] )
         slowest_time = max(t1-t0, slowest_time);
     }   
     t0 = t1;
-}
 
   s_in[0] = 0.0;
   for (int i=0; i<local_n0; i++)
@@ -284,6 +283,8 @@ int main( int argc, char *argv[] )
   MPI::COMM_WORLD.Reduce(s_in.data(), s_out.data(), 1, MPI::DOUBLE, MPI::SUM, 0);  
   if (rank==0)
     std::cout << " k = " << s_out[0] << std::endl;
+
+}
 
   MPI::COMM_WORLD.Barrier();
   t1 = MPI::Wtime();
