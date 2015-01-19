@@ -34,12 +34,18 @@ try:
     #irfftn = pyfftw.interfaces.numpy_fft.irfftn
     #rfftn = pyfftw.interfaces.numpy_fft.rfftn
     
-    ifft_object = {}
-    irfft_object = {}
+    fft_object    = {}
+    ifft_object   = {}
+    fft2_object   = {}
+    ifft2_object  = {}
+    fftn_object   = {}
+    ifftn_object  = {}
+    irfft_object  = {}
+    irfftn_object = {}
     irfft2_object = {}
-    rfft2_object = {}
-    fft_object = {}
-    rfft_object = {}
+    rfft2_object  = {}
+    rfft_object   = {}
+    rfftn_object  = {}
     def ifft(a, axis=None):
         global ifft_object
         if not a.shape in ifft_object:
@@ -49,6 +55,26 @@ try:
         in_array = ifft_object[a.shape].get_input_array()
         in_array[:] = a
         return ifft_object[a.shape]()
+
+    def ifft2(a, axes=None):
+        global ifft2_object
+        if not a.shape in ifft2_object:
+            b = a.copy()
+            ifft2_object[a.shape] = pyfftw.builders.ifft2(b, axes=axes)    
+            
+        in_array = ifft2_object[a.shape].get_input_array()
+        in_array[:] = a
+        return ifft2_object[a.shape]()
+
+    def ifftn(a, axes=None):
+        global ifftn_object
+        if not a.shape in ifftn_object:
+            b = a.copy()
+            ifftn_object[a.shape] = pyfftw.builders.ifftn(b, axes=axes)    
+            
+        in_array = ifftn_object[a.shape].get_input_array()
+        in_array[:] = a
+        return ifftn_object[a.shape]()
 
     def irfft(a, axis=None):
         global irfft_object
@@ -70,6 +96,16 @@ try:
         in_array[:] = a
         return irfft2_object[a.shape]()
 
+    def irfftn(a, axes=None):
+        global irfftn_object
+        if not a.shape in irfftn_object:
+            b = a.copy()
+            irfftn_object[a.shape] = pyfftw.builders.irfftn(b, axes=axes)
+            
+        in_array = irfftn_object[a.shape].get_input_array()
+        in_array[:] = a
+        return irfftn_object[a.shape]()
+    
     def fft(a, axis=None):
         global fft_object
         if not a.shape in fft_object:
@@ -79,6 +115,26 @@ try:
         in_array = fft_object[a.shape].get_input_array()
         in_array[:] = a
         return fft_object[a.shape]()
+
+    def fft2(a, axes=None):
+        global fft2_object
+        if not a.shape in fft2_object:
+            b = a.copy()
+            fft2_object[a.shape] = pyfftw.builders.fft2(b, axes=axes)
+        
+        in_array = fft2_object[a.shape].get_input_array()
+        in_array[:] = a
+        return fft2_object[a.shape]()
+
+    def fftn(a, axes=None):
+        global fftn_object
+        if not a.shape in fftn_object:
+            b = a.copy()
+            fftn_object[a.shape] = pyfftw.builders.fftn(b, axes=axes)
+        
+        in_array = fftn_object[a.shape].get_input_array()
+        in_array[:] = a
+        return fftn_object[a.shape]()
 
     def rfft(a, axis=None):
         global rfft_object
@@ -99,6 +155,16 @@ try:
         in_array = rfft2_object[a.shape].get_input_array()
         in_array[:] = a        
         return rfft2_object[a.shape]()
+
+    def rfftn(a, axes=None):
+        global rfftn_object
+        if not a.shape in rfftn_object:
+            b = a.copy()
+            rfftn_object[a.shape] = pyfftw.builders.rfftn(b, axes=axes)
+            
+        in_array = rfftn_object[a.shape].get_input_array()
+        in_array[:] = a        
+        return rfftn_object[a.shape]()
 
 except:    
     print Warning("Install pyfftw, it is much faster than numpy fft")

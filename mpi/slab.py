@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from wrappyfftw import *
 
-__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
+#__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
 def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgrid,
           sum, where, num_processes, rank, convection, communication, **kwargs):
