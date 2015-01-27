@@ -4,12 +4,13 @@ spectralDNS is a classical pseudo-spectral direct Navier-Stokes solver for tripl
 <p align="center">
     <img src="https://raw.github.com/wiki/mikaem/spectralDNS/figs/weak_scaling_avg.png" width="600" height="400" alt="Weak scaling on Abel cluster"/>
 </p>
+
 <p align="center">
     Weak scaling on the Abel cluster.
 </p>
 
 <p align="center">
-    <img src="https://raw.github.com/wiki/mikaem/spectralDNS/figs/weak_scaling_shaheen.png" width="600" height="400" alt="Weak scaling on Shaheen BlueGene/P"/>
+    <img src="https://www.dropbox.com/s/9bjdgeivwth9hwb/weak_scaling_shaheen.png?dl=0" width="600" height="400" alt="Weak scaling on Shaheen BlueGene/P"/>
 </p>
 <p align="center">
     Weak scaling on Shaheen BlueGene/P.
