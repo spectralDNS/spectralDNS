@@ -10,7 +10,7 @@ spectralDNS is a classical pseudo-spectral direct Navier-Stokes solver for tripl
 </p>
 
 <p align="center">
-    <img src="https://www.dropbox.com/s/9bjdgeivwth9hwb/weak_scaling_shaheen.png?dl=0" width="600" height="400" alt="Weak scaling on Shaheen BlueGene/P"/>
+    <img src="https://www.dropbox.com/s/9bjdgeivwth9hwb/weak_scaling_shaheen.png?dl=1" width="600" height="400" alt="Weak scaling on Shaheen BlueGene/P"/>
 </p>
 <p align="center">
     Weak scaling on Shaheen BlueGene/P.
