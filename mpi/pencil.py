@@ -8,7 +8,7 @@ from wrappyfftw import *
 __all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
 def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
-          sum, where, num_processes, rank, P1, arange, MPI, convection, 
+          sum, where, num_processes, rank, P1, arange, MPI, convection,
           hdf5file, **kwargs):
 
     # Each cpu gets ownership of a pencil of size N1*N2*N in real space
@@ -17,7 +17,7 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
     P2 = num_processes / P1
     N1 = N/P1
     N2 = N/P2
-    
+
     if not (num_processes % 2 == 0 or num_processes == 1):
         raise IOError("Number of cpus must be even")
 
@@ -49,11 +49,11 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
     hdf5file.x2 = x2
 
     """
-    Solution U is real and as such its transform, U_hat = fft(U)(k), 
-    is such that fft(U)(k) = conj(fft(U)(N-k)) and thus it is sufficient 
-    to store N/2+1 Fourier coefficients in the first transformed direction 
+    Solution U is real and as such its transform, U_hat = fft(U)(k),
+    is such that fft(U)(k) = conj(fft(U)(N-k)) and thus it is sufficient
+    to store N/2+1 Fourier coefficients in the first transformed direction
     (y). However, the Nyquist mode (k=N/2+1) is neglected in the 3D fft.
-    The Nyquist mode in included in temporary arrays simply because rfft/irfft 
+    The Nyquist mode in included in temporary arrays simply because rfft/irfft
     expect N/2+1 modes.
     """
 
@@ -68,8 +68,8 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
     U_hat1  = empty((3, N2, N1/2, N), dtype=complex)
     dU      = empty((3, N2, N1/2, N), dtype=complex)
 
-    init_fft(**locals())    
-    
+    init_fft(**locals())
+
     # work arrays (Not required by all convection methods)
     if convection in ('Standard', 'Skewed'):
         U_tmp = empty((3, N1, N, N2), dtype=float)
@@ -82,13 +82,13 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
     kx = fftfreq(N, 1./N).astype(int)
     k1 = slice(xzrank*N2, (xzrank+1)*N2, 1)
     k2 = slice(xyrank*N1/2, (xyrank+1)*N1/2, 1)
-    KX = array(meshgrid(kx[k1], kx[k2], kx, indexing='ij'), dtype=int)
-    KK = sum(KX*KX, 0, dtype=int)
-    KX_over_Ksq = KX.astype(float) / where(KK==0, 1, KK).astype(float)
+    K = array(meshgrid(kx[k1], kx[k2], kx, indexing='ij'), dtype=int)
+    K2 = sum(K*K, 0, dtype=int)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
     # Filter for dealiasing nonlinear convection
-    kmax = 2./3.*(N/2+1)
-    dealias = array((abs(KX[0]) < kmax)*(abs(KX[1]) < kmax)*(abs(KX[2]) < kmax), dtype=bool)
+    kmax_dealias = 2./3.*(N/2+1)
+    dealias = array((abs(K[0]) < kmax_dealias)*(abs(K[1]) < kmax_dealias)*(abs(K[2]) < kmax_dealias), dtype=bool)
     del kwargs
     return locals()
 
@@ -101,47 +101,46 @@ def init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxy, commxz, **kwargs):
     globals().update(locals())
 
 def ifftn_mpi(fu, u):
-    """ifft in three directions using mpi.
-    Need to do ifft in reversed order of fft
+    """Inverse FFT in three directions using MPI.
+    Need to do ifft in reversed order of fft.
     """
     # Do first owned direction
     Uc_hat_z[:] = ifft(fu, axis=2)
 
     # Transform to x all but k=N/2 (the neglected Nyquist mode)
-    for i in range(P2): 
+    for i in range(P2):
         Uc_hat_x[i*N2:(i+1)*N2] = Uc_hat_z[:, :, i*N2:(i+1)*N2]
-        
+
     # Communicate in xz-plane and do fft in x-direction
     commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
     Uc_hat_x[:] = ifft(Uc_hat_xr, axis=0)
-        
+
     # Communicate and transform in xy-plane
     commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
     for i in range(P1):
         Uc_hat_y[:, i*N1/2:(i+1)*N1/2] = Uc_hat_xr[i*N1:(i+1)*N1]
-            
+
     # Do fft for y-direction
     Uc_hat_y[:, -1, :] = 0
     u[:] = irfft(Uc_hat_y, axis=1)
-        
+
 def fftn_mpi(u, fu):
-    """fft in three directions using mpi
-    """    
+    """FFT in three directions using MPI."""
     # Do fft in y direction on owned data
     Uc_hat_y[:] = rfft(u, axis=1)
-    
+
     # Transform to x direction neglecting k=N/2 (Nyquist)
     for i in range(P1):
         Uc_hat_x[i*N1:(i+1)*N1] = Uc_hat_y[:, i*N1/2:(i+1)*N1/2]
-    
+
     # Communicate and do fft in x-direction
     commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
-    Uc_hat_x[:] = fft(Uc_hat_xr, axis=0)        
-    
+    Uc_hat_x[:] = fft(Uc_hat_xr, axis=0)
+
     # Communicate and transform to final z-direction
-    commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])    
-    for i in range(P2): 
+    commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
+    for i in range(P2):
         Uc_hat_z[:, :, i*N2:(i+1)*N2] = Uc_hat_xr[i*N2:(i+1)*N2]
-                                   
-    # Do fft for last direction 
+
+    # Do fft for last direction
     fu[:] = fft(Uc_hat_z, axis=2)
