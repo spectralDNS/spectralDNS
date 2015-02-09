@@ -80,14 +80,14 @@ b = array([0.5, 0.5, 1.], dtype=float)
 
 def project(u):
     """Project u onto divergence free space"""
-    u[:] -= sum(KX_over_Ksq*u, 0)*KX
+    u[:] -= sum(K_over_K2*u, 0)*K
     return u
 
 def standardConvection(c):
     """c_i = u_j du_i/dx_j"""
     for i in range(3):
         for j in range(3):
-            U_tmp[j] = ifftn_mpi(1j*KX[j]*U_hat[i], U_tmp[j])
+            U_tmp[j] = ifftn_mpi(1j*K[j]*U_hat[i], U_tmp[j])
         c[i] = fftn_mpi(sum(U*U_tmp, 0), c[i])
     return c
 
@@ -96,14 +96,14 @@ def divergenceConvection(c, add=False):
     if not add: c.fill(0)
     for i in range(3):
         F_tmp[j] = fftn_mpi(U[0]*U[i], F_tmp[i])
-    c[0] += 1j*sum(KX*F_tmp, 0)
-    c[1] += 1j*KX[0]*F_tmp[1]
-    c[2] += 1j*KX[0]*F_tmp[2]
+    c[0] += 1j*sum(K*F_tmp, 0)
+    c[1] += 1j*K[0]*F_tmp[1]
+    c[2] += 1j*K[0]*F_tmp[2]
     F_tmp[0] = fftn_mpi(U[1]*U[1], F_tmp[0])
     F_tmp[1] = fftn_mpi(U[1]*U[2], F_tmp[1])
     F_tmp[2] = fftn_mpi(U[2]*U[2], F_tmp[2])
-    c[1] += (1j*KX[1]*F_tmp[0] + 1j*KX[2]*F_tmp[1])
-    c[2] += (1j*KX[1]*F_tmp[1] + 1j*KX[2]*F_tmp[2])
+    c[1] += (1j*K[1]*F_tmp[0] + 1j*K[2]*F_tmp[1])
+    c[2] += (1j*K[1]*F_tmp[1] + 1j*K[2]*F_tmp[2])
     return c
 
 def Cross(a, b, c):
@@ -115,14 +115,14 @@ def Cross(a, b, c):
 
 def Curl(a, c):
     """c = F_inv(curl(a))"""
-    c[2] = ifftn_mpi(1j*(KX[0]*a[1]-KX[1]*a[0]), c[2])
-    c[1] = ifftn_mpi(1j*(KX[2]*a[0]-KX[0]*a[2]), c[1])
-    c[0] = ifftn_mpi(1j*(KX[1]*a[2]-KX[2]*a[1]), c[0])
+    c[2] = ifftn_mpi(1j*(K[0]*a[1]-K[1]*a[0]), c[2])
+    c[1] = ifftn_mpi(1j*(K[2]*a[0]-K[0]*a[2]), c[1])
+    c[0] = ifftn_mpi(1j*(K[1]*a[2]-K[2]*a[1]), c[0])
     return c
 
 def Div(a, c):
     """c = F_inv(div(a))"""
-    c = ifftn_mpi(1j*(sum(KX*a, 0)), c)
+    c = ifftn_mpi(1j*(sum(K*a, 0)), c)
     return c
 
 
@@ -151,13 +151,13 @@ def ComputeRHS(dU, rk):
     dU *= dealias*dt
 
     # Compute pressure (to get actual pressure multiply by 1j/dt)
-    P_hat[:] = sum(dU*KX_over_Ksq, 0)
+    P_hat[:] = sum(dU*K_over_K2, 0)
 
     # Add pressure gradient
-    dU -= P_hat*KX
+    dU -= P_hat*K
 
-    # Add contribution from diffusion
-    dU -= nu*dt*KK*U_hat
+    # Add viscous term
+    dU -= nu*dt*K2*U_hat
     return dU
 
 # Taylor-Green initialization
