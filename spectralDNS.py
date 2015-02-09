@@ -139,16 +139,16 @@ def ComputeRHS(dU, rk):
         Cross(U, curl, dU)
 
     # Dealias the nonlinear convection
-    dU[:] *= dealias*dt
+    dU[:] *= dealias
     
-    # Compute pressure (To get actual pressure multiply by 1j/dt)
+    # Compute pressure (To get actual pressure multiply by 1j)
     P_hat[:] = sum(dU*KX_over_Ksq, 0)
         
     # Add pressure gradient
     dU[:] -= P_hat*KX    
 
     # Add contribution from diffusion
-    dU[:] -= nu*dt*KK*U_hat
+    dU[:] -= nu*KK*U_hat
 
 # Taylor-Green initialization
 U[0] = sin(X[0])*cos(X[1])*cos(X[2])
@@ -178,26 +178,26 @@ while t < T-1e-8:
         for rk in range(4):
             ComputeRHS(dU, rk)
             if rk < 3:
-                U_hat[:] = U_hat0 + b[rk]*dU
-            U_hat1[:] += a[rk]*dU            
+                U_hat[:] = U_hat0 + b[rk]*dt*dU
+            U_hat1[:] += a[rk]*dt*dU
         U_hat[:] = U_hat1[:]
         
     elif temporal == "ForwardEuler" or tstep == 1:  
         ComputeRHS(dU, 0)        
-        U_hat[:] += dU
+        U_hat[:] += dU*dt
         if temporal == "AB2":
-            U_hat0[:] = dU
+            U_hat0[:] = dU*dt
         
     else:
         ComputeRHS(dU, 0)
-        U_hat[:] += 1.5*dU - 0.5*U_hat0
-        U_hat0[:] = dU
+        U_hat[:] += 1.5*dU*dt - 0.5*U_hat0
+        U_hat0[:] = dU*dt
 
     for i in range(3):
         ifftn_mpi(U_hat[i], U[i])
         
     if tstep % params['write_result'] == 0 or tstep % params['write_yz_slice'][1] == 0:
-        ifftn_mpi(P_hat*1j/dt, P)
+        ifftn_mpi(P_hat*1j, P)
         hdf5file.write(U, P, tstep)
 
     if tstep % compute_energy == 0:

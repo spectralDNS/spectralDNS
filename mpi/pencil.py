@@ -13,7 +13,7 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
 
     # Each cpu gets ownership of a pencil of size N1*N2*N in real space
     # and (N1/2+1)*N2*N in Fourier space. However, the Nyquist mode is
-    # neglected and as such the real number is N1/2*N2*N in Fourier space.
+    # neglected and as such the actual number is N1/2*N2*N in Fourier space.
     P2 = num_processes / P1
     N1 = N/P1
     N2 = N/P2
@@ -68,7 +68,7 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
     U_hat1  = empty((3, N2, N1/2, N), dtype=complex)
     dU      = empty((3, N2, N1/2, N), dtype=complex)
 
-    init_fft(**locals())    
+    init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxy, commxz)    
     
     # work arrays (Not required by all convection methods)
     if convection in ('Standard', 'Skewed'):
@@ -76,7 +76,7 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
     if convection in ('Divergence', 'Skewed'):
         F_tmp   = empty((3, N2, N1/2, N), dtype=complex)
 
-    curl    = empty((3, N1, N, N2))
+    curl = empty((3, N1, N, N2), dtype=float)
 
     # Set wavenumbers in grid
     kx = fftfreq(N, 1./N).astype(int)
@@ -92,7 +92,7 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
     del kwargs
     return locals()
 
-def init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxy, commxz, **kwargs):
+def init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxy, commxz):
     # Initialize MPI work arrays globally
     Uc_hat_y  = empty((N1, Nf, N2), dtype=complex)
     Uc_hat_x  = empty((N, N1/2, N2), dtype=complex)
