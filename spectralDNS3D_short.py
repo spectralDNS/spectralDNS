@@ -41,8 +41,10 @@ kz = kx[:Nf].copy(); kz[-1] *= -1
 K = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
 K2 = sum(K*K, 0, dtype=int)
 K_over_K2 = K.astype(float) / where(K2 == 0, 1, K2).astype(float)
-kmax = 2./3.*(N/2+1)
-dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*(abs(K[2]) < kmax), dtype=bool)
+kmax_dealias = 2./3.*(N/2+1)
+dealias = array((abs(K[0]) < kmax_dealias)*
+                (abs(K[1]) < kmax_dealias)*(abs(K[2]) < kmax_dealias),
+                dtype=bool)
 a = [1./6., 1./3., 1./3., 1./6.]
 b = [0.5, 0.5, 1.]
 
@@ -52,6 +54,7 @@ def ifftn_mpi(fu, u):
     for i in range(num_processes):
         Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
     u[:] = irfft2(Uc_hatT, axes=(1,2))
+    return u
 
 def fftn_mpi(u, fu):
     Uc_hatT[:] = rfft2(u, axes=(1,2))
@@ -59,22 +62,26 @@ def fftn_mpi(u, fu):
         U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
     comm.Alltoall([U_mpi, MPI.DOUBLE_COMPLEX], [fu, MPI.DOUBLE_COMPLEX])
     fu[:] = fft(fu, axis=0)
+    return fu
 
 def Cross(a, b, c):
-    fftn_mpi(a[1]*b[2]-a[2]*b[1], c[0])
-    fftn_mpi(a[2]*b[0]-a[0]*b[2], c[1])
-    fftn_mpi(a[0]*b[1]-a[1]*b[0], c[2])
+    c[0] = fftn_mpi(a[1]*b[2]-a[2]*b[1], c[0])
+    c[1] = fftn_mpi(a[2]*b[0]-a[0]*b[2], c[1])
+    c[2] = fftn_mpi(a[0]*b[1]-a[1]*b[0], c[2])
+    return c
 
 def Curl(a, c):
-    ifftn_mpi(1j*(K[0]*a[1]-K[1]*a[0]), c[2])
-    ifftn_mpi(1j*(K[2]*a[0]-K[0]*a[2]), c[1])
-    ifftn_mpi(1j*(K[1]*a[2]-K[2]*a[1]), c[0])
+    c[2] = ifftn_mpi(1j*(K[0]*a[1]-K[1]*a[0]), c[2])
+    c[1] = ifftn_mpi(1j*(K[2]*a[0]-K[0]*a[2]), c[1])
+    c[0] = ifftn_mpi(1j*(K[1]*a[2]-K[2]*a[1]), c[0])
+    return c
 
 def ComputeRHS(dU, rk):
     if rk > 0:
-        for i in range(3): ifftn_mpi(U_hat[i], U[i])
-    Curl(U_hat, curl)
-    Cross(U, curl, dU)
+        for i in range(3):
+            U[i] = ifftn_mpi(U_hat[i], U[i])
+    curl = Curl(U_hat, curl)
+    dU = Cross(U, curl, dU)
     dU[:] *= dealias*dt
     P_hat[:] = sum(dU*K_over_K2, 0)
     dU[:] -= P_hat*K
@@ -83,7 +90,9 @@ def ComputeRHS(dU, rk):
 U[0] = sin(X[0])*cos(X[1])*cos(X[2])
 U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
 U[2] = 0
-for i in range(3): fftn_mpi(U[i], U_hat[i])
+for i in range(3):
+    U_hat[i] = fftn_mpi(U[i], U_hat[i])
+
 t = 0.0
 tstep = 0
 while t < T-1e-8:
@@ -94,7 +103,8 @@ while t < T-1e-8:
         if rk < 3: U_hat[:] = U_hat0 + b[rk]*dU
         U_hat1[:] += a[rk]*dU
     U_hat[:] = U_hat1[:]
-    for i in range(3): ifftn_mpi(U_hat[i], U[i])
+    for i in range(3):
+        U[i] = ifftn_mpi(U_hat[i], U[i])
 
 kk = comm.reduce(0.5*sum(U*U)*dx*dx*dx/L**3)
 if rank == 0:

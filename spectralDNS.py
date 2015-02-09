@@ -43,7 +43,7 @@ params = {
     'precision': "double"       # single or double precision
 }
 
-# Parse parameters from the command line 
+# Parse parameters from the command line
 commandline_kwargs = parse_command_line(sys.argv[1:])
 params.update(commandline_kwargs)
 assert params['convection'] in ['Standard', 'Divergence', 'Skewed', 'Vortex']
@@ -52,8 +52,9 @@ vars().update(params)
 
 if mem_profile: mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
 
-float, complex, mpitype = {"single": (float32, complex64, MPI.F_FLOAT_COMPLEX),
-                           "double": (float64, complex128, MPI.F_DOUBLE_COMPLEX)}[precision]
+float, complex, mpitype = {
+    "single": (float32, complex64, MPI.F_FLOAT_COMPLEX),
+    "double": (float64, complex128, MPI.F_DOUBLE_COMPLEX)}[precision]
 
 # Set mesh size. Uniform size in all three directions (for now)
 N = 2**M
@@ -65,7 +66,8 @@ rank = comm.Get_rank()
 hdf5file = HDF5Writer(comm, dt, N, params, float)
 if make_profile: profiler = cProfile.Profile()
 
-# Import decomposed mesh, wavenumber mesh and FFT routines with either slab or pencil decomposition
+# Import decomposed mesh, wavenumber mesh and FFT routines
+# with either slab or pencil decomposition
 with mpi_import():
     exec("from mpi.{} import *".format(decomposition))
 vars().update(setup(**vars()))
@@ -79,88 +81,96 @@ b = array([0.5, 0.5, 1.], dtype=float)
 def project(u):
     """Project u onto divergence free space"""
     u[:] -= sum(KX_over_Ksq*u, 0)*KX
+    return u
 
 def standardConvection(c):
     """c_i = u_j du_i/dx_j"""
     for i in range(3):
         for j in range(3):
-            ifftn_mpi(1j*KX[j]*U_hat[i], U_tmp[j])
-        fftn_mpi(sum(U*U_tmp, 0), c[i])
-        
+            U_tmp[j] = ifftn_mpi(1j*KX[j]*U_hat[i], U_tmp[j])
+        c[i] = fftn_mpi(sum(U*U_tmp, 0), c[i])
+    return c
+
 def divergenceConvection(c, add=False):
     """c_i = div(u_i u_j)"""
     if not add: c.fill(0)
     for i in range(3):
-        fftn_mpi(U[0]*U[i], F_tmp[i])
+        F_tmp[j] = fftn_mpi(U[0]*U[i], F_tmp[i])
     c[0] += 1j*sum(KX*F_tmp, 0)
     c[1] += 1j*KX[0]*F_tmp[1]
     c[2] += 1j*KX[0]*F_tmp[2]
-    fftn_mpi(U[1]*U[1], F_tmp[0])
-    fftn_mpi(U[1]*U[2], F_tmp[1])
-    fftn_mpi(U[2]*U[2], F_tmp[2])
+    F_tmp[0] = fftn_mpi(U[1]*U[1], F_tmp[0])
+    F_tmp[1] = fftn_mpi(U[1]*U[2], F_tmp[1])
+    F_tmp[2] = fftn_mpi(U[2]*U[2], F_tmp[2])
     c[1] += (1j*KX[1]*F_tmp[0] + 1j*KX[2]*F_tmp[1])
     c[2] += (1j*KX[1]*F_tmp[1] + 1j*KX[2]*F_tmp[2])
+    return c
 
 def Cross(a, b, c):
     """c_k = F_k(a x b)"""
-    fftn_mpi(a[1]*b[2]-a[2]*b[1], c[0])
-    fftn_mpi(a[2]*b[0]-a[0]*b[2], c[1])
-    fftn_mpi(a[0]*b[1]-a[1]*b[0], c[2])
+    c[0] = fftn_mpi(a[1]*b[2]-a[2]*b[1], c[0])
+    c[1] = fftn_mpi(a[2]*b[0]-a[0]*b[2], c[1])
+    c[2] = fftn_mpi(a[0]*b[1]-a[1]*b[0], c[2])
+    return c
 
 def Curl(a, c):
     """c = F_inv(curl(a))"""
-    ifftn_mpi(1j*(KX[0]*a[1]-KX[1]*a[0]), c[2])
-    ifftn_mpi(1j*(KX[2]*a[0]-KX[0]*a[2]), c[1])
-    ifftn_mpi(1j*(KX[1]*a[2]-KX[2]*a[1]), c[0])
+    c[2] = ifftn_mpi(1j*(KX[0]*a[1]-KX[1]*a[0]), c[2])
+    c[1] = ifftn_mpi(1j*(KX[2]*a[0]-KX[0]*a[2]), c[1])
+    c[0] = ifftn_mpi(1j*(KX[1]*a[2]-KX[2]*a[1]), c[0])
+    return c
 
 def Div(a, c):
     """c = F_inv(div(a))"""
-    ifftn_mpi(1j*(sum(KX*a, 0), c))
-    
+    c = ifftn_mpi(1j*(sum(KX*a, 0)), c)
+    return c
+
+
 def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U
         for i in range(3):
-            ifftn_mpi(U_hat[i], U[i])
-    
+            U[i] = ifftn_mpi(U_hat[i], U[i])
+
     # Compute convective term and place in dU
     if convection == "Standard":
-        standardConvection(dU)
-        
+        dU = standardConvection(dU)
+
     elif convection == "Divergence":
-        divergenceConvection(dU)        
+        dU = divergenceConvection(dU)
 
     elif convection == "Skewed":
-        standardConvection(dU)
-        divergenceConvection(dU, add=True)        
-        dU[:] = dU/2
-        
+        dU = standardConvection(dU)
+        dU = divergenceConvection(dU, add=True)
+        dU /= 2
+
     elif convection == "Vortex":
-        Curl(U_hat, curl)
-        Cross(U, curl, dU)
+        curl = Curl(U_hat, curl)
+        dU = Cross(U, curl, dU)
 
     # Dealias the nonlinear convection
-    dU[:] *= dealias*dt
-    
-    # Compute pressure (To get actual pressure multiply by 1j/dt)
+    dU *= dealias*dt
+
+    # Compute pressure (to get actual pressure multiply by 1j/dt)
     P_hat[:] = sum(dU*KX_over_Ksq, 0)
-        
+
     # Add pressure gradient
-    dU[:] -= P_hat*KX    
+    dU -= P_hat*KX
 
     # Add contribution from diffusion
-    dU[:] -= nu*dt*KK*U_hat
+    dU -= nu*dt*KK*U_hat
+    return dU
 
 # Taylor-Green initialization
 U[0] = sin(X[0])*cos(X[1])*cos(X[2])
 U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
-U[2] = 0 
+U[2] = 0
 
 # Transform initial data
 for i in range(3):
-   fftn_mpi(U[i], U_hat[i])
+   U_hat[i] = fftn_mpi(U[i], U_hat[i])
 
 if mem_profile: mem("After first FFT")
-   
+
 # Set some timers
 t = 0.0
 tstep = 0
@@ -176,44 +186,45 @@ while t < T-1e-8:
     if temporal == "RK4":
         U_hat1[:] = U_hat0[:] = U_hat
         for rk in range(4):
-            ComputeRHS(dU, rk)
+            dU = ComputeRHS(dU, rk)
             if rk < 3:
                 U_hat[:] = U_hat0 + b[rk]*dU
-            U_hat1[:] += a[rk]*dU            
+            U_hat1[:] += a[rk]*dU
         U_hat[:] = U_hat1[:]
-        
-    elif temporal == "ForwardEuler" or tstep == 1:  
-        ComputeRHS(dU, 0)        
+
+    elif temporal == "ForwardEuler" or tstep == 1:
+        dU = ComputeRHS(dU, 0)
         U_hat[:] += dU
         if temporal == "AB2":
             U_hat0[:] = dU
-        
+
     else:
-        ComputeRHS(dU, 0)
+        dU = ComputeRHS(dU, 0)
         U_hat[:] += 1.5*dU - 0.5*U_hat0
         U_hat0[:] = dU
 
     for i in range(3):
-        ifftn_mpi(U_hat[i], U[i])
-        
+        U[i] = ifftn_mpi(U_hat[i], U[i])
+
     if tstep % params['write_result'] == 0 or tstep % params['write_yz_slice'][1] == 0:
-        ifftn_mpi(P_hat*1j/dt, P)
+        P = ifftn_mpi(P_hat*1j/dt, P)
         hdf5file.write(U, P, tstep)
 
     if tstep % compute_energy == 0:
-        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx*dx/L**3/2) # Compute energy with double precision
+        # Compute energy with double precision
+        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx*dx/L**3/2)
         if rank == 0:
             k.append(kk)
             print t, float(kk)
-            
+
     tt = time.time()-t0
     t0 = time.time()
     if tstep > 1:
         fastest_time = min(tt, fastest_time)
         slowest_time = max(tt, slowest_time)
-        
+
     if tstep == 1 and make_profile:
-        #Enable profiling after first step is finished
+        # Enable profiling after first step is finished
         profiler.enable()
 
 toc = time.time()-tic
@@ -234,11 +245,11 @@ if rank == 0:
     #dkdt = (k[1:]-k[:-1])/dt
     #plot(-dkdt)
     #show()
-    
+
 if make_profile:
     results = create_profile(**vars())
 
 if mem_profile: mem("End")
-    
-hdf5file.generate_xdmf()  
+
+hdf5file.generate_xdmf()
 hdf5file.close()
