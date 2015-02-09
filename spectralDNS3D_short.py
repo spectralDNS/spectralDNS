@@ -76,9 +76,9 @@ def ComputeRHS(dU, rk):
     Curl(U_hat, curl)
     Cross(U, curl, dU)
     dU[:] *= dealias
-    P_hat[:] = sum(dU*KX_over_Ksq, 0)
-    dU[:] -= P_hat*KX    
-    dU[:] -= nu*KK*U_hat
+    P_hat[:] = sum(dU*K_over_K2, 0)
+    dU[:] -= P_hat*K    
+    dU[:] -= nu*K2*U_hat
 
 U[0] = sin(X[0])*cos(X[1])*cos(X[2])
 U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
