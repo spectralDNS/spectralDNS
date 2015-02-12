@@ -78,77 +78,85 @@ b = array([0.5, 0.5, 1.], dtype=float)
 
 def project(u):
     """Project u onto divergence free space"""
-    u[:] -= sum(KX_over_Ksq*u, 0)*KX
+    u -= sum(KX_over_Ksq*u, 0)*KX
+    return u
 
 def standardConvection(c):
     """c_i = u_j du_i/dx_j"""
     for i in range(3):
         for j in range(3):
-            ifftn_mpi(1j*KX[j]*U_hat[i], U_tmp[j])
-        fftn_mpi(sum(U*U_tmp, 0), c[i])
-        
+            U_tmp[j] = ifftn_mpi(1j*KX[j]*U_hat[i], U_tmp[j])
+        c[i] = fftn_mpi(sum(U*U_tmp, 0), c[i])
+    return c
+
 def divergenceConvection(c, add=False):
     """c_i = div(u_i u_j)"""
     if not add: c.fill(0)
     for i in range(3):
-        fftn_mpi(U[0]*U[i], F_tmp[i])
+        F_tmp[i] = fftn_mpi(U[0]*U[i], F_tmp[i])
     c[0] += 1j*sum(KX*F_tmp, 0)
     c[1] += 1j*KX[0]*F_tmp[1]
     c[2] += 1j*KX[0]*F_tmp[2]
-    fftn_mpi(U[1]*U[1], F_tmp[0])
-    fftn_mpi(U[1]*U[2], F_tmp[1])
-    fftn_mpi(U[2]*U[2], F_tmp[2])
+    F_tmp[0] = fftn_mpi(U[1]*U[1], F_tmp[0])
+    F_tmp[1] = fftn_mpi(U[1]*U[2], F_tmp[1])
+    F_tmp[2] = fftn_mpi(U[2]*U[2], F_tmp[2])
     c[1] += (1j*KX[1]*F_tmp[0] + 1j*KX[2]*F_tmp[1])
     c[2] += (1j*KX[1]*F_tmp[1] + 1j*KX[2]*F_tmp[2])
+    return c
 
 def Cross(a, b, c):
     """c_k = F_k(a x b)"""
-    fftn_mpi(a[1]*b[2]-a[2]*b[1], c[0])
-    fftn_mpi(a[2]*b[0]-a[0]*b[2], c[1])
-    fftn_mpi(a[0]*b[1]-a[1]*b[0], c[2])
+    c[0] = fftn_mpi(a[1]*b[2]-a[2]*b[1], c[0])
+    c[1] = fftn_mpi(a[2]*b[0]-a[0]*b[2], c[1])
+    c[2] = fftn_mpi(a[0]*b[1]-a[1]*b[0], c[2])
+    return c
 
 def Curl(a, c):
     """c = F_inv(curl(a))"""
-    ifftn_mpi(1j*(KX[0]*a[1]-KX[1]*a[0]), c[2])
-    ifftn_mpi(1j*(KX[2]*a[0]-KX[0]*a[2]), c[1])
-    ifftn_mpi(1j*(KX[1]*a[2]-KX[2]*a[1]), c[0])
+    c[2] = ifftn_mpi(1j*(KX[0]*a[1]-KX[1]*a[0]), c[2])
+    c[1] = ifftn_mpi(1j*(KX[2]*a[0]-KX[0]*a[2]), c[1])
+    c[0] = ifftn_mpi(1j*(KX[1]*a[2]-KX[2]*a[1]), c[0])
+    return c
 
 def Div(a, c):
     """c = F_inv(div(a))"""
-    ifftn_mpi(1j*(sum(KX*a, 0), c))
-    
+    c = ifftn_mpi(1j*(sum(KX*a, 0), c))
+    return c
+
 def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U
         for i in range(3):
-            ifftn_mpi(U_hat[i], U[i])
+            U[i] = ifftn_mpi(U_hat[i], U[i])
     
     # Compute convective term and place in dU
     if convection == "Standard":
-        standardConvection(dU)
+        dU = standardConvection(dU)
         
     elif convection == "Divergence":
-        divergenceConvection(dU)        
+        dU = divergenceConvection(dU)        
 
     elif convection == "Skewed":
-        standardConvection(dU)
-        divergenceConvection(dU, add=True)        
-        dU[:] = dU/2
+        dU = standardConvection(dU)
+        dU = divergenceConvection(dU, add=True)        
+        dU *= 0.5
         
     elif convection == "Vortex":
-        Curl(U_hat, curl)
-        Cross(U, curl, dU)
+        curl[:] = Curl(U_hat, curl)
+        dU = Cross(U, curl, dU)
 
     # Dealias the nonlinear convection
-    dU[:] *= dealias
+    dU *= dealias
     
     # Compute pressure (To get actual pressure multiply by 1j)
-    P_hat[:] = sum(dU*KX_over_Ksq, 0)
+    P_hat[:] = sum(dU*KX_over_Ksq, 0, out=P_hat)
         
     # Add pressure gradient
-    dU[:] -= P_hat*KX    
+    dU -= P_hat*KX    
 
     # Add contribution from diffusion
-    dU[:] -= nu*KK*U_hat
+    dU -= nu*KK*U_hat
+    
+    return dU
 
 # Taylor-Green initialization
 U[0] = sin(X[0])*cos(X[1])*cos(X[2])
@@ -157,7 +165,7 @@ U[2] = 0
 
 # Transform initial data
 for i in range(3):
-   fftn_mpi(U[i], U_hat[i])
+   U_hat[i] = fftn_mpi(U[i], U_hat[i])
 
 if mem_profile: mem("After first FFT")
    
@@ -176,28 +184,28 @@ while t < T-1e-8:
     if temporal == "RK4":
         U_hat1[:] = U_hat0[:] = U_hat
         for rk in range(4):
-            ComputeRHS(dU, rk)
+            dU = ComputeRHS(dU, rk)
             if rk < 3:
                 U_hat[:] = U_hat0 + b[rk]*dt*dU
-            U_hat1[:] += a[rk]*dt*dU
-        U_hat[:] = U_hat1[:]
+            U_hat1 += a[rk]*dt*dU
+        U_hat[:] = U_hat1
         
     elif temporal == "ForwardEuler" or tstep == 1:  
-        ComputeRHS(dU, 0)        
-        U_hat[:] += dU*dt
+        dU = ComputeRHS(dU, 0)        
+        U_hat += dU*dt
         if temporal == "AB2":
             U_hat0[:] = dU*dt
         
     else:
-        ComputeRHS(dU, 0)
-        U_hat[:] += 1.5*dU*dt - 0.5*U_hat0
+        dU = ComputeRHS(dU, 0)
+        U_hat[:] += (1.5*dU*dt - 0.5*U_hat0)
         U_hat0[:] = dU*dt
 
     for i in range(3):
-        ifftn_mpi(U_hat[i], U[i])
+        U[i] = ifftn_mpi(U_hat[i], U[i])
         
     if tstep % params['write_result'] == 0 or tstep % params['write_yz_slice'][1] == 0:
-        ifftn_mpi(P_hat*1j, P)
+        P = ifftn_mpi(P_hat*1j, P)
         hdf5file.write(U, P, tstep)
 
     if tstep % compute_energy == 0:

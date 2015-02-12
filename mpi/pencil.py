@@ -123,6 +123,8 @@ def ifftn_mpi(fu, u):
     # Do fft for y-direction
     Uc_hat_y[:, -1, :] = 0
     u[:] = irfft(Uc_hat_y, axis=1)
+    
+    return u
         
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
@@ -145,3 +147,5 @@ def fftn_mpi(u, fu):
                                    
     # Do fft for last direction 
     fu[:] = fft(Uc_hat_z, axis=2)
+    
+    return fu

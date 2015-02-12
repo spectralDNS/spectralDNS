@@ -76,15 +76,16 @@ def Curl(a, c):
     return c
 
 def ComputeRHS(dU, rk):
+    #global curl
     if rk > 0:
         for i in range(3):
             U[i] = ifftn_mpi(U_hat[i], U[i])
-    curl = Curl(U_hat, curl)
+    curl[:] = Curl(U_hat, curl)
     dU = Cross(U, curl, dU)
-    dU[:] *= dealias*dt
-    P_hat[:] = sum(dU*K_over_K2, 0)
+    dU[:] *= dealias
+    P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
     dU[:] -= P_hat*K
-    dU[:] -= nu*dt*K2*U_hat
+    dU[:] -= nu*K2*U_hat
     return dU
 
 U[0] = sin(X[0])*cos(X[1])*cos(X[2])
@@ -100,8 +101,8 @@ while t < T-1e-8:
     U_hat1[:] = U_hat0[:] = U_hat
     for rk in range(4):
         dU = ComputeRHS(dU, rk)
-        if rk < 3: U_hat[:] = U_hat0 + b[rk]*dU
-        U_hat1[:] += a[rk]*dU
+        if rk < 3: U_hat[:] = U_hat0 + b[rk]*dt*dU
+        U_hat1[:] += a[rk]*dt*dU
     U_hat[:] = U_hat1[:]
     for i in range(3):
         U[i] = ifftn_mpi(U_hat[i], U[i])

@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from wrappyfftw import *
 
-#__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
+__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
 def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgrid,
           sum, where, num_processes, rank, convection, communication, **kwargs):
@@ -79,7 +79,7 @@ def ifftn_mpi(fu, u):
     """
     if num_processes == 1:
         u[:] = irfftn(fu, axes=(0,1,2))
-        return
+        return u
     
     # Do first owned direction
     Uc_hat[:] = ifft(fu, axis=0)
@@ -99,20 +99,20 @@ def ifftn_mpi(fu, u):
         
     # Do last two directions
     u[:] = irfft2(Uc_hatT, axes=(1,2))
+    return u
     
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """
     if num_processes == 1:
         fu[:] = rfftn(u, axes=(0,1,2))
-        return
+        return fu
     
     if communication == 'alltoall':
         # Do 2 ffts in y-z directions on owned data
         Uc_hatT[:] = rfft2(u, axes=(1,2))
         # Transform data to align with x-direction  
         for i in range(num_processes): 
-            #U_mpi[i] = ft[:, i*Np:(i+1)*Np]
             U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
             
         # Communicate all values
@@ -130,3 +130,4 @@ def fftn_mpi(u, fu):
                       
     # Do fft for last direction 
     fu[:] = fft(fu, axis=0)
+    return fu
