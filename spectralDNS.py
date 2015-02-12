@@ -175,7 +175,7 @@ tstep = 0
 fastest_time = 1e8
 slowest_time = 0.0
 # initialize k for storing energy
-if rank == 0: k = []
+if rank == 0: k = []; w = []
 
 # Forward equations in time
 tic = t0 = time.time()
@@ -210,9 +210,11 @@ while t < T-1e-8:
 
     if tstep % compute_energy == 0:
         kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx*dx/L**3/2) # Compute energy with double precision
+        ww = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx*dx*dx/L**3/2)
         if rank == 0:
             k.append(kk)
-            print t, float(kk)
+            w.append(ww)
+            print t, float(kk), float(ww)
             
     tt = time.time()-t0
     t0 = time.time()
