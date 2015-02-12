@@ -49,7 +49,7 @@ def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgr
         F_tmp   = empty((3, N, Np, Nf), dtype=complex)
     curl    = empty((3, Np, N, N), dtype=float)    
 
-    init_fft(**locals())
+    init_fft(N, Nf, Np, complex, num_processes, comm, communication, rank, mpitype)
         
     # Set wavenumbers in grid
     kx = fftfreq(N, 1./N).astype(int)
@@ -63,10 +63,9 @@ def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgr
     dealias = array((abs(KX[0]) < kmax)*(abs(KX[1]) < kmax)*
                     (abs(KX[2]) < kmax), dtype=bool)
     del kwargs
-    return locals() # Lazy (need only return newly created arrays)
+    return locals() # Lazy (need only return what is needed)
 
-def init_fft(N, Nf, Np, complex, num_processes, comm, communication,
-             rank, mpitype, **kwargs):
+def init_fft(N, Nf, Np, complex, num_processes, comm, communication, rank, mpitype):
     # Initialize MPI work arrays globally
     Uc_hat  = empty((N, Np, Nf), dtype=complex)
     Uc_hatT = empty((Np, N, Nf), dtype=complex)

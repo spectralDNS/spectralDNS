@@ -6,7 +6,16 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from numpy import *
 from pylab import *
 import time
-from wrappyfftw import *
+try:
+    from wrappyfftw import *
+except ImportError:
+    pass  # rely on numpy fft
+
+#HPL: probably some import errors here, fft routines don't have fft
+#prefix, but you import fft from numpy.
+#Also, no mpi.wrappufftw
+
+
 from commandline import *
 
 params = {
@@ -62,27 +71,27 @@ b = [0.5, 0.5, 1.]
 
 def project(u):
     u[:] -= sum(KX*u, 0)*KX_over_Ksq
-            
+
 def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U, V, W
         U[:] = irfft2(U_hat)
-    
+
     curl[:] = irfft2(1j*(KX[0]*U_hat[1] - KX[1]*U_hat[0]))
     dU[0] = rfft2(U[1]*curl)
     dU[1] = rfft2(-U[0]*curl)
-    
+
     # Dealias the nonlinear convection
     dU[:] *= dealias*dt
-            
+
     # Compute pressure (To get actual pressure multiply by 1j/dt)
     P_hat[:] = sum(dU*KX_over_Ksq, 0)
 
     # Add pressure gradient
     dU[:] -= P_hat*KX
-    
+
     # Add contribution from diffusion
     dU[:] -= nu*dt*KK*U_hat
-    
+
 # Taylor-Green initialization
 #U[0] = sin(X[0])*cos(X[1])
 #U[1] =-cos(X[0])*sin(X[1])
@@ -112,24 +121,24 @@ tstep = 0
 t0 = time.time()
 while t < T:
     t += dt; tstep += 1
-    
+
     if temporal == 'RK4':
         U_hat1[:] = U_hat0[:] = U_hat
         for rk in range(4):
-            ComputeRHS(dU, rk)        
+            ComputeRHS(dU, rk)
             #project(dU)
             if rk < 3:
                 U_hat[:] = U_hat0 + b[rk]*dU
-            U_hat1[:] += a[rk]*dU        
+            U_hat1[:] += a[rk]*dU
         U_hat[:] = U_hat1[:]
-        
+
     elif temporal == 'ForwardEuler' or tstep == 1:
         ComputeRHS(dU, 0)
         #project(dU)
         U_hat[:] += dU
         if temporal == "AB2":
             U_hat0[:] = dU
-        
+
     else:
         ComputeRHS(dU, 0)
         #project(dU)
@@ -137,17 +146,17 @@ while t < T:
         U_hat0[:] = dU
 
     U[:] = irfft2(U_hat)
-    
+
     # From here on it's only postprocessing
     if tstep % plot_result == 0:
         curl[:] = irfft2(1j*KX[0]*U_hat[1]-1j*KX[1]*U_hat[0])
         im.set_data(curl[:, :])
-        im.autoscale()  
-        plt.pause(1e-6) 
-        
+        im.autoscale()
+        plt.pause(1e-6)
+
     print tstep, time.time()-t0
     t0 = time.time()
-            
+
 print "Time = ", time.time()-tic
 plt.figure()
 plt.quiver(X[0,::2,::2], X[1,::2,::2], U[0,::2,::2], U[1,::2,::2], pivot='mid', scale=2)
