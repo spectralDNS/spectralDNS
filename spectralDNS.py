@@ -199,8 +199,8 @@ while t < T-1e-8:
         hdf5file.write(U, P, tstep)
 
     if tstep % compute_energy == 0:
-        #kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx*dx/L**3/2) # Compute energy with double precision
-        kk = 0
+        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx*dx/L**3/2) # Compute energy with double precision
+        #kk = 0
         if rank == 0:
             k.append(kk)
             print t, float(kk)
