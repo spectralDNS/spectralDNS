@@ -11,9 +11,12 @@ def create_profile(profiler, comm, MPI, rank, **params):
     results = {}
     for item in ['ifftn_mpi', 
                  'fftn_mpi',
+                 'irfftn',
+                 'irfft2',
                  'ifft',
+                 'rfftn',
+                 'rfft2',
                  'fft',
-                 '_Xfftn',
                  'Alltoall',
                  'Sendrecv_replace',
                  'Curl',
@@ -21,13 +24,13 @@ def create_profile(profiler, comm, MPI, rank, **params):
                  'Scatter',
                  'ComputeRHS']:
         for key, val in ps.stats.iteritems():
-            if item in key[2]:
+            if item is key[2]:
                 results[item] = (comm.reduce(val[2], op=MPI.MIN, root=0),
                                  comm.reduce(val[2], op=MPI.MAX, root=0),
                                  comm.reduce(val[3], op=MPI.MIN, root=0),
                                  comm.reduce(val[3], op=MPI.MAX, root=0))
+                del ps.stats[key]
                 break
-        del ps.stats[key]
         
     if rank == 0:
         print "Printing profiling for total min/max cumulative min/max:"
