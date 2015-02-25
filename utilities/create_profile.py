@@ -6,7 +6,7 @@ __all__ = ['create_profile']
 def create_profile(profiler, comm, MPI, rank, **params):
     profiler.disable()
     ps = pstats.Stats(profiler).sort_stats('cumulative')
-    ps.print_stats(params['make_profile'])
+    #ps.print_stats(params['make_profile'])
     
     results = {}
     for item in ['ifftn_mpi', 
