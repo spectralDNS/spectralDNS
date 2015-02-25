@@ -47,9 +47,11 @@ float, complex, mpitype = {"single": (float32, complex64, MPI.F_FLOAT_COMPLEX),
                            "double": (float64, complex128, MPI.F_DOUBLE_COMPLEX)}[precision]
 
 # Set mesh size. Uniform size in all three directions (for now)
+dt = float(dt)
+nu = float(nu)
 N = 2**M
-L = 2 * pi
-dx = L / N
+L = float(2*pi)
+dx = float(L / N)
 
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
