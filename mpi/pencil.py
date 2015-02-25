@@ -31,23 +31,23 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
     #procxz = arange(num_processes)[rank%P1::P1]
     #procxy = arange(num_processes)[(rank/P1)*P1:(rank/P1+1)*P1]
     #group1 = comm.Get_group()
-    #groupxy = MPI.Group.Incl(group1, procxy)
-    #commxy = comm.Create(groupxy)
+    #groups xy = MPI.Group.Incl(group1, procxy)
+    #commxz = comm.Create(groupxy)
     #group2 = comm.Get_group()
     #groupxz = MPI.Group.Incl(group2, procxz)
-    #commxz = comm.Create(groupxz)
-    commxz = comm.Split(rank%P1)
-    commxy = comm.Split(rank/P1)
+    #commxy = comm.Create(groupxz)
+    commxz = comm.Split(rank/P1)
+    commxy = comm.Split(rank%P1)
     
-    xyrank = commxy.Get_rank() # Local rank in xy-plane
     xzrank = commxz.Get_rank() # Local rank in xz-plane
+    xyrank = commxy.Get_rank() # Local rank in xy-plane
     
     # Create the physical mesh
-    x = linspace(0, L, N+1).astype(float)[:-1]
-    x1 = slice(xyrank * N1, (xyrank+1) * N1, 1)
-    x2 = slice(xzrank * N2, (xzrank+1) * N2, 1)
+    #x = linspace(0, L, N+1).astype(float)[:-1]
+    x1 = slice(xzrank * N1, (xzrank+1) * N1, 1)
+    x2 = slice(xyrank * N2, (xyrank+1) * N2, 1)
     #X = array(meshgrid(x[x1], x[x2], x, indexing='ij'), dtype=float)
-    X = mgrid[xyrank*N1:(xyrank+1)*N1, xzrank*N2:(xzrank+1)*N2, :N].astype(float)*L/N
+    X = mgrid[x1, x2, :N].astype(float)*L/N
     hdf5file.x1 = x1
     hdf5file.x2 = x2
 
@@ -71,7 +71,7 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
     U_hat1  = empty((3, N2, N, N1/2), dtype=complex)
     dU      = empty((3, N2, N, N1/2), dtype=complex)
 
-    init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxy, commxz)    
+    init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy)    
     
     # work arrays (Not required by all convection methods)
     if convection in ('Standard', 'Skewed'):
@@ -83,19 +83,19 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
 
     # Set wavenumbers in grid
     kx = fftfreq(N, 1./N).astype(int)
-    k2 = slice(xzrank*N2, (xzrank+1)*N2, 1)
-    k1 = slice(xyrank*N1/2, (xyrank+1)*N1/2, 1)
-    KX = array(meshgrid(kx[k2], kx, kx[k1], indexing='ij'), dtype=int)
-    KK = sum(KX*KX, 0, dtype=int)
-    KX_over_Ksq = KX.astype(float) / where(KK==0, 1, KK).astype(float)
+    k2 = slice(xyrank*N2, (xyrank+1)*N2, 1)
+    k1 = slice(xzrank*N1/2, (xzrank+1)*N1/2, 1)
+    K = array(meshgrid(kx[k2], kx, kx[k1], indexing='ij'), dtype=int)
+    K2 = sum(K*K, 0, dtype=int)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
-    dealias = array((abs(KX[0]) < kmax)*(abs(KX[1]) < kmax)*(abs(KX[2]) < kmax), dtype=bool)
+    dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*(abs(K[2]) < kmax), dtype=bool)
     del kwargs
     return locals()
 
-def init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxy, commxz):
+def init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy):
     # Initialize MPI work arrays globally
     Uc_hat_z  = empty((N1, N2, Nf), dtype=complex)
     Uc_hat_x  = empty((N, N2, N1/2), dtype=complex)
@@ -115,11 +115,11 @@ def ifftn_mpi(fu, u):
         Uc_hat_x[i*N2:(i+1)*N2] = Uc_hat_y[:, i*N2:(i+1)*N2]
         
     # Communicate in xz-plane and do fft in x-direction
-    commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
+    commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
     Uc_hat_x[:] = ifft(Uc_hat_xr, axis=0)
         
     # Communicate and transform in xy-plane
-    commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
+    commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
     for i in range(P1):
         Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2] = Uc_hat_xr[i*N1:(i+1)*N1]
             
@@ -139,11 +139,11 @@ def fftn_mpi(u, fu):
         Uc_hat_x[i*N1:(i+1)*N1] = Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2]
     
     # Communicate and do fft in x-direction
-    commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
+    commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
     Uc_hat_x[:] = fft(Uc_hat_xr, axis=0)        
     
     # Communicate and transform to final z-direction
-    commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])    
+    commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])    
     for i in range(P2): 
         Uc_hat_y[:, i*N2:(i+1)*N2] = Uc_hat_xr[i*N2:(i+1)*N2]
                                    

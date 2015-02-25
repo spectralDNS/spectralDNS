@@ -54,14 +54,14 @@ def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgr
     # Set wavenumbers in grid
     kx = fftfreq(N, 1./N).astype(int)
     kz = kx[:Nf].copy(); kz[-1] *= -1
-    KX = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
-    KK = sum(KX*KX, 0, dtype=int)
-    KX_over_Ksq = KX.astype(float) / where(KK==0, 1, KK).astype(float)
+    K = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
+    K2 = sum(K*K, 0, dtype=int)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
-    dealias = array((abs(KX[0]) < kmax)*(abs(KX[1]) < kmax)*
-                    (abs(KX[2]) < kmax), dtype=bool)
+    dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*
+                    (abs(K[2]) < kmax), dtype=bool)
     del kwargs
     return locals() # Lazy (need only return what is needed)
 

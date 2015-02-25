@@ -63,19 +63,19 @@ vars().update(setup(**vars()))
 if mem_profile: mem("Arrays")
 
 # RK4 parameters
-a = array([1./6., 1./3., 1./3., 1./6.], dtype=float)
-b = array([0.5, 0.5, 1.], dtype=float)
+a = array([1./6., 1./3., 1./3., 1./6.], dtype=float)*dt
+b = array([0.5, 0.5, 1.], dtype=float)*dt
 
 def project(u):
     """Project u onto divergence free space"""
-    u -= sum(KX_over_Ksq*u, 0)*KX
+    u -= sum(K_over_K2*u, 0)*K
     return u
 
 def standardConvection(c):
     """c_i = u_j du_i/dx_j"""
     for i in range(3):
         for j in range(3):
-            U_tmp[j] = ifftn_mpi(1j*KX[j]*U_hat[i], U_tmp[j])
+            U_tmp[j] = ifftn_mpi(1j*K[j]*U_hat[i], U_tmp[j])
         c[i] = fftn_mpi(sum(U*U_tmp, 0), c[i])
     return c
 
@@ -84,14 +84,14 @@ def divergenceConvection(c, add=False):
     if not add: c.fill(0)
     for i in range(3):
         F_tmp[i] = fftn_mpi(U[0]*U[i], F_tmp[i])
-    c[0] += 1j*sum(KX*F_tmp, 0)
-    c[1] += 1j*KX[0]*F_tmp[1]
-    c[2] += 1j*KX[0]*F_tmp[2]
+    c[0] += 1j*sum(K*F_tmp, 0)
+    c[1] += 1j*K[0]*F_tmp[1]
+    c[2] += 1j*K[0]*F_tmp[2]
     F_tmp[0] = fftn_mpi(U[1]*U[1], F_tmp[0])
     F_tmp[1] = fftn_mpi(U[1]*U[2], F_tmp[1])
     F_tmp[2] = fftn_mpi(U[2]*U[2], F_tmp[2])
-    c[1] += (1j*KX[1]*F_tmp[0] + 1j*KX[2]*F_tmp[1])
-    c[2] += (1j*KX[1]*F_tmp[1] + 1j*KX[2]*F_tmp[2])
+    c[1] += (1j*K[1]*F_tmp[0] + 1j*K[2]*F_tmp[1])
+    c[2] += (1j*K[1]*F_tmp[1] + 1j*K[2]*F_tmp[2])
     return c
 
 def Cross(a, b, c):
@@ -103,9 +103,9 @@ def Cross(a, b, c):
 
 def Curl(a, c):
     """c = F_inv(curl(a))"""
-    c[2] = ifftn_mpi(1j*(KX[0]*a[1]-KX[1]*a[0]), c[2])
-    c[1] = ifftn_mpi(1j*(KX[2]*a[0]-KX[0]*a[2]), c[1])
-    c[0] = ifftn_mpi(1j*(KX[1]*a[2]-KX[2]*a[1]), c[0])
+    c[2] = ifftn_mpi(1j*(K[0]*a[1]-K[1]*a[0]), c[2])
+    c[1] = ifftn_mpi(1j*(K[2]*a[0]-K[0]*a[2]), c[1])
+    c[0] = ifftn_mpi(1j*(K[1]*a[2]-K[2]*a[1]), c[0])
     return c
 
 def Div(a, c):
@@ -138,13 +138,13 @@ def ComputeRHS(dU, rk):
     dU *= dealias
     
     # Compute pressure (To get actual pressure multiply by 1j)
-    P_hat[:] = sum(dU*KX_over_Ksq, 0, out=P_hat)
+    P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
         
-    # Add pressure gradient
-    dU -= P_hat*KX    
-
-    # Add contribution from diffusion
-    dU -= nu*KK*U_hat
+    # Subtract pressure gradient
+    dU -= P_hat*K
+    
+    # Subtract contribution from diffusion
+    dU -= nu*K2*U_hat
     
     return dU
 
@@ -176,8 +176,9 @@ while t < T-1e-8:
         for rk in range(4):
             dU = ComputeRHS(dU, rk)
             if rk < 3:
-                U_hat[:] = U_hat0 + b[rk]*dt*dU
-            U_hat1 += a[rk]*dt*dU
+                #U_hat[:] = U_hat0 + b[rk]*dU
+                U_hat[:] = U_hat0;U_hat += b[rk]*dU # Faster
+            U_hat1 += a[rk]*dU
         U_hat[:] = U_hat1
         
     elif temporal == "ForwardEuler" or tstep == 1:  

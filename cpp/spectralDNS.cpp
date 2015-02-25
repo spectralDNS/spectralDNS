@@ -10,24 +10,32 @@ using namespace std;
 //mpic++ -std=c++11 -O3 spectralDNS.cpp -o spectralDNS -lfftw3_mpi -lfftw3
 //mpixlcxx_r -qsmp -O3 spectralDNS.cpp -o spectralDNS $FFTW3_INC $FFTW3_LIB
 
+// To change from float to double replace all fftwf_ with fftwf_ and vice versa. + change linked libraries.
+typedef float precision;
+
 int main( int argc, char *argv[] )
 {
   int rank, num_processes, M, N, Np, Nf;
-  double wtime, nu, T, dt, L, dx;
+  double wtime, L, dx;
+  precision nu, dt, T;
   double t0, t1, fastest_time, slowest_time, start_time;
   MPI::Init ( argc, argv );
-  fftw_mpi_init();
+  fftwf_mpi_init();
     
   num_processes = MPI::COMM_WORLD.Get_size();
   rank = MPI::COMM_WORLD.Get_rank();
-  double pi = 3.141592653589793238;
+  precision pi = 3.141592653589793238;
   ptrdiff_t alloc_local, local_n0, local_0_start, local_n1, local_1_start, i, j, k;
-  vector<double> s_in(1), s_out(1), vs_in(2), vs_out(2);
+  vector<double> s_in(1), s_out(1), vs_in(2), vs_out(2);  
 
   nu = 0.000625;
-  T = 0.05;
-  dt = 0.005;
-  M = 10;
+  T = 0.1;
+  dt = 0.01;
+  M = 7;  
+  if ( argc > 1 ) {
+    M = atoi( argv[1] );
+  }
+  
 //   N = pow(static_cast<int>(2), M); // Not accepted by Shaheen
   N = 1;
   for (int i=0; i<M;i++)
@@ -36,53 +44,54 @@ int main( int argc, char *argv[] )
   Np = N / num_processes;
   dx = L / N;
   std::cout << std::scientific << std::setprecision(16);
-  
-  vector<double> a(4);
+  if (rank==0)
+      std::cout << "N = " << N << std::endl;
+  vector<precision> a(4);
   a[0] = 1./6.; a[1] = 1./3.; a[2] = 1./3.; a[3] = 1./6.;
-  vector<double> b(3);
+  vector<precision> b(3);
   b[0] = 0.5; b[1] = 0.5; b[2] = 1.0;
   int tot = N*N*N;
   Nf = N/2+1;
-  alloc_local = fftw_mpi_local_size_3d_transposed(N, N, Nf, MPI::COMM_WORLD,
+  alloc_local = fftwf_mpi_local_size_3d_transposed(N, N, Nf, MPI::COMM_WORLD,
                                         &local_n0, &local_0_start,
                                         &local_n1, &local_1_start);
   
-  vector<double> U(2*alloc_local);
-  vector<double> V(2*alloc_local);
-  vector<double> W(2*alloc_local);
-  vector<double> U_tmp(2*alloc_local);
-  vector<double> V_tmp(2*alloc_local);
-  vector<double> W_tmp(2*alloc_local);
-  vector<double> CU(2*alloc_local);
-  vector<double> CV(2*alloc_local);
-  vector<double> CW(2*alloc_local);  
-  vector<double> P(2*alloc_local);
+  vector<precision> U(2*alloc_local);
+  vector<precision> V(2*alloc_local);
+  vector<precision> W(2*alloc_local);
+  vector<precision> U_tmp(2*alloc_local);
+  vector<precision> V_tmp(2*alloc_local);
+  vector<precision> W_tmp(2*alloc_local);
+  vector<precision> CU(2*alloc_local);
+  vector<precision> CV(2*alloc_local);
+  vector<precision> CW(2*alloc_local);  
+  vector<precision> P(2*alloc_local);
   vector<int> dealias(2*alloc_local);
-  vector<double> kk(2*alloc_local);
-  vector<complex<double> > U_hat(alloc_local);
-  vector<complex<double> > V_hat(alloc_local);
-  vector<complex<double> > W_hat(alloc_local);
-  vector<complex<double> > P_hat(alloc_local);
-  vector<complex<double> > U_hat0(alloc_local);
-  vector<complex<double> > V_hat0(alloc_local);
-  vector<complex<double> > W_hat0(alloc_local);
-  vector<complex<double> > U_hat1(alloc_local);
-  vector<complex<double> > V_hat1(alloc_local);
-  vector<complex<double> > W_hat1(alloc_local);
-  vector<complex<double> > dU(alloc_local);
-  vector<complex<double> > dV(alloc_local);
-  vector<complex<double> > dW(alloc_local);  
-  vector<complex<double> > curlX(alloc_local);
-  vector<complex<double> > curlY(alloc_local);
-  vector<complex<double> > curlZ(alloc_local);
+  vector<precision> kk(2*alloc_local);
+  vector<complex<precision> > U_hat(alloc_local);
+  vector<complex<precision> > V_hat(alloc_local);
+  vector<complex<precision> > W_hat(alloc_local);
+  vector<complex<precision> > P_hat(alloc_local);
+  vector<complex<precision> > U_hat0(alloc_local);
+  vector<complex<precision> > V_hat0(alloc_local);
+  vector<complex<precision> > W_hat0(alloc_local);
+  vector<complex<precision> > U_hat1(alloc_local);
+  vector<complex<precision> > V_hat1(alloc_local);
+  vector<complex<precision> > W_hat1(alloc_local);
+  vector<complex<precision> > dU(alloc_local);
+  vector<complex<precision> > dV(alloc_local);
+  vector<complex<precision> > dW(alloc_local);  
+  vector<complex<precision> > curlX(alloc_local);
+  vector<complex<precision> > curlY(alloc_local);
+  vector<complex<precision> > curlZ(alloc_local);
   
   // Starting time
   MPI::COMM_WORLD.Barrier();
   t0 = MPI::Wtime();
   start_time = t0;
 
-  vector<double> kx(N);
-  vector<double> kz(Nf);
+  vector<precision> kx(N);
+  vector<precision> kz(Nf);
   for (int i=0; i<N/2; i++)
   {
       kx[i] = i;
@@ -92,11 +101,11 @@ int main( int argc, char *argv[] )
   for (int i=-N/2; i<0; i++)
       kx[i+N] = i;
 
-  //fftw_plan plan_backward;
-  fftw_plan rfftn, irfftn;
-  rfftn = fftw_mpi_plan_dft_r2c_3d(N, N, N, U.data(), reinterpret_cast<fftw_complex*>(U_hat.data()), 
+  //fftwf_plan plan_backward;
+  fftwf_plan rfftn, irfftn;
+  rfftn = fftwf_mpi_plan_dft_r2c_3d(N, N, N, U.data(), reinterpret_cast<fftwf_complex*>(U_hat.data()), 
                                    MPI::COMM_WORLD, FFTW_MPI_TRANSPOSED_OUT);
-  irfftn = fftw_mpi_plan_dft_c2r_3d(N, N, N, reinterpret_cast<fftw_complex*>(U_hat.data()),  U.data(), 
+  irfftn = fftwf_mpi_plan_dft_c2r_3d(N, N, N, reinterpret_cast<fftwf_complex*>(U_hat.data()),  U.data(), 
                                    MPI::COMM_WORLD, FFTW_MPI_TRANSPOSED_IN);  
       
   for (int i=0; i<local_n0; i++)
@@ -109,11 +118,11 @@ int main( int argc, char *argv[] )
         W[z] = 0.0;
       }
     
-  fftw_mpi_execute_dft_r2c( rfftn, U.data(), reinterpret_cast<fftw_complex*>(U_hat.data()));
-  fftw_mpi_execute_dft_r2c( rfftn, V.data(), reinterpret_cast<fftw_complex*>(V_hat.data()));
-  fftw_mpi_execute_dft_r2c( rfftn, W.data(), reinterpret_cast<fftw_complex*>(W_hat.data()));
+  fftwf_mpi_execute_dft_r2c( rfftn, U.data(), reinterpret_cast<fftwf_complex*>(U_hat.data()));
+  fftwf_mpi_execute_dft_r2c( rfftn, V.data(), reinterpret_cast<fftwf_complex*>(V_hat.data()));
+  fftwf_mpi_execute_dft_r2c( rfftn, W.data(), reinterpret_cast<fftwf_complex*>(W_hat.data()));
     
-  double kmax = 2./3.*(N/2+1);  
+  precision kmax = 2./3.*(N/2+1);  
   for (int i=0; i<local_n1; i++)
     for (int j=0; j<N; j++)
       for (int k=0; k<Nf; k++)
@@ -131,7 +140,7 @@ int main( int argc, char *argv[] )
         kk[z] = m > 0 ? m : 1;
       }       
   
-  complex<double> one(0, 1); 
+  complex<precision> one(0, 1); 
   double t=0.0;
   int tstep = 0;
   fastest_time = 1e8;
@@ -163,9 +172,9 @@ int main( int argc, char *argv[] )
      {
         if (rk > 0)
         {
-           fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(U_hat.data()), U.data());
-           fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(V_hat.data()), V.data());
-           fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(W_hat.data()), W.data());
+           fftwf_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftwf_complex*>(U_hat.data()), U.data());
+           fftwf_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftwf_complex*>(V_hat.data()), V.data());
+           fftwf_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftwf_complex*>(W_hat.data()), W.data());
            for (int k=0; k<U.size(); k++)
            {
              U[k] /= tot;
@@ -183,9 +192,9 @@ int main( int argc, char *argv[] )
                curlY[z] = one*(kz[k]*U_hat[z]-kx[i+local_1_start]*W_hat[z]);
                curlX[z] = one*(kx[j]*W_hat[z]-kz[k]*V_hat[z]);
             }
-        fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(curlX.data()), CU.data());
-        fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(curlY.data()), CV.data());
-        fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(curlZ.data()), CW.data());
+        fftwf_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftwf_complex*>(curlX.data()), CU.data());
+        fftwf_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftwf_complex*>(curlY.data()), CV.data());
+        fftwf_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftwf_complex*>(curlZ.data()), CW.data());
         for (int k=0; k<CU.size(); k++)
         {
             CU[k] /= tot;
@@ -204,9 +213,9 @@ int main( int argc, char *argv[] )
               W_tmp[z] = U[z]*CV[z]-V[z]*CU[z];      
             }
                 
-        fftw_mpi_execute_dft_r2c( rfftn, U_tmp.data(), reinterpret_cast<fftw_complex*>(dU.data()));
-        fftw_mpi_execute_dft_r2c( rfftn, V_tmp.data(), reinterpret_cast<fftw_complex*>(dV.data()));
-        fftw_mpi_execute_dft_r2c( rfftn, W_tmp.data(), reinterpret_cast<fftw_complex*>(dW.data()));
+        fftwf_mpi_execute_dft_r2c( rfftn, U_tmp.data(), reinterpret_cast<fftwf_complex*>(dU.data()));
+        fftwf_mpi_execute_dft_r2c( rfftn, V_tmp.data(), reinterpret_cast<fftwf_complex*>(dV.data()));
+        fftwf_mpi_execute_dft_r2c( rfftn, W_tmp.data(), reinterpret_cast<fftwf_complex*>(dW.data()));
         
         for (int i=0; i<local_n1; i++)
           for (int j=0; j<N; j++)
@@ -262,6 +271,23 @@ int main( int argc, char *argv[] )
             W_hat[z] = W_hat1[z];
         }     
         
+    if (tstep % 2 == 0)
+    {
+        s_in[0] = 0.0;
+        for (int i=0; i<local_n0; i++)
+            for (int j=0; j<N; j++)
+            for (int k=0; k<N; k++)
+            {
+                int z = (i*N+j)*2*Nf+k;
+                s_in[0] += (U[z]*U[z] + V[z]*V[z] + W[z]*W[z]);
+            }
+        s_in[0] *= (0.5*dx*dx*dx/L/L/L);
+
+        MPI::COMM_WORLD.Reduce(s_in.data(), s_out.data(), 1, MPI::DOUBLE, MPI::SUM, 0);  
+        if (rank==0)
+        std::cout << " k = " << s_out[0] << std::endl;
+    }        
+        
     t1 = MPI::Wtime();
     if (tstep > 1)
     {
@@ -291,14 +317,14 @@ int main( int argc, char *argv[] )
   if (rank == 0)  
     std::cout << "Time = " << t1 - start_time  << std::endl;
   
-  fftw_destroy_plan(rfftn);
-  fftw_destroy_plan(irfftn);
+  fftwf_destroy_plan(rfftn);
+  fftwf_destroy_plan(irfftn);
   vs_in[0] = fastest_time;
   vs_in[1] = slowest_time;
-  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::DOUBLE, MPI::MIN, 0);
+  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::FLOAT, MPI::MIN, 0);
   if (rank==0)
       std::cout << "Fastest = " << vs_out[0] << ", " << vs_out[1] << std::endl; 
-  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::DOUBLE, MPI::MAX, 0);
+  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::FLOAT, MPI::MAX, 0);
   if (rank==0)
       std::cout << "Slowest = " << vs_out[0] << ", " << vs_out[1] << std::endl; 
   
