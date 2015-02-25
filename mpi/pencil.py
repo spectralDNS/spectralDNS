@@ -42,14 +42,12 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
     xzrank = commxz.Get_rank() # Local rank in xz-plane
     xyrank = commxy.Get_rank() # Local rank in xy-plane
     
-    print rank, xyrank, xzrank
-    
     # Create the physical mesh
-    x = linspace(0, L, N+1).astype(float)[:-1]
+    #x = linspace(0, L, N+1).astype(float)[:-1]
     x1 = slice(xzrank * N1, (xzrank+1) * N1, 1)
     x2 = slice(xyrank * N2, (xyrank+1) * N2, 1)
-    X = array(meshgrid(x[x1], x[x2], x, indexing='ij'), dtype=float)
-    #X = mgrid[xyrank*N1:(xyrank+1)*N1, xzrank*N2:(xzrank+1)*N2, :N].astype(float)*L/N
+    #X = array(meshgrid(x[x1], x[x2], x, indexing='ij'), dtype=float)
+    X = mgrid[x1, x2, :N].astype(float)*L/N
     hdf5file.x1 = x1
     hdf5file.x2 = x2
 
@@ -87,13 +85,13 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
     kx = fftfreq(N, 1./N).astype(int)
     k2 = slice(xyrank*N2, (xyrank+1)*N2, 1)
     k1 = slice(xzrank*N1/2, (xzrank+1)*N1/2, 1)
-    KX = array(meshgrid(kx[k2], kx, kx[k1], indexing='ij'), dtype=int)
-    KK = sum(KX*KX, 0, dtype=int)
-    KX_over_Ksq = KX.astype(float) / where(KK==0, 1, KK).astype(float)
+    K = array(meshgrid(kx[k2], kx, kx[k1], indexing='ij'), dtype=int)
+    K2 = sum(K*K, 0, dtype=int)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
-    dealias = array((abs(KX[0]) < kmax)*(abs(KX[1]) < kmax)*(abs(KX[2]) < kmax), dtype=bool)
+    dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*(abs(K[2]) < kmax), dtype=bool)
     del kwargs
     return locals()
 
