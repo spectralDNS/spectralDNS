@@ -6,7 +6,7 @@ __all__ = ['create_profile']
 def create_profile(profiler, comm, MPI, rank, **params):
     profiler.disable()
     ps = pstats.Stats(profiler).sort_stats('cumulative')
-    #ps.print_stats(params['make_profile'])
+    ps.print_stats(params['make_profile'])
     
     results = {}
     for item in ['ifftn_mpi', 
@@ -20,11 +20,12 @@ def create_profile(profiler, comm, MPI, rank, **params):
                  'Alltoall',
                  'Sendrecv_replace',
                  'Curl',
+                 'Cross',
                  'project',
                  'Scatter',
                  'ComputeRHS']:
         for key, val in ps.stats.iteritems():
-            if item is key[2]:
+            if item is key[2] or "method '%s'"%item in key[2]:
                 results[item] = (comm.reduce(val[2], op=MPI.MIN, root=0),
                                  comm.reduce(val[2], op=MPI.MAX, root=0),
                                  comm.reduce(val[3], op=MPI.MIN, root=0),
