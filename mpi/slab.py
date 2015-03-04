@@ -91,7 +91,6 @@ def ifftn_mpi(fu, u):
             Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
     
     else:
-        #Uc_send = fu.reshape((num_processes, Np, Nf, Np))
         for i in range(num_processes):
             if not i == rank:
                 comm.Sendrecv_replace([Uc_send[i], mpitype], i, 0, i, 0)   
@@ -113,10 +112,10 @@ def fftn_mpi(u, fu):
         Uc_hatT[:] = rfft2(u, axes=(1,2))
         # Transform data to align with x-direction  
         for i in range(num_processes): 
-            U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
+            Uc_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
             
         # Communicate all values
-        comm.Alltoall([U_mpi, mpitype], [fu, mpitype])  
+        comm.Alltoall([Uc_mpi, mpitype], [fu, mpitype])  
     
     else:
         # Communicating intermediate result 

@@ -145,9 +145,10 @@ def ComputeRHS(dU, rk):
     elif convection == "Vortex":
         curl[:] = Curl(U_hat, curl)
         dU = Cross(U, curl, dU)
-
+    
     # Dealias the nonlinear convection
     dU *= dealias
+    #dU *= 0
     
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
@@ -187,11 +188,13 @@ while t < T-1e-8:
         U_hat1[:] = U_hat0[:] = U_hat
         for rk in range(4):
             dU = ComputeRHS(dU, rk)
+            #dU = project(dU)
             if rk < 3:
                 #U_hat[:] = U_hat0 + b[rk]*dU
                 U_hat[:] = U_hat0;U_hat += b[rk]*dU # Faster
             U_hat1 += a[rk]*dU
         U_hat[:] = U_hat1
+        #U_hat = project(U_hat)
         
     elif temporal == "ForwardEuler" or tstep == 1:  
         dU = ComputeRHS(dU, 0)        

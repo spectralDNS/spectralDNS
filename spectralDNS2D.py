@@ -5,16 +5,9 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from numpy import *
 from pylab import *
+from mpi4py import MPI
 import time
-try:
-    from wrappyfftw import *
-except ImportError:
-    pass  # rely on numpy fft
-
-#HPL: probably some import errors here, fft routines don't have fft
-#prefix, but you import fft from numpy.
-#Also, no mpi.wrappufftw
-
+from mpi.wrappyfftw import *
 
 from commandline import *
 
@@ -36,74 +29,152 @@ N = 2**M
 L = 2 * pi
 dx = L / N
 
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+num_processes = comm.Get_size()
+Np = N / num_processes
+
 # Create the mesh
-x = linspace(0, L, N+1)[:-1]
-X = array(meshgrid(x, x, indexing='ij'))
+X = mgrid[rank*Np:(rank+1)*Np, :N].astype(float)*L/N
 
 # Solution array and Fourier coefficients
 # Because of real transforms and symmetries, N/2+1 coefficients are sufficient
 Nf = N/2+1
-U     = empty((2, N, N))
-U_hat = empty((2, N, Nf), dtype="complex")
-P     = empty((N, N))
-P_hat = empty((N, Nf), dtype="complex")
-curl   = empty((N, N))
+Npf = Np/2+1 if rank+1 == num_processes else Np/2
+
+U     = empty((2, Np, N))
+U_hat = empty((2, N, Npf), dtype="complex")
+P     = empty((Np, N))
+P_hat = empty((N, Npf), dtype="complex")
+curl   = empty((Np, N))
+Uc_hat = empty((N, Npf), dtype="complex")
+Uc_hatT = empty((Np, Nf), dtype="complex")
+U_send = empty((num_processes, Np, Np/2), dtype="complex")
+U_sendr = U_send.reshape((N, Np/2))
+
+U_recv = empty((N, Np/2), dtype="complex")
+nyq = empty(N, dtype="complex")
+nyqc = empty(N, dtype="complex")
+plane_recv = empty(Np, dtype="complex")
 
 # RK4 arrays
-U_hat0 = empty((2, N, Nf), dtype="complex")
-U_hat1 = empty((2, N, Nf), dtype="complex")
-dU     = empty((2, N, Nf), dtype="complex")
+U_hat0 = empty((2, N, Npf), dtype="complex")
+U_hat1 = empty((2, N, Npf), dtype="complex")
+dU     = empty((2, N, Npf), dtype="complex")
 
 # Set wavenumbers in grid
 kx = fftfreq(N, 1./N)
 ky = kx[:Nf].copy(); ky[-1] *= -1
-KX = array(meshgrid(kx, ky, indexing='ij'), dtype=int)
-KK = sum(KX*KX, 0)
-KX_over_Ksq = array(KX, dtype=float) / where(KK==0, 1, KK)
+K = array(meshgrid(kx, ky[rank*Np/2:(rank*Np/2+Npf)], indexing='ij'), dtype=int)
+K2 = sum(K*K, 0)
+K_over_K2 = array(K, dtype=float) / where(K2==0, 1, K2)
 
 # Filter for dealiasing nonlinear convection
 kmax = 2./3.*(N/2+1)
-dealias = array((abs(KX[0]) < kmax)*(abs(KX[1]) < kmax), dtype=bool)
+dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax), dtype=bool)
 
 # RK4 parameters
-a = [1./6., 1./3., 1./3., 1./6.]
-b = [0.5, 0.5, 1.]
+a = array([1./6., 1./3., 1./3., 1./6.])*dt
+b = array([0.5, 0.5, 1.])*dt
 
 def project(u):
-    u[:] -= sum(KX*u, 0)*KX_over_Ksq
+    u[:] -= sum(K*u, 0)*K_over_K2    
+
+def rfft2_mpi(u, fu):
+    if num_processes == 1:
+        fu[:] = rfft2(u, axes=(0,1))
+        return fu    
+    
+    Uc_hatT[:] = rfft(u, axis=1)
+    Uc_hatT[:, 0] += 1j*Uc_hatT[:, -1]
+    
+    # Align data in x-direction
+    for i in range(num_processes): 
+        U_send[i] = Uc_hatT[:, i*Np/2:(i+1)*Np/2]
+            
+    # Communicate all values
+    comm.Alltoall([U_send, MPI.DOUBLE_COMPLEX], [U_recv, MPI.DOUBLE_COMPLEX])
+    
+    fu[:, :Np/2] = fft(U_recv, axis=0)
+        
+    # Handle Nyquist frequency
+    if rank == 0:        
+        nyq[:] = fu[:, 0]        
+        nyqc[0] = nyq[0].real;
+        nyqc[1:N/2] = 0.5*(nyq[1:N/2]+conj(nyq[:N/2:-1]))
+        nyqc[N/2] = nyq[N/2].real
+        fu[:N/2+1, 0] = nyqc[:N/2+1]
+        fu[N/2+1:, 0] = conj(nyqc[(N/2-1):0:-1])
+        nyqc[:] = nyq
+        nyq[0] = nyqc[0].imag
+        nyq[1:N/2] = -0.5*1j*(nyqc[1:N/2]-conj(nyqc[:N/2:-1]))
+        nyq[N/2] = nyqc[N/2].imag
+        nyq[N/2+1:] = conj(nyq[(N/2-1):0:-1])
+        comm.Send([nyq, MPI.DOUBLE_COMPLEX], dest=num_processes-1, tag=77)
+        
+    elif rank == num_processes-1:
+        comm.Recv([nyq, MPI.DOUBLE_COMPLEX], source=0, tag=77)
+        fu[:, -1] = nyq 
+        
+    return fu
+
+def irfft2_mpi(fu, u):
+    if num_processes == 1:
+        u[:] = irfft2(fu, axes=(0,1))
+        return u
+        f   
+    Uc_hat[:] = ifft(fu, axis=0)    
+    U_sendr[:] = Uc_hat[:, :Np/2]
+
+    comm.Alltoall([U_send, MPI.DOUBLE_COMPLEX], [U_recv, MPI.DOUBLE_COMPLEX])
+
+    for i in range(num_processes): 
+        Uc_hatT[:, i*Np/2:(i+1)*Np/2] = U_recv[i*Np:(i+1)*Np]
+    
+    if rank == num_processes-1:
+        nyq[:] = Uc_hat[:, -1]
+
+    comm.Scatter(nyq, plane_recv, root=num_processes-1)
+    Uc_hatT[:, -1] = plane_recv
+    
+    u[:] = irfft(Uc_hatT, 1)
+    return u
 
 def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U, V, W
-        U[:] = irfft2(U_hat)
+        U[0] = irfft2_mpi(U_hat[0], U[0])
+        U[1] = irfft2_mpi(U_hat[1], U[1])
 
-    curl[:] = irfft2(1j*(KX[0]*U_hat[1] - KX[1]*U_hat[0]))
-    dU[0] = rfft2(U[1]*curl)
-    dU[1] = rfft2(-U[0]*curl)
+    curl[:] = irfft2_mpi(1j*(K[0]*U_hat[1] - K[1]*U_hat[0]), curl)
+    dU[0] = rfft2_mpi(U[1]*curl, dU[0])
+    dU[1] = rfft2_mpi(-U[0]*curl, dU[1])
 
     # Dealias the nonlinear convection
-    dU[:] *= dealias*dt
+    dU[:] *= dealias
 
     # Compute pressure (To get actual pressure multiply by 1j/dt)
-    P_hat[:] = sum(dU*KX_over_Ksq, 0)
+    P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
 
     # Add pressure gradient
-    dU[:] -= P_hat*KX
+    dU[:] -= P_hat*K
 
     # Add contribution from diffusion
-    dU[:] -= nu*dt*KK*U_hat
+    dU[:] -= nu*K2*U_hat
 
 # Taylor-Green initialization
-#U[0] = sin(X[0])*cos(X[1])
-#U[1] =-cos(X[0])*sin(X[1])
+U[0] = sin(X[0])*cos(X[1])
+U[1] =-cos(X[0])*sin(X[1])
 
 # Initialize two vortices
-w=exp(-((X[0]-pi)**2+(X[1]-pi+pi/4)**2)/(0.2))+exp(-((X[0]-pi)**2+(X[1]-pi-pi/4)**2)/(0.2))-0.5*exp(-((X[0]-pi-pi/4)**2+(X[1]-pi-pi/4)**2)/(0.4))
-w_hat = rfft2(w)
-U[0] = irfft2(1j*KX_over_Ksq[1]*w_hat)
-U[1] = irfft2(-1j*KX_over_Ksq[0]*w_hat)
+#w = exp(-((X[0]-pi)**2+(X[1]-pi+pi/4)**2)/(0.2))+exp(-((X[0]-pi)**2+(X[1]-pi-pi/4)**2)/(0.2))-0.5*exp(-((X[0]-pi-pi/4)**2+(X[1]-pi-pi/4)**2)/(0.4))
+#w_hat = U_hat[0].copy()
+#w_hat = rfft2_mpi(w, w_hat)
+#U[0] = irfft2_mpi(1j*K_over_K2[1]*w_hat, U[0])
+#U[1] = irfft2_mpi(-1j*K_over_K2[0]*w_hat, U[1])
 
 # Transform initial data
-U_hat[:] = rfft2(U)
+U_hat[0] = rfft2_mpi(U[0], U_hat[0])
+U_hat[1] = rfft2_mpi(U[1], U_hat[1])
 
 # Make it divergence free in case it is not
 project(U_hat)
@@ -126,43 +197,47 @@ while t < T:
         U_hat1[:] = U_hat0[:] = U_hat
         for rk in range(4):
             ComputeRHS(dU, rk)
-            #project(dU)
             if rk < 3:
-                U_hat[:] = U_hat0 + b[rk]*dU
+                #U_hat[:] = U_hat0 + b[rk]*dU
+                U_hat[:] = U_hat0; U_hat += b[rk]*dU # Faster (no tmp array)
             U_hat1[:] += a[rk]*dU
         U_hat[:] = U_hat1[:]
 
     elif temporal == 'ForwardEuler' or tstep == 1:
         ComputeRHS(dU, 0)
-        #project(dU)
-        U_hat[:] += dU
+        U_hat[:] += dU*dt
         if temporal == "AB2":
-            U_hat0[:] = dU
+            U_hat0[:] = dU*dt
 
     else:
         ComputeRHS(dU, 0)
-        #project(dU)
-        U_hat[:] += 1.5*dU - 0.5*U_hat0
-        U_hat0[:] = dU
+        U_hat[:] += (1.5*dU*dt - 0.5*U_hat0)
+        U_hat0[:] = dU*dt
 
-    U[:] = irfft2(U_hat)
+    for i in range(2): 
+        U[i] = irfft2_mpi(U_hat[i], U[i])
 
     # From here on it's only postprocessing
     if tstep % plot_result == 0:
-        curl[:] = irfft2(1j*KX[0]*U_hat[1]-1j*KX[1]*U_hat[0])
+        curl = irfft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         im.set_data(curl[:, :])
         im.autoscale()
         plt.pause(1e-6)
 
-    print tstep, time.time()-t0
+    kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx/L**2/2) # Compute energy with double precision
+    if rank == 0:
+        print tstep, time.time()-t0, kk
     t0 = time.time()
 
 print "Time = ", time.time()-tic
-plt.figure()
-plt.quiver(X[0,::2,::2], X[1,::2,::2], U[0,::2,::2], U[1,::2,::2], pivot='mid', scale=2)
-plt.draw();plt.show()
-#print "Energy numeric = ", sum(U*U)*dx*dx/L**2
-#u0 = sin(X[0])*cos(X[1])*exp(-2.*nu*t)
-#u1 =-sin(X[1])*cos(X[0])*exp(-2.*nu*t)
-#print "Energy exact   = ", sum(u0*u0+u1*u1)*dx*dx/L**2
-#print "Error   = ", sum(sqrt((U[0]-u0)**2+(U[1]-u1)**2))*dx*dx/L**2
+#plt.figure()
+#plt.quiver(X[0,::2,::2], X[1,::2,::2], U[0,::2,::2], U[1,::2,::2], pivot='mid', scale=2)
+#plt.draw();plt.show()
+
+# Check accuracy. Only for Taylor Green
+print "Energy numeric = ", sum(U*U)*dx*dx/L**2
+u0 = sin(X[0])*cos(X[1])*exp(-2.*nu*t)
+u1 =-sin(X[1])*cos(X[0])*exp(-2.*nu*t)
+k1 = comm.reduce(sum(u0*u0+u1*u1)*dx*dx/L**2/2) # Compute energy with double precision)
+if rank==0:
+    print "Energy exact, numeric  = ", k1, kk, k1-kk
