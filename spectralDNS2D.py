@@ -53,8 +53,8 @@ U_send = empty((num_processes, Np, Np/2), dtype="complex")
 U_sendr = U_send.reshape((N, Np/2))
 
 U_recv = empty((N, Np/2), dtype="complex")
-nyq = empty(N, dtype="complex")
-nyqc = empty(N, dtype="complex")
+fft_y = empty(N, dtype="complex")
+fft_x = empty(N, dtype="complex")
 plane_recv = empty(Np, dtype="complex")
 
 # RK4 arrays
@@ -81,7 +81,7 @@ def project(u):
     u[:] -= sum(K*u, 0)*K_over_K2    
 
 def rfft2_mpi(u, fu):
-    if num_processes == 1:
+    if num_processes == 10:
         fu[:] = rfft2(u, axes=(0,1))
         return fu    
     
@@ -99,27 +99,28 @@ def rfft2_mpi(u, fu):
         
     # Handle Nyquist frequency
     if rank == 0:        
-        nyq[:] = fu[:, 0]        
-        nyqc[0] = nyq[0].real;
-        nyqc[1:N/2] = 0.5*(nyq[1:N/2]+conj(nyq[:N/2:-1]))
-        nyqc[N/2] = nyq[N/2].real
-        fu[:N/2+1, 0] = nyqc[:N/2+1]
-        fu[N/2+1:, 0] = conj(nyqc[(N/2-1):0:-1])
-        nyqc[:] = nyq
-        nyq[0] = nyqc[0].imag
-        nyq[1:N/2] = -0.5*1j*(nyqc[1:N/2]-conj(nyqc[:N/2:-1]))
-        nyq[N/2] = nyqc[N/2].imag
-        nyq[N/2+1:] = conj(nyq[(N/2-1):0:-1])
-        comm.Send([nyq, MPI.DOUBLE_COMPLEX], dest=num_processes-1, tag=77)
+        f = fu[:, 0]        
+        fft_x[0] = f[0].real;
+        fft_x[1:N/2] = 0.5*(f[1:N/2]+conj(f[:N/2:-1]))
+        fft_x[N/2] = f[N/2].real        
+        fu[:N/2+1, 0] = fft_x[:N/2+1]        
+        fu[N/2+1:, 0] = conj(fft_x[(N/2-1):0:-1])
+        
+        fft_y[0] = f[0].imag
+        fft_y[1:N/2] = -0.5*1j*(f[1:N/2]-conj(f[:N/2:-1]))
+        fft_y[N/2] = f[N/2].imag
+        fft_y[N/2+1:] = conj(fft_y[(N/2-1):0:-1])
+        
+        comm.Send([fft_y, MPI.DOUBLE_COMPLEX], dest=num_processes-1, tag=77)
         
     elif rank == num_processes-1:
-        comm.Recv([nyq, MPI.DOUBLE_COMPLEX], source=0, tag=77)
-        fu[:, -1] = nyq 
+        comm.Recv([fft_y, MPI.DOUBLE_COMPLEX], source=0, tag=77)
+        fu[:, -1] = fft_y 
         
     return fu
 
 def irfft2_mpi(fu, u):
-    if num_processes == 1:
+    if num_processes == 10:
         u[:] = irfft2(fu, axes=(0,1))
         return u
         f   
@@ -132,9 +133,9 @@ def irfft2_mpi(fu, u):
         Uc_hatT[:, i*Np/2:(i+1)*Np/2] = U_recv[i*Np:(i+1)*Np]
     
     if rank == num_processes-1:
-        nyq[:] = Uc_hat[:, -1]
+        fft_y[:] = Uc_hat[:, -1]
 
-    comm.Scatter(nyq, plane_recv, root=num_processes-1)
+    comm.Scatter(fft_y, plane_recv, root=num_processes-1)
     Uc_hatT[:, -1] = plane_recv
     
     u[:] = irfft(Uc_hatT, 1)
@@ -229,13 +230,13 @@ while t < T:
         print tstep, time.time()-t0, kk
     t0 = time.time()
 
-print "Time = ", time.time()-tic
+if rank == 0:
+    print "Time = ", time.time()-tic
 #plt.figure()
 #plt.quiver(X[0,::2,::2], X[1,::2,::2], U[0,::2,::2], U[1,::2,::2], pivot='mid', scale=2)
 #plt.draw();plt.show()
 
 # Check accuracy. Only for Taylor Green
-print "Energy numeric = ", sum(U*U)*dx*dx/L**2
 u0 = sin(X[0])*cos(X[1])*exp(-2.*nu*t)
 u1 =-sin(X[1])*cos(X[0])*exp(-2.*nu*t)
 k1 = comm.reduce(sum(u0*u0+u1*u1)*dx*dx/L**2/2) # Compute energy with double precision)
