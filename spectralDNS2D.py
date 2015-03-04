@@ -81,7 +81,7 @@ def project(u):
     u[:] -= sum(K*u, 0)*K_over_K2    
 
 def rfft2_mpi(u, fu):
-    if num_processes == 10:
+    if num_processes == 1:
         fu[:] = rfft2(u, axes=(0,1))
         return fu    
     
@@ -120,7 +120,7 @@ def rfft2_mpi(u, fu):
     return fu
 
 def irfft2_mpi(fu, u):
-    if num_processes == 10:
+    if num_processes == 1:
         u[:] = irfft2(fu, axes=(0,1))
         return u
         f   
