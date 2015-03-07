@@ -148,7 +148,6 @@ def ComputeRHS(dU, rk):
     
     # Dealias the nonlinear convection
     dU *= dealias
-    #dU *= 0
     
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
@@ -157,7 +156,7 @@ def ComputeRHS(dU, rk):
     dU -= P_hat*K
     
     # Subtract contribution from diffusion
-    dU -= nu*K2*U_hat
+    dU -= nuK2*U_hat
     
     return dU
 

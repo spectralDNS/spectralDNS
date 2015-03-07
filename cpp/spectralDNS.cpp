@@ -10,8 +10,8 @@ using namespace std;
 //mpic++ -std=c++11 -O3 spectralDNS.cpp -o spectralDNS -lfftw3_mpi -lfftw3
 //mpixlcxx_r -qsmp -O3 spectralDNS.cpp -o spectralDNS $FFTW3_INC $FFTW3_LIB
 
-// To change from float to double replace all fftwf_ with fftwf_ and vice versa. + change linked libraries.
-typedef float precision;
+// To change from float to double replace all fftw_ with fftw_ and vice versa. + change linked libraries.
+typedef double precision;
 
 int main( int argc, char *argv[] )
 {
@@ -20,7 +20,7 @@ int main( int argc, char *argv[] )
   precision nu, dt, T;
   double t0, t1, fastest_time, slowest_time, start_time;
   MPI::Init ( argc, argv );
-  fftwf_mpi_init();
+  fftw_mpi_init();
     
   num_processes = MPI::COMM_WORLD.Get_size();
   rank = MPI::COMM_WORLD.Get_rank();
@@ -52,7 +52,7 @@ int main( int argc, char *argv[] )
   b[0] = 0.5; b[1] = 0.5; b[2] = 1.0;
   int tot = N*N*N;
   Nf = N/2+1;
-  alloc_local = fftwf_mpi_local_size_3d_transposed(N, N, Nf, MPI::COMM_WORLD,
+  alloc_local = fftw_mpi_local_size_3d_transposed(N, N, Nf, MPI::COMM_WORLD,
                                         &local_n0, &local_0_start,
                                         &local_n1, &local_1_start);
   
@@ -101,11 +101,11 @@ int main( int argc, char *argv[] )
   for (int i=-N/2; i<0; i++)
       kx[i+N] = i;
 
-  //fftwf_plan plan_backward;
-  fftwf_plan rfftn, irfftn;
-  rfftn = fftwf_mpi_plan_dft_r2c_3d(N, N, N, U.data(), reinterpret_cast<fftwf_complex*>(U_hat.data()), 
+  //fftw_plan plan_backward;
+  fftw_plan rfftn, irfftn;
+  rfftn = fftw_mpi_plan_dft_r2c_3d(N, N, N, U.data(), reinterpret_cast<fftw_complex*>(U_hat.data()), 
                                    MPI::COMM_WORLD, FFTW_MPI_TRANSPOSED_OUT);
-  irfftn = fftwf_mpi_plan_dft_c2r_3d(N, N, N, reinterpret_cast<fftwf_complex*>(U_hat.data()),  U.data(), 
+  irfftn = fftw_mpi_plan_dft_c2r_3d(N, N, N, reinterpret_cast<fftw_complex*>(U_hat.data()),  U.data(), 
                                    MPI::COMM_WORLD, FFTW_MPI_TRANSPOSED_IN);  
       
   for (int i=0; i<local_n0; i++)
@@ -118,9 +118,9 @@ int main( int argc, char *argv[] )
         W[z] = 0.0;
       }
     
-  fftwf_mpi_execute_dft_r2c( rfftn, U.data(), reinterpret_cast<fftwf_complex*>(U_hat.data()));
-  fftwf_mpi_execute_dft_r2c( rfftn, V.data(), reinterpret_cast<fftwf_complex*>(V_hat.data()));
-  fftwf_mpi_execute_dft_r2c( rfftn, W.data(), reinterpret_cast<fftwf_complex*>(W_hat.data()));
+  fftw_mpi_execute_dft_r2c( rfftn, U.data(), reinterpret_cast<fftw_complex*>(U_hat.data()));
+  fftw_mpi_execute_dft_r2c( rfftn, V.data(), reinterpret_cast<fftw_complex*>(V_hat.data()));
+  fftw_mpi_execute_dft_r2c( rfftn, W.data(), reinterpret_cast<fftw_complex*>(W_hat.data()));
     
   precision kmax = 2./3.*(N/2+1);  
   for (int i=0; i<local_n1; i++)
@@ -172,9 +172,9 @@ int main( int argc, char *argv[] )
      {
         if (rk > 0)
         {
-           fftwf_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftwf_complex*>(U_hat.data()), U.data());
-           fftwf_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftwf_complex*>(V_hat.data()), V.data());
-           fftwf_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftwf_complex*>(W_hat.data()), W.data());
+           fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(U_hat.data()), U.data());
+           fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(V_hat.data()), V.data());
+           fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(W_hat.data()), W.data());
            for (int k=0; k<U.size(); k++)
            {
              U[k] /= tot;
@@ -192,9 +192,9 @@ int main( int argc, char *argv[] )
                curlY[z] = one*(kz[k]*U_hat[z]-kx[i+local_1_start]*W_hat[z]);
                curlX[z] = one*(kx[j]*W_hat[z]-kz[k]*V_hat[z]);
             }
-        fftwf_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftwf_complex*>(curlX.data()), CU.data());
-        fftwf_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftwf_complex*>(curlY.data()), CV.data());
-        fftwf_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftwf_complex*>(curlZ.data()), CW.data());
+        fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(curlX.data()), CU.data());
+        fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(curlY.data()), CV.data());
+        fftw_mpi_execute_dft_c2r(irfftn, reinterpret_cast<fftw_complex*>(curlZ.data()), CW.data());
         for (int k=0; k<CU.size(); k++)
         {
             CU[k] /= tot;
@@ -213,9 +213,9 @@ int main( int argc, char *argv[] )
               W_tmp[z] = U[z]*CV[z]-V[z]*CU[z];      
             }
                 
-        fftwf_mpi_execute_dft_r2c( rfftn, U_tmp.data(), reinterpret_cast<fftwf_complex*>(dU.data()));
-        fftwf_mpi_execute_dft_r2c( rfftn, V_tmp.data(), reinterpret_cast<fftwf_complex*>(dV.data()));
-        fftwf_mpi_execute_dft_r2c( rfftn, W_tmp.data(), reinterpret_cast<fftwf_complex*>(dW.data()));
+        fftw_mpi_execute_dft_r2c( rfftn, U_tmp.data(), reinterpret_cast<fftw_complex*>(dU.data()));
+        fftw_mpi_execute_dft_r2c( rfftn, V_tmp.data(), reinterpret_cast<fftw_complex*>(dV.data()));
+        fftw_mpi_execute_dft_r2c( rfftn, W_tmp.data(), reinterpret_cast<fftw_complex*>(dW.data()));
         
         for (int i=0; i<local_n1; i++)
           for (int j=0; j<N; j++)
@@ -316,14 +316,14 @@ int main( int argc, char *argv[] )
   if (rank == 0)  
     std::cout << "Time = " << t1 - start_time  << std::endl;
   
-  fftwf_destroy_plan(rfftn);
-  fftwf_destroy_plan(irfftn);
+  fftw_destroy_plan(rfftn);
+  fftw_destroy_plan(irfftn);
   vs_in[0] = fastest_time;
   vs_in[1] = slowest_time;
-  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::FLOAT, MPI::MIN, 0);
+  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::DOUBLE, MPI::MIN, 0);
   if (rank==0)
       std::cout << "Fastest = " << vs_out[0] << ", " << vs_out[1] << std::endl; 
-  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::FLOAT, MPI::MAX, 0);
+  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::DOUBLE, MPI::MAX, 0);
   if (rank==0)
       std::cout << "Slowest = " << vs_out[0] << ", " << vs_out[1] << std::endl; 
   
