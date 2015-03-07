@@ -12,47 +12,18 @@ with mpi_import():
     from numpy import *
     from utilities import *
 
-#import time
-#t0 = time.time()
-#import sys, cProfile
-#from mpi4py import MPI
-#from numpy import *
-#from h5io import *
-#from utilities import *
-
 comm = MPI.COMM_WORLD
 comm.barrier()
 if comm.Get_rank()==0:
     print "Import time ", time.time()-t0
 
-params = {
-    'problem': 'TaylorGreen',   # Decide the problem to solve
-    'decomposition': 'slab',    # 'slab' or 'pencil'
-    'communication': 'alltoall',# 'alltoall' or 'sendrecv_replace' (only for slab)
-    'convection': 'Vortex',     # 'Standard', 'Divergence', 'Skewed', 'Vortex'
-    'make_profile': 0,          # Enable cProfile profiler
-    'mem_profile': False,       # Check memory use
-    'M': 5,                     # Mesh size
-    'P1': 1,                    # Mesh decomposition in first direction (pencil P1*P2=num_processes)
-    'temporal': 'RK4',          # Integrator ('RK4', 'ForwardEuler', 'AB2')
-    'write_result': 1e8,        # Write to HDF5 every..
-    'write_yz_slice': [0, 1e8], # Write slice 0 (or higher) in y-z plance every..
-    'compute_energy': 2,        # Compute solution energy every..
-    'nu': 0.000625,             # Viscosity
-    'dt': 0.01,                 # Time step
-    'T': 0.1,                   # End time
-    'precision': "double"       # single or double precision
-}
-
 # Parse parameters from the command line 
 commandline_kwargs = parse_command_line(sys.argv[1:])
-params.update(commandline_kwargs)
-assert params['convection'] in ['Standard', 'Divergence', 'Skewed', 'Vortex']
-assert params['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
-
-exec("from problems.ThreeD.{} import *".format(params['problem']))
-params.update(problem_params)
-vars().update(params)
+with mpi_import():
+    exec("from problems.ThreeD.{} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
+parameters.update(commandline_kwargs)
+check_parameters(parameters)
+vars().update(parameters)
 
 if mem_profile: mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
 
@@ -68,7 +39,7 @@ dx = float(L / N)
 
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
-hdf5file = HDF5Writer(comm, dt, N, params, float)
+hdf5file = HDF5Writer(comm, dt, N, parameters, float)
 if make_profile: profiler = cProfile.Profile()
 
 # Import decomposed mesh, wavenumber mesh and FFT routines with either slab or pencil decomposition
@@ -197,12 +168,12 @@ while t < T-1e-8:
         dU = ComputeRHS(dU, 0)        
         U_hat += dU*dt
         if temporal == "AB2":
-            U_hat0[:] = dU*dt
+            U_hat0[:] = dU; U_hat0 *= dt
         
     else:
         dU = ComputeRHS(dU, 0)
         U_hat[:] += (1.5*dU*dt - 0.5*U_hat0)
-        U_hat0[:] = dU*dt
+        U_hat0[:] = dU; U_hat0 *= dt
 
     for i in range(3):
         U[i] = ifftn_mpi(U_hat[i], U[i])

@@ -3,31 +3,23 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from numpy import *
-from pylab import *
-from mpi4py import MPI
-import time
-from mpi.wrappyfftw import *
+from MPI_knee import mpi_import, MPI
+with mpi_import():
+    from numpy import *
+    from pylab import *
+    from mpi4py import MPI
+    import time
+    from mpi.wrappyfftw import *
+    from utilities.commandline import *
 
-from utilities.commandline import *
-
-params = {
-    'M': 6,
-    'temporal': 'RK4',
-    'plot_result': -1,         # Show an image every..
-    'nu': 0.001,
-    'dt': 0.005,
-    'T': 50.0,
-    'problem': 'TaylorGreen',
-    'debug': False
-}
+# Set up problem parameters using first hard-conded parameters, then possibly
+# overloaded with commandline arguments
 commandline_kwargs = parse_command_line(sys.argv[1:])
-params.update(commandline_kwargs)
-assert params['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
-
-exec("from problems.TwoD.{} import *".format(problem))
-
-vars().update(params)
+with mpi_import():
+    exec("from problems.TwoD.{} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
+parameters.update(commandline_kwargs)
+assert parameters['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
+vars().update(parameters)
 
 # Set the size of the doubly periodic box N**2
 N = 2**M
