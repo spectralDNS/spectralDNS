@@ -17,7 +17,9 @@ params = {
     'plot_result': 10,         # Show an image every..
     'nu': 0.001,
     'dt': 0.005,
-    'T': 50.0
+    'T': 50.0,
+    'problem': 'Taylor-Green',
+    'debug': False
 }
 commandline_kwargs = parse_command_line(sys.argv[1:])
 params.update(commandline_kwargs)
@@ -162,16 +164,17 @@ def ComputeRHS(dU, rk):
     # Add contribution from diffusion
     dU[:] -= nu*K2*U_hat
 
-# Taylor-Green initialization
-U[0] = sin(X[0])*cos(X[1])
-U[1] =-cos(X[0])*sin(X[1])
-
-# Initialize two vortices
-#w = exp(-((X[0]-pi)**2+(X[1]-pi+pi/4)**2)/(0.2))+exp(-((X[0]-pi)**2+(X[1]-pi-pi/4)**2)/(0.2))-0.5*exp(-((X[0]-pi-pi/4)**2+(X[1]-pi-pi/4)**2)/(0.4))
-#w_hat = U_hat[0].copy()
-#w_hat = rfft2_mpi(w, w_hat)
-#U[0] = irfft2_mpi(1j*K_over_K2[1]*w_hat, U[0])
-#U[1] = irfft2_mpi(-1j*K_over_K2[0]*w_hat, U[1])
+if problem == 'Taylor-Green':
+    U[0] = sin(X[0])*cos(X[1])
+    U[1] =-cos(X[0])*sin(X[1])
+elif problem == 'vortices':
+    w =     exp(-((X[0]-pi)**2+(X[1]-pi+pi/4)**2)/(0.2)) \
+       +    exp(-((X[0]-pi)**2+(X[1]-pi-pi/4)**2)/(0.2)) \
+       -0.5*exp(-((X[0]-pi-pi/4)**2+(X[1]-pi-pi/4)**2)/(0.4))
+    w_hat = U_hat[0].copy()
+    w_hat = rfft2_mpi(w, w_hat)
+    U[0] = irfft2_mpi(1j*K_over_K2[1]*w_hat, U[0])
+    U[1] = irfft2_mpi(-1j*K_over_K2[0]*w_hat, U[1])
 
 # Transform initial data
 U_hat[0] = rfft2_mpi(U[0], U_hat[0])
@@ -225,9 +228,11 @@ while t < T:
         im.autoscale()
         plt.pause(1e-6)
 
-    kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx/L**2/2) # Compute energy with double precision
-    if rank == 0:
-        print tstep, time.time()-t0, kk
+    if problem == 'Taylor-Green':
+        # Compute energy with double precision
+        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx/L**2/2) 
+        if rank == 0 and debug == True:
+            print tstep, time.time()-t0, kk
     t0 = time.time()
 
 if rank == 0:
@@ -236,9 +241,22 @@ if rank == 0:
 #plt.quiver(X[0,::2,::2], X[1,::2,::2], U[0,::2,::2], U[1,::2,::2], pivot='mid', scale=2)
 #plt.draw();plt.show()
 
-# Check accuracy. Only for Taylor Green
-u0 = sin(X[0])*cos(X[1])*exp(-2.*nu*t)
-u1 =-sin(X[1])*cos(X[0])*exp(-2.*nu*t)
-k1 = comm.reduce(sum(u0*u0+u1*u1)*dx*dx/L**2/2) # Compute energy with double precision)
-if rank==0:
-    print "Energy exact, numeric  = ", k1, kk, k1-kk
+
+def regression_test(problem='vortices'):
+    import numpy as np
+    if rank!=0:
+        return True
+    if problem == 'vortices':
+        U_ref = np.loadtxt('vortices.txt')
+        assert np.allclose(U[0], U_ref)
+    else:
+        # Check accuracy. Only for Taylor Green
+        u0 = sin(X[0])*cos(X[1])*exp(-2.*nu*t)
+        u1 =-sin(X[1])*cos(X[0])*exp(-2.*nu*t)
+        k1 = comm.reduce(sum(u0*u0+u1*u1)*dx*dx/L**2/2) # Compute energy with double precision)
+        print "Energy exact, numeric  = ", k1, kk, k1-kk
+        assert np.abs(k1-kk)<1.e-10
+
+
+if __name__ == '__main__':
+    regression_test(problem)
