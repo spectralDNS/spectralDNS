@@ -26,6 +26,7 @@ if comm.Get_rank()==0:
     print "Import time ", time.time()-t0
 
 params = {
+    'problem': 'TaylorGreen',   # Decide the problem to solve
     'decomposition': 'slab',    # 'slab' or 'pencil'
     'communication': 'alltoall',# 'alltoall' or 'sendrecv_replace' (only for slab)
     'convection': 'Vortex',     # 'Standard', 'Divergence', 'Skewed', 'Vortex'
@@ -48,6 +49,9 @@ commandline_kwargs = parse_command_line(sys.argv[1:])
 params.update(commandline_kwargs)
 assert params['convection'] in ['Standard', 'Divergence', 'Skewed', 'Vortex']
 assert params['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
+
+exec("from problems.ThreeD.{} import *".format(params['problem']))
+params.update(problem_params)
 vars().update(params)
 
 if mem_profile: mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
@@ -160,10 +164,7 @@ def ComputeRHS(dU, rk):
     
     return dU
 
-# Taylor-Green initialization
-U[0] = sin(X[0])*cos(X[1])*cos(X[2])
-U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
-U[2] = 0 
+U = initialize(**vars())
 
 # Transform initial data
 for i in range(3):
@@ -187,13 +188,10 @@ while t < T-1e-8:
         U_hat1[:] = U_hat0[:] = U_hat
         for rk in range(4):
             dU = ComputeRHS(dU, rk)
-            #dU = project(dU)
             if rk < 3:
-                #U_hat[:] = U_hat0 + b[rk]*dU
-                U_hat[:] = U_hat0;U_hat += b[rk]*dU # Faster
+                U_hat[:] = U_hat0;U_hat += b[rk]*dU
             U_hat1 += a[rk]*dU
         U_hat[:] = U_hat1
-        #U_hat = project(U_hat)
         
     elif temporal == "ForwardEuler" or tstep == 1:  
         dU = ComputeRHS(dU, 0)        
@@ -208,19 +206,9 @@ while t < T-1e-8:
 
     for i in range(3):
         U[i] = ifftn_mpi(U_hat[i], U[i])
-        
-    if tstep % params['write_result'] == 0 or tstep % params['write_yz_slice'][1] == 0:
-        P = ifftn_mpi(P_hat*1j, P)
-        hdf5file.write(U, P, tstep)
-
-    if tstep % compute_energy == 0:
-        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx*dx/L**3/2) # Compute energy with double precision
-        ww = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx*dx*dx/L**3/2)
-        if rank == 0:
-            k.append(kk)
-            w.append(ww)
-            print t, float(kk), float(ww)
-            
+                    
+    update(**vars())
+    
     tt = time.time()-t0
     t0 = time.time()
     if tstep > 1:
@@ -242,14 +230,7 @@ slow = (comm.reduce(fastest_time, op=MPI.MAX, root=0),
 if rank == 0:
     print "Time = ", toc
     print "Fastest = ", fast
-    print "Slowest = ", slow
-
-    #figure()
-    #k = array(k)
-    #dkdt = (k[1:]-k[:-1])/dt
-    #plot(-dkdt)
-    #show()
-    
+    print "Slowest = ", slow    
 if make_profile:
     results = create_profile(**vars())
 
@@ -257,3 +238,4 @@ if mem_profile: mem("End")
     
 hdf5file.generate_xdmf()  
 hdf5file.close()
+finalize(**vars())

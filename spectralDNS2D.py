@@ -14,16 +14,19 @@ from utilities.commandline import *
 params = {
     'M': 6,
     'temporal': 'RK4',
-    'plot_result': 10,         # Show an image every..
+    'plot_result': -1,         # Show an image every..
     'nu': 0.001,
     'dt': 0.005,
     'T': 50.0,
-    'problem': 'Taylor-Green',
+    'problem': 'TaylorGreen',
     'debug': False
 }
 commandline_kwargs = parse_command_line(sys.argv[1:])
 params.update(commandline_kwargs)
 assert params['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
+
+exec("from problems.TwoD.{} import *".format(problem))
+
 vars().update(params)
 
 # Set the size of the doubly periodic box N**2
@@ -78,6 +81,8 @@ dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax), dtype=bool)
 # RK4 parameters
 a = array([1./6., 1./3., 1./3., 1./6.])*dt
 b = array([0.5, 0.5, 1.])*dt
+
+U = initialize(**vars())
 
 def project(u):
     u[:] -= sum(K*u, 0)*K_over_K2    
@@ -164,18 +169,6 @@ def ComputeRHS(dU, rk):
     # Add contribution from diffusion
     dU[:] -= nu*K2*U_hat
 
-if problem == 'Taylor-Green':
-    U[0] = sin(X[0])*cos(X[1])
-    U[1] =-cos(X[0])*sin(X[1])
-elif problem == 'vortices':
-    w =     exp(-((X[0]-pi)**2+(X[1]-pi+pi/4)**2)/(0.2)) \
-       +    exp(-((X[0]-pi)**2+(X[1]-pi-pi/4)**2)/(0.2)) \
-       -0.5*exp(-((X[0]-pi-pi/4)**2+(X[1]-pi-pi/4)**2)/(0.4))
-    w_hat = U_hat[0].copy()
-    w_hat = rfft2_mpi(w, w_hat)
-    U[0] = irfft2_mpi(1j*K_over_K2[1]*w_hat, U[0])
-    U[1] = irfft2_mpi(-1j*K_over_K2[0]*w_hat, U[1])
-
 # Transform initial data
 U_hat[0] = rfft2_mpi(U[0], U_hat[0])
 U_hat[1] = rfft2_mpi(U[1], U_hat[1])
@@ -183,17 +176,18 @@ U_hat[1] = rfft2_mpi(U[1], U_hat[1])
 # Make it divergence free in case it is not
 project(U_hat)
 
-# initialize plot and list k for storing energy
-im = plt.imshow(zeros((N, N)))
-plt.colorbar(im)
-plt.draw()
-
 tic = time.time()
 t = 0.0
 tstep = 0
 
+# initialize plot
+if plot_result > 0:
+    im = plt.imshow(zeros((N, N)))
+    plt.colorbar(im)
+    plt.draw()
+
 # RK4 loop in time
-t0 = time.time()
+t0 = array([time.time()])
 while t < T:
     t += dt; tstep += 1
 
@@ -221,41 +215,15 @@ while t < T:
     for i in range(2): 
         U[i] = irfft2_mpi(U_hat[i], U[i])
 
-    # From here on it's only postprocessing
-    if tstep % plot_result == 0:
+    update(**vars())
+    
+    if tstep % plot_result == 0 and plot_result > 0:
         curl = irfft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         im.set_data(curl[:, :])
         im.autoscale()
         plt.pause(1e-6)
-
-    if problem == 'Taylor-Green':
-        # Compute energy with double precision
-        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx/L**2/2) 
-        if rank == 0 and debug == True:
-            print tstep, time.time()-t0, kk
-    t0 = time.time()
-
+    
 if rank == 0:
-    print "Time = ", time.time()-tic
-#plt.figure()
-#plt.quiver(X[0,::2,::2], X[1,::2,::2], U[0,::2,::2], U[1,::2,::2], pivot='mid', scale=2)
-#plt.draw();plt.show()
+    print "Total computing time = ", time.time()-tic
 
-def regression_test(problem='vortices'):
-    import numpy as np
-    if rank!=0:
-        return True
-    if problem == 'vortices':
-        U_ref = np.loadtxt('vortices.txt')
-        assert np.allclose(U[0], U_ref)
-    else:
-        # Check accuracy. Only for Taylor Green
-        u0 = sin(X[0])*cos(X[1])*exp(-2.*nu*t)
-        u1 =-sin(X[1])*cos(X[0])*exp(-2.*nu*t)
-        k1 = comm.reduce(sum(u0*u0+u1*u1)*dx*dx/L**2/2) # Compute energy with double precision)
-        print "Energy exact, numeric  = ", k1, kk, k1-kk
-        assert np.abs(k1-kk)<1.e-10
-
-
-if __name__ == '__main__':
-    regression_test(problem)
+regression_test(**vars())
