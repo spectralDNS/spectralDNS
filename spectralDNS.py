@@ -19,8 +19,11 @@ if comm.Get_rank()==0:
 
 # Parse parameters from the command line 
 commandline_kwargs = parse_command_line(sys.argv[1:])
+
+# Import parameters and problem specific routines
 with mpi_import():
     exec("from problems.ThreeD.{} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
+
 parameters.update(commandline_kwargs)
 check_parameters(parameters)
 vars().update(parameters)
@@ -155,7 +158,7 @@ if rank == 0: k = []; w = []
 tic = t0 = time.time()
 while t < T-1e-8:
     t += dt; tstep += 1
-    if temporal == "RK4":
+    if integrator == "RK4":
         U_hat1[:] = U_hat0[:] = U_hat
         for rk in range(4):
             dU = ComputeRHS(dU, rk)
@@ -164,10 +167,10 @@ while t < T-1e-8:
             U_hat1 += a[rk]*dU
         U_hat[:] = U_hat1
         
-    elif temporal == "ForwardEuler" or tstep == 1:  
+    elif integrator == "ForwardEuler" or tstep == 1:  
         dU = ComputeRHS(dU, 0)        
         U_hat += dU*dt
-        if temporal == "AB2":
+        if integrator == "AB2":
             U_hat0[:] = dU; U_hat0 *= dt
         
     else:

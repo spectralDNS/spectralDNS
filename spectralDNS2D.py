@@ -74,8 +74,6 @@ dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax), dtype=bool)
 a = array([1./6., 1./3., 1./3., 1./6.])*dt
 b = array([0.5, 0.5, 1.])*dt
 
-U = initialize(**vars())
-
 def project(u):
     u[:] -= sum(K*u, 0)*K_over_K2    
 
@@ -160,6 +158,8 @@ def ComputeRHS(dU, rk):
 
     # Add contribution from diffusion
     dU[:] -= nu*K2*U_hat
+
+U = initialize(**vars())
 
 # Transform initial data
 U_hat[0] = rfft2_mpi(U[0], U_hat[0])
