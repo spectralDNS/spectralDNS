@@ -3,6 +3,7 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
+<<<<<<< .merge_file_xm3FVX
 import time
 t0 = time.time()
 import sys, cProfile
@@ -10,36 +11,32 @@ from mpi4py import MPI
 from numpy import *
 from h5io import *
 from utilities import *
+=======
+from MPI_knee import mpi_import, MPI
+with mpi_import():
+    import time
+    t0 = time.time()
+    import sys, cProfile
+    from h5io import *
+    from numpy import *
+    from utilities import *
+>>>>>>> .merge_file_9iQHuZ
 
 comm = MPI.COMM_WORLD
 comm.barrier()
 if comm.Get_rank()==0:
     print "Import time ", time.time()-t0
 
-params = {
-    'decomposition': 'slab',    # 'slab' or 'pencil'
-    'communication': 'alltoall',# 'alltoall' or 'sendrecv_replace' (only for slab)
-    'convection': 'Vortex',     # 'Standard', 'Divergence', 'Skewed', 'Vortex'
-    'make_profile': 0,          # Enable cProfile profiler
-    'mem_profile': False,       # Check memory use
-    'M': 5,                     # Mesh size
-    'P1': 1,                    # Mesh decomposition in first direction (pencil P1*P2=num_processes)
-    'temporal': 'RK4',          # Integrator ('RK4', 'ForwardEuler', 'AB2')
-    'write_result': 1e8,        # Write to HDF5 every..
-    'write_yz_slice': [0, 1e8], # Write slice 0 (or higher) in y-z plance every..
-    'compute_energy': 2,        # Compute solution energy every..
-    'nu': 0.000625,             # Viscosity
-    'dt': 0.01,                 # Time step
-    'T': 0.1,                   # End time
-    'precision': "double"       # single or double precision
-}
-
 # Parse parameters from the command line 
 commandline_kwargs = parse_command_line(sys.argv[1:])
-params.update(commandline_kwargs)
-assert params['convection'] in ['Standard', 'Divergence', 'Skewed', 'Vortex']
-assert params['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
-vars().update(params)
+
+# Import parameters and problem specific routines
+with mpi_import():
+    exec("from problems.ThreeD.{} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
+
+parameters.update(commandline_kwargs)
+check_parameters(parameters)
+vars().update(parameters)
 
 if mem_profile: mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
 
@@ -55,7 +52,7 @@ dx = float(L / N)
 
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
-hdf5file = HDF5Writer(comm, dt, N, params, float)
+hdf5file = HDF5Writer(comm, dt, N, parameters, float)
 if make_profile: profiler = cProfile.Profile()
 
 # Import decomposed mesh, wavenumber mesh and FFT routines with either slab or pencil decomposition
@@ -138,7 +135,6 @@ def ComputeRHS(dU, rk):
     
     # Dealias the nonlinear convection
     dU *= dealias
-    #dU *= 0
     
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
@@ -147,14 +143,11 @@ def ComputeRHS(dU, rk):
     dU -= P_hat*K
     
     # Subtract contribution from diffusion
-    dU -= nu*K2*U_hat
+    dU -= nuK2*U_hat
     
     return dU
 
-# Taylor-Green initialization
-U[0] = sin(X[0])*cos(X[1])*cos(X[2])
-U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
-U[2] = 0 
+U = initialize(**vars())
 
 # Transform initial data
 for i in range(3):
@@ -174,44 +167,31 @@ if rank == 0: k = []; w = []
 tic = t0 = time.time()
 while t < T-1e-8:
     t += dt; tstep += 1
-    if temporal == "RK4":
+    if integrator == "RK4":
         U_hat1[:] = U_hat0[:] = U_hat
         for rk in range(4):
             dU = ComputeRHS(dU, rk)
-            #dU = project(dU)
             if rk < 3:
-                #U_hat[:] = U_hat0 + b[rk]*dU
-                U_hat[:] = U_hat0;U_hat += b[rk]*dU # Faster
+                U_hat[:] = U_hat0;U_hat += b[rk]*dU
             U_hat1 += a[rk]*dU
         U_hat[:] = U_hat1
-        #U_hat = project(U_hat)
         
-    elif temporal == "ForwardEuler" or tstep == 1:  
+    elif integrator == "ForwardEuler" or tstep == 1:  
         dU = ComputeRHS(dU, 0)        
         U_hat += dU*dt
-        if temporal == "AB2":
-            U_hat0[:] = dU*dt
+        if integrator == "AB2":
+            U_hat0[:] = dU; U_hat0 *= dt
         
     else:
         dU = ComputeRHS(dU, 0)
         U_hat[:] += (1.5*dU*dt - 0.5*U_hat0)
-        U_hat0[:] = dU*dt
+        U_hat0[:] = dU; U_hat0 *= dt
 
     for i in range(3):
         U[i] = ifftn_mpi(U_hat[i], U[i])
-        
-    if tstep % params['write_result'] == 0 or tstep % params['write_yz_slice'][1] == 0:
-        P = ifftn_mpi(P_hat*1j, P)
-        hdf5file.write(U, P, tstep)
-
-    if tstep % compute_energy == 0:
-        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx*dx/L**3/2) # Compute energy with double precision
-        ww = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx*dx*dx/L**3/2)
-        if rank == 0:
-            k.append(kk)
-            w.append(ww)
-            print t, float(kk), float(ww)
-            
+                    
+    update(**vars())
+    
     tt = time.time()-t0
     t0 = time.time()
     if tstep > 1:
@@ -233,14 +213,7 @@ slow = (comm.reduce(fastest_time, op=MPI.MAX, root=0),
 if rank == 0:
     print "Time = ", toc
     print "Fastest = ", fast
-    print "Slowest = ", slow
-
-    #figure()
-    #k = array(k)
-    #dkdt = (k[1:]-k[:-1])/dt
-    #plot(-dkdt)
-    #show()
-    
+    print "Slowest = ", slow    
 if make_profile:
     results = create_profile(**vars())
 
@@ -248,3 +221,4 @@ if mem_profile: mem("End")
     
 hdf5file.generate_xdmf()  
 hdf5file.close()
+finalize(**vars())

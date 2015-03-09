@@ -8,7 +8,7 @@ from wrappyfftw import *
 #__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
 def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgrid,
-          sum, where, num_processes, rank, convection, communication, **kwargs):
+          sum, where, num_processes, rank, convection, communication, nu, **kwargs):
     
     if not num_processes in [2**i for i in range(M+1)]:
         raise IOError("Number of cpus must be in ", [2**i for i in range(M+1)])
@@ -45,7 +45,7 @@ def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgr
     # work arrays (Not required by all convection methods)
     if convection in ('Standard', 'Skewed'):
         U_tmp = empty((3, Np, N, N), dtype=float)
-    if convection in ('Divergence', 'Skewed'):
+    if convection in ('Divergence', 'Skewed', 'Vortex'):
         F_tmp   = empty((3, N, Np, Nf), dtype=complex)
     curl    = empty((3, Np, N, N), dtype=float)    
 
@@ -55,8 +55,9 @@ def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgr
     kx = fftfreq(N, 1./N).astype(int)
     kz = kx[:Nf].copy(); kz[-1] *= -1
     K = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
-    K2 = sum(K*K, 0, dtype=int)
+    K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+    K2 *= nu; nuK2= K2
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)

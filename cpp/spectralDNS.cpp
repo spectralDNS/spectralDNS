@@ -321,10 +321,10 @@ int main( int argc, char *argv[] )
   fftw_destroy_plan(irfftn);
   vs_in[0] = fastest_time;
   vs_in[1] = slowest_time;
-  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::FLOAT, MPI::MIN, 0);
+  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::DOUBLE, MPI::MIN, 0);
   if (rank==0)
       std::cout << "Fastest = " << vs_out[0] << ", " << vs_out[1] << std::endl; 
-  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::FLOAT, MPI::MAX, 0);
+  MPI::COMM_WORLD.Reduce(vs_in.data(), vs_out.data(), 2, MPI::DOUBLE, MPI::MAX, 0);
   if (rank==0)
       std::cout << "Slowest = " << vs_out[0] << ", " << vs_out[1] << std::endl; 
   

@@ -3,26 +3,23 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from numpy import *
-from pylab import *
-from mpi4py import MPI
-import time
-from mpi.wrappyfftw import *
+from MPI_knee import mpi_import, MPI
+with mpi_import():
+    from numpy import *
+    from pylab import *
+    from mpi4py import MPI
+    import time
+    from mpi.wrappyfftw import *
+    from utilities.commandline import *
 
-from commandline import *
-
-params = {
-    'M': 6,
-    'temporal': 'RK4',
-    'plot_result': 10,         # Show an image every..
-    'nu': 0.001,
-    'dt': 0.005,
-    'T': 50.0
-}
+# Set up problem parameters using first hard-conded parameters, then possibly
+# overloaded with commandline arguments
 commandline_kwargs = parse_command_line(sys.argv[1:])
-params.update(commandline_kwargs)
-assert params['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
-vars().update(params)
+with mpi_import():
+    exec("from problems.TwoD.{} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
+parameters.update(commandline_kwargs)
+assert parameters['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
+vars().update(parameters)
 
 # Set the size of the doubly periodic box N**2
 N = 2**M
@@ -162,16 +159,7 @@ def ComputeRHS(dU, rk):
     # Add contribution from diffusion
     dU[:] -= nu*K2*U_hat
 
-# Taylor-Green initialization
-U[0] = sin(X[0])*cos(X[1])
-U[1] =-cos(X[0])*sin(X[1])
-
-# Initialize two vortices
-#w = exp(-((X[0]-pi)**2+(X[1]-pi+pi/4)**2)/(0.2))+exp(-((X[0]-pi)**2+(X[1]-pi-pi/4)**2)/(0.2))-0.5*exp(-((X[0]-pi-pi/4)**2+(X[1]-pi-pi/4)**2)/(0.4))
-#w_hat = U_hat[0].copy()
-#w_hat = rfft2_mpi(w, w_hat)
-#U[0] = irfft2_mpi(1j*K_over_K2[1]*w_hat, U[0])
-#U[1] = irfft2_mpi(-1j*K_over_K2[0]*w_hat, U[1])
+U = initialize(**vars())
 
 # Transform initial data
 U_hat[0] = rfft2_mpi(U[0], U_hat[0])
@@ -180,17 +168,18 @@ U_hat[1] = rfft2_mpi(U[1], U_hat[1])
 # Make it divergence free in case it is not
 project(U_hat)
 
-# initialize plot and list k for storing energy
-im = plt.imshow(zeros((N, N)))
-plt.colorbar(im)
-plt.draw()
-
 tic = time.time()
 t = 0.0
 tstep = 0
 
+# initialize plot
+if plot_result > 0:
+    im = plt.imshow(zeros((N, N)))
+    plt.colorbar(im)
+    plt.draw()
+
 # RK4 loop in time
-t0 = time.time()
+t0 = array([time.time()])
 while t < T:
     t += dt; tstep += 1
 
@@ -218,27 +207,15 @@ while t < T:
     for i in range(2): 
         U[i] = irfft2_mpi(U_hat[i], U[i])
 
-    # From here on it's only postprocessing
-    if tstep % plot_result == 0:
+    update(**vars())
+    
+    if tstep % plot_result == 0 and plot_result > 0:
         curl = irfft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         im.set_data(curl[:, :])
         im.autoscale()
         plt.pause(1e-6)
-
-    kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx/L**2/2) # Compute energy with double precision
-    if rank == 0:
-        print tstep, time.time()-t0, kk
-    t0 = time.time()
-
+    
 if rank == 0:
-    print "Time = ", time.time()-tic
-#plt.figure()
-#plt.quiver(X[0,::2,::2], X[1,::2,::2], U[0,::2,::2], U[1,::2,::2], pivot='mid', scale=2)
-#plt.draw();plt.show()
+    print "Total computing time = ", time.time()-tic
 
-# Check accuracy. Only for Taylor Green
-u0 = sin(X[0])*cos(X[1])*exp(-2.*nu*t)
-u1 =-sin(X[1])*cos(X[0])*exp(-2.*nu*t)
-k1 = comm.reduce(sum(u0*u0+u1*u1)*dx*dx/L**2/2) # Compute energy with double precision)
-if rank==0:
-    print "Energy exact, numeric  = ", k1, kk, k1-kk
+regression_test(**vars())
