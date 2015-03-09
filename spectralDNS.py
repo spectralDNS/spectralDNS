@@ -20,8 +20,7 @@ if comm.Get_rank()==0:
 commandline_kwargs = parse_command_line(sys.argv[1:])
 
 # Import parameters and problem specific routines
-with mpi_import():
-    exec("from problems.ThreeD.{} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
+exec("from problems.ThreeD.{} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
 
 parameters.update(commandline_kwargs)
 check_parameters(parameters)
