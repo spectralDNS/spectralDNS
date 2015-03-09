@@ -3,7 +3,6 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-<<<<<<< .merge_file_xm3FVX
 import time
 t0 = time.time()
 import sys, cProfile
@@ -11,16 +10,6 @@ from mpi4py import MPI
 from numpy import *
 from h5io import *
 from utilities import *
-=======
-from MPI_knee import mpi_import, MPI
-with mpi_import():
-    import time
-    t0 = time.time()
-    import sys, cProfile
-    from h5io import *
-    from numpy import *
-    from utilities import *
->>>>>>> .merge_file_9iQHuZ
 
 comm = MPI.COMM_WORLD
 comm.barrier()
