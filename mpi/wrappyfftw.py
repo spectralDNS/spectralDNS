@@ -14,11 +14,11 @@ try:
     import pyfftw
     nzeros = zeros
     nthreads = 1
-    def empty(N, dtype=float, bytes=16):
-        return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype)
+    def empty(N, dtype=float, bytes=16, order='C'):
+        return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype, order=order)
 
-    def zeros(N, dtype=float, bytes=16):
-        return pyfftw.n_byte_align(nzeros(N, dtype=dtype), bytes)
+    def zeros(N, dtype=float, bytes=16, order='C'):
+        return pyfftw.n_byte_align(nzeros(N, dtype=dtype, order=order), bytes)
     
     ## Monkey patches for fft
     #ifft = pyfftw.interfaces.numpy_fft.ifft

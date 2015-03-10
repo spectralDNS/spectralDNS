@@ -57,7 +57,7 @@ def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgr
     K = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
-    K2 *= nu; nuK2= K2
+    #K2 *= nu; nuK2= K2
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
