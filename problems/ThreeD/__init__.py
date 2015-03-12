@@ -14,7 +14,8 @@ parameters = {
     'nu': 0.000625,             # Viscosity
     'dt': 0.01,                 # Time step
     'T': 0.1,                   # End time
-    'precision': "double"       # single or double precision
+    'precision': "double",      # single or double precision
+    'useweave': False           # Use weave optimized code
 }
 
 def check_parameters(par):

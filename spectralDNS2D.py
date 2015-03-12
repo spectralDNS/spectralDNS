@@ -13,8 +13,7 @@ from utilities.commandline import *
 # Set up problem parameters using first hard-conded parameters, then possibly
 # overloaded with commandline arguments
 commandline_kwargs = parse_command_line(sys.argv[1:])
-#exec("from problems.TwoD.{} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
-from problems.TwoD.TaylorGreen import *
+exec("from problems.TwoD.{0} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
 parameters.update(commandline_kwargs)
 assert parameters['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
 try:
