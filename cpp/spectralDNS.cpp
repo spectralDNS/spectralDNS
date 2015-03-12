@@ -31,7 +31,7 @@ int main( int argc, char *argv[] )
   nu = 0.000625;
   T = 0.1;
   dt = 0.01;
-  M = 7;  
+  M = 6;  
   if ( argc > 1 ) {
     M = atoi( argv[1] );
   }

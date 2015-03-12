@@ -43,7 +43,7 @@ def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgr
     dU      = empty((3, N, Np, Nf), dtype=complex)
 
     # work arrays (Not required by all convection methods)
-    if convection in ('Standard', 'Skewed'):
+    if convection in ('Standard', 'Skewed', 'Vortex'):
         U_tmp = empty((3, Np, N, N), dtype=float)
     if convection in ('Divergence', 'Skewed', 'Vortex'):
         F_tmp   = empty((3, N, Np, Nf), dtype=complex)
@@ -100,7 +100,7 @@ def ifftn_mpi(fu, u):
     # Do last two directions
     u[:] = irfft2(Uc_hatT, axes=(1,2))
     return u
-    
+  
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """

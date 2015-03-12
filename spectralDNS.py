@@ -22,7 +22,7 @@ commandline_kwargs = parse_command_line(sys.argv[1:])
 
 # Import parameters and problem specific routines
 with mpi_import():
-    exec("from problems.ThreeD.{} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
+    exec("from problems.ThreeD.{0} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
 
 parameters.update(commandline_kwargs)
 check_parameters(parameters)
@@ -47,7 +47,7 @@ if make_profile: profiler = cProfile.Profile()
 
 # Import decomposed mesh, wavenumber mesh and FFT routines with either slab or pencil decomposition
 with mpi_import():
-    exec("from mpi.{} import *".format(decomposition))
+    exec("from mpi.{0} import *".format(decomposition))
 vars().update(setup(**vars()))
 
 if mem_profile: mem("Arrays")
@@ -86,16 +86,28 @@ def divergenceConvection(c, add=False):
 
 def Cross(a, b, c):
     """c_k = F_k(a x b)"""
-    c[0] = fftn_mpi(a[1]*b[2]-a[2]*b[1], c[0])
-    c[1] = fftn_mpi(a[2]*b[0]-a[0]*b[2], c[1])
-    c[2] = fftn_mpi(a[0]*b[1]-a[1]*b[0], c[2])
+    if useweave:
+        weave_cross(a, b, U_tmp)
+        c[0] = fftn_mpi(U_tmp[0], c[0])
+        c[1] = fftn_mpi(U_tmp[1], c[1])
+        c[2] = fftn_mpi(U_tmp[2], c[2])
+    else:
+        c[0] = fftn_mpi(a[1]*b[2]-a[2]*b[1], c[0])
+        c[1] = fftn_mpi(a[2]*b[0]-a[0]*b[2], c[1])
+        c[2] = fftn_mpi(a[0]*b[1]-a[1]*b[0], c[2])
     return c
 
 def Curl(a, c):
     """c = F_inv(curl(a))"""
-    c[2] = ifftn_mpi(1j*(K[0]*a[1]-K[1]*a[0]), c[2])
-    c[1] = ifftn_mpi(1j*(K[2]*a[0]-K[0]*a[2]), c[1])
-    c[0] = ifftn_mpi(1j*(K[1]*a[2]-K[2]*a[1]), c[0])
+    if useweave:
+        weave_crossi(a, K, F_tmp)
+        c[2] = ifftn_mpi(F_tmp[2], c[2])
+        c[1] = ifftn_mpi(F_tmp[1], c[1])
+        c[0] = ifftn_mpi(F_tmp[0], c[0])
+    else:
+        c[2] = ifftn_mpi(1j*(K[0]*a[1]-K[1]*a[0]), c[2])
+        c[1] = ifftn_mpi(1j*(K[2]*a[0]-K[0]*a[2]), c[1])
+        c[0] = ifftn_mpi(1j*(K[1]*a[2]-K[2]*a[1]), c[0])
     return c
 
 def Div(a, c):
@@ -103,7 +115,6 @@ def Div(a, c):
     c = ifftn_mpi(1j*(sum(KX*a, 0), c))
     return c
         
-#@profile
 def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U
         for i in range(3):
@@ -125,7 +136,7 @@ def ComputeRHS(dU, rk):
         curl[:] = Curl(U_hat, curl)
         dU = Cross(U, curl, dU)
     
-    if weave_rhs:
+    if useweave:
         dU = weave_rhs(dU, nu, P_hat, U_hat, K2, K, K_over_K2, dealias)
     
     else:

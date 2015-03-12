@@ -16,7 +16,7 @@ with mpi_import():
 # overloaded with commandline arguments
 commandline_kwargs = parse_command_line(sys.argv[1:])
 with mpi_import():
-    exec("from problems.TwoD.{} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
+    exec("from problems.TwoD.{0} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
 parameters.update(commandline_kwargs)
 assert parameters['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
 vars().update(parameters)
