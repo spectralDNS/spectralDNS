@@ -4,18 +4,24 @@ __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from numpy import *
-from pylab import *
 from mpi4py import MPI
 import time
+import sys
 from mpi.wrappyfftw import *
 from utilities.commandline import *
 
 # Set up problem parameters using first hard-conded parameters, then possibly
 # overloaded with commandline arguments
 commandline_kwargs = parse_command_line(sys.argv[1:])
-exec("from problems.TwoD.{} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
+#exec("from problems.TwoD.{} import *".format(commandline_kwargs.get('problem', 'TaylorGreen')))
+from problems.TwoD.TaylorGreen import *
 parameters.update(commandline_kwargs)
 assert parameters['temporal'] in ['RK4', 'ForwardEuler', 'AB2']
+try:
+    from pylab import *
+except:
+    parameters['plot_result'] = -1
+
 vars().update(parameters)
 
 # Set the size of the doubly periodic box N**2
