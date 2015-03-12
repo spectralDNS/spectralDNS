@@ -4,6 +4,10 @@ __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from ..ThreeD import *
+try:
+    from pylab import figure, plot, show
+except:
+   pass
     
 parameters.update(
     {
@@ -37,12 +41,8 @@ def update(comm, rank, tstep, write_result, write_yz_slice, P, P_hat, U, curl,
             w.append(ww)
             print t, float(kk), float(ww)
 
-def finalize(rank, array, dt, mpi_import, plot_dkdt, **soak):
+def finalize(rank, array, dt, plot_dkdt, **soak):
     global k
-    try:
-        from pylab import figure, plot, show
-    except:
-       plot_dkdt = False    
 
     if rank == 0 and plot_dkdt:
         figure()
