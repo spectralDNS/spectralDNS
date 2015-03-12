@@ -99,7 +99,8 @@ def Div(a, c):
     """c = F_inv(div(a))"""
     c = ifftn_mpi(1j*(sum(KX*a, 0), c))
     return c
-
+        
+#@profile
 def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U
         for i in range(3):
@@ -121,17 +122,21 @@ def ComputeRHS(dU, rk):
         curl[:] = Curl(U_hat, curl)
         dU = Cross(U, curl, dU)
     
-    # Dealias the nonlinear convection
-    dU *= dealias
+    if weave_rhs:
+        dU = weave_rhs(dU, nu, P_hat, U_hat, K2, K, K_over_K2, dealias)
     
-    # Compute pressure (To get actual pressure multiply by 1j)
-    P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
+    else:
+        # Dealias the nonlinear convection
+        dU *= dealias
         
-    # Subtract pressure gradient
-    dU -= P_hat*K
-    
-    # Subtract contribution from diffusion
-    dU -= nuK2*U_hat
+        # Compute pressure (To get actual pressure multiply by 1j)
+        P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
+            
+        # Subtract pressure gradient
+        dU -= P_hat*K
+        
+        # Subtract contribution from diffusion
+        dU -= nu*K2*U_hat
     
     return dU
 

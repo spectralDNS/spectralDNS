@@ -123,7 +123,7 @@ def irfft2_mpi(fu, u):
     if num_processes == 1:
         u[:] = irfft2(fu, axes=(0,1))
         return u
-        f   
+
     Uc_hat[:] = ifft(fu, axis=0)    
     U_sendr[:] = Uc_hat[:, :Np/2]
 
@@ -153,7 +153,7 @@ def ComputeRHS(dU, rk):
     # Dealias the nonlinear convection
     dU[:] *= dealias
 
-    # Compute pressure (To get actual pressure multiply by 1j/dt)
+    # Compute pressure (To get actual pressure multiply by 1j)
     P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
 
     # Add pressure gradient

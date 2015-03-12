@@ -11,6 +11,7 @@ parameters.update(
       'nu': 0.000625,             # Viscosity
       'dt': 0.01,                 # Time step
       'T': 0.1,                   # End time
+      'plot_dkdt': False
     }
 )
 
@@ -37,9 +38,9 @@ def update(comm, rank, tstep, write_result, write_yz_slice, P, P_hat, U, curl,
             w.append(ww)
             print t, float(kk), float(ww)
 
-def finalize(rank, array, dt, mpi_import, **soak):
+def finalize(rank, array, dt, mpi_import, plot_dkdt, **soak):
     global k
-    if rank == 0:
+    if rank == 0 and plot_dkdt:
         figure()
         k = array(k)
         dkdt = (k[1:]-k[:-1])/dt
