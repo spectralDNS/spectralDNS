@@ -119,25 +119,6 @@ for (int i=0;i<N1;i++){
                                   type_converters=converters.blitz)
     mod.add_function(fun3)
     mod.compile(extra_compile_args=['-O3', '-ffast-math'], verbose=2)
-
-import weave_single, weave_double
-def weaverhs(dU, U_hat, K2, K, P_hat, K_over_K2, dealias, nu, precision="double"):
-    if precision == "single":
-        weave_single.weaverhs(dU, U_hat, K2, K, P_hat, K_over_K2, dealias, nu)
-    else:
-        weave_double.weaverhs(dU, U_hat, K2, K, P_hat, K_over_K2, dealias, nu)
-        
-def weavecross(a, b, c, precision="double"):
-    if precision == "single":
-        weave_single.weavecross(a, b, c)
-    else:
-        weave_double.weavecross(a, b, c)
-        
-def weavecrossi(a, b, c, precision="double"):
-    if precision == "single":
-        weave_single.weavecrossi(a, b, c)
-    else:
-        weave_double.weavecrossi(a, b, c)
         
 if __name__=="__main__":
     weave_module(sys.argv[-1])
