@@ -3,11 +3,11 @@ __date__ = "2015-03-10"
 __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from scipy.weave import converters
+from scipy.weave import converters, ext_tools
 import scipy.weave.inline_tools as inline_tools
 import scipy.weave.c_spec as c_spec
  
-def weave_rhs(dU, nu, P_hat, U_hat, K2, K, K_over_K2, dealias):
+def weaverhs(dU, nu, P_hat, U_hat, K2, K, K_over_K2, dealias):
     """Compute most of righ hand side using optimized C++ code
     """
     code = """
@@ -36,7 +36,7 @@ for (int i=0;i<N1;i++){
       P_hat(i,j,k) = dU(0,i,j,k)*K_over_K2(0,i,j,k)+dU(1,i,j,k)*K_over_K2(1,i,j,k)+dU(2,i,j,k)*K_over_K2(2,i,j,k);
       dU(0,i,j,k) -= (P_hat(i,j,k)*k0 + U_hat(0,i,j,k)*z);
       dU(1,i,j,k) -= (P_hat(i,j,k)*k1 + U_hat(1,i,j,k)*z);
-      dU(2,i,j,k) -= (P_hat(i,j,k)*k2 + U_hat(2,i,j,k)*z);
+      dU(2,i,j,k) -= (P_hat(i,j,k)*k2 + U_hat(2,i,j,k)*z);  
     }
   }
 }
@@ -46,7 +46,7 @@ for (int i=0;i<N1;i++){
                  extra_compile_args=['-O3', '-ffast-math'])
     return dU
 
-def weave_cross(a, b, c):
+def weavecross(a, b, c):
     """Compute cross product of a and b 
     """
     numeric_type = c_spec.num_to_c_types[a.dtype.char]
@@ -72,7 +72,7 @@ for (int i=0;i<N1;i++){
                  type_converters=converters.blitz, verbose=2, auto_downcast=0,
                  extra_compile_args=['-O3', '-ffast-math'])
 
-def weave_crossi(a, b, c):
+def weavecrossi(a, b, c):
     """Compute cross product of a and b
     """
     numeric_type_a = c_spec.num_to_c_types[a.dtype.char]

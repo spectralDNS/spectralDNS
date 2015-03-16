@@ -17,7 +17,7 @@ parameters.update(
       'plot_dkdt': False
     }
 )
-    
+        
 def initialize(X, U, sin, cos, **soak):
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
