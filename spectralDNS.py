@@ -87,7 +87,7 @@ def divergenceConvection(c, add=False):
 def Cross(a, b, c):
     """c_k = F_k(a x b)"""
     if useweave:
-        weave_cross(a, b, U_tmp)
+        weavecross(a, b, U_tmp, precision)
         c[0] = fftn_mpi(U_tmp[0], c[0])
         c[1] = fftn_mpi(U_tmp[1], c[1])
         c[2] = fftn_mpi(U_tmp[2], c[2])
@@ -100,7 +100,7 @@ def Cross(a, b, c):
 def Curl(a, c):
     """c = F_inv(curl(a))"""
     if useweave:
-        weave_crossi(a, K, F_tmp)
+        weavecrossi(a, K, F_tmp, precision)
         c[2] = ifftn_mpi(F_tmp[2], c[2])
         c[1] = ifftn_mpi(F_tmp[1], c[1])
         c[0] = ifftn_mpi(F_tmp[0], c[0])
@@ -137,7 +137,7 @@ def ComputeRHS(dU, rk):
         dU = Cross(U, curl, dU)
     
     if useweave:
-        dU = weave_rhs(dU, nu, P_hat, U_hat, K2, K, K_over_K2, dealias)
+        weaverhs(dU, U_hat, K2, K, P_hat, K_over_K2, dealias, nu, precision)
     
     else:
         # Dealias the nonlinear convection

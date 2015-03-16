@@ -14,7 +14,7 @@ except ImportError:
 nu = 0.000625
 T = 0.1
 dt = 0.01
-M = 4
+M = 6
 N = 2**M
 L = 2 * pi
 dx = L / N
