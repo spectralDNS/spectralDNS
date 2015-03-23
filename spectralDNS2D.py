@@ -9,8 +9,8 @@ with mpi_import():
     from pylab import *
     from mpi4py import MPI
     import time
-    from mpi.wrappyfftw import *
-    from utilities.commandline import *
+    from src.mpi.wrappyfftw import *
+    from src.utilities.commandline import *
 
 # Set up problem parameters using first hard-conded parameters, then possibly
 # overloaded with commandline arguments
