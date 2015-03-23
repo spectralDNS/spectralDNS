@@ -62,7 +62,7 @@ def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgr
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
     dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*
-                    (abs(K[2]) < kmax), dtype=bool)
+                    (abs(K[2]) < kmax), dtype=int)
     del kwargs
     return locals() # Lazy (need only return what is needed)
 
@@ -100,7 +100,7 @@ def ifftn_mpi(fu, u):
     # Do last two directions
     u[:] = irfft2(Uc_hatT, axes=(1,2))
     return u
-  
+
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """

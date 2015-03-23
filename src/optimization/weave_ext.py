@@ -15,6 +15,7 @@ def weave_module(precision):
     float, complex = {"single": (float32, complex64),
                       "double": (float64, complex128)}[precision]
     
+    # Just declare some variables with correct type. The size is arbitrary at this point
     nu = float(1.0)
     dU = empty((3, 3, 3, 3), dtype=complex)
     U_hat = empty((3, 3, 3, 3), dtype=complex)
@@ -22,15 +23,14 @@ def weave_module(precision):
     K = empty((3, 3, 3, 3), dtype=int)
     K2 = empty((3, 3, 3), dtype=float)
     K_over_K2 = empty((3, 3, 3, 3), dtype=float)
-    dealias = empty((3, 3, 3), dtype=bool)
+    dealias = empty((3, 3, 3), dtype=int)
  
-    numeric_type = c_spec.num_to_c_types[K2.dtype.char]
-    code = """
-%s n = nu;
+    numeric_type = c_spec.num_to_c_types[K2.dtype.char]    
+    code0 = """
 int N1 = NdU[1];
 int N2 = NdU[2];
 int N3 = NdU[3];
-for (int i=0;i<N1;i++){
+for (int i=0;i<N1;i++){ 
   for (int j=0;j<N2;j++){
     for (int k=0;k<N3;k++)
     {  
@@ -39,7 +39,19 @@ for (int i=0;i<N1;i++){
       dU(2,i,j,k) *= dealias(i,j,k);
     }
   }
-}
+}"""
+    mod = ext_tools.ext_module("weave_"+precision)
+    
+    fun0 = ext_tools.ext_function("weavedealias", code0, ['dU', 'dealias'],
+                                 type_converters=converters.blitz)
+    
+    mod.add_function(fun0)
+        
+    code = """
+%s n = nu;
+int N1 = NdU[1];
+int N2 = NdU[2];
+int N3 = NdU[3];
 for (int i=0;i<N1;i++){
   for (int j=0;j<N2;j++){
     for (int k=0;k<N3;k++)
@@ -56,9 +68,8 @@ for (int i=0;i<N1;i++){
   }
 }
 """%(numeric_type, numeric_type, numeric_type, numeric_type, numeric_type)
-
-    mod = ext_tools.ext_module("weave_"+precision)
-    fun = ext_tools.ext_function("weaverhs", code, ['dU', 'U_hat', 'K2', 'K', 'P_hat', 'K_over_K2', 'dealias', 'nu'],
+    
+    fun = ext_tools.ext_function("weaverhs", code, ['dU', 'U_hat', 'K2', 'K', 'P_hat', 'K_over_K2', 'nu'],
                                  type_converters=converters.blitz)
     mod.add_function(fun)
     
@@ -69,7 +80,7 @@ for (int i=0;i<N1;i++){
     code = """
 int N1 = Na[1];
 int N2 = Na[2];
-int N3 = Na[3];
+int N3 = Na[3];  
 %s a0, a1, a2, b0, b1, b2;
 for (int i=0;i<N1;i++){
   for (int j=0;j<N2;j++){
@@ -88,8 +99,8 @@ for (int i=0;i<N1;i++){
                                   type_converters=converters.blitz)
     mod.add_function(fun2)
     
-    a = empty((3, 3, 3, 3), dtype=complex)
-    b = empty((3, 3, 3, 3), dtype=int)  
+    a = empty((3, 3, 3, 3), dtype=int)
+    b = empty((3, 3, 3, 3), dtype=complex)  
     c = empty((3, 3, 3, 3), dtype=complex)
 
     numeric_type_a = c_spec.num_to_c_types[a.dtype.char]
@@ -107,19 +118,20 @@ for (int i=0;i<N1;i++){
       a0 = a(0,i,j,k);a1 = a(1,i,j,k);a2 = a(2,i,j,k);
       b0 = b(0,i,j,k);b1 = b(1,i,j,k);b2 = b(2,i,j,k);
 
-      c(0,i,j,k) = %s (a1.imag()*b2 - a2.imag()*b1, -(a1.real()*b2 - a2.real()*b1));
-      c(1,i,j,k) = %s (a2.imag()*b0 - a0.imag()*b2, -(a2.real()*b0 - a0.real()*b2));
-      c(2,i,j,k) = %s (a0.imag()*b1 - a1.imag()*b0, -(a0.real()*b1 - a1.real()*b0));
+      c(0,i,j,k) = %s (-(a1*b2.imag() - a2*b1.imag()), a1*b2.real() - a2*b1.real());
+      c(1,i,j,k) = %s (-(a2*b0.imag() - a0*b2.imag()), a2*b0.real() - a0*b2.real());
+      c(2,i,j,k) = %s (-(a0*b1.imag() - a1*b0.imag()), a0*b1.real() - a1*b0.real());
       
     }
   }
 }
-""" %(numeric_type_a, numeric_type_b, numeric_type_a, numeric_type_a,numeric_type_a)
+""" %(numeric_type_a, numeric_type_b, numeric_type_b, numeric_type_b,numeric_type_b)
     fun3 = ext_tools.ext_function("weavecrossi", code, ['a', 'b', 'c'],
                                   type_converters=converters.blitz)
     mod.add_function(fun3)
-    mod.compile(extra_compile_args=['-O3', '-ffast-math'], verbose=2)
+    mod.compile(extra_compile_args=['-Ofast'], verbose=2)
+    return mod
         
 if __name__=="__main__":
-    weave_module(sys.argv[-1])
+    mod = weave_module(sys.argv[-1])
     

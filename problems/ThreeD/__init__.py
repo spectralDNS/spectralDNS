@@ -15,7 +15,7 @@ parameters = {
     'dt': 0.01,                 # Time step
     'T': 0.1,                   # End time
     'precision': "double",      # single or double precision
-    'useweave': False           # Use weave optimized code
+    'optimization': None        # Choose optimization None, weave, cython
 }
 
 def check_parameters(par):
@@ -23,3 +23,4 @@ def check_parameters(par):
     assert par['integrator'] in ('RK4', 'ForwardEuler', 'AB2')
     assert par['precision'] in ('single', 'double')
     assert par['communication'] in ('alltoall', 'sendrecv_replace')
+    assert par['optimization'] in (None, "weave", "cython")
