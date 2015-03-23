@@ -8,8 +8,7 @@ t0 = time.time()
 import sys, cProfile
 from mpi4py import MPI
 from numpy import *
-from h5io import *
-from utilities import *
+from src import *
 
 comm = MPI.COMM_WORLD
 comm.barrier()
@@ -81,38 +80,84 @@ def divergenceConvection(c, add=False):
     c[2] += (1j*K[1]*F_tmp[1] + 1j*K[2]*F_tmp[2])
     return c
 
+def cross1(a, b, c):
+    """Regular c = a x b"""
+    #c[:] = cross(a, b, axisa=0, axisb=0, axisc=0) # Very slow
+    c[0] = a[1]*b[2]-a[2]*b[1]
+    c[1] = a[2]*b[0]-a[0]*b[2]
+    c[2] = a[0]*b[1]-a[1]*b[0]
+    return c
+    
+def cross2(a, b, c):
+    """ c = 1j*(a x b)"""
+    cross1(a, b, c)
+    c *= 1j
+    return c
+    
+# Overload with possible optimizations
+if optimization == "weave":
+    cross2 = weavecrossi
+    cross1 = weavecross
+    
+elif optimization == "cython":
+    cross2 = cythoncrossi
+    cross1 = cythoncross
+    
+#@profile
 def Cross(a, b, c):
     """c_k = F_k(a x b)"""
-    if useweave:
-        weavecross(a, b, U_tmp, precision)
-        c[0] = fftn_mpi(U_tmp[0], c[0])
-        c[1] = fftn_mpi(U_tmp[1], c[1])
-        c[2] = fftn_mpi(U_tmp[2], c[2])
-    else:
-        c[0] = fftn_mpi(a[1]*b[2]-a[2]*b[1], c[0])
-        c[1] = fftn_mpi(a[2]*b[0]-a[0]*b[2], c[1])
-        c[2] = fftn_mpi(a[0]*b[1]-a[1]*b[0], c[2])
+    U_tmp[:] = cross1(a, b, U_tmp)
+    c[0] = fftn_mpi(U_tmp[0], c[0])
+    c[1] = fftn_mpi(U_tmp[1], c[1])
+    c[2] = fftn_mpi(U_tmp[2], c[2])
     return c
 
+#@profile
 def Curl(a, c):
     """c = F_inv(curl(a))"""
-    if useweave:
-        weavecrossi(a, K, F_tmp, precision)
-        c[2] = ifftn_mpi(F_tmp[2], c[2])
-        c[1] = ifftn_mpi(F_tmp[1], c[1])
-        c[0] = ifftn_mpi(F_tmp[0], c[0])
-    else:
-        c[2] = ifftn_mpi(1j*(K[0]*a[1]-K[1]*a[0]), c[2])
-        c[1] = ifftn_mpi(1j*(K[2]*a[0]-K[0]*a[2]), c[1])
-        c[0] = ifftn_mpi(1j*(K[1]*a[2]-K[2]*a[1]), c[0])
+    F_tmp[:] = cross2(K, a, F_tmp)
+    c[0] = ifftn_mpi(F_tmp[0], c[0])
+    c[1] = ifftn_mpi(F_tmp[1], c[1])
+    c[2] = ifftn_mpi(F_tmp[2], c[2])    
     return c
 
 def Div(a, c):
     """c = F_inv(div(a))"""
     c = ifftn_mpi(1j*(sum(KX*a, 0), c))
     return c
+
+def dealias_rhs(dU, dealias):
+    """Dealias the nonlinear convection"""
+    dU *= dealias
+    return dU
+
+def add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu):
+    """Add contributions from pressure and diffusion to the rhs"""
+    
+    # Compute pressure (To get actual pressure multiply by 1j)
+    P_hat = sum(dU*K_over_K2, 0, out=P_hat)
         
+    # Subtract pressure gradient
+    dU -= P_hat*K
+    
+    # Subtract contribution from diffusion
+    dU -= nu*K2*U_hat
+    
+    return dU
+
+# Overload with possible optimizations
+if optimization == "weave":        
+    add_pressure_diffusion = weaverhs
+    dealias_rhs = weavedealias
+    
+elif optimization == "cython":
+    add_pressure_diffusion = cythonrhs
+    dealias_rhs = cythondealias
+    
+#@profile    
 def ComputeRHS(dU, rk):
+    """Compute and return entire rhs contribution"""
+    
     if rk > 0: # For rk=0 the correct values are already in U
         for i in range(3):
             U[i] = ifftn_mpi(U_hat[i], U[i])
@@ -133,22 +178,10 @@ def ComputeRHS(dU, rk):
         curl[:] = Curl(U_hat, curl)
         dU = Cross(U, curl, dU)
     
-    if useweave:
-        weaverhs(dU, U_hat, K2, K, P_hat, K_over_K2, dealias, nu, precision)
+    dU = dealias_rhs(dU, dealias)
     
-    else:
-        # Dealias the nonlinear convection
-        dU *= dealias
+    dU = add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu)
         
-        # Compute pressure (To get actual pressure multiply by 1j)
-        P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
-            
-        # Subtract pressure gradient
-        dU -= P_hat*K
-        
-        # Subtract contribution from diffusion
-        dU -= nu*K2*U_hat
-    
     return dU
 
 U = initialize(**vars())
@@ -159,12 +192,11 @@ for i in range(3):
 
 if mem_profile: mem("After first FFT")
    
-# Set some timers
 t = 0.0
 tstep = 0
 fastest_time = 1e8
 slowest_time = 0.0
-# initialize k for storing energy
+# initialize k and w for storing energy and enstrophy
 if rank == 0: k = []; w = []
 
 # Forward equations in time
