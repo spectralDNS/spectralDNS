@@ -23,4 +23,4 @@ def check_parameters(par):
     assert par['integrator'] in ('RK4', 'ForwardEuler', 'AB2')
     assert par['precision'] in ('single', 'double')
     assert par['communication'] in ('alltoall', 'sendrecv_replace')
-    assert par['optimization'] in (None, "weave", "cython")
+    assert par['optimization'] in (None, "weave", "cython", "numexpr", "numba")

@@ -7,7 +7,7 @@ from wrappyfftw import *
 
 __all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
-def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
+def setup(comm, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid,
           sum, where, num_processes, rank, P1, arange, MPI, convection, 
           hdf5file, mgrid, **kwargs):
 
@@ -74,11 +74,8 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
     init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy)    
     
     # work arrays (Not required by all convection methods)
-    if convection in ('Standard', 'Skewed'):
-        U_tmp = empty((3, N1, N2, N), dtype=float)
-    if convection in ('Divergence', 'Skewed'):
-        F_tmp   = empty((3, N2, N, N1/2), dtype=complex)
-
+    U_tmp = empty((3, N1, N2, N), dtype=float)
+    F_tmp   = empty((3, N2, N, N1/2), dtype=complex)
     curl = empty((3, N1, N2, N), dtype=float)
 
     # Set wavenumbers in grid
@@ -91,7 +88,7 @@ def setup(comm, float, complex, mpitype, linspace, N, L, array, meshgrid,
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
-    dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*(abs(K[2]) < kmax), dtype=bool)
+    dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*(abs(K[2]) < kmax), dtype=uint8)
     del kwargs
     return locals()
 
@@ -125,7 +122,7 @@ def ifftn_mpi(fu, u):
             
     # Do fft for y-direction
     Uc_hat_z[:, :, -1] = 0
-    u[:] = irfft(Uc_hat_z, axis=2)
+    u = irfft(Uc_hat_z, axis=2)
     return u
         
 def fftn_mpi(u, fu):
@@ -148,5 +145,5 @@ def fftn_mpi(u, fu):
         Uc_hat_y[:, i*N2:(i+1)*N2] = Uc_hat_xr[i*N2:(i+1)*N2]
                                    
     # Do fft for last direction 
-    fu[:] = fft(Uc_hat_y, axis=1)
+    fu = fft(Uc_hat_y, axis=1)
     return fu

@@ -41,7 +41,8 @@ dx = float(L / N)
 
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
-hdf5file = HDF5Writer(comm, dt, N, parameters, float)
+#hdf5file = HDF5Writer(comm, dt, N, parameters, float)
+hdf5file = None
 if make_profile: profiler = cProfile.Profile()
 
 # Import decomposed mesh, wavenumber mesh and FFT routines with either slab or pencil decomposition
@@ -96,38 +97,6 @@ def cross2(a, b, c):
     cross1(a, b, c)
     c *= 1j
     return c
-    
-# Overload with possible optimizations
-if optimization == "weave":
-    cross2 = weavecrossi
-    cross1 = weavecross
-    
-elif optimization == "cython":
-    cross2 = cythoncrossi
-    cross1 = cythoncross
-    
-#@profile
-def Cross(a, b, c):
-    """c_k = F_k(a x b)"""
-    U_tmp[:] = cross1(a, b, U_tmp)
-    c[0] = fftn_mpi(U_tmp[0], c[0])
-    c[1] = fftn_mpi(U_tmp[1], c[1])
-    c[2] = fftn_mpi(U_tmp[2], c[2])
-    return c
-
-#@profile
-def Curl(a, c):
-    """c = F_inv(curl(a))"""
-    F_tmp[:] = cross2(K, a, F_tmp)
-    c[0] = ifftn_mpi(F_tmp[0], c[0])
-    c[1] = ifftn_mpi(F_tmp[1], c[1])
-    c[2] = ifftn_mpi(F_tmp[2], c[2])    
-    return c
-
-def Div(a, c):
-    """c = F_inv(div(a))"""
-    c = ifftn_mpi(1j*(sum(KX*a, 0), c))
-    return c
 
 def dealias_rhs(dU, dealias):
     """Dealias the nonlinear convection"""
@@ -149,14 +118,37 @@ def add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu):
     return dU
 
 # Overload with possible optimizations
-if optimization == "weave":        
-    add_pressure_diffusion = weaverhs
-    dealias_rhs = weavedealias
+try:
+    for item in ["add_pressure_diffusion", "dealias_rhs", "cross1", "cross2"]:
+        exec("{0} = {1}_{0}".format(item, optimization))
+
+except:
+    if rank == 0 and not optimization is None:
+        print "Optimization with ", optimization, " not possible"
     
-elif optimization == "cython":
-    add_pressure_diffusion = cythonrhs
-    dealias_rhs = cythondealias
-    
+@profile
+def Cross(a, b, c):
+    """c_k = F_k(a x b)"""
+    U_tmp[:] = cross1(a, b, U_tmp)
+    c[0] = fftn_mpi(U_tmp[0], c[0])
+    c[1] = fftn_mpi(U_tmp[1], c[1])
+    c[2] = fftn_mpi(U_tmp[2], c[2])
+    return c
+
+#@profile
+def Curl(a, c):
+    """c = F_inv(curl(a))"""
+    F_tmp[:] = cross2(K, a, F_tmp)
+    c[0] = ifftn_mpi(F_tmp[0], c[0])
+    c[1] = ifftn_mpi(F_tmp[1], c[1])
+    c[2] = ifftn_mpi(F_tmp[2], c[2])    
+    return c
+
+def Div(a, c):
+    """c = F_inv(div(a))"""
+    c = ifftn_mpi(1j*(sum(KX*a, 0), c))
+    return c
+        
 #@profile    
 def ComputeRHS(dU, rk):
     """Compute and return entire rhs contribution"""
@@ -258,6 +250,6 @@ if make_profile:
 
 if mem_profile: mem("End")
     
-hdf5file.generate_xdmf()  
-hdf5file.close()
+#hdf5file.generate_xdmf()  
+#hdf5file.close()
 finalize(**vars())
