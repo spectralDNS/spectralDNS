@@ -128,7 +128,7 @@ for (int i=0;i<N1;i++){
     fun3 = ext_tools.ext_function("weave_cross2", code, ['a', 'b', 'c'],
                                   type_converters=converters.blitz)
     mod.add_function(fun3)
-    mod.compile(extra_compile_args=['-Ofast'], verbose=2)
+    mod.compile(extra_compile_args=['-O3'], verbose=2)
     return mod
         
 if __name__=="__main__":

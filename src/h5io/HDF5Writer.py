@@ -30,6 +30,7 @@ attribute2D = """
 
 try:
     import h5py
+    import copy
     class HDF5Writer(object):
     
         def __init__(self, comm, dt, N, params, dtype, filename="U.h5"):
@@ -126,7 +127,6 @@ try:
             
         def generate_xdmf(self):
             if self.comm.Get_rank() == 0:
-                import copy
                 xf3d = copy.copy(xdmffile)
                 timesteps = self.f["3D/U"].keys()
                 N = self.f.attrs["N"]

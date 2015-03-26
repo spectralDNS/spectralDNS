@@ -33,11 +33,11 @@ fd.close()
 
 ext = Extension("cython_single", ["cython_single.pyx"],
                 include_dirs = [get_include()],
-                extra_compile_args=["-Ofast"])
+                extra_compile_args=["-O3"])
 
 ext2 = Extension("cython_double", ["cython_double.pyx"],
                  include_dirs = [get_include()],
-                 extra_compile_args=["-Ofast"])  
+                 extra_compile_args=["-O3"])  
 
 setup(ext_modules=[ext, ext2],
       cmdclass = {'build_ext': build_ext})

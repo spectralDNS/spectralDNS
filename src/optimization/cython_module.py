@@ -21,8 +21,8 @@ def cython_dealias(np.ndarray[complex_t, ndim=4] du,
 
 def cython_add_pressure_diffusion(np.ndarray[complex_t, ndim=4] du,
               np.ndarray[complex_t, ndim=4] u_hat,
-              np.ndarray[int_t, ndim=3] ksq,
-              np.ndarray[int_t, ndim=4] kk,
+              np.ndarray[int, ndim=3] ksq,
+              np.ndarray[int, ndim=4] kk,
               np.ndarray[complex_t, ndim=3] p_hat,
               np.ndarray[real_t, ndim=4] k_over_k2,
               real_t nu):
@@ -59,7 +59,7 @@ def cython_cross1(np.ndarray[real_t, ndim=4] a,
                 c[1,i,j,k] = a2*b0 - a0*b2
                 c[2,i,j,k] = a0*b1 - a1*b0
 
-def cython_cross2(np.ndarray[int_t, ndim=4] a,
+def cython_cross2(np.ndarray[int, ndim=4] a,
                   np.ndarray[complex_t, ndim=4] b,
                   np.ndarray[complex_t, ndim=4] c):
     cdef unsigned int i, j, k

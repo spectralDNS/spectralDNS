@@ -41,7 +41,7 @@ hdf5file = HDF5Writer(comm, dt, N, parameters, float)
 if make_profile: profiler = cProfile.Profile()
 
 # Import decomposed mesh, wavenumber mesh and FFT routines with either slab or pencil decomposition
-exec("from mpi.{0} import *".format(decomposition))
+exec("from src.mpi.{0} import *".format(decomposition))
 vars().update(setup(**vars()))
 
 # RK4 parameters
@@ -118,7 +118,7 @@ except:
     if rank == 0 and not optimization is None:
         print "Optimization with ", optimization, " not possible"
     
-@profile
+#@profile
 def Cross(a, b, c):
     """c_k = F_k(a x b)"""
     U_tmp[:] = cross1(a, b, U_tmp)
@@ -238,6 +238,6 @@ if rank == 0:
 if make_profile:
     results = create_profile(**vars())
     
-hdf5file.generate_xdmf()  
+#hdf5file.generate_xdmf()  
 hdf5file.close()
 finalize(**vars())
