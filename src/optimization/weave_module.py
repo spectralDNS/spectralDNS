@@ -21,11 +21,11 @@ def weave_module(precision):
     U_hat = empty((3, 3, 3, 3), dtype=complex)
     P_hat = empty((3, 3, 3), dtype=complex)
     K = empty((3, 3, 3, 3), dtype=int)
-    K2 = empty((3, 3, 3), dtype=float)
+    K2 = empty((3, 3, 3), dtype=int)
     K_over_K2 = empty((3, 3, 3, 3), dtype=float)
-    dealias = empty((3, 3, 3), dtype=int)
+    dealias = empty((3, 3, 3), dtype=uint8)
  
-    numeric_type = c_spec.num_to_c_types[K2.dtype.char]    
+    numeric_type = c_spec.num_to_c_types[K_over_K2.dtype.char]    
     code0 = """
 int N1 = NdU[1];
 int N2 = NdU[2];
@@ -40,11 +40,9 @@ for (int i=0;i<N1;i++){
     }
   }
 }"""
-    mod = ext_tools.ext_module("weave_"+precision)
-    
-    fun0 = ext_tools.ext_function("weavedealias", code0, ['dU', 'dealias'],
-                                 type_converters=converters.blitz)
-    
+    mod = ext_tools.ext_module("weave_"+precision)    
+    fun0 = ext_tools.ext_function("weave_dealias", code0, ['dU', 'dealias'],
+                                 type_converters=converters.blitz)    
     mod.add_function(fun0)
         
     code = """
@@ -69,7 +67,8 @@ for (int i=0;i<N1;i++){
 }
 """%(numeric_type, numeric_type, numeric_type, numeric_type, numeric_type)
     
-    fun = ext_tools.ext_function("weaverhs", code, ['dU', 'U_hat', 'K2', 'K', 'P_hat', 'K_over_K2', 'nu'],
+    fun = ext_tools.ext_function("weave_add_pressure_diffusion", 
+                                 code, ['dU', 'U_hat', 'K2', 'K', 'P_hat', 'K_over_K2', 'nu'],
                                  type_converters=converters.blitz)
     mod.add_function(fun)
     
@@ -95,7 +94,7 @@ for (int i=0;i<N1;i++){
   }
 }
 """ %numeric_type
-    fun2 = ext_tools.ext_function("weavecross", code, ['a', 'b', 'c'],
+    fun2 = ext_tools.ext_function("weave_cross1", code, ['a', 'b', 'c'],
                                   type_converters=converters.blitz)
     mod.add_function(fun2)
     
@@ -126,7 +125,7 @@ for (int i=0;i<N1;i++){
   }
 }
 """ %(numeric_type_a, numeric_type_b, numeric_type_b, numeric_type_b,numeric_type_b)
-    fun3 = ext_tools.ext_function("weavecrossi", code, ['a', 'b', 'c'],
+    fun3 = ext_tools.ext_function("weave_cross2", code, ['a', 'b', 'c'],
                                   type_converters=converters.blitz)
     mod.add_function(fun3)
     mod.compile(extra_compile_args=['-Ofast'], verbose=2)

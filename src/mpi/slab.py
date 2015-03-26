@@ -7,7 +7,7 @@ from wrappyfftw import *
 
 #__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
-def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgrid,
+def setup(comm, M, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid, mgrid,
           sum, where, num_processes, rank, convection, communication, nu, **kwargs):
     
     if not num_processes in [2**i for i in range(M+1)]:
@@ -55,14 +55,14 @@ def setup(comm, M, float, complex, mpitype, linspace, N, L, array, meshgrid, mgr
     kx = fftfreq(N, 1./N).astype(int)
     kz = kx[:Nf].copy(); kz[-1] *= -1
     K = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
-    K2 = sum(K*K, 0, dtype=float)
+    K2 = sum(K*K, 0, dtype=int)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
     #K2 *= nu; nuK2= K2
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
     dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*
-                    (abs(K[2]) < kmax), dtype=int)
+                    (abs(K[2]) < kmax), dtype=uint8)
     del kwargs
     return locals() # Lazy (need only return what is needed)
 
@@ -73,13 +73,14 @@ def init_fft(N, Nf, Np, complex, num_processes, comm, communication, rank, mpity
     Uc_send = Uc_hat.reshape((num_processes, Np, Np, Nf))
     U_mpi   = empty((num_processes, Np, Np, Nf), dtype=complex)
     globals().update(locals())
-    
+
+#@profile    
 def ifftn_mpi(fu, u):
     """ifft in three directions using mpi.
     Need to do ifft in reversed order of fft
     """
     if num_processes == 1:
-        u[:] = irfftn(fu, axes=(0,1,2))
+        u = irfftn(fu, axes=(0,1,2))
         return u
     
     # Do first owned direction
@@ -88,6 +89,7 @@ def ifftn_mpi(fu, u):
     if communication == 'alltoall':
         # Communicate all values
         comm.Alltoall([Uc_hat, mpitype], [U_mpi, mpitype])
+        #transpose_Uc(Uc_hatT, U_mpi, num_processes, Np)
         for i in range(num_processes): 
             Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
     
@@ -98,20 +100,22 @@ def ifftn_mpi(fu, u):
             Uc_hatT[:, i*Np:(i+1)*Np] = Uc_send[i]
         
     # Do last two directions
-    u[:] = irfft2(Uc_hatT, axes=(1,2))
+    u = irfft2(Uc_hatT, axes=(1,2))
     return u
 
+#@profile
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """
     if num_processes == 1:
-        fu[:] = rfftn(u, axes=(0,1,2))
+        fu = rfftn(u, axes=(0,1,2))
         return fu
     
     if communication == 'alltoall':
         # Do 2 ffts in y-z directions on owned data
         Uc_hatT[:] = rfft2(u, axes=(1,2))
         # Transform data to align with x-direction  
+        #transpose_Umpi(Uc_hatT, U_mpi, num_processes, Np)
         for i in range(num_processes): 
             U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
             
@@ -129,5 +133,5 @@ def fftn_mpi(u, fu):
         fu_send[:] = fu_send.transpose(0,2,1,3)
                       
     # Do fft for last direction 
-    fu[:] = fft(fu, axis=0)
+    fu = fft(fu, axis=0)
     return fu
