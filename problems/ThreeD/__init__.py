@@ -4,7 +4,6 @@ parameters = {
     'communication': 'alltoall',# 'alltoall' or 'sendrecv_replace' (only for slab)
     'convection': 'Vortex',     # 'Standard', 'Divergence', 'Skewed', 'Vortex'
     'make_profile': 0,          # Enable cProfile profiler
-    'mem_profile': False,       # Check memory use
     'M': 5,                     # Mesh size
     'P1': 1,                    # Mesh decomposition in first direction (pencil P1*P2=num_processes)
     'integrator': 'RK4',        # Integrator ('RK4', 'ForwardEuler', 'AB2')

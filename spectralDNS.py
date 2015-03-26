@@ -27,8 +27,6 @@ parameters.update(commandline_kwargs)
 check_parameters(parameters)
 vars().update(parameters)
 
-if mem_profile: mem = MemoryUsage("Start (numpy/mpi4py++)", comm)
-
 float, complex, mpitype = {"single": (float32, complex64, MPI.F_FLOAT_COMPLEX),
                            "double": (float64, complex128, MPI.F_DOUBLE_COMPLEX)}[precision]
 
@@ -41,16 +39,13 @@ dx = float(L / N)
 
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
-#hdf5file = HDF5Writer(comm, dt, N, parameters, float)
-hdf5file = None
+hdf5file = HDF5Writer(comm, dt, N, parameters, float)
 if make_profile: profiler = cProfile.Profile()
 
 # Import decomposed mesh, wavenumber mesh and FFT routines with either slab or pencil decomposition
 with mpi_import():
     exec("from src.mpi.{0} import *".format(decomposition))
 vars().update(setup(**vars()))
-
-if mem_profile: mem("Arrays")
 
 # RK4 parameters
 a = array([1./6., 1./3., 1./3., 1./6.], dtype=float)*dt
@@ -185,8 +180,6 @@ U = initialize(**vars())
 for i in range(3):
    U_hat[i] = fftn_mpi(U[i], U_hat[i])
 
-if mem_profile: mem("After first FFT")
-   
 t = 0.0
 tstep = 0
 fastest_time = 1e8
@@ -247,9 +240,7 @@ if rank == 0:
     print "Slowest = ", slow    
 if make_profile:
     results = create_profile(**vars())
-
-if mem_profile: mem("End")
     
-#hdf5file.generate_xdmf()  
-#hdf5file.close()
+hdf5file.generate_xdmf()  
+hdf5file.close()
 finalize(**vars())
