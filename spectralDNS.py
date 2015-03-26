@@ -121,7 +121,7 @@ except:
     if rank == 0 and not optimization is None:
         print "Optimization with ", optimization, " not possible"
     
-@profile
+#@profile
 def Cross(a, b, c):
     """c_k = F_k(a x b)"""
     U_tmp[:] = cross1(a, b, U_tmp)
@@ -241,6 +241,5 @@ if rank == 0:
 if make_profile:
     results = create_profile(**vars())
     
-hdf5file.generate_xdmf()  
 hdf5file.close()
 finalize(**vars())

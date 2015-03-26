@@ -6,27 +6,6 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 """Wrap call to hdf5 to allow running without installing h5py
 """
 __all__ = ['HDF5Writer']
-from numpy import pi, float32
-
-xdmffile = """<?xml version="1.0" encoding="utf-8"?>
-<Xdmf xmlns:xi="http://www.w3.org/2001/XInclude" Version="2.1">
-  <Domain>
-    <Grid Name="Structured Grid" GridType="Collection" CollectionType="Temporal">
-"""
-timeattr = """      <Time TimeType="List"><DataItem Format="XML" Dimensions="{1}"> {0} </DataItem></Time>"""
-attribute3D = """
-        <Attribute Name="{0}" Center="Node">
-          <DataItem Format="HDF" NumberType="Float" Precision="{5}" Dimensions="{1} {1} {1}">
-            {2}:/3D/{3}/{4}
-          </DataItem>
-        </Attribute>"""
-
-attribute2D = """
-        <Attribute Name="{0}_2D" Center="Node">
-          <DataItem Format="HDF" NumberType="Float" Precision="{5}" Dimensions="{1} {1}">
-            {2}:/2D/{3}/{4}
-          </DataItem>
-        </Attribute>"""
 
 try:
     import h5py
@@ -123,80 +102,7 @@ try:
                             
         def close(self):
             self.f.close()
-            
-        def generate_xdmf(self):
-            if self.comm.Get_rank() == 0:
-                import copy
-                xf3d = copy.copy(xdmffile)
-                timesteps = self.f["3D/U"].keys()
-                N = self.f.attrs["N"]
-                tt = ""
-                for i in timesteps:
-                    tt += "%s " %i
-                
-                xf3d += timeattr.format(tt, len(timesteps))
-            
-                for tstep in timesteps:
-                    xf3d += """
-      <Grid GridType="Uniform">
-        <Geometry Type="ORIGIN_DXDYDZ">
-          <DataItem DataType="UInt" Dimensions="3" Format="XML" Precision="4">0 0 0</DataItem>
-          <DataItem DataType="Float" Dimensions="3" Format="XML" Precision="4">{0} {0} {0}</DataItem>
-        </Geometry>""".format(2*pi)
-
-                    xf3d += """
-        <Topology Dimensions="{0} {0} {0}" Type="3DCoRectMesh"/>""".format(N)
-                    prec = 4 if self.dtype is float32 else 8
-                    for comp in self.f["3D"]:
-                        xf3d += attribute3D.format(comp, N, self.fname, comp, tstep, prec)
-                    xf3d += """  
-      </Grid>
-"""
-                xf3d += """    
-    </Grid>
-  </Domain>
-</Xdmf>  
-"""
-                xf = open(self.fname[:-2]+"xdmf", "w")
-                xf.write(xf3d)
-                xf.close()
-                
-                if len(self.f["2D/U"].keys()) == 0:
-                    return
-                
-                xf2d = copy.copy(xdmffile)
-                timesteps = self.f["2D/U"].keys()
-                N = self.f.attrs["N"]
-                tt = ""
-                for i in timesteps:
-                    tt += "%s " %i
-                
-                xf2d += timeattr.format(tt, len(timesteps))
-            
-                for tstep in timesteps:
-                    xf2d += """
-      <Grid GridType="Uniform">
-        <Geometry Type="ORIGIN_DXDY">
-          <DataItem DataType="UInt" Dimensions="2" Format="XML" Precision="4">0 0</DataItem>
-          <DataItem DataType="Float" Dimensions="2" Format="XML" Precision="4">{0} {0}</DataItem>
-        </Geometry>""".format(2*pi)
-
-                    xf2d += """
-        <Topology Dimensions="{0} {0}" Type="2DCoRectMesh"/>""".format(N)
-                    prec = 4 if self.dtype is float32 else 8
-                    for comp in self.f["2D"]:
-                        xf2d += attribute2D.format(comp, N, self.fname, comp, tstep, prec)
-                    xf2d += """  
-      </Grid>
-"""
-                xf2d += """  
-    </Grid>
-  </Domain>
-</Xdmf>"""
-                xf = open(self.fname[:-3]+"_2D.xdmf", "w")
-                xf.write(xf2d)
-                xf.close()
-
+                            
 except:
     class HDF5Writer(object):
         def __init__(self, comm, dt, N, params, filename="U.h5"):
@@ -208,6 +114,3 @@ except:
         
         def close(self):
             del self
-            
-        def generate_xdmf(self):
-            pass
