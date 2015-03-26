@@ -238,9 +238,5 @@ if rank == 0:
 if make_profile:
     results = create_profile(**vars())
     
-<<<<<<< .merge_file_Kk9Opd
-#hdf5file.generate_xdmf()  
-=======
->>>>>>> .merge_file_Cl2Vte
 hdf5file.close()
 finalize(**vars())
