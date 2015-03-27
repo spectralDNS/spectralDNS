@@ -3,6 +3,8 @@ __date__ = "2015-03-24"
 __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
+transpose_Uc, transpose_Umpi = None, None
+
 try:
     import cython_single, cython_double
     def cython_add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu):
@@ -32,6 +34,19 @@ try:
         else:
             cython_double.cython_dealias(a, b)
         return a
+    
+    def transpose_Uc(a, b, c, d):
+        if a.dtype == "complex64":
+            cython_single.transpose_Uc(a, b, c, d)
+        else:
+            cython_double.transpose_Uc(a, b, c, d)
+
+    def transpose_Umpi(a, b, c, d):
+        if a.dtype == "complex64":
+            cython_single.transpose_Umpi(a, b, c, d)
+        else:
+            cython_double.transpose_Umpi(a, b, c, d)
+            
 except:
     pass
 

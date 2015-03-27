@@ -10,12 +10,11 @@ import scipy.weave.c_spec as c_spec
 import sys
 
 def weave_module(precision):
-    """Compute most of righ hand side using optimized C++ code
-    """
+    
     float, complex = {"single": (float32, complex64),
                       "double": (float64, complex128)}[precision]
     
-    # Just declare some variables with correct type. The size is arbitrary at this point
+    # Just declare some variables with correct type. The size and values are arbitrary at this point
     nu = float(1.0)
     dU = empty((3, 3, 3, 3), dtype=complex)
     U_hat = empty((3, 3, 3, 3), dtype=complex)
