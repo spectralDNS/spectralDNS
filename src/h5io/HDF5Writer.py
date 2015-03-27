@@ -12,23 +12,29 @@ try:
     class HDF5Writer(object):
     
         def __init__(self, comm, dt, N, params, dtype, filename="U.h5"):
-            self.f = h5py.File(filename, "w", driver="mpio", comm=comm)
             self.comm = comm
             self.components = components = ["U", "V", "W", "P"]
             if "eta" in params: components += ["Bx", "By", "Bz"]
-            self.f.create_group("3D")
-            self.f.create_group("2D")
-            for c in components:
-                self.f["3D"].create_group(c)
-                self.f["2D"].create_group(c)
-            self.f.attrs.create("dt", dt)
-            self.f.attrs.create("N", N)    
             self.fname = filename
             self.params = params
-            self.f["2D"].attrs.create("i", params['write_yz_slice'][0])
             self.dtype = dtype
+            self.dt = dt
+            self.N = N
+            self.f = None
+            
+        def init_h5file(self):
+            self.f = h5py.File(self.fname, "w", driver="mpio", comm=self.comm)
+            self.f.create_group("3D")
+            self.f.create_group("2D")
+            for c in self.components:
+                self.f["3D"].create_group(c)
+                self.f["2D"].create_group(c)
+            self.f.attrs.create("dt", self.dt)
+            self.f.attrs.create("N", self.N)    
+            self.f["2D"].attrs.create("i", self.params['write_yz_slice'][0])            
             
         def write(self, U, P, tstep):
+            if not self.f: self.init_h5file() 
             
             if tstep % self.params['write_result'] == 0 and self.params['decomposition'] == 'slab':
                 rank = self.comm.Get_rank()
@@ -101,7 +107,7 @@ try:
                         self.f["2D/Bz/%d"%tstep][:, x2] = U[5, i-x1.start]
                             
         def close(self):
-            self.f.close()
+            if self.f: self.f.close()
                             
 except:
     class HDF5Writer(object):

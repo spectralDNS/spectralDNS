@@ -94,24 +94,24 @@ def cython_cross2(np.ndarray[int_t, ndim=4] a,
         #c[i] = fftn_mpi(sum(U*U_tmp, 0), c[i])
     #return c
 
-#def transpose_Uc(np.ndarray[complex_t, ndim=3] Uc_hatT,
-                 #np.ndarray[complex_t, ndim=4] U_mpi, 
-                 #int num_processes, int Np):
-    #cdef unsigned int i,j,k,l,kk
-    #for i in xrange(num_processes): 
-        #for j in xrange(Uc_hatT.shape[0]):
-            #for k in xrange(i*Np, (i+1)*Np):
-                #kk = k-i*Np
-                #for l in xrange(Uc_hatT.shape[2]):
-                    #Uc_hatT[j, k, l] = U_mpi[i, j, kk, l]
+def transpose_Uc(np.ndarray[complex_t, ndim=3] Uc_hatT,
+                 np.ndarray[complex_t, ndim=4] U_mpi, 
+                 int num_processes, int Np):
+    cdef unsigned int i,j,k,l,kk
+    for i in xrange(num_processes): 
+        for j in xrange(Uc_hatT.shape[0]):
+            for k in xrange(i*Np, (i+1)*Np):
+                kk = k-i*Np
+                for l in xrange(Uc_hatT.shape[2]):
+                    Uc_hatT[j, k, l] = U_mpi[i, j, kk, l]
 
-#def transpose_Umpi(np.ndarray[complex_t, ndim=3] Uc_hatT,
-                   #np.ndarray[complex_t, ndim=4] U_mpi, 
-                   #int num_processes, int Np):
-    #cdef unsigned int i,j,k,l,kk
-    #for i in xrange(num_processes): 
-        #for j in xrange(Uc_hatT.shape[0]):
-            #for k in xrange(i*Np, (i+1)*Np):
-                #kk = k-i*Np    
-                #for l in xrange(Uc_hatT.shape[2]):
-                    #U_mpi[i,j,kk,l] = Uc_hatT[j,k,l]
+def transpose_Umpi(np.ndarray[complex_t, ndim=3] Uc_hatT,
+                   np.ndarray[complex_t, ndim=4] U_mpi, 
+                   int num_processes, int Np):
+    cdef unsigned int i,j,k,l,kk
+    for i in xrange(num_processes): 
+        for j in xrange(Uc_hatT.shape[0]):
+            for k in xrange(i*Np, (i+1)*Np):
+                kk = k-i*Np    
+                for l in xrange(Uc_hatT.shape[2]):
+                    U_mpi[i,j,kk,l] = Uc_hatT[j,k,l]

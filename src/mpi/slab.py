@@ -7,6 +7,8 @@ from wrappyfftw import *
 
 #__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
+from ..optimization import transpose_Uc, transpose_Umpi
+
 def setup(comm, M, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid, mgrid,
           sum, where, num_processes, rank, convection, communication, nu, **kwargs):
     
@@ -89,9 +91,11 @@ def ifftn_mpi(fu, u):
     if communication == 'alltoall':
         # Communicate all values
         comm.Alltoall([Uc_hat, mpitype], [U_mpi, mpitype])
-        #transpose_Uc(Uc_hatT, U_mpi, num_processes, Np)
-        for i in range(num_processes): 
-            Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
+        if transpose_Uc: 
+            transpose_Uc(Uc_hatT, U_mpi, num_processes, Np)
+        else:
+            for i in range(num_processes): 
+                Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
     
     else:
         for i in range(num_processes):
@@ -115,9 +119,11 @@ def fftn_mpi(u, fu):
         # Do 2 ffts in y-z directions on owned data
         Uc_hatT[:] = rfft2(u, axes=(1,2))
         # Transform data to align with x-direction  
-        #transpose_Umpi(Uc_hatT, U_mpi, num_processes, Np)
-        for i in range(num_processes): 
-            U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
+        if transpose_Umpi:
+            transpose_Umpi(Uc_hatT, U_mpi, num_processes, Np)
+        else:
+            for i in range(num_processes): 
+                U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
             
         # Communicate all values
         comm.Alltoall([U_mpi, mpitype], [fu, mpitype])  
