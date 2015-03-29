@@ -93,7 +93,7 @@ def generate_xdmf(h5filename):
   </Domain>
 </Xdmf>"""
     f.attrs.create("xdmf_2d", xf2d)
-    xf2 = open(h5filename[:-2]+"xdmf_2D", "w")
+    xf2 = open(h5filename[:-3]+"_2D."+"xdmf", "w")
     xf2.write(xf2d)
     xf2.close()        
     

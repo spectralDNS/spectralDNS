@@ -61,14 +61,14 @@ try:
                     self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype=self.dtype)
                                     
                 x1, x2 = self.x1, self.x2
-                self.f["3D/U/%d"%tstep][x1, :, x2] = U[0]
-                self.f["3D/V/%d"%tstep][x1, :, x2] = U[1]
-                self.f["3D/W/%d"%tstep][x1, :, x2] = U[2]
-                self.f["3D/P/%d"%tstep][x1, :, x2] = P
+                self.f["3D/U/%d"%tstep][x1, x2, :] = U[0]
+                self.f["3D/V/%d"%tstep][x1, x2, :] = U[1]
+                self.f["3D/W/%d"%tstep][x1, x2, :] = U[2]
+                self.f["3D/P/%d"%tstep][x1, x2, :] = P
                 if len(self.components) == 7:
-                    self.f["3D/Bx/%d"%tstep][x1, :, x2] = U[3]
-                    self.f["3D/By/%d"%tstep][x1, :, x2] = U[4]
-                    self.f["3D/Bz/%d"%tstep][x1, :, x2] = U[5]
+                    self.f["3D/Bx/%d"%tstep][x1, x2, :] = U[3]
+                    self.f["3D/By/%d"%tstep][x1, x2, :] = U[4]
+                    self.f["3D/Bz/%d"%tstep][x1, x2, :] = U[5]
                     
             if tstep % self.params['write_yz_slice'][1] == 0 and self.params['decomposition'] == 'slab':
                 i = self.params['write_yz_slice'][0]
@@ -96,15 +96,14 @@ try:
                     self.f["2D/"+comp].create_dataset(str(tstep), shape=(N, N), dtype=self.dtype)
                                     
                 x1, x2 = self.x1, self.x2
-                if i >= x1.start and i < x1.stop:
-                    self.f["2D/U/%d"%tstep][:, x2] = U[0, i-x1.start]
-                    self.f["2D/V/%d"%tstep][:, x2] = U[1, i-x1.start]
-                    self.f["2D/W/%d"%tstep][:, x2] = U[2, i-x1.start]
-                    self.f["2D/P/%d"%tstep][:, x2] = P[i-x1.start]
-                    if len(self.components) == 7:
-                        self.f["2D/Bx/%d"%tstep][:, x2] = U[3, i-x1.start]
-                        self.f["2D/By/%d"%tstep][:, x2] = U[4, i-x1.start]
-                        self.f["2D/Bz/%d"%tstep][:, x2] = U[5, i-x1.start]
+                self.f["2D/U/%d"%tstep][x1, x2] = U[0, :, :, i]
+                self.f["2D/V/%d"%tstep][x1, x2] = U[1, :, :, i]
+                self.f["2D/W/%d"%tstep][x1, x2] = U[2, :, :, i]
+                self.f["2D/P/%d"%tstep][x1, x2] = P[:, :, i]
+                if len(self.components) == 7:
+                    self.f["2D/Bx/%d"%tstep][x1, x2] = U[3, :, :, i]
+                    self.f["2D/By/%d"%tstep][x1, x2] = U[4, :, :, i]
+                    self.f["2D/Bz/%d"%tstep][x1, x2] = U[5, :, :, i]
                             
         def close(self):
             if self.f: self.f.close()

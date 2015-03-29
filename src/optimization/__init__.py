@@ -4,6 +4,7 @@ __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 transpose_Uc, transpose_Umpi = None, None
+transform_Uc_xz, transform_Uc_yx, transform_Uc_xy, transform_Uc_zx = None, None, None, None
 
 try:
     import cython_single, cython_double
@@ -40,12 +41,42 @@ try:
             cython_single.transpose_Uc(a, b, c, d)
         else:
             cython_double.transpose_Uc(a, b, c, d)
+        return a
 
     def transpose_Umpi(a, b, c, d):
         if a.dtype == "complex64":
             cython_single.transpose_Umpi(a, b, c, d)
         else:
             cython_double.transpose_Umpi(a, b, c, d)
+        return a
+
+    def transform_Uc_xz(a, b, c, d):
+        if a.dtype == "complex64":
+            cython_single.transform_Uc_xz(a, b, c, d)
+        else:
+            cython_double.transform_Uc_xz(a, b, c, d)
+        return a
+
+    def transform_Uc_yx(a, b, c, d):
+        if a.dtype == "complex64":
+            cython_single.transform_Uc_yx(a, b, c, d)
+        else:
+            cython_double.transform_Uc_yx(a, b, c, d)
+        return a
+
+    def transform_Uc_xy(a, b, c, d):
+        if a.dtype == "complex64":
+            cython_single.transform_Uc_xy(a, b, c, d)
+        else:
+            cython_double.transform_Uc_xy(a, b, c, d)
+        return a
+
+    def transform_Uc_zx(a, b, c, d):
+        if a.dtype == "complex64":
+            cython_single.transform_Uc_zx(a, b, c, d)
+        else:
+            cython_double.transform_Uc_zx(a, b, c, d)
+        return a
             
 except:
     pass
@@ -112,6 +143,48 @@ try:
         else:
             du = numba_double.add_pressure_diffusion(du, u_hat, ksq, kk, p_hat, k_over_k2, nu)
         return du
+
+    def transpose_Uc(a, b, c, d):
+        if a.dtype == "complex64":
+            a = numba_single.transpose_Uc(a, b, c, d)
+        else:
+            a = numba_double.transpose_Uc(a, b, c, d)
+        return a
+
+    def transpose_Umpi(a, b, c, d):
+        if a.dtype == "complex64":
+            a = numba_single.transpose_Umpi(a, b, c, d)
+        else:
+            a = numba_double.transpose_Umpi(a, b, c, d)
+        return a
+
+    def transform_Uc_xz(a, b, c, d):
+        if a.dtype == "complex64":
+            a = numba_single.transform_Uc_xz(a, b, c, d)
+        else:
+            a = numba_double.transform_Uc_xz(a, b, c, d)
+        return a
+
+    def transform_Uc_yx(a, b, c, d):
+        if a.dtype == "complex64":
+            a = numba_single.transform_Uc_yx(a, b, c, d)
+        else:
+            a = numba_double.transform_Uc_yx(a, b, c, d)
+        return a
+
+    def transform_Uc_xy(a, b, c, d):
+        if a.dtype == "complex64":
+            a = numba_single.transform_Uc_xy(a, b, c, d)
+        else:
+            a = numba_double.transform_Uc_xy(a, b, c, d)
+        return a
+
+    def transform_Uc_zx(a, b, c, d):
+        if a.dtype == "complex64":
+            a = numba_single.transform_Uc_zx(a, b, c, d)
+        else:
+            a = numba_double.transform_Uc_zx(a, b, c, d)
+        return a
     
 except:
     pass

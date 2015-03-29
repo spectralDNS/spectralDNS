@@ -65,3 +65,64 @@ def add_pressure_diffusion(du, u_hat, ksq, kk, p_hat, k_over_k2, nu):
                 du[1,i,j,k] = du[1,i,j,k] - (p_hat[i,j,k]*k1+u_hat[1,i,j,k]*z)
                 du[2,i,j,k] = du[2,i,j,k] - (p_hat[i,j,k]*k2+u_hat[2,i,j,k]*z)
     return du
+
+@jit(complex[:,:,:](complex[:,:,:], complex[:,:,:,:], int64, int64), nopython=True)
+def transpose_Uc(Uc_hatT, U_mpi, num_processes, Np):
+    for i in xrange(num_processes): 
+        for j in xrange(Uc_hatT.shape[0]):
+            for k in xrange(i*Np, (i+1)*Np):
+                kk = k-i*Np
+                for l in xrange(Uc_hatT.shape[2]):
+                    Uc_hatT[j, k, l] = U_mpi[i, j, kk, l]
+    return Uc_hatT
+
+@jit(complex[:,:,:,:](complex[:,:,:,:], complex[:,:,:], int64, int64), nopython=True)
+def transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np):
+    for i in xrange(num_processes): 
+        for j in xrange(Uc_hatT.shape[0]):
+            for k in xrange(i*Np, (i+1)*Np):
+                kk = k-i*Np    
+                for l in xrange(Uc_hatT.shape[2]):
+                    U_mpi[i,j,kk,l] = Uc_hatT[j,k,l]
+    return U_mpi
+
+@jit(complex[:,:,:](complex[:,:,:], complex[:,:,:], int64, int64), nopython=True)
+def transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1, N1):
+    for i in xrange(P1):
+        for j in xrange(i*N1, (i+1)*N1):
+            i0 = j-i*N1
+            for k in xrange(Uc_hat_x.shape[1]):
+                for l in xrange(Uc_hat_x.shape[2]):
+                    Uc_hat_x[j, k, l] = Uc_hat_z[i0, k, l+i*N1/2]
+    return Uc_hat_x
+
+@jit(complex[:,:,:](complex[:,:,:], complex[:,:,:], int64, int64), nopython=True)
+def transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2, N2):
+    for i in xrange(P2):
+        for j in xrange(i*N2, (i+1)*N2):
+            i0 = j-i*N2
+            for k in xrange(Uc_hat_xr.shape[1]):
+                k0 = k+i*N2
+                for l in xrange(Uc_hat_xr.shape[2]):
+                    Uc_hat_y[i0, k0, l] = Uc_hat_xr[j, k, l]
+    return Uc_hat_y
+
+@jit(complex[:,:,:](complex[:,:,:], complex[:,:,:], int64, int64), nopython=True)
+def transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2, N2):
+    for i in xrange(P2):
+        for j in xrange(i*N2, (i+1)*N2):
+            i0 = j-i*N2
+            for k in xrange(Uc_hat_x.shape[1]):
+                for l in xrange(Uc_hat_x.shape[2]):
+                    Uc_hat_x[j, k, l] = Uc_hat_y[i0, k+i*N2, l]
+    return Uc_hat_x
+
+@jit(complex[:,:,:](complex[:,:,:], complex[:,:,:], int64, int64), nopython=True)
+def transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1, N1):
+    for i in xrange(P1):
+        for j in xrange(i*N1, (i+1)*N1):
+            i0 = j-i*N1
+            for k in xrange(Uc_hat_xr.shape[1]):
+                for l in xrange(Uc_hat_xr.shape[2]):
+                    Uc_hat_z[i0, k, l+i*N1/2] = Uc_hat_xr[j, k, l]
+    return Uc_hat_z

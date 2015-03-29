@@ -94,11 +94,11 @@ def ifftn_mpi(fu, u):
         if transpose_Uc: 
             transpose_Uc(Uc_hatT, U_mpi, num_processes, Np)
         else:
-            for i in range(num_processes): 
+            for i in xrange(num_processes): 
                 Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
     
     else:
-        for i in range(num_processes):
+        for i in xrange(num_processes):
             if not i == rank:
                 comm.Sendrecv_replace([Uc_send[i], mpitype], i, 0, i, 0)   
             Uc_hatT[:, i*Np:(i+1)*Np] = Uc_send[i]
@@ -120,9 +120,9 @@ def fftn_mpi(u, fu):
         Uc_hatT[:] = rfft2(u, axes=(1,2))
         # Transform data to align with x-direction  
         if transpose_Umpi:
-            transpose_Umpi(Uc_hatT, U_mpi, num_processes, Np)
+            transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np)
         else:
-            for i in range(num_processes): 
+            for i in xrange(num_processes): 
                 U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
             
         # Communicate all values
@@ -133,7 +133,7 @@ def fftn_mpi(u, fu):
         ft = fu.transpose(1,0,2)
         ft[:] = rfft2(u, axes=(1,2))
         fu_send = fu.reshape((num_processes, Np, Np, Nf))
-        for i in range(num_processes):
+        for i in xrange(num_processes):
             if not i == rank:
                 comm.Sendrecv_replace([fu_send[i], mpitype], i, 0, i, 0)   
         fu_send[:] = fu_send.transpose(0,2,1,3)
