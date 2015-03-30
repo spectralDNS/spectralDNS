@@ -81,19 +81,6 @@ def cython_cross2(np.ndarray[int, ndim=4] a,
                 c[2,i,j,k].real = -(a0*b1.imag - a1*b0.imag)
                 c[2,i,j,k].imag = a0*b1.real - a1*b0.real
 
-#def standardConvection(np.ndarray[complex_t, ndim=4] c,
-                       #np.ndarray[complex_t, ndim=4] U_hat,
-                       #np.ndarray[real_t, ndim=4] U_tmp,
-                       #np.ndarray[real_t, ndim=4] U,
-                       #np.ndarray[int_t, ndim=4] K,
-                       #fftn_mpi, ifftn_mpi):
-    #"""c_i = u_j du_i/dx_j"""
-    #for i in xrange(3):
-        #for j in xrange(3):
-            #U_tmp[j] = ifftn_mpi(1j*K[j]*U_hat[i], U_tmp[j])
-        #c[i] = fftn_mpi(sum(U*U_tmp, 0), c[i])
-    #return c
-
 def transpose_Uc(np.ndarray[complex_t, ndim=3] Uc_hatT,
                  np.ndarray[complex_t, ndim=4] U_mpi, 
                  int num_processes, int Np):
@@ -105,8 +92,8 @@ def transpose_Uc(np.ndarray[complex_t, ndim=3] Uc_hatT,
                 for l in xrange(Uc_hatT.shape[2]):
                     Uc_hatT[j, k, l] = U_mpi[i, j, kk, l]
 
-def transpose_Umpi(np.ndarray[complex_t, ndim=3] Uc_hatT,
-                   np.ndarray[complex_t, ndim=4] U_mpi, 
+def transpose_Umpi(np.ndarray[complex_t, ndim=4] U_mpi,
+                   np.ndarray[complex_t, ndim=3] Uc_hatT,
                    int num_processes, int Np):
     cdef unsigned int i,j,k,l,kk
     for i in xrange(num_processes): 
@@ -115,3 +102,48 @@ def transpose_Umpi(np.ndarray[complex_t, ndim=3] Uc_hatT,
                 kk = k-i*Np    
                 for l in xrange(Uc_hatT.shape[2]):
                     U_mpi[i,j,kk,l] = Uc_hatT[j,k,l]
+
+def transform_Uc_xz(np.ndarray[complex_t, ndim=3] Uc_hat_x, 
+                   np.ndarray[complex_t, ndim=3] Uc_hat_z, 
+                   int P1, int N1):
+    cdef unsigned int i,j,k,l,i0
+    for i in xrange(P1):
+        for j in xrange(i*N1, (i+1)*N1):
+            i0 = j-i*N1
+            for k in xrange(Uc_hat_x.shape[1]):
+                for l in xrange(Uc_hat_x.shape[2]):
+                    Uc_hat_x[j, k, l] = Uc_hat_z[i0, k, l+i*N1/2]
+
+def transform_Uc_yx(np.ndarray[complex_t, ndim=3] Uc_hat_y, 
+                   np.ndarray[complex_t, ndim=3] Uc_hat_xr, 
+                   int P2, int N2):
+    cdef unsigned int i,j,k,l,i0
+    for i in xrange(P2):
+        for j in xrange(i*N2, (i+1)*N2):
+            i0 = j-i*N2
+            for k in xrange(Uc_hat_xr.shape[1]):
+                k0 = k+i*N2
+                for l in xrange(Uc_hat_xr.shape[2]):
+                    Uc_hat_y[i0, k0, l] = Uc_hat_xr[j, k, l]
+
+def transform_Uc_xy(np.ndarray[complex_t, ndim=3] Uc_hat_x, 
+                   np.ndarray[complex_t, ndim=3] Uc_hat_y, 
+                   int P2, int N2):
+    cdef unsigned int i,j,k,l,i0
+    for i in xrange(P2):
+        for j in xrange(i*N2, (i+1)*N2):
+            i0 = j-i*N2
+            for k in xrange(Uc_hat_x.shape[1]):
+                for l in xrange(Uc_hat_x.shape[2]):
+                    Uc_hat_x[j, k, l] = Uc_hat_y[i0, k+i*N2, l]
+
+def transform_Uc_zx(np.ndarray[complex_t, ndim=3] Uc_hat_z, 
+                    np.ndarray[complex_t, ndim=3] Uc_hat_xr, 
+                    int P1, int N1):
+    cdef unsigned int i,j,k,l,i0
+    for i in xrange(P1):
+        for j in xrange(i*N1, (i+1)*N1):
+            i0 = j-i*N1
+            for k in xrange(Uc_hat_xr.shape[1]):
+                for l in xrange(Uc_hat_xr.shape[2]):
+                    Uc_hat_z[i0, k, l+i*N1/2] = Uc_hat_xr[j, k, l]

@@ -1,3 +1,10 @@
+"""To use optimization do:
+
+python setup.py build_ext --inplace
+
+in this folder. (Will need to work on improved installation routines)
+
+"""
 from distutils.core import setup
 from distutils.extension import Extension
 from Cython.Distutils import build_ext

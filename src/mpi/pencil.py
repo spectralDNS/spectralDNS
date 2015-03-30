@@ -4,8 +4,10 @@ __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from wrappyfftw import *
+from ..optimization import transform_Uc_xz, transform_Uc_yx, transform_Uc_xy, transform_Uc_zx
 
 __all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
+
 
 def setup(comm, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid,
           sum, where, num_processes, rank, P1, arange, MPI, convection, 
@@ -88,7 +90,8 @@ def setup(comm, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid,
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
-    dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*(abs(K[2]) < kmax), dtype=uint8)
+    dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*
+                    (abs(K[2]) < kmax), dtype=uint8)
     del kwargs
     return locals()
 
@@ -108,23 +111,31 @@ def ifftn_mpi(fu, u):
     Uc_hat_y[:] = ifft(fu, axis=1)
 
     # Transform to x all but k=N/2 (the neglected Nyquist mode)
-    for i in range(P2): 
-        Uc_hat_x[i*N2:(i+1)*N2] = Uc_hat_y[:, i*N2:(i+1)*N2]
-        
+    Uc_hat_x[:] = 0
+    if transform_Uc_xy:
+        transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2, N2)
+    else:
+        for i in range(P2): 
+            Uc_hat_x[i*N2:(i+1)*N2] = Uc_hat_y[:, i*N2:(i+1)*N2]
+           
     # Communicate in xz-plane and do fft in x-direction
     commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
     Uc_hat_x[:] = ifft(Uc_hat_xr, axis=0)
         
     # Communicate and transform in xy-plane
     commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
-    for i in range(P1):
-        Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2] = Uc_hat_xr[i*N1:(i+1)*N1]
+    if transform_Uc_zx:
+        transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1, N1)
+    else:
+        for i in range(P1):
+            Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2] = Uc_hat_xr[i*N1:(i+1)*N1]
             
     # Do fft for y-direction
     Uc_hat_z[:, :, -1] = 0
     u = irfft(Uc_hat_z, axis=2)
     return u
         
+#@profile        
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """    
@@ -132,17 +143,23 @@ def fftn_mpi(u, fu):
     Uc_hat_z[:] = rfft(u, axis=2)
     
     # Transform to x direction neglecting k=N/2 (Nyquist)
-    for i in range(P1):
-        Uc_hat_x[i*N1:(i+1)*N1] = Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2]
+    if transform_Uc_xz:
+        transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1, N1)
+    else:
+        for i in range(P1):
+            Uc_hat_x[i*N1:(i+1)*N1] = Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2]
     
     # Communicate and do fft in x-direction
     commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
     Uc_hat_x[:] = fft(Uc_hat_xr, axis=0)        
     
     # Communicate and transform to final z-direction
-    commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])    
-    for i in range(P2): 
-        Uc_hat_y[:, i*N2:(i+1)*N2] = Uc_hat_xr[i*N2:(i+1)*N2]
+    commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])  
+    if transform_Uc_yx:
+        transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2, N2)
+    else:
+        for i in range(P2): 
+            Uc_hat_y[:, i*N2:(i+1)*N2] = Uc_hat_xr[i*N2:(i+1)*N2]
                                    
     # Do fft for last direction 
     fu = fft(Uc_hat_y, axis=1)
