@@ -7,7 +7,7 @@ from MPI_knee import mpi_import, MPI
 with mpi_import():
     from numpy import *
     from pylab import *
-    from mpi4py import MPI
+    import sys
     import time
     from src.mpi.wrappyfftw import *
     from src.utilities.commandline import *

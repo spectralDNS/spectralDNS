@@ -26,6 +26,7 @@ with mpi_import():
 parameters.update(commandline_kwargs)
 check_parameters(parameters)
 vars().update(parameters)
+optimizer.__dict__ = {'optimization': optimization, 'precision': precision}
 
 float, complex, mpitype = {"single": (float32, complex64, MPI.F_FLOAT_COMPLEX),
                            "double": (float64, complex128, MPI.F_DOUBLE_COMPLEX)}[precision]
@@ -79,25 +80,29 @@ def divergenceConvection(c, add=False):
     c[2] += (1j*K[1]*F_tmp[1] + 1j*K[2]*F_tmp[2])
     return c
 
-def cross1(a, b, c):
+@optimizer
+def cross1(c, a, b):
     """Regular c = a x b"""
     #c[:] = cross(a, b, axisa=0, axisb=0, axisc=0) # Very slow
     c[0] = a[1]*b[2]-a[2]*b[1]
     c[1] = a[2]*b[0]-a[0]*b[2]
     c[2] = a[0]*b[1]-a[1]*b[0]
     return c
-    
-def cross2(a, b, c):
+
+@optimizer    
+def cross2(c, a, b):
     """ c = 1j*(a x b)"""
-    cross1(a, b, c)
+    cross1(c, a, b)
     c *= 1j
     return c
 
+@optimizer
 def dealias_rhs(dU, dealias):
     """Dealias the nonlinear convection"""
     dU *= dealias
     return dU
 
+@optimizer
 def add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu):
     """Add contributions from pressure and diffusion to the rhs"""
     
@@ -112,28 +117,18 @@ def add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu):
     
     return dU
 
-# Overload with possible optimizations
-try:
-    for item in ["add_pressure_diffusion", "dealias_rhs", "cross1", "cross2"]:
-        exec("{0} = {1}_{0}".format(item, optimization))
-
-except:
-    if rank == 0 and not optimization is None:
-        print "Optimization with ", optimization, " not possible"
-    
-#@profile
+#@profile    
 def Cross(a, b, c):
     """c_k = F_k(a x b)"""
-    U_tmp[:] = cross1(a, b, U_tmp)
+    U_tmp[:] = cross1(U_tmp, a, b)
     c[0] = fftn_mpi(U_tmp[0], c[0])
     c[1] = fftn_mpi(U_tmp[1], c[1])
     c[2] = fftn_mpi(U_tmp[2], c[2])
     return c
 
-#@profile
 def Curl(a, c):
     """c = F_inv(curl(a))"""
-    F_tmp[:] = cross2(K, a, F_tmp)
+    F_tmp[:] = cross2(F_tmp, K, a)
     c[0] = ifftn_mpi(F_tmp[0], c[0])
     c[1] = ifftn_mpi(F_tmp[1], c[1])
     c[2] = ifftn_mpi(F_tmp[2], c[2])    
@@ -144,7 +139,6 @@ def Div(a, c):
     c = ifftn_mpi(1j*(sum(KX*a, 0), c))
     return c
         
-#@profile    
 def ComputeRHS(dU, rk):
     """Compute and return entire rhs contribution"""
     
@@ -187,34 +181,43 @@ slowest_time = 0.0
 # initialize k and w for storing energy and enstrophy
 if rank == 0: k = []; w = []
 
-# Forward equations in time
-tic = t0 = time.time()
-while t < T-1e-8:
-    t += dt; tstep += 1
+@optimizer
+def integrate(U_hat, ComputeRHS):
+    global U_hat1, U_hat0, dU
     if integrator == "RK4":
         U_hat1[:] = U_hat0[:] = U_hat
         for rk in range(4):
             dU = ComputeRHS(dU, rk)
             if rk < 3:
-                U_hat[:] = U_hat0;U_hat += b[rk]*dU
+                U_hat[:] = U_hat0 + b[rk]*dU
             U_hat1 += a[rk]*dU
         U_hat[:] = U_hat1
-        
+            
     elif integrator == "ForwardEuler" or tstep == 1:  
         dU = ComputeRHS(dU, 0)        
         U_hat += dU*dt
         if integrator == "AB2":
-            U_hat0[:] = dU; U_hat0 *= dt
+            U_hat0[:] = dU*dt
         
     else:
         dU = ComputeRHS(dU, 0)
         U_hat[:] += (1.5*dU*dt - 0.5*U_hat0)
-        U_hat0[:] = dU; U_hat0 *= dt
+        U_hat0[:] = U_hat
+    
+    return U_hat
+
+# Forward equations in time
+tic = t0 = time.time()
+
+while t < T-1e-8:
+    t += dt; tstep += 1
+    
+    U_hat = integrate(U_hat, ComputeRHS)
 
     for i in range(3):
         U[i] = ifftn_mpi(U_hat[i], U[i])
                     
-    update(**vars())
+    update(**globals())
     
     tt = time.time()-t0
     t0 = time.time()

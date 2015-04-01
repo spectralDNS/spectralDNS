@@ -4,11 +4,10 @@ __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from wrappyfftw import *
+from ..optimization import *
 
 #__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
-
-from ..optimization import transpose_Uc, transpose_Umpi
-
+          
 def setup(comm, M, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid, mgrid,
           sum, where, num_processes, rank, convection, communication, nu, **kwargs):
     
@@ -40,26 +39,24 @@ def setup(comm, M, float, complex, uint8, mpitype, linspace, N, L, array, meshgr
     P_hat = empty((N, Np, Nf), dtype=complex)
 
     # Temporal storage arrays (Not required by all temporal integrators)
-    U_hat0  = empty((3, N, Np, Nf), dtype=complex)
-    U_hat1  = empty((3, N, Np, Nf), dtype=complex)
-    dU      = empty((3, N, Np, Nf), dtype=complex)
+    U_hat0 = empty((3, N, Np, Nf), dtype=complex)
+    U_hat1 = empty((3, N, Np, Nf), dtype=complex)
+    dU     = empty((3, N, Np, Nf), dtype=complex)
 
     # work arrays (Not required by all convection methods)
-    if convection in ('Standard', 'Skewed', 'Vortex'):
-        U_tmp = empty((3, Np, N, N), dtype=float)
-    if convection in ('Divergence', 'Skewed', 'Vortex'):
-        F_tmp   = empty((3, N, Np, Nf), dtype=complex)
-    curl    = empty((3, Np, N, N), dtype=float)    
-
-    init_fft(N, Nf, Np, complex, num_processes, comm, communication, rank, mpitype)
-        
+    U_tmp  = empty((3, Np, N, N), dtype=float)
+    F_tmp  = empty((3, N, Np, Nf), dtype=complex)
+    curl   = empty((3, Np, N, N), dtype=float)   
+    
+    init_fft(N, Nf, Np, complex, num_processes, comm, communication, rank, 
+             mpitype)
+    
     # Set wavenumbers in grid
     kx = fftfreq(N, 1./N).astype(int)
     kz = kx[:Nf].copy(); kz[-1] *= -1
     K = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
     K2 = sum(K*K, 0, dtype=int)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
-    #K2 *= nu; nuK2= K2
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
@@ -68,14 +65,27 @@ def setup(comm, M, float, complex, uint8, mpitype, linspace, N, L, array, meshgr
     del kwargs
     return locals() # Lazy (need only return what is needed)
 
-def init_fft(N, Nf, Np, complex, num_processes, comm, communication, rank, mpitype):
+@optimizer
+def transpose_Uc(Uc_hatT, U_mpi, num_processes, Np, Nf):
+    for i in xrange(num_processes): 
+        Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
+    return Uc_hatT
+
+@optimizer
+def transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np, Nf):
+    for i in xrange(num_processes): 
+        U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
+    return U_mpi
+
+def init_fft(N, Nf, Np, complex, num_processes, comm, communication, rank, 
+             mpitype):
     # Initialize MPI work arrays globally
     Uc_hat  = empty((N, Np, Nf), dtype=complex)
     Uc_hatT = empty((Np, N, Nf), dtype=complex)
     Uc_send = Uc_hat.reshape((num_processes, Np, Np, Nf))
     U_mpi   = empty((num_processes, Np, Np, Nf), dtype=complex)
     globals().update(locals())
-
+    
 #@profile    
 def ifftn_mpi(fu, u):
     """ifft in three directions using mpi.
@@ -91,11 +101,7 @@ def ifftn_mpi(fu, u):
     if communication == 'alltoall':
         # Communicate all values
         comm.Alltoall([Uc_hat, mpitype], [U_mpi, mpitype])
-        if transpose_Uc: 
-            transpose_Uc(Uc_hatT, U_mpi, num_processes, Np)
-        else:
-            for i in xrange(num_processes): 
-                Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
+        Uc_hatT[:] = transpose_Uc(Uc_hatT, U_mpi, num_processes, Np, Nf)
     
     else:
         for i in xrange(num_processes):
@@ -119,11 +125,7 @@ def fftn_mpi(u, fu):
         # Do 2 ffts in y-z directions on owned data
         Uc_hatT[:] = rfft2(u, axes=(1,2))
         # Transform data to align with x-direction  
-        if transpose_Umpi:
-            transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np)
-        else:
-            for i in xrange(num_processes): 
-                U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
+        U_mpi[:] = transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np, Nf)
             
         # Communicate all values
         comm.Alltoall([U_mpi, mpitype], [fu, mpitype])  

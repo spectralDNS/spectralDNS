@@ -10,7 +10,7 @@ using namespace std;
 //mpic++ -std=c++11 -O3 spectralDNS.cpp -o spectralDNS -lfftw3_mpi -lfftw3
 //mpixlcxx_r -qsmp -O3 spectralDNS.cpp -o spectralDNS $FFTW3_INC $FFTW3_LIB
 
-// To change from float to double replace all fftw_ with fftw_ and vice versa. + change linked libraries.
+// To change from float to double replace all fftw_ with fftwf_ and vice versa. + change linked libraries.
 typedef double precision;
 
 int main( int argc, char *argv[] )

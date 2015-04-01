@@ -4,14 +4,50 @@ __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from wrappyfftw import *
-from ..optimization import transform_Uc_xz, transform_Uc_yx, transform_Uc_xy, transform_Uc_zx
 
 __all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
+from ..optimization import *
+
+@optimizer
+def transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1, N1, N2):
+    if not optimization is None:
+        exec("Uc_hat_x = %s_transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1, N1, N2)"%(optimization))
+    else:
+        for i in range(P1):
+            Uc_hat_x[i*N1:(i+1)*N1] = Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2]
+    return Uc_hat_x
+            
+@optimizer
+def transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1, N1, N2):
+    if not optimization is None:
+        exec("Uc_hat_z = %s_transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1, N1, N2)"%(optimization))
+    else:
+        for i in range(P1):
+            Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2] = Uc_hat_xr[i*N1:(i+1)*N1]
+    return Uc_hat_z
+
+@optimizer
+def transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2, N1, N2):
+    if not optimization is None:
+        exec("Uc_hat_x = %s_transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2, N1, N2)"%(optimization))
+    else:
+        for i in range(P2): 
+            Uc_hat_x[i*N2:(i+1)*N2] = Uc_hat_y[:, i*N2:(i+1)*N2]
+    return Uc_hat_x
+
+@optimizer
+def transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2, N1, N2):
+    if not optimization is None:
+        exec("Uc_hat_y = %s_transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2, N1, N2)"%(optimization))
+    else:
+        for i in range(P2): 
+            Uc_hat_y[:, i*N2:(i+1)*N2] = Uc_hat_xr[i*N2:(i+1)*N2]
+    return Uc_hat_y
 
 def setup(comm, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid,
           sum, where, num_processes, rank, P1, arange, MPI, convection, 
-          hdf5file, mgrid, **kwargs):
+          hdf5file, mgrid, optimization, **kwargs):
 
     # Each cpu gets ownership of a pencil of size N1*N2*N in real space
     # and (N1/2+1)*N2*N in Fourier space. However, the Nyquist mode is
@@ -30,14 +66,6 @@ def setup(comm, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid,
 
     # Create two communicator groups for each rank
     # The goups correspond to chunks in the xy-plane and the xz-plane
-    #procxz = arange(num_processes)[rank%P1::P1]
-    #procxy = arange(num_processes)[(rank/P1)*P1:(rank/P1+1)*P1]
-    #group1 = comm.Get_group()
-    #groups xy = MPI.Group.Incl(group1, procxy)
-    #commxz = comm.Create(groupxy)
-    #group2 = comm.Get_group()
-    #groupxz = MPI.Group.Incl(group2, procxz)
-    #commxy = comm.Create(groupxz)
     commxz = comm.Split(rank/P1)
     commxy = comm.Split(rank%P1)
     
@@ -45,10 +73,8 @@ def setup(comm, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid,
     xyrank = commxy.Get_rank() # Local rank in xy-plane
     
     # Create the physical mesh
-    #x = linspace(0, L, N+1).astype(float)[:-1]
     x1 = slice(xzrank * N1, (xzrank+1) * N1, 1)
     x2 = slice(xyrank * N2, (xyrank+1) * N2, 1)
-    #X = array(meshgrid(x[x1], x[x2], x, indexing='ij'), dtype=float)
     X = mgrid[x1, x2, :N].astype(float)*L/N
     hdf5file.x1 = x1
     hdf5file.x2 = x2
@@ -73,7 +99,7 @@ def setup(comm, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid,
     U_hat1  = empty((3, N2, N, N1/2), dtype=complex)
     dU      = empty((3, N2, N, N1/2), dtype=complex)
 
-    init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy)    
+    init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy, optimization)    
     
     # work arrays (Not required by all convection methods)
     U_tmp = empty((3, N1, N2, N), dtype=float)
@@ -95,7 +121,7 @@ def setup(comm, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid,
     del kwargs
     return locals()
 
-def init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy):
+def init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy, optimization):
     # Initialize MPI work arrays globally
     Uc_hat_z  = empty((N1, N2, Nf), dtype=complex)
     Uc_hat_x  = empty((N, N2, N1/2), dtype=complex)
@@ -112,11 +138,7 @@ def ifftn_mpi(fu, u):
 
     # Transform to x all but k=N/2 (the neglected Nyquist mode)
     Uc_hat_x[:] = 0
-    if transform_Uc_xy:
-        transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2, N2)
-    else:
-        for i in range(P2): 
-            Uc_hat_x[i*N2:(i+1)*N2] = Uc_hat_y[:, i*N2:(i+1)*N2]
+    Uc_hat_x[:] = transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2, N1, N2)
            
     # Communicate in xz-plane and do fft in x-direction
     commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
@@ -124,18 +146,13 @@ def ifftn_mpi(fu, u):
         
     # Communicate and transform in xy-plane
     commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
-    if transform_Uc_zx:
-        transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1, N1)
-    else:
-        for i in range(P1):
-            Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2] = Uc_hat_xr[i*N1:(i+1)*N1]
+    Uc_hat_z[:] = transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1, N1, N2)
             
     # Do fft for y-direction
     Uc_hat_z[:, :, -1] = 0
     u = irfft(Uc_hat_z, axis=2)
     return u
         
-#@profile        
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """    
@@ -143,11 +160,7 @@ def fftn_mpi(u, fu):
     Uc_hat_z[:] = rfft(u, axis=2)
     
     # Transform to x direction neglecting k=N/2 (Nyquist)
-    if transform_Uc_xz:
-        transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1, N1)
-    else:
-        for i in range(P1):
-            Uc_hat_x[i*N1:(i+1)*N1] = Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2]
+    Uc_hat_x[:] = transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1, N1, N2)
     
     # Communicate and do fft in x-direction
     commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
@@ -155,11 +168,7 @@ def fftn_mpi(u, fu):
     
     # Communicate and transform to final z-direction
     commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])  
-    if transform_Uc_yx:
-        transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2, N2)
-    else:
-        for i in range(P2): 
-            Uc_hat_y[:, i*N2:(i+1)*N2] = Uc_hat_xr[i*N2:(i+1)*N2]
+    Uc_hat_y[:] = transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2, N1, N2)
                                    
     # Do fft for last direction 
     fu = fft(Uc_hat_y, axis=1)
