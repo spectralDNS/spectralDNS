@@ -21,11 +21,11 @@ def transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np, Nf):
         U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
     return U_mpi
 
-def setup(comm, M, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
-          sum, where, num_processes, rank, nu, **kwargs):
+def setup(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
+          sum, where, num_processes, rank, **kwargs):
     
-    if not num_processes in [2**i for i in range(M+1)]:
-        raise IOError("Number of cpus must be in ", [2**i for i in range(M+1)])
+    if not num_processes in [2**i for i in range(config.M+1)]:
+        raise IOError("Number of cpus must be in ", [2**i for i in range(config.M+1)])
 
     # Each cpu gets ownership of Np slices
     Np = N / num_processes     

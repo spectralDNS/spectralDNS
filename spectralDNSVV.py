@@ -2,6 +2,9 @@ __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2015-01-02"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
+"""
+Velocity-vorticity formulation
+"""
 
 from MPI_knee import mpi_import, MPI
 with mpi_import():

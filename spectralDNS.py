@@ -3,10 +3,12 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from MPI_knee import mpi_import, MPI
+from MPI_knee import mpi_import, MPI, imp
 with mpi_import():
     import time
+    import importlib
     import config
+    import importlib
     t0 = time.time()
     import sys, cProfile
     from numpy import *
@@ -20,10 +22,7 @@ config.update(commandline_kwargs)
 with mpi_import():
     from src.mpi import setup, ifftn_mpi, fftn_mpi
     from src.maths import *
-    from problems import *
 
-parameters.update(commandline_kwargs)
-vars().update(parameters)
 comm = MPI.COMM_WORLD
 comm.barrier()
 num_processes = comm.Get_size()
@@ -35,13 +34,13 @@ float, complex, mpitype = {"single": (float32, complex64, MPI.F_FLOAT_COMPLEX),
                            "double": (float64, complex128, MPI.F_DOUBLE_COMPLEX)}[config.precision]
 
 # Apply correct precision and set mesh size
-dt = float(dt)
-nu = float(nu)
-N = 2**M
+dt = float(config.dt)
+nu = float(config.nu)
+N = 2**config.M
 L = float(2*pi)
 dx = float(L/N)
 
-hdf5file = HDF5Writer(comm, dt, N, parameters, float)
+hdf5file = HDF5Writer(comm, dt, N, vars(config), float)
 if config.make_profile: profiler = cProfile.Profile()
 
 # Set up solver using wither slab or decomposition
@@ -150,7 +149,6 @@ def ComputeRHS(dU, rk):
         
     return dU
 
-U = initialize(**vars())
 
 # Transform initial data
 for i in range(3):
@@ -159,46 +157,53 @@ for i in range(3):
 # Set up function to perform temporal integration (using config.integrator parameter)
 integrate = getintegrator(**vars())
 
-t = 0.0
-tstep = 0
-fastest_time = 1e8
-slowest_time = 0.0
-tic = t0 = time.time()
-while t < T-1e-8:
-    t += dt; tstep += 1
-    
-    U_hat[:] = integrate(t, tstep, dt)
+def update(**kwargs):
+    pass
 
-    for i in range(3):
-        U[i] = ifftn_mpi(U_hat[i], U[i])
-                    
-    update(**vars())
-    
-    tt = time.time()-t0
-    t0 = time.time()
-    if tstep > 1:
-        fastest_time = min(tt, fastest_time)
-        slowest_time = max(tt, slowest_time)
+def initialize(**kwargs):
+    pass
+
+def solve():
+    t = 0.0
+    tstep = 0
+    fastest_time = 1e8
+    slowest_time = 0.0
+    tic = t0 = time.time()
+    while t < config.T-1e-8:
+        t += dt; tstep += 1
         
-    if tstep == 1 and config.make_profile:
-        #Enable profiling after first step is finished
-        profiler.enable()
+        U_hat[:] = integrate(t, tstep, dt)
 
-toc = time.time()-tic
+        for i in range(3):
+            U[i] = ifftn_mpi(U_hat[i], U[i])
+                 
+        globals().update(locals())
+        update(**globals())
+        
+        tt = time.time()-t0
+        t0 = time.time()
+        if tstep > 1:
+            fastest_time = min(tt, fastest_time)
+            slowest_time = max(tt, slowest_time)
+            
+        if tstep == 1 and config.make_profile:
+            #Enable profiling after first step is finished
+            profiler.enable()
 
-# Get min/max of fastest and slowest process
-fast = (comm.reduce(fastest_time, op=MPI.MIN, root=0),
-        comm.reduce(slowest_time, op=MPI.MIN, root=0))
-slow = (comm.reduce(fastest_time, op=MPI.MAX, root=0),
-        comm.reduce(slowest_time, op=MPI.MAX, root=0))
+    toc = time.time()-tic
 
-if rank == 0:
-    print "Time = ", toc
-    print "Fastest = ", fast
-    print "Slowest = ", slow    
-    
-if config.make_profile:
-    results = create_profile(**vars())
-    
-hdf5file.close()
-finalize(**vars())
+    # Get min/max of fastest and slowest process
+    fast = (comm.reduce(fastest_time, op=MPI.MIN, root=0),
+            comm.reduce(slowest_time, op=MPI.MIN, root=0))
+    slow = (comm.reduce(fastest_time, op=MPI.MAX, root=0),
+            comm.reduce(slowest_time, op=MPI.MAX, root=0))
+
+    if rank == 0:
+        print "Time = ", toc
+        print "Fastest = ", fast
+        print "Slowest = ", slow    
+        
+    if config.make_profile:
+        results = create_profile(**vars())
+        
+    hdf5file.close()
