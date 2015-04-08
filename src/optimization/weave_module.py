@@ -127,6 +127,33 @@ for (int i=0;i<N1;i++){
     fun3 = ext_tools.ext_function("cross2", code, ['c', 'a', 'b'],
                                   type_converters=converters.blitz)
     mod.add_function(fun3)
+    
+    a = empty((3, 3, 3, 3), dtype=float)
+    numeric_type_a = c_spec.num_to_c_types[a.dtype.char]
+    code = """
+int N1 = Na[1];
+int N2 = Na[2];
+int N3 = Na[3];
+%s a0, a1, a2;
+%s b0, b1, b2;
+for (int i=0;i<N1;i++){
+  for (int j=0;j<N2;j++){
+    for (int k=0;k<N3;k++)
+    {  
+      a0 = a(0,i,j,k);a1 = a(1,i,j,k);a2 = a(2,i,j,k);
+      b0 = b(0,i,j,k);b1 = b(1,i,j,k);b2 = b(2,i,j,k);
+
+      c(0,i,j,k) = %s (-(a1*b2.imag() - a2*b1.imag()), a1*b2.real() - a2*b1.real());
+      c(1,i,j,k) = %s (-(a2*b0.imag() - a0*b2.imag()), a2*b0.real() - a0*b2.real());
+      c(2,i,j,k) = %s (-(a0*b1.imag() - a1*b0.imag()), a0*b1.real() - a1*b0.real());
+      
+    }
+  }
+}
+""" %(numeric_type_a, numeric_type_b, numeric_type_b, numeric_type_b,numeric_type_b)
+    fun3b = ext_tools.ext_function("cross3", code, ['c', 'a', 'b'],
+                                  type_converters=converters.blitz)
+    mod.add_function(fun3b)        
 
     Uc_hatT = empty((4, 4, 4), dtype=complex)
     U_mpi   = empty((2, 4, 2, 4), dtype=complex)

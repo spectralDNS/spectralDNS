@@ -3,34 +3,6 @@ from numba import jit, int64, int32, uint8, autojit
 from numba import {0} as float
 from numba import {1} as complex
 
-##@jit(complex[:,:,:,:](complex[:,:,:,:], ))
-#def integrate(U_hat, ComputeRHS):
-    
-    ##cfunc = jit(complex[:,:,:,:](complex[:,:,:,:], int64))
-    ##wrap = cfunc(ComputeRHS)
-    
-    #globals().update(dict(ComputeRHS=ComputeRHS))
-    #var = ComputeRHS.func_globals
-    #dU = var['dU']
-    #U_hat0 = var['U_hat0']
-    #U_hat1 = var['U_hat1']
-    #a = var['a']
-    #b = var['b']
-    #integrator = var['integrator'],
-    #tstep = var['tstep']
-    #dt = var['dt']
-    
-    #if integrator[0] == "RK4":
-        #U_hat = RK4(U_hat, U_hat0, U_hat1, dU, a, b)
-    
-    #elif integrator[0] == "ForwardEuler":
-        #U_hat = ForwardEuler(U_hat, U_hat0, dU, dt)
-        
-    #elif integrator[0] == "AB2":
-        #U_hat = AB2(U_hat, U_hat0, dU, dt, tstep)
-        
-    #return U_hat
-
 #@jit(complex[:,:,:,:](complex[:,:,:,:], complex[:,:,:,:], complex[:,:,:,:],
                       #complex[:,:,:,:], float[:], float[:]), 
                       #nopython=True, locals=globals())
@@ -120,6 +92,23 @@ def cross1(c, a, b):
 
 @jit(complex[:,:,:,:](complex[:,:,:,:], int64[:,:,:,:], complex[:,:,:,:]), nopython=True)    
 def cross2(c, a, b):
+    """ c = 1j*(a x b)"""
+    for i in xrange(a.shape[1]):
+        for j in xrange(a.shape[2]):
+            for k in xrange(a.shape[3]):
+                a0 = a[0,i,j,k]
+                a1 = a[1,i,j,k]
+                a2 = a[2,i,j,k]
+                b0 = b[0,i,j,k]
+                b1 = b[1,i,j,k]
+                b2 = b[2,i,j,k]
+                c[0,i,j,k] = -(a1*b2.imag - a2*b1.imag) +1j*(a1*b2.real - a2*b1.real)
+                c[1,i,j,k] = -(a2*b0.imag - a0*b2.imag) +1j*(a2*b0.real - a0*b2.real)
+                c[2,i,j,k] = -(a0*b1.imag - a1*b0.imag) +1j*(a0*b1.real - a1*b0.real)
+    return c
+
+@jit(complex[:,:,:,:](complex[:,:,:,:], float[:,:,:,:], complex[:,:,:,:]), nopython=True)    
+def cross3(c, a, b):
     """ c = 1j*(a x b)"""
     for i in xrange(a.shape[1]):
         for j in xrange(a.shape[2]):

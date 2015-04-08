@@ -5,37 +5,14 @@ from numpy.linalg import norm
 
 {0}
 
-def integrate(np.ndarray[complex_t, ndim=4] U_hat, ComputeRHS):
-    
-    cdef:
-        var = ComputeRHS.func_globals
-        np.ndarray[complex_t, ndim=4] dU = var['dU']
-        np.ndarray[complex_t, ndim=4] U_hat0 = var['U_hat0']
-        np.ndarray[complex_t, ndim=4] U_hat1 = var['U_hat1']
-        np.ndarray[real_t, ndim=1] a = var['a']
-        np.ndarray[real_t, ndim=1] b = var['b']
-        str integrator = var['integrator'],
-        int tstep = var['tstep']
-        real_t dt = var['dt']
-        
-    if integrator == "RK4":
-        U_hat = RK4(U_hat, U_hat0, U_hat1, dU, ComputeRHS, a, b)
-    
-    elif integrator == "ForwardEuler":
-        U_hat = ForwardEuler(U_hat, U_hat0, dU, dt, ComputeRHS)
-        
-    elif integrator == "AB2":
-        U_hat = AB2(U_hat, U_hat0, dU, dt, ComputeRHS, tstep)
-        
-    return U_hat
-
 def RK4(np.ndarray[complex_t, ndim=4] U_hat, 
         np.ndarray[complex_t, ndim=4] U_hat0, 
         np.ndarray[complex_t, ndim=4] U_hat1, 
         np.ndarray[complex_t, ndim=4] dU,
-        ComputeRHS,
         np.ndarray[real_t, ndim=1] a, 
-        np.ndarray[real_t, ndim=1] b):
+        np.ndarray[real_t, ndim=1] b,
+        real_t dt,
+        ComputeRHS):
     cdef complex_t z
     cdef unsigned int rk, i, j, k, l
     for i in xrange(dU.shape[0]):
@@ -45,7 +22,7 @@ def RK4(np.ndarray[complex_t, ndim=4] U_hat,
                     z = U_hat[i,j,k,l]
                     U_hat1[i,j,k,l] = z 
                     U_hat0[i,j,k,l] = z
-                    
+        
     for rk in xrange(4):
         dU = ComputeRHS(dU, rk)
         if rk < 3:
@@ -53,13 +30,13 @@ def RK4(np.ndarray[complex_t, ndim=4] U_hat,
                 for j in xrange(dU.shape[1]):
                     for k in xrange(dU.shape[2]):
                         for l in xrange(dU.shape[3]):
-                            U_hat[i,j,k,l] = U_hat0[i,j,k,l] + b[rk]*dU[i,j,k,l]
+                            U_hat[i,j,k,l] = U_hat0[i,j,k,l] + b[rk]*dt*dU[i,j,k,l]
             
         for i in xrange(dU.shape[0]):
             for j in xrange(dU.shape[1]):
                 for k in xrange(dU.shape[2]):
                     for l in xrange(dU.shape[3]):
-                        U_hat1[i,j,k,l] = U_hat1[i,j,k,l] + a[rk]*dU[i,j,k,l]
+                        U_hat1[i,j,k,l] = U_hat1[i,j,k,l] + a[rk]*dt*dU[i,j,k,l]
                         
     for i in xrange(dU.shape[0]):
         for j in xrange(dU.shape[1]):
@@ -87,8 +64,8 @@ def ForwardEuler(np.ndarray[complex_t, ndim=4] U_hat,
 def AB2(np.ndarray[complex_t, ndim=4] U_hat, 
         np.ndarray[complex_t, ndim=4] U_hat0, 
         np.ndarray[complex_t, ndim=4] dU,
-        real_t dt,
-        ComputeRHS, int tstep):
+        real_t dt, int tstep,
+        ComputeRHS):
     cdef complex_t z
     cdef real_t p0 = 1.5
     cdef real_t p1 = 0.5
@@ -113,7 +90,7 @@ def AB2(np.ndarray[complex_t, ndim=4] U_hat,
         for j in xrange(dU.shape[1]):
             for k in xrange(dU.shape[2]):
                 for l in xrange(dU.shape[3]):                    
-                    U_hat0[i,j,k,l] = U_hat[i,j,k,l]
+                    U_hat0[i,j,k,l] = dU[i,j,k,l]*dt
     return U_hat
 
 def dealias_rhs(np.ndarray[complex_t, ndim=4] du,
@@ -179,6 +156,29 @@ def cross2(np.ndarray[complex_t, ndim=4] c,
            np.ndarray[complex_t, ndim=4] b):
     cdef unsigned int i, j, k
     cdef int_t a0, a1, a2
+    cdef complex_t b0, b1, b2
+    for i in xrange(a.shape[1]):
+        for j in xrange(a.shape[2]):
+            for k in xrange(a.shape[3]):
+                a0 = a[0,i,j,k];
+                a1 = a[1,i,j,k];
+                a2 = a[2,i,j,k];
+                b0 = b[0,i,j,k];
+                b1 = b[1,i,j,k];
+                b2 = b[2,i,j,k];
+                c[0,i,j,k].real = -(a1*b2.imag - a2*b1.imag)
+                c[0,i,j,k].imag = a1*b2.real - a2*b1.real
+                c[1,i,j,k].real = -(a2*b0.imag - a0*b2.imag)
+                c[1,i,j,k].imag = a2*b0.real - a0*b2.real
+                c[2,i,j,k].real = -(a0*b1.imag - a1*b0.imag)
+                c[2,i,j,k].imag = a0*b1.real - a1*b0.real
+    return c
+
+def cross3(np.ndarray[complex_t, ndim=4] c,
+           np.ndarray[real_t, ndim=4] a,
+           np.ndarray[complex_t, ndim=4] b):
+    cdef unsigned int i, j, k
+    cdef real_t a0, a1, a2
     cdef complex_t b0, b1, b2
     for i in xrange(a.shape[1]):
         for j in xrange(a.shape[2]):

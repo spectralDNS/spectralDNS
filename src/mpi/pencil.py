@@ -4,50 +4,36 @@ __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from wrappyfftw import *
+from ..optimization import optimizer
 
 __all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
-from ..optimization import *
-
 @optimizer
 def transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1, N1, N2):
-    if not optimization is None:
-        exec("Uc_hat_x = %s_transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1, N1, N2)"%(optimization))
-    else:
-        for i in range(P1):
-            Uc_hat_x[i*N1:(i+1)*N1] = Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2]
+    for i in range(P1):
+        Uc_hat_x[i*N1:(i+1)*N1] = Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2]
     return Uc_hat_x
             
 @optimizer
 def transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1, N1, N2):
-    if not optimization is None:
-        exec("Uc_hat_z = %s_transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1, N1, N2)"%(optimization))
-    else:
-        for i in range(P1):
-            Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2] = Uc_hat_xr[i*N1:(i+1)*N1]
+    for i in range(P1):
+        Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2] = Uc_hat_xr[i*N1:(i+1)*N1]
     return Uc_hat_z
 
 @optimizer
 def transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2, N1, N2):
-    if not optimization is None:
-        exec("Uc_hat_x = %s_transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2, N1, N2)"%(optimization))
-    else:
-        for i in range(P2): 
-            Uc_hat_x[i*N2:(i+1)*N2] = Uc_hat_y[:, i*N2:(i+1)*N2]
+    for i in range(P2): 
+        Uc_hat_x[i*N2:(i+1)*N2] = Uc_hat_y[:, i*N2:(i+1)*N2]
     return Uc_hat_x
 
 @optimizer
 def transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2, N1, N2):
-    if not optimization is None:
-        exec("Uc_hat_y = %s_transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2, N1, N2)"%(optimization))
-    else:
-        for i in range(P2): 
-            Uc_hat_y[:, i*N2:(i+1)*N2] = Uc_hat_xr[i*N2:(i+1)*N2]
+    for i in range(P2): 
+        Uc_hat_y[:, i*N2:(i+1)*N2] = Uc_hat_xr[i*N2:(i+1)*N2]
     return Uc_hat_y
 
-def setup(comm, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid,
-          sum, where, num_processes, rank, P1, arange, MPI, convection, 
-          hdf5file, mgrid, optimization, **kwargs):
+def setup(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
+          sum, where, num_processes, rank, P1, hdf5file, mgrid, **kwargs):
 
     # Each cpu gets ownership of a pencil of size N1*N2*N in real space
     # and (N1/2+1)*N2*N in Fourier space. However, the Nyquist mode is
@@ -99,18 +85,19 @@ def setup(comm, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid,
     U_hat1  = empty((3, N2, N, N1/2), dtype=complex)
     dU      = empty((3, N2, N, N1/2), dtype=complex)
 
-    init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy, optimization)    
+    init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy)    
     
     # work arrays (Not required by all convection methods)
-    U_tmp = empty((3, N1, N2, N), dtype=float)
-    F_tmp   = empty((3, N2, N, N1/2), dtype=complex)
-    curl = empty((3, N1, N2, N), dtype=float)
+    U_tmp  = empty((3, N1, N2, N), dtype=float)
+    F_tmp  = empty((3, N2, N, N1/2), dtype=complex)
+    curl   = empty((3, N1, N2, N), dtype=float)
+    Source = None
 
     # Set wavenumbers in grid
     kx = fftfreq(N, 1./N).astype(int)
     k2 = slice(xyrank*N2, (xyrank+1)*N2, 1)
     k1 = slice(xzrank*N1/2, (xzrank+1)*N1/2, 1)
-    K = array(meshgrid(kx[k2], kx, kx[k1], indexing='ij'), dtype=int)
+    K  = array(meshgrid(kx[k2], kx, kx[k1], indexing='ij'), dtype=int)
     K2 = sum(K*K, 0, dtype=int)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
@@ -121,7 +108,7 @@ def setup(comm, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid,
     del kwargs
     return locals()
 
-def init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy, optimization):
+def init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy):
     # Initialize MPI work arrays globally
     Uc_hat_z  = empty((N1, N2, Nf), dtype=complex)
     Uc_hat_x  = empty((N, N2, N1/2), dtype=complex)

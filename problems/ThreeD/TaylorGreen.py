@@ -4,12 +4,14 @@ __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from ..ThreeD import *
+
 parameters.update(
     {
       'nu': 0.000625,             # Viscosity
       'dt': 0.01,                 # Time step
       'T': 0.1,                   # End time
-      'plot_dkdt': False
+      'plot_dkdt': False,
+      'compute_energy': 2         # Compute solution energy every..        
     }
 )
 

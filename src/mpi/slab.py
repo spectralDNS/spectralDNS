@@ -4,12 +4,25 @@ __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from wrappyfftw import *
-from ..optimization import *
+import config
+from ..optimization import optimizer
 
-#__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
-          
-def setup(comm, M, float, complex, uint8, mpitype, linspace, N, L, array, meshgrid, mgrid,
-          sum, where, num_processes, rank, convection, communication, nu, **kwargs):
+__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
+
+@optimizer
+def transpose_Uc(Uc_hatT, U_mpi, num_processes, Np, Nf):
+    for i in xrange(num_processes): 
+        Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
+    return Uc_hatT
+
+@optimizer
+def transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np, Nf):
+    for i in xrange(num_processes): 
+        U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
+    return U_mpi
+
+def setup(comm, M, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
+          sum, where, num_processes, rank, nu, **kwargs):
     
     if not num_processes in [2**i for i in range(M+1)]:
         raise IOError("Number of cpus must be in ", [2**i for i in range(M+1)])
@@ -18,8 +31,6 @@ def setup(comm, M, float, complex, uint8, mpitype, linspace, N, L, array, meshgr
     Np = N / num_processes     
 
     # Create the physical mesh
-    #x = linspace(0, L, N+1).astype(float)[:-1]
-    #X = array(meshgrid(x[rank*Np:(rank+1)*Np], x, x, indexing='ij'), dtype=float)
     X = mgrid[rank*Np:(rank+1)*Np, :N, :N].astype(float)*L/N
 
     """
@@ -47,14 +58,14 @@ def setup(comm, M, float, complex, uint8, mpitype, linspace, N, L, array, meshgr
     U_tmp  = empty((3, Np, N, N), dtype=float)
     F_tmp  = empty((3, N, Np, Nf), dtype=complex)
     curl   = empty((3, Np, N, N), dtype=float)   
+    Source = None
     
-    init_fft(N, Nf, Np, complex, num_processes, comm, communication, rank, 
-             mpitype)
+    init_fft(N, Nf, Np, complex, num_processes, comm, rank, mpitype)
     
     # Set wavenumbers in grid
     kx = fftfreq(N, 1./N).astype(int)
     kz = kx[:Nf].copy(); kz[-1] *= -1
-    K = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
+    K  = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
     K2 = sum(K*K, 0, dtype=int)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
@@ -65,20 +76,7 @@ def setup(comm, M, float, complex, uint8, mpitype, linspace, N, L, array, meshgr
     del kwargs
     return locals() # Lazy (need only return what is needed)
 
-@optimizer
-def transpose_Uc(Uc_hatT, U_mpi, num_processes, Np, Nf):
-    for i in xrange(num_processes): 
-        Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
-    return Uc_hatT
-
-@optimizer
-def transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np, Nf):
-    for i in xrange(num_processes): 
-        U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
-    return U_mpi
-
-def init_fft(N, Nf, Np, complex, num_processes, comm, communication, rank, 
-             mpitype):
+def init_fft(N, Nf, Np, complex, num_processes, comm, rank, mpitype):
     # Initialize MPI work arrays globally
     Uc_hat  = empty((N, Np, Nf), dtype=complex)
     Uc_hatT = empty((Np, N, Nf), dtype=complex)
@@ -98,7 +96,7 @@ def ifftn_mpi(fu, u):
     # Do first owned direction
     Uc_hat[:] = ifft(fu, axis=0)
         
-    if communication == 'alltoall':
+    if config.communication == 'alltoall':
         # Communicate all values
         comm.Alltoall([Uc_hat, mpitype], [U_mpi, mpitype])
         Uc_hatT[:] = transpose_Uc(Uc_hatT, U_mpi, num_processes, Np, Nf)
@@ -121,7 +119,7 @@ def fftn_mpi(u, fu):
         fu = rfftn(u, axes=(0,1,2))
         return fu
     
-    if communication == 'alltoall':
+    if config.communication == 'alltoall':
         # Do 2 ffts in y-z directions on owned data
         Uc_hatT[:] = rfft2(u, axes=(1,2))
         # Transform data to align with x-direction  
@@ -143,3 +141,4 @@ def fftn_mpi(u, fu):
     # Do fft for last direction 
     fu = fft(fu, axis=0)
     return fu
+        

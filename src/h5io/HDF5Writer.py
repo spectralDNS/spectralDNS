@@ -5,6 +5,8 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 """Wrap call to hdf5 to allow running without installing h5py
 """
+import config
+
 __all__ = ['HDF5Writer']
 
 try:
@@ -36,7 +38,7 @@ try:
         def write(self, U, P, tstep):
             if not self.f: self.init_h5file() 
             
-            if tstep % self.params['write_result'] == 0 and self.params['decomposition'] == 'slab':
+            if tstep % self.params['write_result'] == 0 and config.decomposition == 'slab':
                 rank = self.comm.Get_rank()
                 N = self.f.attrs["N"]
                 assert N == P.shape[-1]
@@ -54,7 +56,7 @@ try:
                     self.f["3D/By/%d"%tstep][rank*Np:(rank+1)*Np] = U[4]
                     self.f["3D/Bz/%d"%tstep][rank*Np:(rank+1)*Np] = U[5]
 
-            elif tstep % self.params['write_result'] == 0 and self.params['decomposition'] == 'pencil':
+            elif tstep % self.params['write_result'] == 0 and config.decomposition == 'pencil':
                 N = self.f.attrs["N"]
                 
                 for comp in self.components:
@@ -70,7 +72,7 @@ try:
                     self.f["3D/By/%d"%tstep][x1, x2, :] = U[4]
                     self.f["3D/Bz/%d"%tstep][x1, x2, :] = U[5]
                     
-            if tstep % self.params['write_yz_slice'][1] == 0 and self.params['decomposition'] == 'slab':
+            if tstep % self.params['write_yz_slice'][1] == 0 and config.decomposition == 'slab':
                 i = self.params['write_yz_slice'][0]
                 rank = self.comm.Get_rank()
                 N = self.f.attrs["N"]
@@ -89,7 +91,7 @@ try:
                         self.f["2D/By/%d"%tstep][:] = U[4, i-rank*Np]
                         self.f["2D/Bz/%d"%tstep][:] = U[5, i-rank*Np]
 
-            elif tstep % self.params['write_yz_slice'][1] == 0 and self.params['decomposition'] == 'pencil':
+            elif tstep % self.params['write_yz_slice'][1] == 0 and config.decomposition == 'pencil':
                 i = self.params['write_yz_slice'][0]
                 N = self.f.attrs["N"]
                 for comp in self.components:

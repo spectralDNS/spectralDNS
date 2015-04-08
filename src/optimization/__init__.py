@@ -4,6 +4,7 @@ __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from functools import wraps
+import config
 
 def optimizer(func):
     """Decorator used to wrap calls to optimized versions of functions.
@@ -14,13 +15,13 @@ def optimizer(func):
     
     """
     try: # Look for optimized version of function
-        if optimizer.optimization == "numexpr":
+        if config.optimization == "numexpr":
             fun = eval(".".join(("numexpr_module", func.func_name)))
         else:
-            fun = eval("{0}_{1}.".format(optimizer.optimization, optimizer.precision)+func.func_name)
+            fun = eval("{0}_{1}.".format(config.optimization, config.precision)+func.func_name)
         @wraps(func)
         def wrapped_function(*args, **kwargs): 
-            if optimizer.optimization == "weave":
+            if config.optimization == "weave":
                 fun(*args, **kwargs)
                 u0 = args[0]
             else:
@@ -28,17 +29,13 @@ def optimizer(func):
             return u0
         
     except: # Otherwise revert to default numpy implementation
-        print func.func_name + " not optimized"
+        #print func.func_name + " not optimized"
         @wraps(func)
         def wrapped_function(*args, **kwargs):
             u0 = func(*args, **kwargs)
             return u0
 
     return wrapped_function
-
-# default setting for optimizer - overloaded in spectralDNS
-optimizer.optimization = None
-optimizer.precision = "double"
 
 try:
     import cython_single, cython_double

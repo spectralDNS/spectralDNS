@@ -19,17 +19,9 @@ def create_profile(profiler, comm, MPI, rank, **params):
                  'fft',
                  'Alltoall',
                  'Sendrecv_replace',
-                 'cython_add_pressure_diffusion',
-                 'weave_add_pressure_diffusion',
                  'add_pressure_diffusion',
-                 'cython_cross1',
-                 'weave_cross1',
                  'cross1',
-                 'cython_cross2',
-                 'weave_cross2',
                  'cross2',
-                 'cython_dealias'
-                 'weave_dealias',
                  'dealias_rhs',
                  'Curl',
                  'Cross',
@@ -37,7 +29,7 @@ def create_profile(profiler, comm, MPI, rank, **params):
                  'Scatter',
                  'ComputeRHS']:
         for key, val in ps.stats.iteritems():
-            if item is key[2] or "method '%s'"%item in key[2]:
+            if item is key[2] or "method '%s'"%item in key[2] or ".%s"%item in key[2]:
                 results[item] = (comm.reduce(val[2], op=MPI.MIN, root=0),
                                  comm.reduce(val[2], op=MPI.MAX, root=0),
                                  comm.reduce(val[3], op=MPI.MIN, root=0),
@@ -50,4 +42,3 @@ def create_profile(profiler, comm, MPI, rank, **params):
         pprint.pprint(results)
 
     return results
-
