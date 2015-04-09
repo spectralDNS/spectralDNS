@@ -3,48 +3,9 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from MPI_knee import mpi_import, MPI, imp
+from MPI_knee import mpi_import
 with mpi_import():
-    import time
-    import importlib
-    import config
-    import importlib
-    t0 = time.time()
-    import sys, cProfile
-    from numpy import *
-    from src import *
-
-# Parse parameters from the command line and update config
-commandline_kwargs = parse_command_line(sys.argv[1:])
-config.update(commandline_kwargs)
-
-# Import problem specific methods and solver methods specific to either slab or pencil decomposition
-with mpi_import():
-    from src.mpi import setup, ifftn_mpi, fftn_mpi
-    from src.maths import *
-
-comm = MPI.COMM_WORLD
-comm.barrier()
-num_processes = comm.Get_size()
-rank = comm.Get_rank()
-if comm.Get_rank()==0: print "Import time ", time.time()-t0
-
-# Set types based on configuration
-float, complex, mpitype = {"single": (float32, complex64, MPI.F_FLOAT_COMPLEX),
-                           "double": (float64, complex128, MPI.F_DOUBLE_COMPLEX)}[config.precision]
-
-# Apply correct precision and set mesh size
-dt = float(config.dt)
-nu = float(config.nu)
-N = 2**config.M
-L = float(2*pi)
-dx = float(L/N)
-
-hdf5file = HDF5Writer(comm, dt, N, vars(config), float)
-if config.make_profile: profiler = cProfile.Profile()
-
-# Set up solver using wither slab or decomposition
-vars().update(setup(**vars()))
+    from init import *
 
 def standardConvection(c):
     """c_i = u_j du_i/dx_j"""
@@ -149,19 +110,8 @@ def ComputeRHS(dU, rk):
         
     return dU
 
-
-# Transform initial data
-for i in range(3):
-   U_hat[i] = fftn_mpi(U[i], U_hat[i])
-
 # Set up function to perform temporal integration (using config.integrator parameter)
 integrate = getintegrator(**vars())
-
-def update(**kwargs):
-    pass
-
-def initialize(**kwargs):
-    pass
 
 def solve():
     t = 0.0
