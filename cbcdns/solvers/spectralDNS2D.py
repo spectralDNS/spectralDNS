@@ -3,37 +3,30 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from MPI_knee import mpi_import, MPI
-with mpi_import():
-    from numpy import *
-    import config
-    from pylab import *
-    import sys
-    import time
-    from src.mpi.wrappyfftw import *
-    from src.utilities.commandline import *
+import config
+from mpi4py import MPI
+from numpy import *
+from pylab import *
+import sys
+import time
+from src.mpi.wrappyfftw import *
+from src.utilities import Timer
 
-commandline_kwargs = parse_command_line(sys.argv[1:])
 config.dimensions = 2
 config.optimization = None
 
-with mpi_import():
-    from src.maths import getintegrator, project
-    from problems import *
-    
-parameters.update(commandline_kwargs)
-vars().update(parameters)
-
-# Apply correct precision and set mesh size
-dt = float(dt)
-nu = float(nu)
-N = 2**M
-L = float(2*pi)
-dx = float(L/N)
+from src.maths import getintegrator, project
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 num_processes = comm.Get_size()
+    
+# Apply correct precision and set mesh size
+dt = float(config.dt)
+nu = float(config.nu)
+N = 2**config.M
+L = float(2*pi)
+dx = float(L/N)
 Np = N / num_processes
 
 # Set types based on configuration
@@ -162,46 +155,27 @@ def ComputeRHS(dU, rk):
     dU -= nu*K2*U_hat
     
     return dU
-
-U = initialize(**vars())
-
-# Transform initial data
-U_hat[0] = rfft2_mpi(U[0], U_hat[0])
-U_hat[1] = rfft2_mpi(U[1], U_hat[1])
-
-# Make it divergence free in case it is not
-U_hat = project(U_hat, K, K_over_K2)
-
-tic = time.time()
-t = 0.0
-tstep = 0
-
-# initialize plot
-if plot_result > 0:
-    im = plt.imshow(zeros((N, N)))
-    plt.colorbar(im)
-    plt.draw()
     
-integrate = getintegrator(**vars())    
+integrate = getintegrator(**vars())   
 
-t0 = array([time.time()])
-while t < T:
-    t += dt; tstep += 1
+def regression_test(**kw):
+    pass
 
-    U_hat[:] = integrate(t, tstep, dt)
+def solve():
+    timer = Timer()
+    t = 0.0
+    tstep = 0
+    while t < config.T:        
+        t += dt
+        tstep += 1
 
-    for i in range(2): 
-        U[i] = irfft2_mpi(U_hat[i], U[i])
+        U_hat[:] = integrate(t, tstep, dt)
 
-    update(**vars())
+        for i in range(2): 
+            U[i] = irfft2_mpi(U_hat[i], U[i])
+
+        update(t, tstep, **globals())
+        
+    timer.final(MPI, rank)
     
-    if tstep % plot_result == 0 and plot_result > 0:
-        curl = irfft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
-        im.set_data(curl[:, :])
-        im.autoscale()
-        plt.pause(1e-6)
-    
-if rank == 0:
-    print "Total computing time = ", time.time()-tic
-
-regression_test(**vars())
+    regression_test(**globals())

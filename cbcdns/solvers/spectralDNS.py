@@ -3,9 +3,7 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from MPI_knee import mpi_import
-with mpi_import():
-    from init import *
+from spectralinit import *
 
 def standardConvection(c):
     """c_i = u_j du_i/dx_j"""
@@ -101,7 +99,6 @@ def ComputeRHS(dU, rk):
         for i in range(3):
             U[i] = ifftn_mpi(U_hat[i], U[i])
     
-    # Compute convective term and place in dU
     dU = conv(dU)
     
     dU = dealias_rhs(dU, dealias)
@@ -114,45 +111,28 @@ def ComputeRHS(dU, rk):
 integrate = getintegrator(**vars())
 
 def solve():
+    timer = Timer()
     t = 0.0
     tstep = 0
-    fastest_time = 1e8
-    slowest_time = 0.0
-    tic = t0 = time.time()
     while t < config.T-1e-8:
-        t += dt; tstep += 1
+        t += dt 
+        tstep += 1
         
         U_hat[:] = integrate(t, tstep, dt)
 
         for i in range(3):
             U[i] = ifftn_mpi(U_hat[i], U[i])
                  
-        globals().update(locals())
-        update(**globals())
+        update(t, tstep, **globals())
         
-        tt = time.time()-t0
-        t0 = time.time()
-        if tstep > 1:
-            fastest_time = min(tt, fastest_time)
-            slowest_time = max(tt, slowest_time)
-            
+        timer()
+        
         if tstep == 1 and config.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
 
-    toc = time.time()-tic
-
-    # Get min/max of fastest and slowest process
-    fast = (comm.reduce(fastest_time, op=MPI.MIN, root=0),
-            comm.reduce(slowest_time, op=MPI.MIN, root=0))
-    slow = (comm.reduce(fastest_time, op=MPI.MAX, root=0),
-            comm.reduce(slowest_time, op=MPI.MAX, root=0))
-
-    if rank == 0:
-        print "Time = ", toc
-        print "Fastest = ", fast
-        print "Slowest = ", slow    
-        
+    timer.final(MPI, rank)
+    
     if config.make_profile:
         results = create_profile(**vars())
         

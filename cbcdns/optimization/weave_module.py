@@ -269,7 +269,6 @@ for (int i=0; i<P1; i++){
                                   type_converters=converters.blitz)
     mod.add_function(fun9)
     
-    mod.compile(extra_compile_args=['-Ofast'], verbose=2)
     return mod
         
 if __name__=="__main__":

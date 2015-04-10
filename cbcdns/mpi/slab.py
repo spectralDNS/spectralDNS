@@ -4,7 +4,7 @@ __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from wrappyfftw import *
-import config
+from cbcdns import config
 from ..optimization import optimizer
 
 __all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
