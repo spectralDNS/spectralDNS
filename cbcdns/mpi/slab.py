@@ -3,7 +3,7 @@ __date__ = "2014-12-30"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from wrappyfftw import *
+from ..fft.wrappyfftw import *
 from cbcdns import config
 from ..optimization import optimizer
 
@@ -138,7 +138,7 @@ def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
     return locals() # Lazy (need only return what is needed)
 
 setup = {"MHD": setupMHD,
-         "NS": setupDNS,
+         "NS":  setupDNS,
          "VV":  setupDNS}[config.solver]        
 
 def init_fft(N, Nf, Np, complex, num_processes, comm, rank, mpitype):

@@ -3,19 +3,19 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-import config
+from cbcdns import config
 from mpi4py import MPI
 from numpy import *
 from pylab import *
 import sys
 import time
-from src.mpi.wrappyfftw import *
-from src.utilities import Timer
+from cbcdns.fft.wrappyfftw import *
+from cbcdns.utilities import Timer
 
 config.dimensions = 2
 config.optimization = None
 
-from src.maths import getintegrator, project
+from cbcdns.maths import getintegrator, project
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()

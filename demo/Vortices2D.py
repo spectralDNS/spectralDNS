@@ -39,17 +39,16 @@ def update(t, tstep, N, curl, U_hat, irfft2_mpi, K, **kw):
         
 if __name__ == '__main__':
     # Set some (any) problem dependent parameters by overloading default parameters
-    import config
+    from cbcdns import config
     config.update(
     {
-      'solver': 'NS2D',
       'nu': 0.001,
       'dt': 0.005,
       'T': 50,
       'debug': False}
     )
 
-    from spectral import solver
+    from cbcdns import solver
     initialize(**vars(solver))
     solver.update = update
     solver.regression_test = regression_test

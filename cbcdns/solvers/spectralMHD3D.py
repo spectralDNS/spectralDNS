@@ -37,7 +37,7 @@ def ComputeRHS(dU, rk):
     # Dealias the nonlinear convection
     dU[:] *= dealias
     
-    # Compute pressure (To get actual pressure multiply by 1j/dt)
+    # Compute pressure (To get actual pressure multiply by 1j)
     P_hat[:] = sum(dU[:3]*K_over_K2, 0)
         
     # Add pressure gradient

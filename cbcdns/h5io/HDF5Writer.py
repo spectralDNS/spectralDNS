@@ -16,7 +16,7 @@ try:
         def __init__(self, comm, dt, N, dtype, filename="U.h5"):
             self.comm = comm
             self.components = components = ["U", "V", "W", "P"]
-            if "eta" in vars(config): components += ["Bx", "By", "Bz"]
+            if config.solver == "MHD": components += ["Bx", "By", "Bz"]
             self.fname = filename
             self.dtype = dtype
             self.dt = dt
@@ -71,8 +71,8 @@ try:
                     self.f["3D/By/%d"%tstep][x1, x2, :] = U[4]
                     self.f["3D/Bz/%d"%tstep][x1, x2, :] = U[5]
                     
-            if tstep % config.write_yz_slize[1] == 0 and config.decomposition == 'slab':
-                i = config.write_yz_slize[0]
+            if tstep % config.write_yz_slice[1] == 0 and config.decomposition == 'slab':
+                i = config.write_yz_slice[0]
                 rank = self.comm.Get_rank()
                 N = self.f.attrs["N"]
                 assert N == P.shape[-1]
@@ -90,8 +90,8 @@ try:
                         self.f["2D/By/%d"%tstep][:] = U[4, i-rank*Np]
                         self.f["2D/Bz/%d"%tstep][:] = U[5, i-rank*Np]
 
-            elif tstep % config.write_yz_slize[1] == 0 and config.decomposition == 'pencil':
-                i = config.write_yz_slize[0]
+            elif tstep % config.write_yz_slice[1] == 0 and config.decomposition == 'pencil':
+                i = config.write_yz_slice[0]
                 N = self.f.attrs["N"]
                 for comp in self.components:
                     self.f["2D/"+comp].create_dataset(str(tstep), shape=(N, N), dtype=self.dtype)

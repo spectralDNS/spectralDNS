@@ -38,7 +38,6 @@ def optimizer(func):
     return wrapped_function
 
 try:
-    #import cython_single, cython_double
     import cython_module
            
 except:
@@ -67,7 +66,6 @@ try:
 except:
     pass
 
-import numba_single, numba_double
 try:   
     import numba_single, numba_double
     

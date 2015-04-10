@@ -3,7 +3,8 @@ __date__ = "2014-12-30"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from wrappyfftw import *
+from ..fft.wrappyfftw import *
+from cbcdns import config
 from ..optimization import optimizer
 
 __all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
@@ -32,13 +33,14 @@ def transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2, N1, N2):
         Uc_hat_y[:, i*N2:(i+1)*N2] = Uc_hat_xr[i*N2:(i+1)*N2]
     return Uc_hat_y
 
-def setup(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
-          sum, where, num_processes, rank, P1, hdf5file, mgrid, **kwargs):
+def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
+             sum, where, num_processes, rank, hdf5file, mgrid, **kwargs):
 
     # Each cpu gets ownership of a pencil of size N1*N2*N in real space
     # and (N1/2+1)*N2*N in Fourier space. However, the Nyquist mode is
-    # neglected and as such the actual number is N1/2*N2*N in Fourier space.
-    assert num_processes > 1 and P1 < num_processes
+    # neglected and as such the actual number is N1/2*N2*N in Fourier space.    
+    assert num_processes > 1 and config.P1 < num_processes
+    P1 = config.P1
     
     P2 = num_processes / P1
     N1 = N/P1
@@ -107,6 +109,93 @@ def setup(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
                     (abs(K[2]) < kmax), dtype=uint8)
     del kwargs
     return locals()
+
+def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
+             sum, where, num_processes, rank, hdf5file, mgrid, **kwargs):
+
+    # Each cpu gets ownership of a pencil of size N1*N2*N in real space
+    # and (N1/2+1)*N2*N in Fourier space. However, the Nyquist mode is
+    # neglected and as such the actual number is N1/2*N2*N in Fourier space.
+    assert num_processes > 1 and config.P1 < num_processes
+    P1 = config.P1
+    
+    P2 = num_processes / P1
+    N1 = N/P1
+    N2 = N/P2
+    
+    if not (num_processes % 2 == 0 or num_processes == 1):
+        raise IOError("Number of cpus must be even")
+
+    if not ((P1 == 1 or P1 % 2 == 0) and (P2 == 1 or P2 % 2 == 0)):
+        raise IOError("Number of cpus in each direction must be even")
+
+    # Create two communicator groups for each rank
+    # The goups correspond to chunks in the xy-plane and the xz-plane
+    commxz = comm.Split(rank/P1)
+    commxy = comm.Split(rank%P1)
+    
+    xzrank = commxz.Get_rank() # Local rank in xz-plane
+    xyrank = commxy.Get_rank() # Local rank in xy-plane
+    
+    # Create the physical mesh
+    x1 = slice(xzrank * N1, (xzrank+1) * N1, 1)
+    x2 = slice(xyrank * N2, (xyrank+1) * N2, 1)
+    X = mgrid[x1, x2, :N].astype(float)*L/N
+    hdf5file.x1 = x1
+    hdf5file.x2 = x2
+
+    """
+    Solution U is real and as such its transform, U_hat = fft(U)(k), 
+    is such that fft(U)(k) = conj(fft(U)(N-k)) and thus it is sufficient 
+    to store N/2+1 Fourier coefficients in the first transformed direction 
+    (y). However, the Nyquist mode (k=N/2+1) is neglected in the 3D fft.
+    The Nyquist mode in included in temporary arrays simply because rfft/irfft 
+    expect N/2+1 modes.
+    """
+
+    Nf = N/2+1 # Total Fourier coefficients in z-direction
+    UB     = empty((6, N1, N2, N), dtype=float)
+    UB_hat = empty((6, N2, N, N1/2), dtype=complex)
+    P      = empty((N1, N2, N), dtype=float)
+    P_hat  = empty((N2, N, N1/2), dtype=complex)
+
+    # Create views into large data structures
+    U     = UB[:3] 
+    U_hat = UB_hat[:3]
+    B     = UB[3:]
+    B_hat = UB_hat[3:]
+
+    # Temporal storage arrays (Not required by all temporal integrators)
+    UB_hat0  = empty((6, N2, N, N1/2), dtype=complex)
+    UB_hat1  = empty((6, N2, N, N1/2), dtype=complex)
+    dU       = empty((6, N2, N, N1/2), dtype=complex)
+
+    init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy)    
+    
+    # work arrays (Not required by all convection methods)
+    U_tmp  = empty((3, N1, N2, N), dtype=float)
+    F_tmp  = empty((3, 3, N2, N, N1/2), dtype=complex)
+    curl   = empty((3, N1, N2, N), dtype=float)
+    Source = None
+
+    # Set wavenumbers in grid
+    kx = fftfreq(N, 1./N).astype(int)
+    k2 = slice(xyrank*N2, (xyrank+1)*N2, 1)
+    k1 = slice(xzrank*N1/2, (xzrank+1)*N1/2, 1)
+    K  = array(meshgrid(kx[k2], kx, kx[k1], indexing='ij'), dtype=int)
+    K2 = sum(K*K, 0, dtype=int)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
+    # Filter for dealiasing nonlinear convection
+    kmax = 2./3.*(N/2+1)
+    dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*
+                    (abs(K[2]) < kmax), dtype=uint8)
+    del kwargs
+    return locals()
+
+setup = {"MHD": setupMHD,
+         "NS":  setupDNS,
+         "VV":  setupDNS}[config.solver]
 
 def init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy):
     # Initialize MPI work arrays globally

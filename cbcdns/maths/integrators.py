@@ -39,7 +39,7 @@ def AB2(u0, u1, dU, dt, tstep, ComputeRHS):
 def getintegrator(dU, ComputeRHS, float, array, **kw):
     """Return integrator using choice in global parameter integrator.
     """
-    if config.solver in ("NS", "VV"):
+    if config.solver in ("NS", "VV", "NS2D"):
         u0, u1, u2 = kw['U_hat'], kw['U_hat0'], kw['U_hat1'] 
     else:
         u0, u1, u2 = kw['UB_hat'], kw['UB_hat0'], kw['UB_hat1']
