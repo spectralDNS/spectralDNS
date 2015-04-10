@@ -9,52 +9,57 @@ from ..optimization import optimizer, wraps
 __all__ = ['getintegrator']
 
 @optimizer
-def RK4(U_hat, U_hat0, U_hat1, dU, a, b, dt, ComputeRHS):
+def RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS):
     """Runge Kutta fourth order"""
-    U_hat1[:] = U_hat0[:] = U_hat
+    u2[:] = u1[:] = u0
     for rk in range(4):
         dU = ComputeRHS(dU, rk)
         if rk < 3:
-            U_hat[:] = U_hat0 + b[rk]*dt*dU
-        U_hat1 += a[rk]*dt*dU
-    U_hat[:] = U_hat1
-    return U_hat
+            u0[:] = u1 + b[rk]*dt*dU
+        u2 += a[rk]*dt*dU
+    u0[:] = u2
+    return u0
 
 @optimizer
-def ForwardEuler(U_hat, U_hat0, dU, dt, ComputeRHS):
+def ForwardEuler(u0, u1, dU, dt, ComputeRHS):
     dU = ComputeRHS(dU, 0)        
-    U_hat += dU*dt
-    return U_hat
+    u0 += dU*dt
+    return u0
 
 @optimizer
-def AB2(U_hat, U_hat0, dU, dt, tstep, ComputeRHS):
+def AB2(u0, u1, dU, dt, tstep, ComputeRHS):
     dU = ComputeRHS(dU, 0)
     if tstep == 1:
-        U_hat += dU*dt
+        u0 += dU*dt
     else:
-        U_hat += (1.5*dU*dt - 0.5*U_hat0)        
-    U_hat0[:] = dU*dt    
-    return U_hat
+        u0 += (1.5*dU*dt - 0.5*u1)        
+    u1[:] = dU*dt    
+    return u0
 
-def getintegrator(U_hat, U_hat0, U_hat1, dU, ComputeRHS, float, array, **soak):
+def getintegrator(dU, ComputeRHS, float, array, **kw):
     """Return integrator using choice in global parameter integrator.
     """
+    if config.solver in ("NS", "VV"):
+        u0, u1, u2 = kw['U_hat'], kw['U_hat0'], kw['U_hat1'] 
+    else:
+        u0, u1, u2 = kw['UB_hat'], kw['UB_hat0'], kw['UB_hat1']
+        
     if config.integrator == "RK4": 
         # RK4 parameters
         a = array([1./6., 1./3., 1./3., 1./6.], dtype=float)
         b = array([0.5, 0.5, 1.], dtype=float)
         @wraps(RK4)
         def func(t, tstep, dt):
-            return RK4(U_hat, U_hat0, U_hat1, dU, a, b, dt, ComputeRHS)
+            return RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS)
         return func
             
     elif config.integrator == "ForwardEuler":  
         @wraps(ForwardEuler)
         def func(t, tstep, dt):
-            return ForwardEuler(U_hat, U_hat0, dU, dt, ComputeRHS)
+            return ForwardEuler(u0, u1, dU, dt, ComputeRHS)
         return func
     else:
         @wraps(AB2)
         def func(t, tstep, dt):
-            return AB2(U_hat, U_hat0, dU, dt, tstep, ComputeRHS)
+            return AB2(u0, u1, dU, dt, tstep, ComputeRHS)
         return func

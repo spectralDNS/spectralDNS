@@ -22,7 +22,7 @@ def Cross(a, b, c):
 
 def Curl(a, c):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
-    F_tmp[:] = cross3(F_tmp, K_over_K2, a)
+    F_tmp[:] = cross2(F_tmp, K_over_K2, a)
     c[0] = ifftn_mpi(F_tmp[0], c[0])
     c[1] = ifftn_mpi(F_tmp[1], c[1])
     c[2] = ifftn_mpi(F_tmp[2], c[2])    

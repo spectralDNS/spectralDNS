@@ -91,7 +91,7 @@ def cross1(c, a, b):
     return c
 
 @jit(complex[:,:,:,:](complex[:,:,:,:], int64[:,:,:,:], complex[:,:,:,:]), nopython=True)    
-def cross2(c, a, b):
+def cross2a(c, a, b):
     """ c = 1j*(a x b)"""
     for i in xrange(a.shape[1]):
         for j in xrange(a.shape[2]):
@@ -108,7 +108,7 @@ def cross2(c, a, b):
     return c
 
 @jit(complex[:,:,:,:](complex[:,:,:,:], float[:,:,:,:], complex[:,:,:,:]), nopython=True)    
-def cross3(c, a, b):
+def cross2b(c, a, b):
     """ c = 1j*(a x b)"""
     for i in xrange(a.shape[1]):
         for j in xrange(a.shape[2]):
@@ -122,6 +122,13 @@ def cross3(c, a, b):
                 c[0,i,j,k] = -(a1*b2.imag - a2*b1.imag) +1j*(a1*b2.real - a2*b1.real)
                 c[1,i,j,k] = -(a2*b0.imag - a0*b2.imag) +1j*(a2*b0.real - a0*b2.real)
                 c[2,i,j,k] = -(a0*b1.imag - a1*b0.imag) +1j*(a0*b1.real - a1*b0.real)
+    return c
+
+def cross2(c, a, b):
+    if a.dtype == int64.key:
+        c = cross2a(c, a, b)
+    elif a.dtype == float.key:
+        c = cross2b(c, a, b)
     return c
 
 @jit(complex[:,:,:,:](complex[:,:,:,:], uint8[:,:,:]))

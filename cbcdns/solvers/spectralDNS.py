@@ -28,6 +28,7 @@ def divergenceConvection(c, add=False):
     c[2] += (1j*K[1]*F_tmp[1] + 1j*K[2]*F_tmp[2])
     return c
 
+@profile
 def Cross(a, b, c):
     """c_k = F_k(a x b)"""
     U_tmp[:] = cross1(U_tmp, a, b)
@@ -36,6 +37,7 @@ def Cross(a, b, c):
     c[2] = fftn_mpi(U_tmp[2], c[2])
     return c
 
+@profile
 def Curl(a, c):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
     F_tmp[:] = cross2(F_tmp, K, a)

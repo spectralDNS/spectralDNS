@@ -3,7 +3,15 @@
 cimport numpy as np
 from numpy.linalg import norm
 
-{0}
+
+ctypedef np.int64_t int_t
+ctypedef fused complex_t:
+    np.complex128_t
+    np.complex64_t
+
+ctypedef fused real_t:
+    np.float64_t
+    np.float32_t
     
 ctypedef fused T:
     np.float64_t
@@ -154,33 +162,10 @@ def cross1(np.ndarray[real_t, ndim=4] c,
     return c
 
 def cross2(np.ndarray[complex_t, ndim=4] c,
-           np.ndarray[int_t, ndim=4] a,
+           np.ndarray[T, ndim=4] a,
            np.ndarray[complex_t, ndim=4] b):
     cdef unsigned int i, j, k
-    cdef int_t a0, a1, a2
-    cdef complex_t b0, b1, b2
-    for i in xrange(a.shape[1]):
-        for j in xrange(a.shape[2]):
-            for k in xrange(a.shape[3]):
-                a0 = a[0,i,j,k];
-                a1 = a[1,i,j,k];
-                a2 = a[2,i,j,k];
-                b0 = b[0,i,j,k];
-                b1 = b[1,i,j,k];
-                b2 = b[2,i,j,k];
-                c[0,i,j,k].real = -(a1*b2.imag - a2*b1.imag)
-                c[0,i,j,k].imag = a1*b2.real - a2*b1.real
-                c[1,i,j,k].real = -(a2*b0.imag - a0*b2.imag)
-                c[1,i,j,k].imag = a2*b0.real - a0*b2.real
-                c[2,i,j,k].real = -(a0*b1.imag - a1*b0.imag)
-                c[2,i,j,k].imag = a0*b1.real - a1*b0.real
-    return c
-
-def cross3(np.ndarray[complex_t, ndim=4] c,
-           np.ndarray[real_t, ndim=4] a,
-           np.ndarray[complex_t, ndim=4] b):
-    cdef unsigned int i, j, k
-    cdef real_t a0, a1, a2
+    cdef T a0, a1, a2
     cdef complex_t b0, b1, b2
     for i in xrange(a.shape[1]):
         for j in xrange(a.shape[2]):

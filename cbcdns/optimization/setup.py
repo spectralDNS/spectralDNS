@@ -11,8 +11,6 @@ from distutils.extension import Extension
 from Cython.Distutils import build_ext
 from numpy import get_include
 
-print sys.argv
-
 if '--with-cython' in sys.argv[-1]:
     use_cython = True
     from Cython.Distutils import build_ext
@@ -38,7 +36,6 @@ ctypedef np.int64_t int_t
     fd = open("cython_double.pyx", "w")
     fd.write(ff.format(precision["double"]))
     fd.close()
-
 
 if '--with-weave' in sys.argv[-1]:
     import weave_module

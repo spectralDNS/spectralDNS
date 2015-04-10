@@ -16,3 +16,6 @@ with mpi_import():
     elif config.solver == 'NS2D':
         import solvers.spectralDNS2D as solver
         
+    elif config.solver == 'MHD':
+        import solvers.spectralMHD3D as solver
+        

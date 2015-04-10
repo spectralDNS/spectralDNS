@@ -21,8 +21,8 @@ def transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np, Nf):
         U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
     return U_mpi
 
-def setup(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
-          sum, where, num_processes, rank, **kwargs):
+def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
+             sum, where, num_processes, rank, **kwargs):
     
     if not num_processes in [2**i for i in range(config.M+1)]:
         raise IOError("Number of cpus must be in ", [2**i for i in range(config.M+1)])
@@ -75,6 +75,71 @@ def setup(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
                     (abs(K[2]) < kmax), dtype=uint8)
     del kwargs
     return locals() # Lazy (need only return what is needed)
+
+def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
+             sum, where, num_processes, rank, **kwargs):
+    
+    if not num_processes in [2**i for i in range(config.M+1)]:
+        raise IOError("Number of cpus must be in ", [2**i for i in range(config.M+1)])
+
+    # Each cpu gets ownership of Np slices
+    Np = N / num_processes     
+
+    # Create the physical mesh
+    X = mgrid[rank*Np:(rank+1)*Np, :N, :N].astype(float)*L/N
+
+    """
+    Solution U is real and as such its transform, U_hat = fft(U)(k), 
+    is such that fft(U)(k) = conj(fft(U)(N-k)) and thus it is sufficient 
+    to store N/2+1 Fourier coefficients in the first transformed direction (y).
+    For means of efficient MPI communication, the physical box (N^3) is
+    shared by processors along the first direction, whereas the Fourier 
+    coefficients are shared along the third direction. The y-direction
+    is N/2+1 in Fourier space.
+    """
+
+    Nf = N/2+1
+    UB     = empty((6, Np, N, N), dtype=float)  
+    UB_hat = empty((6, N, Np, Nf), dtype=complex)
+    P      = empty((Np, N, N), dtype=float)
+    P_hat  = empty((N, Np, Nf), dtype=complex)
+    
+    # Create views into large data structures
+    U     = UB[:3] 
+    U_hat = UB_hat[:3]
+    B     = UB[3:]
+    B_hat = UB_hat[3:]
+
+    # Temporal storage arrays (Not required by all temporal integrators)
+    UB_hat0 = empty((6, N, Np, Nf), dtype=complex)
+    UB_hat1 = empty((6, N, Np, Nf), dtype=complex)
+    dU      = empty((6, N, Np, Nf), dtype=complex)
+
+    # work arrays (Not required by all convection methods)
+    U_tmp  = empty((3, Np, N, N), dtype=float)
+    F_tmp  = empty((3, 3, N, Np, Nf), dtype=complex)
+    curl   = empty((3, Np, N, N), dtype=float)   
+    Source = None
+    
+    init_fft(N, Nf, Np, complex, num_processes, comm, rank, mpitype)
+    
+    # Set wavenumbers in grid
+    kx = fftfreq(N, 1./N).astype(int)
+    kz = kx[:Nf].copy(); kz[-1] *= -1
+    K  = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
+    K2 = sum(K*K, 0, dtype=int)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
+    # Filter for dealiasing nonlinear convection
+    kmax = 2./3.*(N/2+1)
+    dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*
+                    (abs(K[2]) < kmax), dtype=uint8)
+    del kwargs
+    return locals() # Lazy (need only return what is needed)
+
+setup = {"MHD": setupMHD,
+         "NS": setupDNS,
+         "VV":  setupDNS}[config.solver]        
 
 def init_fft(N, Nf, Np, complex, num_processes, comm, rank, mpitype):
     # Initialize MPI work arrays globally

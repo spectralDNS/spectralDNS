@@ -124,7 +124,7 @@ for (int i=0;i<N1;i++){
   }
 }
 """ %(numeric_type_a, numeric_type_b, numeric_type_b, numeric_type_b,numeric_type_b)
-    fun3 = ext_tools.ext_function("cross2", code, ['c', 'a', 'b'],
+    fun3 = ext_tools.ext_function("cross2a", code, ['c', 'a', 'b'],
                                   type_converters=converters.blitz)
     mod.add_function(fun3)
     
@@ -151,7 +151,7 @@ for (int i=0;i<N1;i++){
   }
 }
 """ %(numeric_type_a, numeric_type_b, numeric_type_b, numeric_type_b,numeric_type_b)
-    fun3b = ext_tools.ext_function("cross3", code, ['c', 'a', 'b'],
+    fun3b = ext_tools.ext_function("cross2b", code, ['c', 'a', 'b'],
                                   type_converters=converters.blitz)
     mod.add_function(fun3b)        
 

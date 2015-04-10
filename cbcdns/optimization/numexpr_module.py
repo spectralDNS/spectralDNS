@@ -15,10 +15,6 @@ def cross2(c, a, b):
     c *= 1j
     return c
 
-def cross3(c, a, b):
-    cross2(c, a, b)
-    return c
-
 def dealias_rhs(dU, dealias):
     dU = numexpr.evaluate("dU*dealias")
     return dU

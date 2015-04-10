@@ -13,12 +13,11 @@ try:
     import h5py
     class HDF5Writer(object):
     
-        def __init__(self, comm, dt, N, params, dtype, filename="U.h5"):
+        def __init__(self, comm, dt, N, dtype, filename="U.h5"):
             self.comm = comm
             self.components = components = ["U", "V", "W", "P"]
-            if "eta" in params: components += ["Bx", "By", "Bz"]
+            if "eta" in vars(config): components += ["Bx", "By", "Bz"]
             self.fname = filename
-            self.params = params
             self.dtype = dtype
             self.dt = dt
             self.N = N
@@ -33,12 +32,12 @@ try:
                 self.f["2D"].create_group(c)
             self.f.attrs.create("dt", self.dt)
             self.f.attrs.create("N", self.N)    
-            self.f["2D"].attrs.create("i", self.params['write_yz_slice'][0])            
+            self.f["2D"].attrs.create("i", config.write_yz_slice[0])            
             
         def write(self, U, P, tstep):
             if not self.f: self.init_h5file() 
             
-            if tstep % self.params['write_result'] == 0 and config.decomposition == 'slab':
+            if tstep % config.write_result == 0 and config.decomposition == 'slab':
                 rank = self.comm.Get_rank()
                 N = self.f.attrs["N"]
                 assert N == P.shape[-1]
@@ -56,7 +55,7 @@ try:
                     self.f["3D/By/%d"%tstep][rank*Np:(rank+1)*Np] = U[4]
                     self.f["3D/Bz/%d"%tstep][rank*Np:(rank+1)*Np] = U[5]
 
-            elif tstep % self.params['write_result'] == 0 and config.decomposition == 'pencil':
+            elif tstep % config.write_result == 0 and config.decomposition == 'pencil':
                 N = self.f.attrs["N"]
                 
                 for comp in self.components:
@@ -72,8 +71,8 @@ try:
                     self.f["3D/By/%d"%tstep][x1, x2, :] = U[4]
                     self.f["3D/Bz/%d"%tstep][x1, x2, :] = U[5]
                     
-            if tstep % self.params['write_yz_slice'][1] == 0 and config.decomposition == 'slab':
-                i = self.params['write_yz_slice'][0]
+            if tstep % config.write_yz_slize[1] == 0 and config.decomposition == 'slab':
+                i = config.write_yz_slize[0]
                 rank = self.comm.Get_rank()
                 N = self.f.attrs["N"]
                 assert N == P.shape[-1]
@@ -91,8 +90,8 @@ try:
                         self.f["2D/By/%d"%tstep][:] = U[4, i-rank*Np]
                         self.f["2D/Bz/%d"%tstep][:] = U[5, i-rank*Np]
 
-            elif tstep % self.params['write_yz_slice'][1] == 0 and config.decomposition == 'pencil':
-                i = self.params['write_yz_slice'][0]
+            elif tstep % config.write_yz_slize[1] == 0 and config.decomposition == 'pencil':
+                i = config.write_yz_slize[0]
                 N = self.f.attrs["N"]
                 for comp in self.components:
                     self.f["2D/"+comp].create_dataset(str(tstep), shape=(N, N), dtype=self.dtype)
@@ -112,7 +111,7 @@ try:
                             
 except:
     class HDF5Writer(object):
-        def __init__(self, comm, dt, N, params, filename="U.h5"):
+        def __init__(self, comm, dt, N, filename="U.h5"):
             if comm.Get_rank() == 0:
                 print Warning("Need to install h5py to allow storing results")
         
