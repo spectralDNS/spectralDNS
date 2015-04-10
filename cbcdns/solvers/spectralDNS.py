@@ -136,6 +136,6 @@ def solve():
     timer.final(MPI, rank)
     
     if config.make_profile:
-        results = create_profile(**vars())
+        results = create_profile(**globals())
         
     hdf5file.close()

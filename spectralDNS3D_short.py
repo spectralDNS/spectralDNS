@@ -6,8 +6,9 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from numpy import *
 from numpy.fft import fftfreq, fft, ifft, irfft2, rfft2, rfftn, irfftn
 from mpi4py import MPI
+
 try:
-    from mpi.wrappyfftw import *
+    from cbcdns.fft.wrappyfftw import *
 except ImportError:
     pass # Rely on numpy.fft routines
 
@@ -106,7 +107,7 @@ while t < T-1e-8:
     U_hat[:] = U_hat1[:]
     for i in range(3):
         U[i] = ifftn_mpi(U_hat[i], U[i])
-
+        
 kk = comm.reduce(0.5*sum(U*U)*dx*dx*dx/L**3)
 if rank == 0:
     print kk
