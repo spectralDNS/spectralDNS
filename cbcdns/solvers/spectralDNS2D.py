@@ -50,7 +50,13 @@ def solve():
             U[i] = ifft2_mpi(U_hat[i], U[i])
 
         update(t, tstep, **globals())
+
+        timer()
         
+        if tstep == 1 and config.make_profile:
+            #Enable profiling after first step is finished
+            profiler.enable()
+                
     timer.final(MPI, rank)
     
     regression_test(**globals())

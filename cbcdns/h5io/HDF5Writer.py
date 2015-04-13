@@ -39,11 +39,10 @@ try:
             if tstep % config.write_result == 0 and config.decomposition == 'slab':
                 rank = self.comm.Get_rank()
                 N = self.f.attrs["N"]
-                assert N == P.shape[-1]
                 Np =  N / self.comm.Get_size()
                 
                 for comp, val in self.components.iteritems():
-                    self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype=self.dtype)                                    
+                    self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype=self.dtype)
                     self.f["3D/%s/%d"%(comp,tstep)][rank*Np:(rank+1)*Np] = val
 
             elif tstep % config.write_result == 0 and config.decomposition == 'pencil':
@@ -51,14 +50,22 @@ try:
                 
                 x1, x2 = self.x1, self.x2
                 for comp, val in self.components.iteritems():
-                    self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype=self.dtype)                                    
+                    self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype=self.dtype)
                     self.f["3D/%s/%d"%(comp, tstep)][x1, x2, :] = val
+                    
+            elif tstep % config.write_result == 0 and config.decomposition == 'line':
+                rank = self.comm.Get_rank()
+                N = self.f.attrs["N"]
+                Np =  N / self.comm.Get_size()
+                
+                for comp, val in self.components.iteritems():
+                    self.f["2D/"+comp].create_dataset(str(tstep), shape=(N, N), dtype=self.dtype)
+                    self.f["2D/%s/%d"%(comp,tstep)][rank*Np:(rank+1)*Np] = val                
                     
             if tstep % config.write_yz_slice[1] == 0 and config.decomposition == 'slab':
                 i = config.write_yz_slice[0]
                 rank = self.comm.Get_rank()
                 N = self.f.attrs["N"]
-                assert N == P.shape[-1]
                 Np =  N / self.comm.Get_size()     
                 for comp in self.components:
                     self.f["2D/"+comp].create_dataset(str(tstep), shape=(N, N), dtype=self.dtype)
