@@ -5,6 +5,8 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
 
+hdf5file = HDF5Writer(comm, N, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5")
+
 def standardConvection(c):
     """c_i = u_j du_i/dx_j"""
     for i in range(3):

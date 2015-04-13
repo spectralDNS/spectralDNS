@@ -33,7 +33,7 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, W, W_hat, Curl, hdf5file,
     if tstep % config.write_result == 0:
         U = Curl(W_hat, U)
         P[:] = sqrt(W[0]*W[0] + W[1]*W[1] + W[2]*W[2])
-        hdf5file.write(U, P, tstep)
+        hdf5file.write(tstep)
 
     if tstep == 100:
         Source[:] = 0

@@ -234,6 +234,10 @@ def update(t, tstep, comm, rank, rho, N, L, curl, K, ifft2_mpi, U_hat, **kwargs)
         plt.draw()
         globals().update(dict(im=im, im2=im2))
 
+    if tstep % config.write_result == 0:
+        P = ifft2_mpi(P_hat*1j, P)
+        hdf5file.write(tstep)           
+
     if tstep % config.plot_result == 0 and config.plot_result > 0:
         print tstep
         curl[:] = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)

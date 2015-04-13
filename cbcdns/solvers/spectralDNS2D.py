@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
 
-config.optimization = None
+hdf5file = HDF5Writer(comm, N, float, {"U":U[0], "V":U[1], "P":P}, config.solver+".h5")
 assert config.decomposition == 'line'
 
 def ComputeRHS(dU, rk):
@@ -31,8 +31,6 @@ def ComputeRHS(dU, rk):
     
     return dU
 
-##
-    
 integrate = getintegrator(**vars())   
 
 def regression_test(**kw):

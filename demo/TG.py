@@ -35,7 +35,7 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, float64, dx, L, sum,
     global k, w
     if tstep % config.write_result == 0 or tstep % config.write_yz_slice[1] == 0:
         P = ifftn_mpi(P_hat*1j, P)
-        hdf5file.write(U, P, tstep)
+        hdf5file.write(tstep)
 
     if tstep % compute_energy == 0:
         kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx*dx/L**3/2) # Compute energy with double precision

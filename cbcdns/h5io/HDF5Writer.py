@@ -13,18 +13,17 @@ try:
     import h5py
     class HDF5Writer(object):
     
-        def __init__(self, comm, dt, N, dtype, filename="U.h5"):
+        def __init__(self, comm, N, dtype, comps, filename="U.h5"):
             self.comm = comm
-            self.components = components = ["U", "V", "W", "P"]
-            if config.solver == "MHD": components += ["Bx", "By", "Bz"]
+            self.components = comps
             self.fname = filename
             self.dtype = dtype
-            self.dt = dt
+            self.dt = config.dt
             self.N = N
             self.f = None
             
         def init_h5file(self):
-            self.f = h5py.File(self.fname, "w", driver="mpio", comm=self.comm)
+            self.f = h5py.File(self.fname, "w", driver="mpio", comm=self.comm)            
             self.f.create_group("3D")
             self.f.create_group("2D")
             for c in self.components:
@@ -34,7 +33,7 @@ try:
             self.f.attrs.create("N", self.N)    
             self.f["2D"].attrs.create("i", config.write_yz_slice[0])            
             
-        def write(self, U, P, tstep):
+        def write(self, tstep):
             if not self.f: self.init_h5file() 
             
             if tstep % config.write_result == 0 and config.decomposition == 'slab':
@@ -43,33 +42,17 @@ try:
                 assert N == P.shape[-1]
                 Np =  N / self.comm.Get_size()
                 
-                for comp in self.components:
-                    self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype=self.dtype)
-                                    
-                self.f["3D/U/%d"%tstep][rank*Np:(rank+1)*Np] = U[0]
-                self.f["3D/V/%d"%tstep][rank*Np:(rank+1)*Np] = U[1]
-                self.f["3D/W/%d"%tstep][rank*Np:(rank+1)*Np] = U[2]
-                self.f["3D/P/%d"%tstep][rank*Np:(rank+1)*Np] = P
-                if len(self.components) == 7:
-                    self.f["3D/Bx/%d"%tstep][rank*Np:(rank+1)*Np] = U[3]
-                    self.f["3D/By/%d"%tstep][rank*Np:(rank+1)*Np] = U[4]
-                    self.f["3D/Bz/%d"%tstep][rank*Np:(rank+1)*Np] = U[5]
+                for comp, val in self.components.iteritems():
+                    self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype=self.dtype)                                    
+                    self.f["3D/%s/%d"%(comp,tstep)][rank*Np:(rank+1)*Np] = val
 
             elif tstep % config.write_result == 0 and config.decomposition == 'pencil':
                 N = self.f.attrs["N"]
                 
-                for comp in self.components:
-                    self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype=self.dtype)
-                                    
                 x1, x2 = self.x1, self.x2
-                self.f["3D/U/%d"%tstep][x1, x2, :] = U[0]
-                self.f["3D/V/%d"%tstep][x1, x2, :] = U[1]
-                self.f["3D/W/%d"%tstep][x1, x2, :] = U[2]
-                self.f["3D/P/%d"%tstep][x1, x2, :] = P
-                if len(self.components) == 7:
-                    self.f["3D/Bx/%d"%tstep][x1, x2, :] = U[3]
-                    self.f["3D/By/%d"%tstep][x1, x2, :] = U[4]
-                    self.f["3D/Bz/%d"%tstep][x1, x2, :] = U[5]
+                for comp, val in self.components.iteritems():
+                    self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype=self.dtype)                                    
+                    self.f["3D/%s/%d"%(comp, tstep)][x1, x2, :] = val
                     
             if tstep % config.write_yz_slice[1] == 0 and config.decomposition == 'slab':
                 i = config.write_yz_slice[0]
@@ -81,37 +64,24 @@ try:
                     self.f["2D/"+comp].create_dataset(str(tstep), shape=(N, N), dtype=self.dtype)
                                     
                 if i >= rank*Np and i < (rank+1)*Np:
-                    self.f["2D/U/%d"%tstep][:] = U[0, i-rank*Np]
-                    self.f["2D/V/%d"%tstep][:] = U[1, i-rank*Np]
-                    self.f["2D/W/%d"%tstep][:] = U[2, i-rank*Np]
-                    self.f["2D/P/%d"%tstep][:] = P[i-rank*Np]
-                    if len(self.components) == 7:
-                        self.f["2D/Bx/%d"%tstep][:] = U[3, i-rank*Np]
-                        self.f["2D/By/%d"%tstep][:] = U[4, i-rank*Np]
-                        self.f["2D/Bz/%d"%tstep][:] = U[5, i-rank*Np]
+                    for comp, val in self.components.iteritems():                
+                        self.f["2D/%s/%d"%(comp, tstep)][:] = val[i-rank*Np]
 
             elif tstep % config.write_yz_slice[1] == 0 and config.decomposition == 'pencil':
                 i = config.write_yz_slice[0]
                 N = self.f.attrs["N"]
+                x1, x2 = self.x1, self.x2
                 for comp in self.components:
                     self.f["2D/"+comp].create_dataset(str(tstep), shape=(N, N), dtype=self.dtype)
-                                    
-                x1, x2 = self.x1, self.x2
-                self.f["2D/U/%d"%tstep][x1, x2] = U[0, :, :, i]
-                self.f["2D/V/%d"%tstep][x1, x2] = U[1, :, :, i]
-                self.f["2D/W/%d"%tstep][x1, x2] = U[2, :, :, i]
-                self.f["2D/P/%d"%tstep][x1, x2] = P[:, :, i]
-                if len(self.components) == 7:
-                    self.f["2D/Bx/%d"%tstep][x1, x2] = U[3, :, :, i]
-                    self.f["2D/By/%d"%tstep][x1, x2] = U[4, :, :, i]
-                    self.f["2D/Bz/%d"%tstep][x1, x2] = U[5, :, :, i]
+                    for comp, val in self.components.iteritems():                                    
+                        self.f["2D/%s/%d"%(comp, tstep)][x1, x2] = val[:, :, i]
                             
         def close(self):
             if self.f: self.f.close()
                             
 except:
     class HDF5Writer(object):
-        def __init__(self, comm, dt, N, filename="U.h5"):
+        def __init__(self, comm, dt, N, comps, filename="U.h5"):
             if comm.Get_rank() == 0:
                 print Warning("Need to install h5py to allow storing results")
         

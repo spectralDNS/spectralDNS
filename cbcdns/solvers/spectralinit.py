@@ -31,7 +31,6 @@ N = 2**config.M
 L = float(2*pi)
 dx = float(L/N)
 
-hdf5file = HDF5Writer(comm, dt, N, float)
 if config.make_profile: profiler = cProfile.Profile()
 
 # Set up solver using wither slab or decomposition

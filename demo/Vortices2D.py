@@ -23,13 +23,17 @@ def regression_test(U, num_processes, loadtxt, allclose, **kwargs):
     assert allclose(U[0], U_ref)
 
 im = None
-def update(t, tstep, N, curl, U_hat, ifft2_mpi, K, **kw):
+def update(t, tstep, N, curl, U_hat, ifft2_mpi, K, P, P_hat, hdf5file, **kw):
     global im
     # initialize plot
     if tstep == 1:
         im = plt.imshow(zeros((N, N)))
         plt.colorbar(im)
         plt.draw()
+        
+    if tstep % config.write_result == 0:
+        P = ifft2_mpi(P_hat*1j, P)
+        hdf5file.write(tstep)   
         
     if tstep % plot_result == 0 and plot_result > 0:
         curl = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
@@ -50,6 +54,6 @@ if __name__ == '__main__':
     solver = get_solver()
     initialize(**vars(solver))
     solver.update = update
-    solver.regression_test = regression_test
+    #solver.regression_test = regression_test
     solver.solve()
 
