@@ -6,19 +6,12 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 Velocity-vorticity formulation
 """
 from spectralinit import *
+from spectralDNS import Cross
 
 # Rename variable since we are working with a vorticity formulation
 W = U.copy()               # W is vorticity
 W_hat = U_hat              # U_hat is used in subroutines, rename here for convenience
 Source = U_hat.copy()
-
-def Cross(a, b, c):
-    """c_k = F_k(a x b)"""
-    U_tmp[:] = cross1(U_tmp, a, b)
-    c[0] = fftn_mpi(U_tmp[0], c[0])
-    c[1] = fftn_mpi(U_tmp[1], c[1])
-    c[2] = fftn_mpi(U_tmp[2], c[2])
-    return c
 
 def Curl(a, c):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""

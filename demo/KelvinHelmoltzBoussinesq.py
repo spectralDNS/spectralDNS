@@ -81,16 +81,35 @@ def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, Np, N, pi, fft2_mpi, 
   
     Um = 0.5*(config.U1 - config.U2)
     U[1] = config.A*sin(0.5*X[0])
-    for i in range(Np):
-        for j in range(N):
-            if 0.0 <= X[1][i,j] < 0.5*pi:
-                U[0][i,j] = config.U1 - Um*exp((X[1][i,j] - 0.5*pi)/config.delta) 
-            elif 0.5*pi <= X[1][i,j] < pi:
-                U[0][i,j] = config.U2 + Um*exp(-1.0*(X[1][i,j] - 0.5*pi)/config.delta) 
-            elif pi <= X[1][i,j] < 1.5*pi:
-                U[0][i,j] = config.U2 + Um*exp((X[1][i,j] - 1.5*pi)/config.delta) 
-            elif 1.5*pi <= X[1][i,j] < 2*pi:
-                U[0][i,j] = config.U1 - Um*exp(-1.0*(X[1][i,j] - 1.5*pi)/config.delta)
+    #for i in range(Np):
+        #for j in range(N):
+            #if 0.0 <= X[1][i,j] < 0.5*pi:
+                #U[0][i,j] = config.U1 - Um*exp((X[1][i,j] - 0.5*pi)/config.delta) 
+            #elif 0.5*pi <= X[1][i,j] < pi:
+                #U[0][i,j] = config.U2 + Um*exp(-1.0*(X[1][i,j] - 0.5*pi)/config.delta) 
+            #elif pi <= X[1][i,j] < 1.5*pi:
+                #U[0][i,j] = config.U2 + Um*exp((X[1][i,j] - 1.5*pi)/config.delta) 
+            #elif 1.5*pi <= X[1][i,j] < 2*pi:
+                #U[0][i,j] = config.U1 - Um*exp(-1.0*(X[1][i,j] - 1.5*pi)/config.delta)
+
+    #x = X[1,0,:]
+    U[0, :, :N/4] = config.U1 - Um*exp((X[1,:, :N/4] - 0.5*pi)/config.delta) 
+    U[0, :, N/4:N/2] = config.U2 + Um*exp(-1.0*(X[1, :, N/4:N/2] - 0.5*pi)/config.delta) 
+    U[0, :, N/2:3*N/4] = config.U2 + Um*exp((X[1, :, N/2:3*N/4] - 1.5*pi)/config.delta) 
+    U[0, :, 3*N/4:] = config.U1 - Um*exp(-1.0*(X[1, :, 3*N/4:] - 1.5*pi)/config.delta)
+
+    
+    #for i in range(Np):
+        #for j in range(N):
+            #if 0.0 <= X[1][i,j] < 0.5*pi:
+                #U[0][i,j] = config.U1 - Um*exp((X[1][i,j] - 0.5*pi)/config.delta) 
+            #elif 0.5*pi <= X[1][i,j] < pi:
+                #U[0][i,j] = config.U2 + Um*exp(-1.0*(X[1][i,j] - 0.5*pi)/config.delta) 
+            #elif pi <= X[1][i,j] < 1.5*pi:
+                #U[0][i,j] = config.U2 + Um*exp((X[1][i,j] - 1.5*pi)/config.delta) 
+            #elif 1.5*pi <= X[1][i,j] < 2*pi:
+                #U[0][i,j] = config.U1 - Um*exp(-1.0*(X[1][i,j] - 1.5*pi)/config.delta)
+
                 
     #for i in range(Np):
     #for j in range(N):
