@@ -12,7 +12,7 @@ Pr = float(config.Pr)
 def add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Ri, Pr):
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat[:]  = sum(dU[:2]*K_over_K2, 0, out=P_hat)
-    P_hat[:] -= Ri*U_hat[2]*K_over_K2[1]
+    P_hat[:] -= Ri*rho_hat*K_over_K2[1]
     
     # Add pressure gradient
     dU[:2] -= P_hat*K
