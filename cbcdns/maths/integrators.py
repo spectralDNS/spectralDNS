@@ -41,8 +41,10 @@ def getintegrator(dU, ComputeRHS, float, array, **kw):
     """
     if config.solver in ("NS", "VV", "NS2D"):
         u0, u1, u2 = kw['U_hat'], kw['U_hat0'], kw['U_hat1'] 
-    else:
+    elif config.solver == "MHD":
         u0, u1, u2 = kw['UB_hat'], kw['UB_hat0'], kw['UB_hat1']
+    elif config.solver == "Bq2D":
+        u0, u1, u2 = kw['Ur_hat'], kw['Ur_hat0'], kw['Ur_hat1']
         
     if config.integrator == "RK4": 
         # RK4 parameters

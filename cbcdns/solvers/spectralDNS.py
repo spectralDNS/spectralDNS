@@ -94,6 +94,7 @@ def add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu):
     
     return dU
 
+#@profile
 def ComputeRHS(dU, rk):
     """Compute and return entire rhs contribution"""
     

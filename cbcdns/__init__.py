@@ -7,7 +7,7 @@ from utilities.MPI_knee import mpi_import
 with mpi_import():
     from cbcdns import config
 
-def get_solver():
+def get_solver(update=None):
     with mpi_import():
         if config.solver == 'NS':
             import solvers.spectralDNS as solver
@@ -20,5 +20,12 @@ def get_solver():
             
         elif config.solver == 'MHD':
             import solvers.spectralMHD3D as solver
-        
+
+        elif config.solver == 'Bq2D':
+            import solvers.spectralDNS2D_Boussinesq as solver
+            
+        else:
+            raise AttributeError("Wrong solver!")
+            
+    if update: solver.update = update
     return solver

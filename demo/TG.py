@@ -62,11 +62,11 @@ if __name__ == "__main__":
         'nu': 0.000625,             # Viscosity
         'dt': 0.01,                 # Time step
         'T': 0.1,                   # End time
+        'TT': 10
         }
     )
     
-    solver = get_solver()
+    solver = get_solver(update)
     initialize(**vars(solver))
-    solver.update = update
     solver.solve()
     #finalize(**vars(solver))

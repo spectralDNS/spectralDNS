@@ -19,10 +19,10 @@ def set_source(U, Source, fftn_mpi, N, **kwargs):
     Source[2] = fftn_mpi(U[2], Source[2])
     return Source
 
-im=None    
+im = None    
 def update(t, tstep, dt, comm, rank, P, P_hat, U, W, W_hat, Curl, hdf5file, 
-           Source, ifftn_mpi, X, Nf, **soak):
-    
+           Source, ifftn_mpi, X, Nf, **soak):    
+    global im
     if tstep == 1 and rank == 0:
         plt.figure()
         im = plt.quiver(X[1, 0], X[2, 0], 
@@ -39,7 +39,6 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, W, W_hat, Curl, hdf5file,
         Source[:] = 0
         
     if tstep % 2 == 0 and rank == 0:
-        global im
         im.set_UVC(U[1, 0], U[2, 0])
         plt.pause(1e-6)
     

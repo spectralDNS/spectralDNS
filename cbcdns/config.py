@@ -8,9 +8,9 @@ Global run-time configuration that may be overloaded on the commandline
 import argparse
 parser = argparse.ArgumentParser(prog='cbcdns')
 
-parser.add_argument('solver', choices=('NS', 'VV', 'NS2D', 'MHD'), 
+parser.add_argument('solver', choices=('NS', 'VV', 'NS2D', 'MHD', 'Bq2D'), 
                     help="""Choose solver. NS is a regular velocity-pressure formulation and VV uses a velocity-vorticity formulation. NS2D is a regular 2D solver. MHD is a 3D MagnetoHydroDynamics solver.""")
-parser.add_argument('--decomposition', default='slab', choices=('slab', 'pencil', 'line'), help="Choose 3D decomposition between slab and pencil, line is for 2D problems.")
+parser.add_argument('--decomposition', default='slab', choices=('slab', 'pencil', 'line'), help="Choose 3D decomposition between slab and pencil. For 2D problems line is the only choice and is made automatically.")
 parser.add_argument('--precision', default='double', choices=('single', 'double'))
 parser.add_argument('--optimization', default='', choices=('cython', 'weave', 'numba', 'numexpr'))
 parser.add_argument('--communication', default='alltoall', choices=('alltoall', 'sendrecv_replace'), help='only for slab')
@@ -28,8 +28,9 @@ parser.add_argument('--write_yz_slice',  default=[0, 1e8], help="Write 2D slice 
 
 vars().update(vars(parser.parse_args()))
 
-if solver == "NS2D":
-    decomposition = line
+if solver in ('NS2D', 'Bq2D'):
+    decomposition = 'line'
+    parser.set_defaults(decomposition='line')
 
 def update(new):
     assert isinstance(new, dict)

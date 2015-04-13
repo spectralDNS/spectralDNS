@@ -14,14 +14,19 @@ def optimizer(func):
     in the main module.
     
     """
+
     try: # Look for optimized version of function
-        if config.optimization in ("numexpr"):
-            fun = eval(".".join(("{0}_module".format(config.optimization), func.func_name)))
+        name = func.func_name
+        if config.decomposition == 'line':
+            name += '_2D'
+        if config.optimization in ('numexpr', ):
+            fun = eval('.'.join(('{0}_module'.format(config.optimization), name)))
         else:
-            fun = eval("{0}_{1}.".format(config.optimization, config.precision)+func.func_name)
+            fun = eval('{0}_{1}.'.format(config.optimization, config.precision)+name)
+            
         @wraps(func)
         def wrapped_function(*args, **kwargs): 
-            if config.optimization == "weave":
+            if config.optimization == 'weave':
                 fun(*args, **kwargs)
                 u0 = args[0]
             else:
@@ -29,7 +34,7 @@ def optimizer(func):
             return u0
         
     except: # Otherwise revert to default numpy implementation
-        print func.func_name + " not optimized"
+        print func.func_name + ' not optimized'
         @wraps(func)
         def wrapped_function(*args, **kwargs):
             u0 = func(*args, **kwargs)

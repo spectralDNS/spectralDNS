@@ -288,3 +288,139 @@ def transform_Uc_zx(np.ndarray[complex_t, ndim=3] Uc_hat_z,
                 for l in xrange(N1/2):
                     Uc_hat_z[i0, k, l+i*N1/2] = Uc_hat_xr[j, k, l]
     return Uc_hat_z
+
+### 2D routines
+
+def add_pressure_diffusion_2D(np.ndarray[complex_t, ndim=3] du, 
+             np.ndarray[complex_t, ndim=2] p_hat, 
+             np.ndarray[complex_t, ndim=3] u_hat,
+             np.ndarray[complex_t, ndim=2] rho_hat,
+             np.ndarray[real_t, ndim=3] k_over_k2, 
+             np.ndarray[int_t, ndim=3] k, 
+             np.ndarray[int_t, ndim=2] ksq, 
+             real_t nu, real_t Ri, real_t Pr):
+
+    cdef unsigned int i, j
+    cdef int_t k0, k1, k2
+    cdef real_t z
+    # Compute pressure (To get actual pressure multiply by 1j)
+    for i in xrange(ksq.shape[0]):
+        for j in xrange(ksq.shape[1]):
+            z = nu*ksq[i,j]
+            k0 = k[0,i,j]
+            k1 = k[1,i,j]
+            k2 = k[2,i,j]
+            p_hat[i,j] = du[0,i,j]*k_over_k2[0,i,j]+du[1,i,j]*k_over_k2[1,i,j] - Ri*rho_hat[i,j]*k_over_k2[1,i,j]
+            
+            du[0,i,j] = du[0,i,j] - (p_hat[i,j]*k0+u_hat[0,i,j]*z)
+            du[1,i,j] = du[1,i,j] - (p_hat[i,j]*k1+u_hat[1,i,j]*z+Ri*rho_hat[i,j])
+            du[2,i,j] = du[2,i,j] - rho_hat[i,j]*z/Pr
+            
+    return du
+
+def RK4_2D(np.ndarray[complex_t, ndim=3] U_hat, 
+        np.ndarray[complex_t, ndim=3] U_hat0, 
+        np.ndarray[complex_t, ndim=3] U_hat1, 
+        np.ndarray[complex_t, ndim=3] dU,
+        np.ndarray[real_t, ndim=1] a, 
+        np.ndarray[real_t, ndim=1] b,
+        real_t dt,
+        ComputeRHS):
+    cdef complex_t z
+    cdef unsigned int rk, i, j, k
+    for i in xrange(dU.shape[0]):
+        for j in xrange(dU.shape[1]):
+            for k in xrange(dU.shape[2]):
+                z = U_hat[i,j,k]
+                U_hat1[i,j,k] = z 
+                U_hat0[i,j,k] = z
+        
+    for rk in xrange(4):
+        dU = ComputeRHS(dU, rk)
+        if rk < 3:
+            for i in xrange(dU.shape[0]):
+                for j in xrange(dU.shape[1]):
+                    for k in xrange(dU.shape[2]):
+                        U_hat[i,j,k] = U_hat0[i,j,k] + b[rk]*dt*dU[i,j,k]
+            
+        for i in xrange(dU.shape[0]):
+            for j in xrange(dU.shape[1]):
+                for k in xrange(dU.shape[2]):
+                    U_hat1[i,j,k] = U_hat1[i,j,k] + a[rk]*dt*dU[i,j,k]
+                        
+    for i in xrange(dU.shape[0]):
+        for j in xrange(dU.shape[1]):
+            for k in xrange(dU.shape[2]):
+                U_hat[i,j,k] = U_hat1[i,j,k]
+                    
+    return U_hat
+
+def ForwardEuler_2D(np.ndarray[complex_t, ndim=3] U_hat, 
+                    np.ndarray[complex_t, ndim=3] U_hat0, 
+                    np.ndarray[complex_t, ndim=3] dU, 
+                    real_t dt,
+                    ComputeRHS):
+    cdef complex_t z
+    cdef unsigned int rk, i, j, k
+    dU = ComputeRHS(dU, 0)
+    for i in xrange(dU.shape[0]):
+        for j in xrange(dU.shape[1]):
+            for k in xrange(dU.shape[2]):
+                U_hat[i,j,k] = U_hat[i,j,k] + dU[i,j,k]*dt 
+    return U_hat
+
+def AB2_2D(np.ndarray[complex_t, ndim=3] U_hat, 
+           np.ndarray[complex_t, ndim=3] U_hat0, 
+           np.ndarray[complex_t, ndim=3] dU,
+           real_t dt, int tstep,
+           ComputeRHS):
+    cdef complex_t z
+    cdef real_t p0 = 1.5
+    cdef real_t p1 = 0.5
+    cdef unsigned int rk, i, j, k
+    dU = ComputeRHS(dU, 0)
+    
+    if tstep == 1:
+        for i in xrange(dU.shape[0]):
+            for j in xrange(dU.shape[1]):
+                for k in xrange(dU.shape[2]):
+                    U_hat[i,j,k] = U_hat[i,j,k] + dU[i,j,k]*dt
+                        
+    else:
+        for i in xrange(dU.shape[0]):
+            for j in xrange(dU.shape[1]):
+                for k in xrange(dU.shape[2]):
+                    U_hat[i,j,k] = U_hat[i,j,k] + p0*dU[i,j,k]*dt - p1*U_hat0[i,j,k]   
+                    
+    for i in xrange(dU.shape[0]):
+        for j in xrange(dU.shape[1]):
+            for k in xrange(dU.shape[2]):
+                U_hat0[i,j,k] = dU[i,j,k]*dt
+    return U_hat
+
+def dealias_rhs_2D(np.ndarray[complex_t, ndim=3] du,
+                   np.ndarray[np.uint8_t, ndim=2] dealias):
+    cdef unsigned int i, j
+    cdef np.uint8_t uu
+    if du.shape[0] == 3:
+        for i in xrange(dealias.shape[0]):
+            for j in xrange(dealias.shape[1]):
+                uu = dealias[i, j]
+                du[0, i, j].real *= uu
+                du[0, i, j].imag *= uu
+                du[1, i, j].real *= uu
+                du[1, i, j].imag *= uu
+                du[2, i, j].real *= uu
+                du[2, i, j].imag *= uu                    
+
+    else:
+        for l in xrange(du.shape[0]):
+            for i in xrange(dealias.shape[0]):
+                for j in xrange(dealias.shape[1]):
+                    uu = dealias[i, j]
+                    du[l, i, j].real *= uu
+                    du[l, i, j].imag *= uu
+                        
+    return du
+
+    

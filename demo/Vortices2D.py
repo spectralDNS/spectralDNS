@@ -38,7 +38,6 @@ def update(t, tstep, N, curl, U_hat, ifft2_mpi, K, **kw):
         plt.pause(1e-6)
         
 if __name__ == '__main__':
-    # Set some (any) problem dependent parameters by overloading default parameters
     from cbcdns import config, get_solver
     config.update(
     {
