@@ -39,15 +39,13 @@ try:
             if tstep % config.write_result == 0 and config.decomposition == 'slab':
                 rank = self.comm.Get_rank()
                 N = self.f.attrs["N"]
-                Np =  N / self.comm.Get_size()
-                
+                Np =  N / self.comm.Get_size()                
                 for comp, val in self.components.iteritems():
                     self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype=self.dtype)
                     self.f["3D/%s/%d"%(comp,tstep)][rank*Np:(rank+1)*Np] = val
 
             elif tstep % config.write_result == 0 and config.decomposition == 'pencil':
-                N = self.f.attrs["N"]
-                
+                N = self.f.attrs["N"]                
                 x1, x2 = self.x1, self.x2
                 for comp, val in self.components.iteritems():
                     self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype=self.dtype)
@@ -56,8 +54,7 @@ try:
             elif tstep % config.write_result == 0 and config.decomposition == 'line':
                 rank = self.comm.Get_rank()
                 N = self.f.attrs["N"]
-                Np =  N / self.comm.Get_size()
-                
+                Np =  N / self.comm.Get_size()                
                 for comp, val in self.components.iteritems():
                     self.f["2D/"+comp].create_dataset(str(tstep), shape=(N, N), dtype=self.dtype)
                     self.f["2D/%s/%d"%(comp,tstep)][rank*Np:(rank+1)*Np] = val                

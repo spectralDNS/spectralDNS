@@ -3,7 +3,7 @@
 """
 from pylab import plt, zeros
 
-plot_result = 10
+plot_result = -10
 
 def initialize(U, X, U_hat, exp, pi, ifft2_mpi, fft2_mpi, K_over_K2, **kwargs):
     w =     exp(-((X[0]-pi)**2+(X[1]-pi+pi/4)**2)/(0.2)) \
@@ -15,7 +15,7 @@ def initialize(U, X, U_hat, exp, pi, ifft2_mpi, fft2_mpi, K_over_K2, **kwargs):
     U[1] = ifft2_mpi(-1j*K_over_K2[0]*w_hat, U[1])
     U_hat[0] = fft2_mpi(U[0], U_hat[0])
     U_hat[1] = fft2_mpi(U[1], U_hat[1])
-
+    
 def regression_test(U, num_processes, loadtxt, allclose, **kwargs):
     if num_processes > 1:
         return True
@@ -33,6 +33,7 @@ def update(t, tstep, N, curl, U_hat, ifft2_mpi, K, P, P_hat, hdf5file, **kw):
         
     if tstep % config.write_result == 0:
         P = ifft2_mpi(P_hat*1j, P)
+        curl = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         hdf5file.write(tstep)   
         
     if tstep % plot_result == 0 and plot_result > 0:
@@ -46,14 +47,16 @@ if __name__ == '__main__':
     config.update(
     {
       'nu': 0.001,
-      'dt': 0.005,
+      'dt': 0.001,
       'T': 50,
+      'write_result': 100,
       'debug': False}
     )
 
     solver = get_solver()
+    solver.hdf5file.components["curl"] = solver.curl
     initialize(**vars(solver))
     solver.update = update
-    #solver.regression_test = regression_test
+    solver.regression_test = regression_test
     solver.solve()
 

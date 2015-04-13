@@ -81,18 +81,6 @@ def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, Np, N, pi, fft2_mpi, 
   
     Um = 0.5*(config.U1 - config.U2)
     U[1] = config.A*sin(0.5*X[0])
-    #for i in range(Np):
-        #for j in range(N):
-            #if 0.0 <= X[1][i,j] < 0.5*pi:
-                #U[0][i,j] = config.U1 - Um*exp((X[1][i,j] - 0.5*pi)/config.delta) 
-            #elif 0.5*pi <= X[1][i,j] < pi:
-                #U[0][i,j] = config.U2 + Um*exp(-1.0*(X[1][i,j] - 0.5*pi)/config.delta) 
-            #elif pi <= X[1][i,j] < 1.5*pi:
-                #U[0][i,j] = config.U2 + Um*exp((X[1][i,j] - 1.5*pi)/config.delta) 
-            #elif 1.5*pi <= X[1][i,j] < 2*pi:
-                #U[0][i,j] = config.U1 - Um*exp(-1.0*(X[1][i,j] - 1.5*pi)/config.delta)
-
-    #x = X[1,0,:]
     U[0, :, :N/4] = config.U1 - Um*exp((X[1,:, :N/4] - 0.5*pi)/config.delta) 
     U[0, :, N/4:N/2] = config.U2 + Um*exp(-1.0*(X[1, :, N/4:N/2] - 0.5*pi)/config.delta) 
     U[0, :, N/2:3*N/4] = config.U2 + Um*exp((X[1, :, N/2:3*N/4] - 1.5*pi)/config.delta) 
@@ -211,7 +199,8 @@ def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, Np, N, pi, fft2_mpi, 
     return U, rho
 
 im, im2 = None, None
-def update(t, tstep, comm, rank, rho, N, L, curl, K, ifft2_mpi, U_hat, **kwargs):
+def update(t, tstep, comm, rank, rho, N, L, curl, K, ifft2_mpi, U_hat, 
+           P_hat, P, hdf5file, **kwargs):
     global im, im2
         
     if tstep == 1:
@@ -280,11 +269,11 @@ if __name__ == "__main__":
     'T': 1.0,
     'U1':-0.5,
     'U2':0.5,
-    'l0': 0.001,   # Smoothing parameter
+    'l0': 0.001,    # Smoothing parameter
     'A': 0.01,      # Amplitude of perturbation
     'Ri': 0.167,    # Richardson number
     'Pr': 12.0,     # Prantl number
-    'delta': 0.1,    # Width of perturbations
+    'delta': 0.1,   # Width of perturbations
     'bb': 0.8,
     'k0': 2
     }

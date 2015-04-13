@@ -24,48 +24,51 @@ attribute2D = """
 
 def generate_xdmf(h5filename):
     f = h5py.File(h5filename)
-    xf3d = copy.copy(xdmffile)
-    timesteps = f["3D/U"].keys()
-    N = f.attrs["N"]
-    tt = ""
-    for i in timesteps:
-        tt += "%s " %i
-    
-    xf3d += timeattr.format(tt, len(timesteps))
-    
-    dtype = f["3D/U"].values()[0].dtype
+    comps = f["3D"].keys()
+    if len(f["/".join(("3D", comps[0]))]) > 0:
+        xf3d = copy.copy(xdmffile)
+        timesteps = f["/".join(("3D", comps[0]))].keys()
+        N = f.attrs["N"]
+        tt = ""
+        for i in timesteps:
+            tt += "%s " %i
+        
+        xf3d += timeattr.format(tt, len(timesteps))
+        
+        dtype = f["/".join(("3D", comps[0]))].values()[0].dtype
 
-    for tstep in timesteps:
-        xf3d += """
+        for tstep in timesteps:
+            xf3d += """
       <Grid GridType="Uniform">
         <Geometry Type="ORIGIN_DXDYDZ">
           <DataItem DataType="UInt" Dimensions="3" Format="XML" Precision="4">0 0 0</DataItem>
           <DataItem DataType="Float" Dimensions="3" Format="XML" Precision="4">{0} {0} {0}</DataItem>
         </Geometry>""".format(2*pi)
 
-        xf3d += """
+            xf3d += """
         <Topology Dimensions="{0} {0} {0}" Type="3DCoRectMesh"/>""".format(N)
-        prec = 4 if dtype == float32 else 8
-        for comp in f["3D"]:
-            xf3d += attribute3D.format(comp, N, h5filename, comp, tstep, prec)
-        xf3d += """  
+            prec = 4 if dtype == float32 else 8
+            for comp in f["3D"]:
+                xf3d += attribute3D.format(comp, N, h5filename, comp, tstep, prec)
+            xf3d += """  
       </Grid>
 """
-    xf3d += """    
+        xf3d += """    
     </Grid>
   </Domain>
 </Xdmf>  
 """
-    f.attrs.create("xdmf_3d", xf3d)
-    xf = open(h5filename[:-2]+"xdmf", "w")
-    xf.write(xf3d)
-    xf.close()            
-    if len(f["2D/U"].keys()) == 0:
+        #f.attrs.create("xdmf_3d", xf3d)
+        xf = open(h5filename[:-2]+"xdmf", "w")
+        xf.write(xf3d)
+        xf.close()            
+    if len(f["/".join(("2D", comps[0]))]) == 0:   
         return
     
     xf2d = copy.copy(xdmffile)
-    timesteps = f["2D/U"].keys()
+    timesteps = f["/".join(("2D", comps[0]))].keys()
     N = f.attrs["N"]
+    dtype = f["/".join(("2D", comps[0]))].values()[0].dtype
     tt = ""
     for i in timesteps:
         tt += "%s " %i
@@ -92,7 +95,7 @@ def generate_xdmf(h5filename):
     </Grid>
   </Domain>
 </Xdmf>"""
-    f.attrs.create("xdmf_2d", xf2d)
+    #f.attrs.create("xdmf_2d", xf2d)
     xf2 = open(h5filename[:-3]+"_2D."+"xdmf", "w")
     xf2.write(xf2d)
     xf2.close()        
