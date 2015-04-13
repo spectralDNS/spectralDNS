@@ -12,7 +12,7 @@ from cbcdns.h5io import *
 from cbcdns.optimization import *
 
 # Import problem specific methods and solver methods specific to either slab or pencil decomposition
-from cbcdns.mpi import setup, ifftn_mpi, fftn_mpi
+from cbcdns.mpi import *
 from cbcdns.maths import *
 
 comm = MPI.COMM_WORLD
@@ -40,9 +40,7 @@ vars().update(setup(**vars()))
 def update(**kwargs):
     pass
 
-def initialize(**kwargs):
-    pass
-
 def set_source(Source, **kwargs):
     Source[:] = 0
     return Source
+

@@ -56,7 +56,7 @@ def finalize(rank, dt, **soak):
         show()
 
 if __name__ == "__main__":
-    from cbcdns import config
+    from cbcdns import config, get_solver
     config.update(
         {
         'nu': 0.000625,             # Viscosity
@@ -64,10 +64,9 @@ if __name__ == "__main__":
         'T': 0.1,                   # End time
         }
     )
-        
-    from cbcdns import solver
+    
+    solver = get_solver()
     initialize(**vars(solver))
     solver.update = update
     solver.solve()
     #finalize(**vars(solver))
-

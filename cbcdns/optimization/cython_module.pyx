@@ -110,13 +110,45 @@ def dealias_rhs(np.ndarray[complex_t, ndim=4] du,
                 np.ndarray[np.uint8_t, ndim=3] dealias):
     cdef unsigned int i, j, k
     cdef np.uint8_t uu
-    for l in xrange(du.shape[0]):
+    if du.shape[0] == 3:
         for i in xrange(dealias.shape[0]):
             for j in xrange(dealias.shape[1]):
                 for k in xrange(dealias.shape[2]):
                     uu = dealias[i, j, k]
-                    du[l, i, j, k].real *= uu
-                    du[l, i, j, k].imag *= uu
+                    du[0, i, j, k].real *= uu
+                    du[0, i, j, k].imag *= uu
+                    du[1, i, j, k].real *= uu
+                    du[1, i, j, k].imag *= uu
+                    du[2, i, j, k].real *= uu
+                    du[2, i, j, k].imag *= uu
+                    
+    elif du.shape[0] == 6:
+        for i in xrange(dealias.shape[0]):
+            for j in xrange(dealias.shape[1]):
+                for k in xrange(dealias.shape[2]):
+                    uu = dealias[i, j, k]
+                    du[0, i, j, k].real *= uu
+                    du[0, i, j, k].imag *= uu
+                    du[1, i, j, k].real *= uu
+                    du[1, i, j, k].imag *= uu
+                    du[2, i, j, k].real *= uu
+                    du[2, i, j, k].imag *= uu
+                    du[3, i, j, k].real *= uu
+                    du[3, i, j, k].imag *= uu
+                    du[4, i, j, k].real *= uu
+                    du[4, i, j, k].imag *= uu
+                    du[5, i, j, k].real *= uu
+                    du[5, i, j, k].imag *= uu
+
+    else:
+        for l in xrange(du.shape[0]):
+            for i in xrange(dealias.shape[0]):
+                for j in xrange(dealias.shape[1]):
+                    for k in xrange(dealias.shape[2]):
+                        uu = dealias[i, j, k]
+                        du[l, i, j, k].real *= uu
+                        du[l, i, j, k].imag *= uu
+
     return du
 
 def add_pressure_diffusion(np.ndarray[complex_t, ndim=4] du,

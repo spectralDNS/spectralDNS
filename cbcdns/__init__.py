@@ -7,15 +7,18 @@ from utilities.MPI_knee import mpi_import
 with mpi_import():
     from cbcdns import config
 
-    if config.solver == 'NS':
-        import solvers.spectralDNS as solver
+def get_solver():
+    with mpi_import():
+        if config.solver == 'NS':
+            import solvers.spectralDNS as solver
+            
+        elif config.solver == 'VV':
+            import solvers.spectralDNSVV as solver
+            
+        elif config.solver == 'NS2D':
+            import solvers.spectralDNS2D as solver
+            
+        elif config.solver == 'MHD':
+            import solvers.spectralMHD3D as solver
         
-    elif config.solver == 'VV':
-        import solvers.spectralDNSVV as solver
-        
-    elif config.solver == 'NS2D':
-        import solvers.spectralDNS2D as solver
-        
-    elif config.solver == 'MHD':
-        import solvers.spectralMHD3D as solver
-        
+    return solver

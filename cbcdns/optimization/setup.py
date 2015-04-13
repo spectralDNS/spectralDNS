@@ -4,6 +4,31 @@ files with different precision
 """
 import sys
 
+
+if '--with-cython' in sys.argv[-1]:
+    # Compile cython extension modules for single and double precision
+    precision = {
+    "single": """
+ctypedef np.complex64_t complex_t
+ctypedef np.float32_t real_t
+ctypedef np.int64_t int_t
+""",
+    "double": """
+ctypedef np.complex128_t complex_t
+ctypedef np.float64_t real_t
+ctypedef np.int64_t int_t
+"""      
+    }
+
+    ff = open("cython_module.py").read()
+    fs = open("cython_single.pyx", "w")
+    fs.write(ff.format(precision["single"]))
+    fs.close()
+
+    fd = open("cython_double.pyx", "w")
+    fd.write(ff.format(precision["double"]))
+    fd.close()
+
 if '--with-weave' in sys.argv[-1]:
     import weave_module
     # Compile weave extension modules for single and double precision

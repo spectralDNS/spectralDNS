@@ -187,6 +187,7 @@ def fftn_mpi(u, fu):
     if config.communication == 'alltoall':
         # Do 2 ffts in y-z directions on owned data
         Uc_hatT[:] = rfft2(u, axes=(1,2))
+        
         # Transform data to align with x-direction  
         U_mpi[:] = transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np, Nf)
             
@@ -206,4 +207,4 @@ def fftn_mpi(u, fu):
     # Do fft for last direction 
     fu = fft(fu, axis=0)
     return fu
-        
+     

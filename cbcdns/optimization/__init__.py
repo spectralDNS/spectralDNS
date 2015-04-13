@@ -15,7 +15,7 @@ def optimizer(func):
     
     """
     try: # Look for optimized version of function
-        if config.optimization in ("numexpr", "cython"):
+        if config.optimization in ("numexpr"):
             fun = eval(".".join(("{0}_module".format(config.optimization), func.func_name)))
         else:
             fun = eval("{0}_{1}.".format(config.optimization, config.precision)+func.func_name)
@@ -38,7 +38,8 @@ def optimizer(func):
     return wrapped_function
 
 try:
-    import cython_module
+    import cython_double, cython_single
+    #import cython_module
            
 except:
     pass
