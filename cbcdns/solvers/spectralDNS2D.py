@@ -8,6 +8,18 @@ from spectralinit import *
 hdf5file = HDF5Writer(comm, N, float, {"U":U[0], "V":U[1], "P":P}, config.solver+".h5")
 assert config.decomposition == 'line'
 
+def add_pressure_diffusion(dU, P_hat, U_hat, K, K2, nu):
+    # Compute pressure (To get actual pressure multiply by 1j)
+    P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
+
+    # Add pressure gradient
+    dU -= P_hat*K
+
+    # Add contribution from diffusion
+    dU -= nu*K2*U_hat
+    
+    return dU
+
 def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U, V, W
         U[0] = ifft2_mpi(U_hat[0], U[0])
@@ -18,16 +30,9 @@ def ComputeRHS(dU, rk):
     dU[1] = fft2_mpi(-U[0]*curl, dU[1])
 
     # Dealias the nonlinear convection
-    dU *= dealias
+    dU = dealias_rhs(dU, dealias)
 
-    # Compute pressure (To get actual pressure multiply by 1j)
-    P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
-
-    # Add pressure gradient
-    dU -= P_hat*K
-
-    # Add contribution from diffusion
-    dU -= nu*K2*U_hat
+    dU = add_pressure_diffusion(dU, P_hat, U_hat, K, K2, nu)
     
     return dU
 

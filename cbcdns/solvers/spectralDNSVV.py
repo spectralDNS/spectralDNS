@@ -14,7 +14,7 @@ W_hat = U_hat              # U_hat is used in subroutines, rename here for conve
 Source = U_hat.copy()
 
 def Curl(a, c):
-    """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
+    """c = curl(a) = F_inv(F(curl(a))/K2) = F_inv(1j*(K x a)/K2)"""
     F_tmp[:] = cross2(F_tmp, K_over_K2, a)
     c[0] = ifftn_mpi(F_tmp[0], c[0])
     c[1] = ifftn_mpi(F_tmp[1], c[1])
