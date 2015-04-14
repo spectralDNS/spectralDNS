@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from ..optimization import optimizer
 
-__all__ = ['cross1', 'cross2']
+__all__ = ['cross1', 'cross2', 'cross2D1', 'cross2D2']
 
 @optimizer
 def cross1(c, a, b):
@@ -20,5 +20,16 @@ def cross1(c, a, b):
 def cross2(c, a, b):
     """ c = 1j*(a x b), where type(a) is int/float and type(b) is complex"""
     c = cross1(c, a, b)
+    c *= 1j
+    return c
+
+@optimizer    
+def cross2D1(c, a, b):
+    c = a[0]*b[1] - a[1]*b[0]
+    return c
+
+@optimizer    
+def cross2D2(c, a, b):
+    c = cross2D1(c, a, b)
     c *= 1j
     return c

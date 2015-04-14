@@ -24,13 +24,14 @@ def add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Ri, 
     dU[2] -= nu * K2 * rho_hat/Pr  
     return dU
 
-#@profile
+@profile
 def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U, V, W
         for i in range(3):
             Ur[i] = ifft2_mpi(Ur_hat[i], Ur[i])
 
-    curl[:] = ifft2_mpi(1j*(K[0]*U_hat[1] - K[1]*U_hat[0]), curl)
+    F_tmp_hat[0] = cross2D2(F_tmp_hat[0], K, U_hat)
+    curl[:] = ifft2_mpi(F_tmp_hat[0], curl)
     dU[0] = fft2_mpi(U[1]*curl, dU[0])
     dU[1] = fft2_mpi(-U[0]*curl, dU[1])
    
@@ -54,6 +55,7 @@ integrate = getintegrator(**vars())
 def regression_test(**kw):
     pass
 
+@profile
 def solve():
     timer = Timer()
     t = 0.0
