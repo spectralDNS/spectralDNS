@@ -21,6 +21,7 @@ def Curl(a, c):
     c[2] = ifftn_mpi(F_tmp[2], c[2])    
     return c
 
+#@profile
 def ComputeRHS(dU, rk):
     if rk > 0:
         for i in range(3):

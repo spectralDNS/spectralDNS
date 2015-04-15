@@ -8,6 +8,11 @@ with mpi_import():
     from cbcdns import config
 
 def get_solver(update=None):
+    args = config.parser.parse_args()
+    if args.solver in ('NS2D', 'Bq2D'):
+        args.decomposition = 'line'
+    vars(config).update(vars(args))
+
     with mpi_import():
         if config.solver == 'NS':
             import solvers.spectralDNS as solver

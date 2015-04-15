@@ -14,16 +14,24 @@ def optimizer(func):
     in the main module.
     
     """
-
     try: # Look for optimized version of function
+        if config.optimization in ('numexpr'):
+            mod = eval('{0}_module'.format(config.optimization))
+            
+        else:
+            mod = eval('{0}_{1}'.format(config.optimization, config.precision))
+            
+        # Check for generic implementation first, then solver specific 
         name = func.func_name
         if config.decomposition == 'line':
-            name += '_2D'
-        if config.optimization in ('numexpr', ):
-            fun = eval('.'.join(('{0}_module'.format(config.optimization), name)))
-        else:
-            fun = eval('{0}_{1}.'.format(config.optimization, config.precision)+name)
+            fun = getattr(mod, name+"_2D", None)
             
+        else:
+            fun = getattr(mod, name, None)
+            
+        if not fun:
+            fun = getattr(mod, name+"_"+config.solver)
+        
         @wraps(func)
         def wrapped_function(*args, **kwargs): 
             if config.optimization == 'weave':

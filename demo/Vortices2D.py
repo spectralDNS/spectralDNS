@@ -1,9 +1,8 @@
 """
 2D test case with three vortices
 """
-from pylab import plt, zeros
-
-plot_result = -10
+from numpy import zeros
+import matplotlib.pyplot as plt
 
 def initialize(U, X, U_hat, exp, pi, ifft2_mpi, fft2_mpi, K_over_K2, **kwargs):
     w =     exp(-((X[0]-pi)**2+(X[1]-pi+pi/4)**2)/(0.2)) \
@@ -36,7 +35,7 @@ def update(t, tstep, N, curl, U_hat, ifft2_mpi, K, P, P_hat, hdf5file, **kw):
         curl = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         hdf5file.write(tstep)   
         
-    if tstep % plot_result == 0 and plot_result > 0:
+    if tstep % config.plot_result == 0 and config.plot_result > 0:
         curl = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         im.set_data(curl[:, :])
         im.autoscale()
@@ -47,12 +46,13 @@ if __name__ == '__main__':
     config.update(
     {
       'nu': 0.001,
-      'dt': 0.001,
+      'dt': 0.005,
       'T': 50,
-      'write_result': 100,
-      'debug': False}
+      'write_result': 100}
     )
 
+    config.parser.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
+    config.parser.add_argument("--debug", type=bool, default=True)
     solver = get_solver()
     solver.hdf5file.components["curl"] = solver.curl
     initialize(**vars(solver))

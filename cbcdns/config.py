@@ -26,13 +26,6 @@ parser.add_argument('--P1', default=1, type=int, help='pencil decomposition in f
 parser.add_argument('--write_result', default=1e8, type=int, help="Write results to HDF5 every...")
 parser.add_argument('--write_yz_slice',  default=[0, 1e8], help="Write 2D slice to HDF5 [x index, every]")
 
-vars().update(vars(parser.parse_args()))
-
-if solver in ('NS2D', 'Bq2D'):
-    decomposition = 'line'
-    parser.set_defaults(decomposition='line')
-
 def update(new):
     assert isinstance(new, dict)
-    parser.set_defaults(**new)
-    globals().update(vars(parser.parse_args()))
+    parser.set_defaults(**new) # allows extra arguments

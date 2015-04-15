@@ -98,58 +98,57 @@ def AB2(np.ndarray[complex_t, ndim=4] U_hat,
                     U_hat0[i,j,k,l] = dU[i,j,k,l]*dt
     return U_hat
 
-def dealias_rhs(np.ndarray[complex_t, ndim=4] du,
-                np.ndarray[np.uint8_t, ndim=3] dealias):
+def dealias_rhs_NS(np.ndarray[complex_t, ndim=4] du,
+                   np.ndarray[np.uint8_t, ndim=3] dealias):
     cdef unsigned int i, j, k
     cdef np.uint8_t uu
-    if du.shape[0] == 3:
-        for i in xrange(dealias.shape[0]):
-            for j in xrange(dealias.shape[1]):
-                for k in xrange(dealias.shape[2]):
-                    uu = dealias[i, j, k]
-                    du[0, i, j, k].real *= uu
-                    du[0, i, j, k].imag *= uu
-                    du[1, i, j, k].real *= uu
-                    du[1, i, j, k].imag *= uu
-                    du[2, i, j, k].real *= uu
-                    du[2, i, j, k].imag *= uu
-                    
-    elif du.shape[0] == 6:
-        for i in xrange(dealias.shape[0]):
-            for j in xrange(dealias.shape[1]):
-                for k in xrange(dealias.shape[2]):
-                    uu = dealias[i, j, k]
-                    du[0, i, j, k].real *= uu
-                    du[0, i, j, k].imag *= uu
-                    du[1, i, j, k].real *= uu
-                    du[1, i, j, k].imag *= uu
-                    du[2, i, j, k].real *= uu
-                    du[2, i, j, k].imag *= uu
-                    du[3, i, j, k].real *= uu
-                    du[3, i, j, k].imag *= uu
-                    du[4, i, j, k].real *= uu
-                    du[4, i, j, k].imag *= uu
-                    du[5, i, j, k].real *= uu
-                    du[5, i, j, k].imag *= uu
-
-    else:
-        for l in xrange(du.shape[0]):
-            for i in xrange(dealias.shape[0]):
-                for j in xrange(dealias.shape[1]):
-                    for k in xrange(dealias.shape[2]):
-                        uu = dealias[i, j, k]
-                        du[l, i, j, k].real *= uu
-                        du[l, i, j, k].imag *= uu
-                        
+    for i in xrange(dealias.shape[0]):
+        for j in xrange(dealias.shape[1]):
+            for k in xrange(dealias.shape[2]):
+                uu = dealias[i, j, k]
+                du[0, i, j, k].real *= uu
+                du[0, i, j, k].imag *= uu
+                du[1, i, j, k].real *= uu
+                du[1, i, j, k].imag *= uu
+                du[2, i, j, k].real *= uu
+                du[2, i, j, k].imag *= uu
     return du
 
-def add_pressure_diffusion(np.ndarray[complex_t, ndim=4] du,
-              np.ndarray[complex_t, ndim=4] u_hat,
-              np.ndarray[int_t, ndim=3] ksq,
-              np.ndarray[int_t, ndim=4] kk,
-              np.ndarray[complex_t, ndim=3] p_hat,
-              np.ndarray[real_t, ndim=4] k_over_k2,
-              real_t nu):
+def dealias_rhs_VV(np.ndarray[complex_t, ndim=4] du,
+                   np.ndarray[np.uint8_t, ndim=3] dealias):
+    du = dealias_rhs_NS(du, dealias)
+    return du
+
+def dealias_rhs_MHD(np.ndarray[complex_t, ndim=4] du,
+                    np.ndarray[np.uint8_t, ndim=3] dealias):
+    cdef unsigned int i, j, k
+    cdef np.uint8_t uu
+    for i in xrange(dealias.shape[0]):
+        for j in xrange(dealias.shape[1]):
+            for k in xrange(dealias.shape[2]):
+                uu = dealias[i, j, k]
+                du[0, i, j, k].real *= uu
+                du[0, i, j, k].imag *= uu
+                du[1, i, j, k].real *= uu
+                du[1, i, j, k].imag *= uu
+                du[2, i, j, k].real *= uu
+                du[2, i, j, k].imag *= uu
+                du[3, i, j, k].real *= uu
+                du[3, i, j, k].imag *= uu
+                du[4, i, j, k].real *= uu
+                du[4, i, j, k].imag *= uu
+                du[5, i, j, k].real *= uu
+                du[5, i, j, k].imag *= uu
+
+    return du
+
+def add_pressure_diffusion_NS(np.ndarray[complex_t, ndim=4] du,
+                              np.ndarray[complex_t, ndim=4] u_hat,
+                              np.ndarray[int_t, ndim=3] ksq,
+                              np.ndarray[int_t, ndim=4] kk,
+                              np.ndarray[complex_t, ndim=3] p_hat,
+                              np.ndarray[real_t, ndim=4] k_over_k2,
+                              real_t nu):
     cdef unsigned int i, j, k
     cdef real_t z
     cdef int_t k0, k1, k2
@@ -283,15 +282,14 @@ def transform_Uc_zx(np.ndarray[complex_t, ndim=3] Uc_hat_z,
 
 ### 2D routines
 
-def add_pressure_diffusion_2D(np.ndarray[complex_t, ndim=3] du, 
-             np.ndarray[complex_t, ndim=2] p_hat, 
-             np.ndarray[complex_t, ndim=3] u_hat,
-             np.ndarray[complex_t, ndim=2] rho_hat,
-             np.ndarray[real_t, ndim=3] k_over_k2, 
-             np.ndarray[int_t, ndim=3] k, 
-             np.ndarray[int_t, ndim=2] ksq, 
-             real_t nu, real_t Ri, real_t Pr):
-
+def add_pressure_diffusion_Bq2D(np.ndarray[complex_t, ndim=3] du, 
+                                np.ndarray[complex_t, ndim=2] p_hat, 
+                                np.ndarray[complex_t, ndim=3] u_hat,
+                                np.ndarray[complex_t, ndim=2] rho_hat,
+                                np.ndarray[real_t, ndim=3] k_over_k2, 
+                                np.ndarray[int_t, ndim=3] k, 
+                                np.ndarray[int_t, ndim=2] ksq, 
+                                real_t nu, real_t Ri, real_t Pr):
     cdef unsigned int i, j
     cdef int_t k0, k1, k2
     cdef real_t z
@@ -390,34 +388,37 @@ def AB2_2D(np.ndarray[complex_t, ndim=3] U_hat,
                 U_hat0[i,j,k] = dU[i,j,k]*dt
     return U_hat
 
-def dealias_rhs_2D(np.ndarray[complex_t, ndim=3] du,
-                   np.ndarray[np.uint8_t, ndim=2] dealias):
+def dealias_rhs_NS2D(np.ndarray[complex_t, ndim=3] du,
+                     np.ndarray[np.uint8_t, ndim=2] dealias):
     cdef unsigned int i, j
     cdef np.uint8_t uu
-    if du.shape[0] == 3:
-        for i in xrange(dealias.shape[0]):
-            for j in xrange(dealias.shape[1]):
-                uu = dealias[i, j]
-                du[0, i, j].real *= uu
-                du[0, i, j].imag *= uu
-                du[1, i, j].real *= uu
-                du[1, i, j].imag *= uu
-                du[2, i, j].real *= uu
-                du[2, i, j].imag *= uu                    
-
-    else:
-        for l in xrange(du.shape[0]):
-            for i in xrange(dealias.shape[0]):
-                for j in xrange(dealias.shape[1]):
-                    uu = dealias[i, j]
-                    du[l, i, j].real *= uu
-                    du[l, i, j].imag *= uu
-                        
+    for i in xrange(dealias.shape[0]):
+        for j in xrange(dealias.shape[1]):
+            uu = dealias[i, j]
+            du[0, i, j].real *= uu
+            du[0, i, j].imag *= uu
+            du[1, i, j].real *= uu
+            du[1, i, j].imag *= uu
     return du
 
-def cross2D1_2D(np.ndarray[real_t, ndim=2] c,
-             np.ndarray[real_t, ndim=3] a,
-             np.ndarray[real_t, ndim=3] b):
+def dealias_rhs_Bq2D(np.ndarray[complex_t, ndim=3] du,
+                     np.ndarray[np.uint8_t, ndim=2] dealias):
+    cdef unsigned int i, j
+    cdef np.uint8_t uu
+    for i in xrange(dealias.shape[0]):
+        for j in xrange(dealias.shape[1]):
+            uu = dealias[i, j]
+            du[0, i, j].real *= uu
+            du[0, i, j].imag *= uu
+            du[1, i, j].real *= uu
+            du[1, i, j].imag *= uu
+            du[2, i, j].real *= uu
+            du[2, i, j].imag *= uu 
+    return du
+
+def cross1_2D(np.ndarray[real_t, ndim=2] c,
+              np.ndarray[real_t, ndim=3] a,
+              np.ndarray[real_t, ndim=3] b):
     cdef unsigned int i, j
     cdef real_t a0, a1, b0, b1
     for i in xrange(a.shape[1]):
@@ -429,9 +430,9 @@ def cross2D1_2D(np.ndarray[real_t, ndim=2] c,
             c[i,j] = a0*b1 - a1*b0
     return c
 
-def cross2D2_2D(np.ndarray[complex_t, ndim=2] c,
-                np.ndarray[T, ndim=3] a,
-                np.ndarray[complex_t, ndim=3] b):
+def cross2_2D(np.ndarray[complex_t, ndim=2] c,
+              np.ndarray[T, ndim=3] a,
+              np.ndarray[complex_t, ndim=3] b):
     cdef unsigned int i, j
     cdef T a0, a1
     cdef complex_t b0, b1
@@ -444,3 +445,23 @@ def cross2D2_2D(np.ndarray[complex_t, ndim=2] c,
             c[i,j].real = -(a0*b1.imag - a1*b0.imag)
             c[i,j].imag = a0*b1.real - a1*b0.real
     return c
+
+def add_pressure_diffusion_NS2D(np.ndarray[complex_t, ndim=3] du,
+                                np.ndarray[complex_t, ndim=2] p_hat,                  
+                                np.ndarray[complex_t, ndim=3] u_hat,
+                                np.ndarray[int_t, ndim=3] k,
+                                np.ndarray[int_t, ndim=2] ksq,
+                                np.ndarray[real_t, ndim=3] k_over_k2,
+                                real_t nu):
+    cdef unsigned int i, j
+    cdef real_t z
+    cdef int_t k0, k1
+    for i in xrange(ksq.shape[0]):
+        for j in xrange(ksq.shape[1]):
+            z = nu*ksq[i,j]
+            k0 = k[0,i,j]
+            k1 = k[1,i,j]
+            p_hat[i,j] = du[0,i,j]*k_over_k2[0,i,j]+du[1,i,j]*k_over_k2[1,i,j]
+            du[0,i,j] = du[0,i,j] - (p_hat[i,j]*k0+u_hat[0,i,j]*z)
+            du[1,i,j] = du[1,i,j] - (p_hat[i,j]*k1+u_hat[1,i,j]*z)
+    return du

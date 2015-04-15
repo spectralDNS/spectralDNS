@@ -27,7 +27,8 @@ def setupNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
     U_hat = empty((2, N, Npf), dtype=complex)
     P     = empty((Np, N), dtype=float)
     P_hat = empty((N, Npf), dtype=complex)
-    curl   = empty((Np, N), dtype=float)
+    curl  = empty((Np, N), dtype=float)
+    F_tmp = empty((2, N, Npf), dtype=complex)
 
     init_fft(N, Nf, Np, Npf, complex, num_processes, comm, rank, mpitype, conj)
 
