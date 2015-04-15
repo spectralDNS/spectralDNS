@@ -45,6 +45,7 @@ if not "sdist" in sys.argv:
     if use_cython:
         ext = cythonize(os.path.join(cdir, "*.pyx"))
         [e.extra_compile_args.extend(["-Ofast"]) for e in ext]
+        [e.include_dirs.extend([get_include()]) for e in ext]
         cmdclass = {'build_ext': build_ext}
         
     if use_weave:

@@ -114,7 +114,36 @@ def init_fft(N, Nf, Np, Npf, complex, num_processes, comm, rank, mpitype, conj):
     U_sendr = U_send.reshape((N, Np/2))
     globals().update(locals())
 
+@optimizer
+def transpose_x(U_send, Uc_hatT, num_processes, Np):
+    # Align data in x-direction
+    for i in range(num_processes): 
+        U_send[i] = Uc_hatT[:, i*Np/2:(i+1)*Np/2]
+    return U_send
+
+@optimizer
+def transpose_y(Uc_hatT, U_recv, num_processes, Np):
+    for i in range(num_processes): 
+        Uc_hatT[:, i*Np/2:(i+1)*Np/2] = U_recv[i*Np:(i+1)*Np]
+    return Uc_hatT
+
+@optimizer
+def swap_Nq(fft_y, fu, fft_x, N):
+    f = fu[:, 0]        
+    fft_x[0] = f[0].real
+    fft_x[1:N/2] = 0.5*(f[1:N/2]+conj(f[:N/2:-1]))
+    fft_x[N/2] = f[N/2].real        
+    fu[:N/2+1, 0] = fft_x[:N/2+1]        
+    fu[N/2+1:, 0] = conj(fft_x[(N/2-1):0:-1])
+    
+    fft_y[0] = f[0].imag
+    fft_y[1:N/2] = -0.5*1j*(f[1:N/2]-conj(f[:N/2:-1]))
+    fft_y[N/2] = f[N/2].imag
+    fft_y[N/2+1:] = conj(fft_y[(N/2-1):0:-1])
+    return fft_y
+@profile
 def fft2_mpi(u, fu):
+    global U_send, fft_y
     if num_processes == 1:
         fu[:] = rfft2(u, axes=(0,1))
         return fu    
@@ -122,9 +151,7 @@ def fft2_mpi(u, fu):
     Uc_hatT[:] = rfft(u, axis=1)
     Uc_hatT[:, 0] += 1j*Uc_hatT[:, -1]
     
-    # Align data in x-direction
-    for i in range(num_processes): 
-        U_send[i] = Uc_hatT[:, i*Np/2:(i+1)*Np/2]
+    U_send = transpose_x(U_send, Uc_hatT, num_processes, Np)
             
     # Communicate all values
     comm.Alltoall([U_send, mpitype], [U_recv, mpitype])
@@ -133,18 +160,7 @@ def fft2_mpi(u, fu):
         
     # Handle Nyquist frequency
     if rank == 0:        
-        f = fu[:, 0]        
-        fft_x[0] = f[0].real
-        fft_x[1:N/2] = 0.5*(f[1:N/2]+conj(f[:N/2:-1]))
-        fft_x[N/2] = f[N/2].real        
-        fu[:N/2+1, 0] = fft_x[:N/2+1]        
-        fu[N/2+1:, 0] = conj(fft_x[(N/2-1):0:-1])
-        
-        fft_y[0] = f[0].imag
-        fft_y[1:N/2] = -0.5*1j*(f[1:N/2]-conj(f[:N/2:-1]))
-        fft_y[N/2] = f[N/2].imag
-        fft_y[N/2+1:] = conj(fft_y[(N/2-1):0:-1])
-        
+        fft_y = swap_Nq(fft_y, fu, fft_x, N)
         comm.Send([fft_y, mpitype], dest=num_processes-1, tag=77)
         
     elif rank == num_processes-1:
@@ -154,6 +170,7 @@ def fft2_mpi(u, fu):
     return fu
 
 def ifft2_mpi(fu, u):
+    global Uc_hatT
     if num_processes == 1:
         u[:] = irfft2(fu, axes=(0,1))
         return u
@@ -163,8 +180,7 @@ def ifft2_mpi(fu, u):
 
     comm.Alltoall([U_send, mpitype], [U_recv, mpitype])
 
-    for i in range(num_processes): 
-        Uc_hatT[:, i*Np/2:(i+1)*Np/2] = U_recv[i*Np:(i+1)*Np]
+    Uc_hatT = transpose_y(Uc_hatT, U_recv, num_processes, Np)
     
     if rank == num_processes-1:
         fft_y[:] = Uc_hat[:, -1]

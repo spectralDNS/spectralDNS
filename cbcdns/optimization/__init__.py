@@ -42,7 +42,7 @@ def optimizer(func):
             return u0
         
     except: # Otherwise revert to default numpy implementation
-        #print func.func_name + ' not optimized'
+        print func.func_name + ' not optimized'
         @wraps(func)
         def wrapped_function(*args, **kwargs):
             u0 = func(*args, **kwargs)
