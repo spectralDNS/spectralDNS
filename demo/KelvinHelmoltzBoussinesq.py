@@ -2,88 +2,15 @@ from cbcdns import config, get_solver
 import matplotlib.pyplot as plt
 from numpy import zeros
 
-def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, Np, N, pi, fft2_mpi, **kwargs):
+def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, Np, N, pi, fft2_mpi, Rip, **kwargs):
 
-
-#--------------------------------------------------------------------------
-#                 1. case
-#--------------------------------------------------------------------------   
-
-    #Um = 0.5*(U1 - U2)
-    #U[1] = A*sin(X[0])
-    #for i in range(Np):
-    #for j in range(N):
-        #if 0.0 <= X[1][i,j] < pi/2.0:
-        #U[0][i,j] = U1 - Um*exp((X[1][i,j] - pi/2.0)/delta) 
-        #elif pi/2.0 <= X[1][i,j] < pi:
-        #U[0][i,j] = U2 + Um*exp(-1.0*(X[1][i,j] - pi/2.0)/delta) 
-        #elif pi <= X[1][i,j] < 3*pi/2.0:
-        #U[0][i,j] = U2 + Um*exp((X[1][i,j] - 3*pi/2.0)/delta) 
-        #elif 3*pi/2. <= X[1][i,j] < 2*pi:
-        #U[0][i,j] = U1 - Um*exp(-1.0*(X[1][i,j] - 3*pi/2.0)/delta)
-    #for i in range(Np):
-    #for j in range(N):
-        #if 0.0 <= X[1][i,j] < pi/2.0:
-            #rho[i, j] = 1.0 + 0.5*exp((X[1][i,j] - pi/2.0)/delta)
-        #elif pi/2.0 <= X[1][i,j] < pi:
-        #rho[i, j] = 2.0 - 0.5*exp(-1*(X[1][i,j] - pi/2.0)/delta)
-        #elif pi <= X[1][i,j] < 3*pi/2.0:
-        #rho[i, j] = 2.0 - 0.5*exp((X[1][i,j] - 3*pi/2.0)/delta)
-        #elif 3*pi/2. <= X[1][i,j] < 2*pi:
-        #rho[i, j] = 1.0 + 0.5*exp(-1.0*(X[1][i,j] - 3*pi/2.0)/delta)
-   
-#--------------------------------------------------------------------------
-#                 Working case L = 2pi (This is the correct initial value)
-#-------------------------------------------------------------------------- 
-# This case shows SKHI for law resolution, but by increasing resolution
-# e.g. M = 10, most of the SKHI disappear. No sign of periodic motion in 
-# y-direction
-  
-  #rho[:] = sin(X[1]/2)
-    #Um = 0.5*(U1 - U2)
-    #U[1] = A*sin(0.5*X[0])
-    #for i in range(Np):
-    #for j in range(N):
-        #if 0.0 <= X[1][i,j] < pi:
-        #U[0][i,j] = U1 - Um*exp((X[1][i,j] - pi)/delta) 
-        #elif pi <= X[1][i,j] < 2*pi:
-        #U[0][i,j] = U2 + Um*exp(-1.0*(X[1][i,j] - pi)/delta) 
-        #elif 2*pi <= X[1][i,j] < 3*pi:
-        #U[0][i,j] = U2 + Um*exp((X[1][i,j] - 3*pi)/delta) 
-        #elif 3*pi <= X[1][i,j] < 4*pi:
-        #U[0][i,j] = U1 - Um*exp(-1.0*(X[1][i,j] - 3*pi)/delta)
-    ##for i in range(Np):
-    ##for j in range(N):
-        ##if 0.0 <= X[1][i,j] < pi:
-            ##rho[i, j] = 1.0 + 0.5*exp((X[1][i,j] - pi)/delta)
-        ##elif pi <= X[1][i,j] < 2*pi:
-        ##rho[i, j] = 2.0 - 0.5*exp(-1*(X[1][i,j] - pi)/delta)
-        ##elif 2*pi <= X[1][i,j] < 3*pi:
-        ##rho[i, j] = 2.0 - 0.5*exp((X[1][i,j] - 3*pi)/delta)
-        ##elif 3*pi <= X[1][i,j] < 4*pi:
-        ##rho[i, j] =1.0 + 0.5*exp(-1.0*(X[1][i,j] - 3*pi)/delta)
-
-    #for i in range(Np):
-    #for j in range(N):
-        #if 0.0 <= X[1][i,j] < 2*pi:
-        #rho[i, j] = tanh((X[1][i,j]-(pi))/delta)
-        #elif 2*pi <= X[1][i,j] < 4*pi:
-          #rho[i, j] = -tanh((X[1][i,j]-(3*pi))/delta)
-
-#--------------------------------------------------------------------------
-#                 Working case L = 2pi
-#-------------------------------------------------------------------------- 
-# This case shows SKHI for law resolution, but by increasing resolution
-# e.g. M = 10, most of the SKHI disappear. No sign of periodic motion in 
-# y-direction
-  
     Um = 0.5*(config.U1 - config.U2)
     U[1] = config.A*sin(0.5*X[0])
     U[0, :, :N/4] = config.U1 - Um*exp((X[1,:, :N/4] - 0.5*pi)/config.delta) 
     U[0, :, N/4:N/2] = config.U2 + Um*exp(-1.0*(X[1, :, N/4:N/2] - 0.5*pi)/config.delta) 
     U[0, :, N/2:3*N/4] = config.U2 + Um*exp((X[1, :, N/2:3*N/4] - 1.5*pi)/config.delta) 
     U[0, :, 3*N/4:] = config.U1 - Um*exp(-1.0*(X[1, :, 3*N/4:] - 1.5*pi)/config.delta)
-
+    Rip *= config.Ri
     
     #for i in range(Np):
         #for j in range(N):
@@ -117,84 +44,6 @@ def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, Np, N, pi, fft2_mpi, 
           
     for i in range(3):
         Ur_hat[i] = fft2_mpi(Ur[i], Ur_hat[i]) 
-
-#--------------------------------------------------------------------------
-#                 Martines et al. 2006
-#--------------------------------------------------------------------------  
-# In this case the velocity and the density are given by the error-function
-# This case was run for Pr = 12 Ri = 0.12 and Re = 6000 delta = 0.005 M = 10
-# dt = 0.003. SKHI are observed. Almost the same behavior as Mashayek case.
-    #U[1] = A*sin(4*(X[0]+X[1])/9.) #- A*sin(4*(X[0]+X[1])/18.)/1.5
-    #for i in range(Np):
-    #for j in range(N):
-        #if 0.0 <= X[1][i,j] < 4.5*pi:
-        #U[0][i,j] = math.erf((pi**0.5)*(X[1][i,j]-3*pi)/delta)
-        #elif 4.5*pi <= X[1][i,j] < 9*pi:
-        #U[0][i, j] = -math.erf((pi**0.5)*(X[1][i,j]-6*pi)/delta)
-    ##for i in range(Np):
-    ##for j in range(N):
-        ##if 0.0 <= X[1][i,j] < 4.5*pi:
-        ##U[1][i,j] *= 2*exp(-1.0*(X[1][i,j]-2.5*pi)**2/delta)/(pi**0.5)
-        ##elif 4.5*pi <= X[1][i,j] < 9*pi:
-        ##U[1][i,j] *= 2*exp(-1.0*(X[1][i,j]-6.5*pi)**2/delta)/(pi**0.5)
-            
-    ##rho[:] = A*sin(X[0])      
-    #for i in range(Np):
-    #for j in range(N):
-        #if 0.0 <= X[1][i,j] < 4.5*pi:
-        #rho[i, j] = -math.erf((pi**0.5)*0.4*(X[1][i,j]-3*pi)/delta)/0.4
-        #elif 4.5*pi <= X[1][i,j] < 9*pi:
-            #rho[i, j] = math.erf((pi**0.5)*0.4*(X[1][i,j]-6*pi)/delta)/0.4
-
-    #for i in range(Np):
-    #for j in range(N):
-        #if 0.0 <= X[1][i,j] < pi:
-        #omega_pert[i,j] = A*(cosh((X[1][i,j]-0.5*pi)/delta))**(-2) * ((k0**2 + 2.0-6.0*(tanh((X[1][i,j]-0.5*pi)/delta))**2)*cos(k0*(X[0][i,j]-pi)) - bb*(0.25*k0**2 + 2.0-6.0*(tanh((X[1][i,j]-0.5*pi)/delta))**2)*cos(0.5*k0*(X[0][i,j]-pi)))   
-        #omega[i,j]  = (cosh((X[1][i,j]-0.5*pi)/delta))**(-2) + omega_pert[i,j]
-        #elif pi <= X[1][i,j] < 2*pi: 
-        #omega_pert[i,j] = A*(cosh((X[1][i,j]-1.5*pi)/delta))**(-2) * ((k0**2 + 2.0-6.0*(tanh((X[1][i,j]-1.5*pi)/delta))**2)*cos(k0*(X[0][i,j]-pi)) - bb*(0.25*k0**2 + 2.0-6.0*(tanh((X[1][i,j]-1.5*pi)/delta))**2)*cos(0.5*k0*(X[0][i,j]-pi)))   
-        #omega[i,j]  = -(cosh((X[1][i,j]-1.5*pi)/delta))**(-2) - omega_pert[i,j]
-
-#--------------------------------------------------------------------------
-#                 From Mashayek & Peltier 2012
-#--------------------------------------------------------------------------  
-# This case was run for Pr = 12 Ri = 0.12 and Re = 6000 delta = 0.005 M = 10
-# SKHI are observed
-    #U[1] = A*sin(X[0])
-    #for i in range(Np):
-    #for j in range(N):
-        #if 0.0 <= X[1][i,j] < 2*pi:
-        #U[0][ i, j] = tanh((X[1][i,j]-pi)/delta)
-        #elif 2*pi <= X[1][i,j] < 4*pi:
-        #U[0][i, j] = -tanh((X[1][i,j]-3*pi)/delta)
-    #rho[:] = A*sin(X[0])       
-    #for i in range(Np):
-    #for j in range(N):
-        #if 0.0 <= X[1][i,j] < 2*pi:
-        #rho[i, j] = tanh(1.1*(X[1][i,j]-pi)/delta)
-        #elif 2*pi <= X[1][i,j] < 4*pi:
-          #rho[i, j] = -tanh(1.1*(X[1][i,j]-3*pi)/delta)
-          
-#--------------------------------------------------------------------------
-#                     Density Test
-#--------------------------------------------------------------------------
-# This is a test for the density
-    ##U[0] = 0.0
-    ##U[1] = 0.0
-    #for i in range(Np):
-    #for j in range(N):
-        #rho[i,j] = sin(X[0][i,j]+X[1][i,j])
-        #U[0][i,j] = 0.0
-        #U[1][i,j] = 0.0
-#--------------------------------------------------------------------------
-#                     Taylor-Green Test
-#--------------------------------------------------------------------------
-# This test shows that the solver for the velocity is correct
-
-    #U[0] = sin(X[0])*cos(X[1])
-    #U[1] =-cos(X[0])*sin(X[1])
-    #rho[:] = 0.0         
-    return U, rho
 
 im, im2 = None, None
 def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, ifft2_mpi, U_hat, U, sum, 

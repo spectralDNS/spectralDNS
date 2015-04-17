@@ -10,17 +10,23 @@ Ri = float(config.Ri)
 Pr = float(config.Pr)
 
 @optimizer
-def add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Ri, Pr):
+def add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Rip, Pr):
     # Compute pressure (To get actual pressure multiply by 1j)
-    P_hat[:]  = sum(dU[:2]*K_over_K2, 0, out=P_hat)
-    P_hat[:] -= Ri*rho_hat*K_over_K2[1]
+    P_hat  = sum(dU[:2]*K_over_K2, 0, out=P_hat)
+    
+    F_tmp[0] = fft2_mpi(Rip*rho, F_tmp[0])
+    
+    P_hat -= F_tmp[0]*K_over_K2[1]
+    #P_hat -= Ri*rho_hat*K_over_K2[1]
     
     # Add pressure gradient
     dU[:2] -= P_hat*K
 
     # Add contribution from diffusion                      
     dU[0] -= nu*K2*U_hat[0]
-    dU[1] -= nu*K2*U_hat[1] + Ri*rho_hat
+    
+    #dU[1] -= (nu*K2*U_hat[1] + Ri*rho_hat)
+    dU[1] -= (nu*K2*U_hat[1] + F_tmp[0])
     dU[2] -= nu * K2 * rho_hat/Pr  
     return dU
 
@@ -29,22 +35,22 @@ def ComputeRHS(dU, rk):
         for i in range(3):
             Ur[i] = ifft2_mpi(Ur_hat[i], Ur[i])
 
-    F_tmp_hat[0] = cross2(F_tmp_hat[0], K, U_hat)
-    curl[:] = ifft2_mpi(F_tmp_hat[0], curl)
+    F_tmp[0] = cross2(F_tmp[0], K, U_hat)
+    curl[:] = ifft2_mpi(F_tmp[0], curl)
     dU[0] = fft2_mpi(U[1]*curl, dU[0])
     dU[1] = fft2_mpi(-U[0]*curl, dU[1])
    
-    F_tmp[0] = ifft2_mpi(1j*K[0]*rho_hat, F_tmp[0])      
-    F_tmp[1] = ifft2_mpi(1j*K[1]*rho_hat, F_tmp[1])      
+    F_tmp[0] = fft2_mpi(U[0]*rho, F_tmp[0])
+    F_tmp[1] = fft2_mpi(U[1]*rho, F_tmp[1])
+    dU[2] = 1j*(K[0]*F_tmp[0]+K[1]*F_tmp[1])
     
-    F_tmp_hat[0] = fft2_mpi(U[0]*F_tmp[0], F_tmp_hat[0])      
-    F_tmp_hat[1] = fft2_mpi(U[1]*F_tmp[1], F_tmp_hat[1])    
-    
-    dU[2] = -(F_tmp_hat[0] + F_tmp_hat[1])
+    F_tmp[0] = fft2_mpi(U[0]*U_tmp[0], F_tmp[0])      
+    F_tmp[1] = fft2_mpi(U[1]*U_tmp[1], F_tmp[1])    
+    dU[2] = -(F_tmp[0] + F_tmp[1])
     
     dU = dealias_rhs(dU, dealias)
     
-    dU = add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Ri, Pr)
+    dU = add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Rip, Pr)
     
     return dU
 

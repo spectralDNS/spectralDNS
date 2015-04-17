@@ -6,6 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from ..fft.wrappyfftw import *
 from cbcdns import config
 from ..optimization import optimizer
+from scipy.special import erf
 
 __all__ = ['setup', 'ifft2_mpi', 'fft2_mpi']
 
@@ -51,7 +52,7 @@ def setupNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
     return locals()
 
 def setupBoussinesq(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
-                    sum, where, num_processes, rank, conj, **kwargs):
+                    sum, where, num_processes, rank, conj, pi, resize, **kwargs):
     
     # Each cpu gets ownership of Np indices
     Np = N / num_processes     
@@ -69,7 +70,13 @@ def setupBoussinesq(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     P     = empty((Np, N), dtype=float)
     P_hat = empty((N, Npf), dtype=complex)
     curl   = empty((Np, N), dtype=float)
+    Rip    = empty((Np, N), dtype=float)
     dU     = empty((3, N, Npf), dtype=complex)
+    
+    #ee = -erf((X[1,0,:]-pi)*10)
+    #Rip[:] = resize(ee.repeat(Np), (N, Np)).T
+    Rip[:, :N/2] = 1
+    Rip[:, N/2:] = -1
  
     # Create views into large data structures
     rho     = Ur[2]
@@ -77,8 +84,8 @@ def setupBoussinesq(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     U     = Ur[:2] 
     U_hat = Ur_hat[:2]
 
-    F_tmp = empty((2, Np, N), dtype=float)
-    F_tmp_hat = empty((2, N, Npf), dtype=complex)
+    U_tmp = empty((2, Np, N), dtype=float)
+    F_tmp = empty((2, N, Npf), dtype=complex)
 
     init_fft(N, Nf, Np, Npf, complex, num_processes, comm, rank, mpitype, conj)
     
@@ -141,7 +148,7 @@ def swap_Nq(fft_y, fu, fft_x, N):
     fft_y[N/2] = f[N/2].imag
     fft_y[N/2+1:] = conj(fft_y[(N/2-1):0:-1])
     return fft_y
-@profile
+
 def fft2_mpi(u, fu):
     global U_send, fft_y
     if num_processes == 1:
@@ -157,7 +164,7 @@ def fft2_mpi(u, fu):
     comm.Alltoall([U_send, mpitype], [U_recv, mpitype])
     
     fu[:, :Np/2] = fft(U_recv, axis=0)
-        
+    
     # Handle Nyquist frequency
     if rank == 0:        
         fft_y = swap_Nq(fft_y, fu, fft_x, N)

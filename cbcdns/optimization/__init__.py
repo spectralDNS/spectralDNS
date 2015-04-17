@@ -52,7 +52,6 @@ def optimizer(func):
 
 try:
     import cython_double, cython_single
-    #import cython_module
            
 except:
     pass
