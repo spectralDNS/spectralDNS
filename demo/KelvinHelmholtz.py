@@ -4,7 +4,7 @@ from numpy import zeros
 
 def initialize(X, U, U_hat, exp, sin, cos, tanh, Np, N, pi, fft2_mpi, **kwargs):
     Um = 0.5*(config.U1 - config.U2)
-    U[1] = config.A*sin(X[0])       
+    U[1] = config.A*sin(2*X[0])       
     U[0, :, :N/4] = config.U1 - Um*exp((X[1,:, :N/4] - 0.5*pi)/config.delta)
     U[0, :, N/4:N/2] = config.U2 + Um*exp(-1.0*(X[1, :, N/4:N/2] - 0.5*pi)/config.delta)
     U[0, :, N/2:3*N/4] = config.U2 + Um*exp((X[1, :, N/2:3*N/4] - 1.5*pi)/config.delta)
@@ -28,7 +28,7 @@ def update(t, tstep, comm, rank, N, L, dx, ifft2_mpi, U_hat, U, sum,
             
     if tstep == 1 and config.plot_result > 0:
         fig, ax = plt.subplots(1,1)
-        fig.suptitle('U0', fontsize=20)
+        fig.suptitle('Pressure', fontsize=20)
         ax.set_xlabel('x')
         ax.set_ylabel('y')
 
@@ -48,8 +48,8 @@ def update(t, tstep, comm, rank, N, L, dx, ifft2_mpi, U_hat, U, sum,
 
     if tstep % config.plot_result == 0 and config.plot_result > 0:
         curl[:] = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
-        #curl = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
-        im.set_data(U[0, :, :].T)
+        P = ifft2_mpi(1j*P_hat, P)
+        im.set_data(P[:, :].T)
         im.autoscale()
         plt.pause(1e-6)
         im2.set_data(curl[:,:].T)

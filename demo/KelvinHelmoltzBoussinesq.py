@@ -1,57 +1,36 @@
 from cbcdns import config, get_solver
 import matplotlib.pyplot as plt
-from numpy import zeros
+from numpy import zeros, exp
 
-def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, Np, N, pi, fft2_mpi, Rip, **kwargs):
+def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, Np, N, pi, fft2_mpi, float, **kwargs):
 
     Um = 0.5*(config.U1 - config.U2)
-    U[1] = config.A*sin(0.5*X[0])
-    U[0, :, :N/4] = config.U1 - Um*exp((X[1,:, :N/4] - 0.5*pi)/config.delta) 
-    U[0, :, N/4:N/2] = config.U2 + Um*exp(-1.0*(X[1, :, N/4:N/2] - 0.5*pi)/config.delta) 
-    U[0, :, N/2:3*N/4] = config.U2 + Um*exp((X[1, :, N/2:3*N/4] - 1.5*pi)/config.delta) 
-    U[0, :, 3*N/4:] = config.U1 - Um*exp(-1.0*(X[1, :, 3*N/4:] - 1.5*pi)/config.delta)
-    Rip *= config.Ri
+    U[1] = config.A*sin(6*X[0])
+    #U[0, :, :N/4] = config.U1 - Um*exp((X[1,:, :N/4] - 0.5*pi)/config.delta) 
+    #U[0, :, N/4:N/2] = config.U2 + Um*exp(-1.0*(X[1, :, N/4:N/2] - 0.5*pi)/config.delta) 
+    #U[0, :, N/2:3*N/4] = config.U2 + Um*exp((X[1, :, N/2:3*N/4] - 1.5*pi)/config.delta) 
+    #U[0, :, 3*N/4:] = config.U1 - Um*exp(-1.0*(X[1, :, 3*N/4:] - 1.5*pi)/config.delta)
     
-    #for i in range(Np):
-        #for j in range(N):
-            #if 0.0 <= X[1][i,j] < 0.5*pi:
-                #U[0][i,j] = config.U1 - Um*exp((X[1][i,j] - 0.5*pi)/config.delta) 
-            #elif 0.5*pi <= X[1][i,j] < pi:
-                #U[0][i,j] = config.U2 + Um*exp(-1.0*(X[1][i,j] - 0.5*pi)/config.delta) 
-            #elif pi <= X[1][i,j] < 1.5*pi:
-                #U[0][i,j] = config.U2 + Um*exp((X[1][i,j] - 1.5*pi)/config.delta) 
-            #elif 1.5*pi <= X[1][i,j] < 2*pi:
-                #U[0][i,j] = config.U1 - Um*exp(-1.0*(X[1][i,j] - 1.5*pi)/config.delta)
-
+    #rho[:, :N/2] = tanh((X[1][:, :N/2]-(0.5*pi))/config.delta)
+    #rho[:, N/2:] =-tanh((X[1][:, N/2:]-(1.5*pi))/config.delta)
                 
-    #for i in range(Np):
-    #for j in range(N):
-        #if 0.0 <= X[1][i,j] < pi:
-            #rho[i, j] = 1.0 + 0.5*exp((X[1][i,j] - pi)/delta)
-        #elif pi <= X[1][i,j] < 2*pi:
-        #rho[i, j] = 2.0 - 0.5*exp(-1*(X[1][i,j] - pi)/delta)
-        #elif 2*pi <= X[1][i,j] < 3*pi:
-        #rho[i, j] = 2.0 - 0.5*exp((X[1][i,j] - 3*pi)/delta)
-        #elif 3*pi <= X[1][i,j] < 4*pi:
-        #rho[i, j] =1.0 + 0.5*exp(-1.0*(X[1][i,j] - 3*pi)/delta)
-
-    for i in range(Np):
-        for j in range(N):
-            if 0.0 <= X[1][i,j] < pi:
-                rho[i, j] = tanh((X[1][i,j]-(0.5*pi))/config.delta)
-            elif pi <= X[1][i,j] < 2*pi:
-                rho[i, j] = -tanh((X[1][i,j]-(1.5*pi))/config.delta)
-          
+    rho0 = 0.5*(config.rho1 + config.rho2)
+    U[0, :, :N/2] = tanh((X[1, :, :N/2] -0.5*pi)/config.delta)
+    U[0, :, N/2:] = -tanh((X[1, :, N/2:]-1.5*pi)/config.delta)
+    rho[:, :N/2] = 2.0 + tanh((X[1, :, :N/2] -0.5*pi)/config.delta)
+    rho[:, N/2:] = 2.0 -tanh((X[1, :, N/2:]-1.5*pi)/config.delta) 
+    rho -= rho0
+    
     for i in range(3):
         Ur_hat[i] = fft2_mpi(Ur[i], Ur_hat[i]) 
 
 im, im2 = None, None
 def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, ifft2_mpi, U_hat, U, sum, 
-           P_hat, P, hdf5file, float64, **kwargs):
+           P_hat, P, hdf5file, float64, rho_hat, **kwargs):
     global im, im2
         
     if tstep == 1 and config.plot_result > 0:
-        fig, ax = plt.subplots(1,1)
+        fig, ax = plt.subplots(1, 1)
         fig.suptitle('Density', fontsize=20)
         ax.set_xlabel('x')
         ax.set_ylabel('y')
@@ -72,7 +51,6 @@ def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, ifft2_mpi, U_hat, U, su
 
     if tstep % config.plot_result == 0 and config.plot_result > 0:
         curl[:] = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
-        #curl = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         im.set_data(rho[:, :].T)
         im.autoscale()
         plt.pause(1e-6)
@@ -91,22 +69,10 @@ def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, ifft2_mpi, U_hat, U, su
         if rank == 0:
             print tstep, kk
 
-def regression_test(comm, U, X, dx, L, nu, t, sin, cos, sum, float64, exp, 
-                    rank, **kwargs):
-    print "---------regression_test--------------"
-    # Check accuracy
-    #kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx/L**2/2)
-    #u0 = sin(X[0])*cos(X[1])*exp(-2.*nu*t)
-    #u1 =-sin(X[1])*cos(X[0])*exp(-2.*nu*t)
-    #k1 = comm.reduce(sum(u0*u0+u1*u1)*dx*dx/L**2/2) # Compute energy with double precision)
-    #if rank == 0:
-        #print "Energy (exact, numeric, error)  = (%2.6f, %2.6f, %2.4e) " %(k1, kk, k1-kk)
-        #assert abs(k1-kk)<1.e-10
-
 if __name__ == "__main__":
     config.update(
     {
-    'nu': 1.0e-05,
+    'nu': 1.0e-08,
     'dt': 0.001,
     'T': 1.0,
     'U1':-0.5,
@@ -117,7 +83,9 @@ if __name__ == "__main__":
     'Pr': 12.0,     # Prantl number
     'delta': 0.1,   # Width of perturbations
     'bb': 0.8,
-    'k0': 2
+    'k0': 2,
+    'rho1': 1.0,
+    'rho2': 3.0,
     }
     )
     config.parser.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline    

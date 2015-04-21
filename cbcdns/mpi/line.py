@@ -70,14 +70,8 @@ def setupBoussinesq(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     P     = empty((Np, N), dtype=float)
     P_hat = empty((N, Npf), dtype=complex)
     curl   = empty((Np, N), dtype=float)
-    Rip    = empty((Np, N), dtype=float)
     dU     = empty((3, N, Npf), dtype=complex)
-    
-    #ee = -erf((X[1,0,:]-pi)*10)
-    #Rip[:] = resize(ee.repeat(Np), (N, Np)).T
-    Rip[:, :N/2] = 1
-    Rip[:, N/2:] = -1
- 
+     
     # Create views into large data structures
     rho     = Ur[2]
     rho_hat = Ur_hat[2]
