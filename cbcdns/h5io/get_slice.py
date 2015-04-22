@@ -19,6 +19,7 @@ def get_slice(h5filename, tsteps, newfilename=None):
         fnew = h5py.File(newfilename, "w", driver="mpio", comm=comm)    
         fnew.create_group("2D")
         fnew.create_group("3D")
+        fnew.attrs.create("N", N)
         for comp in comps:
             fnew["3D"].create_group(comp)
             fnew["2D"].create_group(comp)
@@ -42,6 +43,7 @@ def get_slice(h5filename, tsteps, newfilename=None):
             fnew = h5py.File(h5filename[:-3]+"_"+tstep+".h5", "w", driver="mpio", comm=comm)    
             fnew.create_group("2D")
             fnew.create_group("3D")
+            fnew.attrs.create("N", N)
             for comp in comps:
                 fnew["3D"].create_group(comp)
                 fnew["2D"].create_group(comp)

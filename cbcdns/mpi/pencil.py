@@ -34,7 +34,7 @@ def transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2, N1, N2):
     return Uc_hat_y
 
 def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
-             sum, where, num_processes, rank, hdf5file, mgrid, **kwargs):
+             sum, where, num_processes, rank, mgrid, **kwargs):
 
     # Each cpu gets ownership of a pencil of size N1*N2*N in real space
     # and (N1/2+1)*N2*N in Fourier space. However, the Nyquist mode is
@@ -64,8 +64,6 @@ def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     x1 = slice(xzrank * N1, (xzrank+1) * N1, 1)
     x2 = slice(xyrank * N2, (xyrank+1) * N2, 1)
     X = mgrid[x1, x2, :N].astype(float)*L/N
-    hdf5file.x1 = x1
-    hdf5file.x2 = x2
 
     """
     Solution U is real and as such its transform, U_hat = fft(U)(k), 
@@ -111,7 +109,7 @@ def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     return locals()
 
 def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
-             sum, where, num_processes, rank, hdf5file, mgrid, **kwargs):
+             sum, where, num_processes, rank, mgrid, **kwargs):
 
     # Each cpu gets ownership of a pencil of size N1*N2*N in real space
     # and (N1/2+1)*N2*N in Fourier space. However, the Nyquist mode is
@@ -141,8 +139,6 @@ def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     x1 = slice(xzrank * N1, (xzrank+1) * N1, 1)
     x2 = slice(xyrank * N2, (xyrank+1) * N2, 1)
     X = mgrid[x1, x2, :N].astype(float)*L/N
-    hdf5file.x1 = x1
-    hdf5file.x2 = x2
 
     """
     Solution U is real and as such its transform, U_hat = fft(U)(k), 
