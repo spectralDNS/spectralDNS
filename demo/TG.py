@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from numpy import array
+from numpy import array, pi
 
 def initialize(config, **kw):
     if config.solver == 'NS':
@@ -37,8 +37,8 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, float64, dx, L, sum,
         hdf5file.write(tstep)
 
     if tstep % config.compute_energy == 0:
-        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx*dx/L**3/2) # Compute energy with double precision
-        ww = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx*dx*dx/L**3/2)
+        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
+        ww = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
         if rank == 0:
             k.append(kk)
             w.append(ww)
@@ -61,6 +61,7 @@ if __name__ == "__main__":
         'nu': 0.000625,             # Viscosity
         'dt': 0.01,                 # Time step
         'T': 0.1,                   # End time
+        'L': [4*pi, 2*pi, 2*pi]
         }
     )
     config.parser.add_argument("--compute_energy", type=int, default=2)

@@ -6,6 +6,8 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 Global run-time configuration that may be overloaded on the commandline
 """
 import argparse
+from numpy import pi
+
 parser = argparse.ArgumentParser(prog='cbcdns')
 
 parser.add_argument('solver', choices=('NS', 'VV', 'NS2D', 'MHD', 'Bq2D'), 
@@ -21,7 +23,8 @@ parser.add_argument('--nu', default=0.000625, type=float, help='Viscosity')
 parser.add_argument('--eta', default=0.01, type=float, help='MHD parameter')
 parser.add_argument('--dt', default=0.01, type=float, help='Time step size')
 parser.add_argument('--T', default=0.1, type=float, help='End time')
-parser.add_argument('--M', default=6, type=int, help='Mesh size')
+parser.add_argument('--M', default=[6, 6, 6], nargs='+', help='Mesh size')
+parser.add_argument('--L', default=[2*pi, 2*pi, 2*pi], nargs='+', help='Physical mesh size')
 parser.add_argument('--P1', default=1, type=int, help='pencil decomposition in first direction')
 parser.add_argument('--write_result', default=1e8, type=int, help="Write results to HDF5 every...")
 parser.add_argument('--write_yz_slice',  default=[0, 1e8], help="Write 2D slice to HDF5 [x index, every]")

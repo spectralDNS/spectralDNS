@@ -15,36 +15,44 @@ except ImportError:
 nu = 0.000625
 T = 0.1
 dt = 0.01
-M = 6
+M = array([6, 6, 6])
 N = 2**M
-L = 2 * pi
+L = array([4*pi, 2*pi, 4*pi])
 dx = L / N
 comm = MPI.COMM_WORLD
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
 Np = N / num_processes
-X = mgrid[rank*Np:(rank+1)*Np, :N, :N].astype(float)*L/N
-Nf = N/2+1
-U     = empty((3, Np, N, N))
-U_hat = empty((3, N, Np, Nf), dtype="complex")
-P     = empty((Np, N, N))
-P_hat = empty((N, Np, Nf), dtype="complex")
-U_hat0  = empty((3, N, Np, Nf), dtype="complex")
-U_hat1  = empty((3, N, Np, Nf), dtype="complex")
-dU      = empty((3, N, Np, Nf), dtype="complex")
-Uc_hat  = empty((N, Np, Nf), dtype="complex")
-Uc_hatT = empty((Np, N, Nf), dtype="complex")
-U_mpi   = empty((num_processes, Np, Np, Nf), dtype="complex")
-curl    = empty((3, Np, N, N))
+Lp = 2*pi/L
+X = mgrid[rank*Np[0]:(rank+1)*Np[0], :N[1], :N[2]].astype(float)
+X[0] *= L[0]/N[0]
+X[1] *= L[1]/N[1]
+X[2] *= L[2]/N[2]
+Nf = N[2]/2+1
 
-kx = fftfreq(N, 1./N)
-kz = kx[:Nf].copy(); kz[-1] *= -1
-K = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
+U     = empty((3, Np[0], N[1], N[2]))
+U_hat = empty((3, N[0], Np[1], Nf), dtype="complex")
+P     = empty((Np[0], N[1], N[2]))
+P_hat = empty((N[0], Np[1], Nf), dtype="complex")
+U_hat0  = empty((3, N[0], Np[1], Nf), dtype="complex")
+U_hat1  = empty((3, N[0], Np[1], Nf), dtype="complex")
+dU      = empty((3, N[0], Np[1], Nf), dtype="complex")
+Uc_hat  = empty((N[0], Np[1], Nf), dtype="complex")
+Uc_hatT = empty((Np[0], N[1], Nf), dtype="complex")
+U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype="complex")
+curl    = empty((3, Np[0], N[1], N[2]))
+
+kx = fftfreq(N[0], 1./N[0])
+ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
+kz = fftfreq(N[2], 1./N[2])[:Nf]
+kz[-1] *= -1
+K = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=int)
+K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] # scale with physical mesh size
 K2 = sum(K*K, 0, dtype=int)
 K_over_K2 = K.astype(float) / where(K2 == 0, 1, K2).astype(float)
 kmax_dealias = 2./3.*(N/2+1)
-dealias = array((abs(K[0]) < kmax_dealias)*(abs(K[1]) < kmax_dealias)*
-                (abs(K[2]) < kmax_dealias), dtype=bool)
+dealias = array((abs(K[0]) < kmax_dealias[0])*(abs(K[1]) < kmax_dealias[1])*
+                (abs(K[2]) < kmax_dealias[2]), dtype=bool)
 a = [1./6., 1./3., 1./3., 1./6.]
 b = [0.5, 0.5, 1.]
 
@@ -52,14 +60,14 @@ def ifftn_mpi(fu, u):
     Uc_hat[:] = ifft(fu, axis=0)
     comm.Alltoall([Uc_hat, MPI.DOUBLE_COMPLEX], [U_mpi, MPI.DOUBLE_COMPLEX])
     for i in range(num_processes):
-        Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
+        Uc_hatT[:, i*Np[1]:(i+1)*Np[1]] = U_mpi[i]
     u[:] = irfft2(Uc_hatT, axes=(1,2))
     return u
 
 def fftn_mpi(u, fu):
     Uc_hatT[:] = rfft2(u, axes=(1,2))
     for i in range(num_processes):
-        U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
+        U_mpi[i] = Uc_hatT[:, i*Np[1]:(i+1)*Np[1]]
     comm.Alltoall([U_mpi, MPI.DOUBLE_COMPLEX], [fu, MPI.DOUBLE_COMPLEX])
     fu[:] = fft(fu, axis=0)
     return fu
@@ -71,9 +79,9 @@ def Cross(a, b, c):
     return c
 
 def Curl(a, c):
-    c[2] = ifftn_mpi(1j*(K[0]*a[1]-K[1]*a[0]), c[2])
-    c[1] = ifftn_mpi(1j*(K[2]*a[0]-K[0]*a[2]), c[1])
     c[0] = ifftn_mpi(1j*(K[1]*a[2]-K[2]*a[1]), c[0])
+    c[1] = ifftn_mpi(1j*(K[2]*a[0]-K[0]*a[2]), c[1])
+    c[2] = ifftn_mpi(1j*(K[0]*a[1]-K[1]*a[0]), c[2])
     return c
 
 def ComputeRHS(dU, rk):
@@ -108,6 +116,6 @@ while t < T-1e-8:
     for i in range(3):
         U[i] = ifftn_mpi(U_hat[i], U[i])
         
-kk = comm.reduce(0.5*sum(U*U)*dx*dx*dx/L**3)
+kk = comm.reduce(0.5*sum(U*U)*dx[0]/L[0]*dx[1]/L[1]*dx[2]/L[2])
 if rank == 0:
     print kk
