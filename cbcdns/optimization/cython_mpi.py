@@ -70,11 +70,12 @@ def transform_Uc_zx(np.ndarray[complex_t, ndim=3] Uc_hat_z,
                     int P1, int N1, int N2):
     cdef unsigned int i, j, k, l, i0
     for i in xrange(P1):
-        for j in xrange(i*N1, (i+1)*N1):
-            i0 = j-i*N1
+        for i0 in xrange(N1):
+            j = i0+i*N1
             for k in xrange(N2):
                 for l in xrange(N1/2):
                     Uc_hat_z[i0, k, l+i*N1/2] = Uc_hat_xr[j, k, l]
+                    
     return Uc_hat_z
 
 def transpose_x_2D(np.ndarray[complex_t, ndim=3] U_send,

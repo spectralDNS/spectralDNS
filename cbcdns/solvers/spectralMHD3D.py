@@ -10,6 +10,16 @@ hdf5file = HDF5Writer(comm, N, float, {"U":U[0], "V":U[1], "W":U[2], "P":P,
 
 eta = float(config.eta)
 
+def set_Elsasser(c, F_tmp, K):
+    c[:3] = -1j*(K[0]*(F_tmp[:, 0] + F_tmp[0, :])
+                +K[1]*(F_tmp[:, 1] + F_tmp[1, :])
+                +K[2]*(F_tmp[:, 2] + F_tmp[2, :]))/2.0
+
+    c[3:] =  1j*(K[0]*(F_tmp[0, :] - F_tmp[:, 0])
+                +K[1]*(F_tmp[1, :] - F_tmp[:, 1])
+                +K[2]*(F_tmp[2, :] - F_tmp[:, 2]))/2.0
+    return c
+
 def divergenceConvection(z0, z1, c):
     """Divergence convection using Elsasser variables
     z0=U+B
@@ -19,13 +29,14 @@ def divergenceConvection(z0, z1, c):
         for j in range(3):
             F_tmp[i, j] = fftn_mpi(z0[i]*z1[j], F_tmp[i, j])
             
-    c[:3] = -1j*(K[0]*(F_tmp[:, 0] + F_tmp[0, :])
-                +K[1]*(F_tmp[:, 1] + F_tmp[1, :])
-                +K[2]*(F_tmp[:, 2] + F_tmp[2, :]))/2.0
+    c = set_Elsasser(c, F_tmp, K)
+    #c[:3] = -1j*(K[0]*(F_tmp[:, 0] + F_tmp[0, :])
+                #+K[1]*(F_tmp[:, 1] + F_tmp[1, :])
+                #+K[2]*(F_tmp[:, 2] + F_tmp[2, :]))/2.0
 
-    c[3:] =  1j*(K[0]*(F_tmp[0, :] - F_tmp[:, 0])
-                +K[1]*(F_tmp[1, :] - F_tmp[:, 1])
-                +K[2]*(F_tmp[2, :] - F_tmp[:, 2]))/2.0
+    #c[3:] =  1j*(K[0]*(F_tmp[0, :] - F_tmp[:, 0])
+                #+K[1]*(F_tmp[1, :] - F_tmp[:, 1])
+                #+K[2]*(F_tmp[2, :] - F_tmp[:, 2]))/2.0
 
     return c    
     

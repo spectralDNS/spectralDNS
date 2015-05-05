@@ -17,6 +17,7 @@ def create_profile(profiler, comm, MPI, rank, **params):
                  'rfftn',
                  'rfft2',
                  'fft',
+                 'rfft',
                  'Alltoall',
                  'Sendrecv_replace',
                  'add_pressure_diffusion',
