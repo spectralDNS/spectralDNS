@@ -38,7 +38,10 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, float64, dx, L, sum,
 
     if tstep % config.compute_energy == 0:
         kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
-        ww = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+        if config.solver == 'NS':
+            ww = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+        elif config.solver == 'VV':
+            ww = comm.reduce(sum(kw['W'].astype(float64)*kw['W'].astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
         if rank == 0:
             k.append(kk)
             w.append(ww)
@@ -61,7 +64,8 @@ if __name__ == "__main__":
         'nu': 0.000625,             # Viscosity
         'dt': 0.01,                 # Time step
         'T': 0.1,                   # End time
-        'L': [2*pi, 2*pi, 2*pi]
+        'L': [2*pi, 4*pi, 6*pi],
+        'M': [4, 5, 6]
         }
     )
     config.parser.add_argument("--compute_energy", type=int, default=2)

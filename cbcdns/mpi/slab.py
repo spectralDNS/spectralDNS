@@ -6,23 +6,44 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from ..fft.wrappyfftw import *
 from cbcdns import config
 from ..optimization import optimizer
+from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8
 
 __all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
 @optimizer
-def transpose_Uc(Uc_hatT, U_mpi, num_processes, Np, Nf):
+def transpose_Uc(Uc_hatT, U_mpi, num_processes):
+    n0 = U_mpi.shape[2]
     for i in xrange(num_processes): 
-        Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
+        Uc_hatT[:, i*n0:(i+1)*n0] = U_mpi[i]
     return Uc_hatT
 
 @optimizer
-def transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np, Nf):
+def transpose_Umpi(U_mpi, Uc_hatT, num_processes):
+    n0 = U_mpi.shape[2]
     for i in xrange(num_processes): 
-        U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
+        U_mpi[i] = Uc_hatT[:, i*n0:(i+1)*n0]
     return U_mpi
 
-def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
-             sum, where, num_processes, rank, pi, **kwargs):
+def create_wavenumber_arrays(N, Np, Nf, rank, float):
+    kx = fftfreq(N[0], 1./N[0])
+    ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
+    kz = fftfreq(N[2], 1./N[2])[:Nf]
+    kz[-1] *= -1
+    Lp = 2*pi/config.L
+    K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
+    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] # scale with physical mesh size. This takes care of mapping the physical domain to a computational cube of size (2pi)**3
+    K2 = sum(K*K, 0, dtype=float)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
+    # Filter for dealiasing nonlinear convection
+    kmax = 2./3.*(N/2+1)
+    dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
+                    (abs(K[2]) < kmax[2]), dtype=uint8)
+    
+    return K, K2, K_over_K2, dealias
+
+def setupDNS(comm, float, complex, mpitype, N, L, mgrid,
+             num_processes, rank, **kwargs):
     
     if not num_processes in [2**i for i in range(config.M[0]+1)]:
         raise IOError("Number of cpus must be in ", [2**i for i in range(config.M[0]+1)])
@@ -62,27 +83,14 @@ def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
     Source = None
     
     init_fft(N, Nf, Np, complex, num_processes, comm, rank, mpitype)
+        
+    K, K2, K_over_K2, dealias = create_wavenumber_arrays(N, Np, Nf, rank, float)
     
-    # Set wavenumbers in grid
-    kx = fftfreq(N[0], 1./N[0])
-    ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
-    kz = fftfreq(N[2], 1./N[2])[:Nf]
-    kz[-1] *= -1
-    Lp = 2*pi/L
-    K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
-    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] # scale with physical mesh size. This takes care of mapping the physical domain to a computational cube of size (2pi)**3
-    K2 = sum(K*K, 0, dtype=float)
-    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
-
-    # Filter for dealiasing nonlinear convection
-    kmax = 2./3.*(N/2+1)
-    dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
-                    (abs(K[2]) < kmax[2]), dtype=uint8)
     del kwargs
     return locals() # Lazy (need only return what is needed)
 
-def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
-             sum, where, num_processes, rank, pi, **kwargs):
+def setupMHD(comm, float, complex, mpitype, N, L, mgrid,
+             num_processes, rank, **kwargs):
     
     if not num_processes in [2**i for i in range(config.M[0]+1)]:
         raise IOError("Number of cpus must be in ", [2**i for i in range(config.M[0]+1)])
@@ -129,20 +137,8 @@ def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
     
     init_fft(N, Nf, Np, complex, num_processes, comm, rank, mpitype)
     
-    kx = fftfreq(N[0], 1./N[0])
-    ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
-    kz = fftfreq(N[2], 1./N[2])[:Nf]
-    kz[-1] *= -1
-    Lp = 2*pi/L
-    K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
-    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] # scale with physical mesh size. This takes care of mapping the physical domain to a computational cube of size (2pi)**3
-    K2 = sum(K*K, 0, dtype=float)
-    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
-
-    # Filter for dealiasing nonlinear convection
-    kmax = 2./3.*(N/2+1)
-    dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
-                    (abs(K[2]) < kmax[2]), dtype=uint8)
+    K, K2, K_over_K2, dealias = create_wavenumber_arrays(N, Np, Nf, rank, float)
+    
     del kwargs
     return locals() # Lazy (need only return what is needed)
 
@@ -155,7 +151,7 @@ def init_fft(N, Nf, Np, complex, num_processes, comm, rank, mpitype):
     Uc_hat  = empty((N[0], Np[1], Nf), dtype=complex)
     Uc_hatT = empty((Np[0], N[1], Nf), dtype=complex)
     Uc_send = Uc_hat.reshape((num_processes, Np[0], Np[1], Nf))
-    U_mpi   = empty((num_processes, Np[0], Np[0], Nf), dtype=complex)
+    U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype=complex)
     globals().update(locals())
     
 #@profile    
@@ -173,7 +169,7 @@ def ifftn_mpi(fu, u):
     if config.communication == 'alltoall':
         # Communicate all values
         comm.Alltoall([Uc_hat, mpitype], [U_mpi, mpitype])
-        Uc_hatT[:] = transpose_Uc(Uc_hatT, U_mpi, num_processes, Np[1], Nf)
+        Uc_hatT[:] = transpose_Uc(Uc_hatT, U_mpi, num_processes)
     
     else:
         for i in xrange(num_processes):
@@ -198,7 +194,7 @@ def fftn_mpi(u, fu):
         Uc_hatT[:] = rfft2(u, axes=(1,2))
         
         # Transform data to align with x-direction  
-        U_mpi[:] = transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np[1], Nf)
+        U_mpi[:] = transpose_Umpi(U_mpi, Uc_hatT, num_processes)
             
         # Communicate all values
         comm.Alltoall([U_mpi, mpitype], [fu, mpitype])  

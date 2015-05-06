@@ -162,35 +162,41 @@ for (int i=0;i<N1;i++){
 
     code = """
 int kk;
+int n0 = NUc_hatT[0];
+int n1 = NU_mpi[2];
+int n2 = NU_mpi[3];    
 for (int i=0; i<num_processes; i++){
-  for (int j=0; j<Np; j++){
-    for (int k=i*Np; k<(i+1)*Np; k++){
-      kk = k-i*Np;
-      for (int l=0; l<Nf; l++){      
+  for (int j=0; j<n0; j++){
+    for (int k=i*n1; k<(i+1)*n1; k++){
+      kk = k-i*n1;
+      for (int l=0; l<n2; l++){      
         Uc_hatT(j, k, l) = U_mpi(i, j, kk, l);
       }
     }
   }
 }
 """
-    fun4 = ext_tools.ext_function("transpose_Uc", code, ['Uc_hatT', 'U_mpi', 'num_processes', 'Np', 'Nf'],
+    fun4 = ext_tools.ext_function("transpose_Uc", code, ['Uc_hatT', 'U_mpi', 'num_processes'],
                                   type_converters=converters.blitz)
     mod.add_function(fun4)
     
     code = """
 int kk;
+int n0 = NU_mpi[1];
+int n1 = NU_mpi[2];
+int n2 = NU_mpi[3];    
 for (int i=0; i<num_processes; i++){
-  for (int j=0; j<Np; j++){
-    for (int k=i*Np; k<(i+1)*Np; k++){
-      kk = k-i*Np;
-      for (int l=0; l<Nf; l++){      
+  for (int j=0; j<n0; j++){
+    for (int k=i*n1; k<(i+1)*n1; k++){
+      kk = k-i*n1;
+      for (int l=0; l<n2; l++){      
         U_mpi(i, j, kk, l) = Uc_hatT(j, k, l);
       }
     }
   }
 }
 """
-    fun5 = ext_tools.ext_function("transpose_Umpi", code, ['U_mpi', 'Uc_hatT', 'num_processes', 'Np', 'Nf'],
+    fun5 = ext_tools.ext_function("transpose_Umpi", code, ['U_mpi', 'Uc_hatT', 'num_processes'],
                                   type_converters=converters.blitz)
     mod.add_function(fun5)
 
@@ -202,70 +208,82 @@ for (int i=0; i<num_processes; i++){
 
     code = """
 int i0, kk;
+int n0 = NUc_hat_z[0];
+int n1 = NUc_hat_z[1];
+int n2 = NUc_hat_x[2];
 for (int i=0; i<P1; i++){
-  for (int j=i*N1; j<(i+1)*N1; j++){
-    i0 = j-i*N1;
-    for (int k=0; k<N2; k++){
-      for (int l=0; l<N1/2; l++){      
-        Uc_hat_x(j, k, l) = Uc_hat_z(i0, k, l+i*N1/2);
+  for (int j=i*n0; j<(i+1)*n0; j++){
+    i0 = j-i*n0;
+    for (int k=0; k<n1; k++){
+      for (int l=0; l<n2; l++){      
+        Uc_hat_x(j, k, l) = Uc_hat_z(i0, k, l+i*n2);
       }
     }
   }
 }
 """
-    fun6 = ext_tools.ext_function("transform_Uc_xz", code, ['Uc_hat_x', 'Uc_hat_z', 'P1', 'N1', 'N2'],
+    fun6 = ext_tools.ext_function("transform_Uc_xz", code, ['Uc_hat_x', 'Uc_hat_z', 'P1'],
                                   type_converters=converters.blitz)
     mod.add_function(fun6)
     
     code = """
 int i0, k0;
+int n0 = NUc_hat_y[0];
+int n1 = NUc_hat_xr[1];
+int n2 = NUc_hat_xr[2];    
 for (int i=0; i<P2; i++){
-  for (int j=i*N2; j<(i+1)*N2; j++){
-    i0 = j-i*N2;
-    for (int k=0; k<N2; k++){
-      k0 = k+i*N2;
-      for (int l=0; l<N1/2; l++){      
+  for (int j=i*n0; j<(i+1)*n0; j++){
+    i0 = j-i*n0;
+    for (int k=0; k<n1; k++){
+      k0 = k+i*n1;
+      for (int l=0; l<n2; l++){      
         Uc_hat_y(i0, k0, l) = Uc_hat_xr(j, k, l);
       }
     }
   }
 }
 """
-    fun7 = ext_tools.ext_function("transform_Uc_yx", code, ['Uc_hat_y', 'Uc_hat_xr', 'P2', 'N1', 'N2'],
+    fun7 = ext_tools.ext_function("transform_Uc_yx", code, ['Uc_hat_y', 'Uc_hat_xr', 'P2'],
                                   type_converters=converters.blitz)
     mod.add_function(fun7)
 
     code = """
 int i0;
+int n0 = NUc_hat_y[0];
+int n1 = NUc_hat_x[1];
+int n2 = NUc_hat_x[2];
 for (int i=0; i<P2; i++){
-  for (int j=i*N2; j<(i+1)*N2; j++){
-    i0 = j-i*N2;
-    for (int k=0; k<N2; k++){
-      for (int l=0; l<N1/2; l++){      
-        Uc_hat_x(j, k, l) = Uc_hat_y(i0, k+i*N2, l);
+  for (int j=i*n0; j<(i+1)*n0; j++){
+    i0 = j-i*n0;
+    for (int k=0; k<n1; k++){
+      for (int l=0; l<n2; l++){      
+        Uc_hat_x(j, k, l) = Uc_hat_y(i0, k+i*n1, l);
       }
     }
   }
 }
 """
-    fun8 = ext_tools.ext_function("transform_Uc_xy", code, ['Uc_hat_x', 'Uc_hat_y', 'P2', 'N1', 'N2'],
+    fun8 = ext_tools.ext_function("transform_Uc_xy", code, ['Uc_hat_x', 'Uc_hat_y', 'P2'],
                                   type_converters=converters.blitz)
     mod.add_function(fun8)
 
     code = """
 int i0;
+int n0 = NUc_hat_z[0];
+int n1 = NUc_hat_xr[1];
+int n2 = NUc_hat_xr[2];
 for (int i=0; i<P1; i++){
-  for (int j=i*N1; j<(i+1)*N1; j++){
-    i0 = j-i*N1;
-    for (int k=0; k<N2; k++){
-      for (int l=0; l<N1/2; l++){      
-        Uc_hat_z(i0, k, l+i*N1/2) = Uc_hat_xr(j, k, l);
+  for (int j=i*n0; j<(i+1)*n0; j++){
+    i0 = j-i*n0;
+    for (int k=0; k<n1; k++){
+      for (int l=0; l<n2; l++){      
+        Uc_hat_z(i0, k, l+i*n2) = Uc_hat_xr(j, k, l);
       }
     }
   }
 }
 """
-    fun9 = ext_tools.ext_function("transform_Uc_zx", code, ['Uc_hat_z', 'Uc_hat_xr', 'P1', 'N1', 'N2'],
+    fun9 = ext_tools.ext_function("transform_Uc_zx", code, ['Uc_hat_z', 'Uc_hat_xr', 'P1'],
                                   type_converters=converters.blitz)
     mod.add_function(fun9)
     

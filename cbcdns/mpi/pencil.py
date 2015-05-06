@@ -6,35 +6,64 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from ..fft.wrappyfftw import *
 from cbcdns import config
 from ..optimization import optimizer
+from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8
 
 __all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
 @optimizer
-def transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1, N1, N2):
+def transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1):
+    n0 = Uc_hat_z.shape[0]
+    n1 = Uc_hat_x.shape[2]
     for i in range(P1):
-        Uc_hat_x[i*N1:(i+1)*N1] = Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2]
+        Uc_hat_x[i*n0:(i+1)*n0] = Uc_hat_z[:, :, i*n1:(i+1)*n1]
     return Uc_hat_x
             
 @optimizer
-def transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1, N1, N2):
+def transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1):
+    n0 = Uc_hat_z.shape[0]
+    n1 = Uc_hat_xr.shape[2]
     for i in range(P1):
-        Uc_hat_z[:, :, i*N1/2:(i+1)*N1/2] = Uc_hat_xr[i*N1:(i+1)*N1]
+        Uc_hat_z[:, :, i*n1:(i+1)*n1] = Uc_hat_xr[i*n0:(i+1)*n0]
     return Uc_hat_z
 
 @optimizer
-def transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2, N1, N2):
+def transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2):
+    n0 = Uc_hat_y.shape[0]
+    n1 = Uc_hat_x.shape[1]
     for i in range(P2): 
-        Uc_hat_x[i*N2:(i+1)*N2] = Uc_hat_y[:, i*N2:(i+1)*N2]
+        Uc_hat_x[i*n0:(i+1)*n0] = Uc_hat_y[:, i*n1:(i+1)*n1]
     return Uc_hat_x
 
 @optimizer
-def transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2, N1, N2):
+def transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2):
+    n0 = Uc_hat_y.shape[0]
+    n1 = Uc_hat_xr.shape[1]
     for i in range(P2): 
-        Uc_hat_y[:, i*N2:(i+1)*N2] = Uc_hat_xr[i*N2:(i+1)*N2]
+        Uc_hat_y[:, i*n1:(i+1)*n1] = Uc_hat_xr[i*n0:(i+1)*n0]
     return Uc_hat_y
 
+def create_wavenumber_arrays(N, N1, N2, xyrank, xzrank, float):
+    # Set wavenumbers in grid
+    kx = fftfreq(N[0], 1./N[0]).astype(int)
+    ky = fftfreq(N[1], 1./N[1]).astype(int)
+    kz = fftfreq(N[2], 1./N[2]).astype(int)
+    Lp = 2*pi/config.L
+    k2 = slice(xyrank*N2[0], (xyrank+1)*N2[0], 1)
+    k1 = slice(xzrank*N1[2]/2, (xzrank+1)*N1[2]/2, 1)
+    K  = array(meshgrid(kx[k2], ky, kz[k1], indexing='ij'), dtype=float)
+    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] # scale with physical mesh size. This takes care of mapping the physical domain to a computational cube of size (2pi)**3
+    K2 = sum(K*K, 0, dtype=float)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
+    # Filter for dealiasing nonlinear convection
+    kmax = 2./3.*(N/2+1)
+    dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
+                    (abs(K[2]) < kmax[2]), dtype=uint8)
+    
+    return K, K2, K_over_K2, dealias
+
 def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
-             sum, where, num_processes, rank, mgrid, **kwargs):
+             sum, where, num_processes, rank, mgrid, pi, **kwargs):
 
     # Each cpu gets ownership of a pencil of size N1*N2*N in real space
     # and (N1/2+1)*N2*N in Fourier space. However, the Nyquist mode is
@@ -61,9 +90,10 @@ def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     xyrank = commxy.Get_rank() # Local rank in xy-plane
     
     # Create the physical mesh
-    x1 = slice(xzrank * N1, (xzrank+1) * N1, 1)
-    x2 = slice(xyrank * N2, (xyrank+1) * N2, 1)
-    X = mgrid[x1, x2, :N].astype(float)*L/N
+    x1 = slice(xzrank * N1[0], (xzrank+1) * N1[0], 1)
+    x2 = slice(xyrank * N2[1], (xyrank+1) * N2[1], 1)
+    X = mgrid[x1, x2, :N[2]].astype(float)
+    X[0] *= L[0]/N[0]; X[1] *= L[1]/N[1]; X[2] *= L[2]/N[2]
 
     """
     Solution U is real and as such its transform, U_hat = fft(U)(k), 
@@ -74,37 +104,27 @@ def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     expect N/2+1 modes.
     """
 
-    Nf = N/2+1 # Total Fourier coefficients in z-direction
-    U     = empty((3, N1, N2, N), dtype=float)
-    U_hat = empty((3, N2, N, N1/2), dtype=complex)
-    P     = empty((N1, N2, N), dtype=float)
-    P_hat = empty((N2, N, N1/2), dtype=complex)
+    Nf = N[2]/2+1 # Total Fourier coefficients in z-direction
+    U     = empty((3, N1[0], N2[1], N[2]), dtype=float)
+    U_hat = empty((3, N2[0], N[1], N1[2]/2), dtype=complex)
+    P     = empty((N1[0], N2[1], N[2]), dtype=float)
+    P_hat = empty((N2[0], N[1], N1[2]/2), dtype=complex)
 
     # Temporal storage arrays (Not required by all temporal integrators)
-    U_hat0  = empty((3, N2, N, N1/2), dtype=complex)
-    U_hat1  = empty((3, N2, N, N1/2), dtype=complex)
-    dU      = empty((3, N2, N, N1/2), dtype=complex)
-
-    init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy)    
+    U_hat0  = empty((3, N2[0], N[1], N1[2]/2), dtype=complex)
+    U_hat1  = empty((3, N2[0], N[1], N1[2]/2), dtype=complex)
+    dU      = empty((3, N2[0], N[1], N1[2]/2), dtype=complex)
     
     # work arrays (Not required by all convection methods)
-    U_tmp  = empty((3, N1, N2, N), dtype=float)
-    F_tmp  = empty((3, N2, N, N1/2), dtype=complex)
-    curl   = empty((3, N1, N2, N), dtype=float)
+    U_tmp  = empty((3, N1[0], N2[1], N[2]), dtype=float)
+    F_tmp  = empty((3, N2[0], N[1], N1[2]/2), dtype=complex)
+    curl   = empty((3, N1[0], N2[1], N[2]), dtype=float)
     Source = None
+    
+    init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy)    
 
-    # Set wavenumbers in grid
-    kx = fftfreq(N, 1./N).astype(int)
-    k2 = slice(xyrank*N2, (xyrank+1)*N2, 1)
-    k1 = slice(xzrank*N1/2, (xzrank+1)*N1/2, 1)
-    K  = array(meshgrid(kx[k2], kx, kx[k1], indexing='ij'), dtype=int)
-    K2 = sum(K*K, 0, dtype=int)
-    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+    K, K2, K_over_K2, dealias = create_wavenumber_arrays(N, N1, N2, xyrank, xzrank, float)
 
-    # Filter for dealiasing nonlinear convection
-    kmax = 2./3.*(N/2+1)
-    dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*
-                    (abs(K[2]) < kmax), dtype=uint8)
     del kwargs
     return locals()
 
@@ -136,9 +156,10 @@ def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     xyrank = commxy.Get_rank() # Local rank in xy-plane
     
     # Create the physical mesh
-    x1 = slice(xzrank * N1, (xzrank+1) * N1, 1)
-    x2 = slice(xyrank * N2, (xyrank+1) * N2, 1)
-    X = mgrid[x1, x2, :N].astype(float)*L/N
+    x1 = slice(xzrank * N1[0], (xzrank+1) * N1[0], 1)
+    x2 = slice(xyrank * N2[1], (xyrank+1) * N2[1], 1)
+    X = mgrid[x1, x2, :N[2]].astype(float)
+    X[0] *= L[0]/N[0]; X[1] *= L[1]/N[1]; X[2] *= L[2]/N[2]
 
     """
     Solution U is real and as such its transform, U_hat = fft(U)(k), 
@@ -149,11 +170,11 @@ def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     expect N/2+1 modes.
     """
 
-    Nf = N/2+1 # Total Fourier coefficients in z-direction
-    UB     = empty((6, N1, N2, N), dtype=float)
-    UB_hat = empty((6, N2, N, N1/2), dtype=complex)
-    P      = empty((N1, N2, N), dtype=float)
-    P_hat  = empty((N2, N, N1/2), dtype=complex)
+    Nf = N[2]/2+1 # Total Fourier coefficients in z-direction
+    UB     = empty((6, N1[0], N2[1], N[2]), dtype=float)
+    UB_hat = empty((6, N2[0], N[1], N1[2]/2), dtype=complex)
+    P      = empty((N1[0], N2[1], N[2]), dtype=float)
+    P_hat  = empty((N2[0], N[1], N1[2]/2), dtype=complex)
 
     # Create views into large data structures
     U     = UB[:3] 
@@ -162,30 +183,20 @@ def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     B_hat = UB_hat[3:]
 
     # Temporal storage arrays (Not required by all temporal integrators)
-    UB_hat0  = empty((6, N2, N, N1/2), dtype=complex)
-    UB_hat1  = empty((6, N2, N, N1/2), dtype=complex)
-    dU       = empty((6, N2, N, N1/2), dtype=complex)
+    UB_hat0  = empty((6, N2[0], N[1], N1[2]/2), dtype=complex)
+    UB_hat1  = empty((6, N2[0], N[1], N1[2]/2), dtype=complex)
+    dU       = empty((6, N2[0], N[1], N1[2]/2), dtype=complex)
 
+    # work arrays (Not required by all convection methods)
+    U_tmp  = empty((3, N1[0], N2[1], N[2]), dtype=float)
+    F_tmp  = empty((3, 3, N2[0], N[1], N1[2]/2), dtype=complex)
+    curl   = empty((3, N1[0], N2[1], N[2]), dtype=float)
+    Source = None
+    
     init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy)    
     
-    # work arrays (Not required by all convection methods)
-    U_tmp  = empty((3, N1, N2, N), dtype=float)
-    F_tmp  = empty((3, 3, N2, N, N1/2), dtype=complex)
-    curl   = empty((3, N1, N2, N), dtype=float)
-    Source = None
-
-    # Set wavenumbers in grid
-    kx = fftfreq(N, 1./N).astype(int)
-    k2 = slice(xyrank*N2, (xyrank+1)*N2, 1)
-    k1 = slice(xzrank*N1/2, (xzrank+1)*N1/2, 1)
-    K  = array(meshgrid(kx[k2], kx, kx[k1], indexing='ij'), dtype=int)
-    K2 = sum(K*K, 0, dtype=int)
-    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
-
-    # Filter for dealiasing nonlinear convection
-    kmax = 2./3.*(N/2+1)
-    dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*
-                    (abs(K[2]) < kmax), dtype=uint8)
+    K, K2, K_over_K2, dealias = create_wavenumber_arrays(N, N1, N2, xyrank, xzrank, float)
+    
     del kwargs
     return locals()
 
@@ -195,10 +206,10 @@ setup = {"MHD": setupMHD,
 
 def init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy):
     # Initialize MPI work arrays globally
-    Uc_hat_z  = empty((N1, N2, Nf), dtype=complex)
-    Uc_hat_x  = empty((N, N2, N1/2), dtype=complex)
-    Uc_hat_xr = empty((N, N2, N1/2), dtype=complex)
-    Uc_hat_y  = zeros((N2, N, N1/2), dtype=complex)
+    Uc_hat_z  = empty((N1[0], N2[1], Nf), dtype=complex)
+    Uc_hat_x  = empty((N[0], N2[1], N1[2]/2), dtype=complex)
+    Uc_hat_xr = empty((N[0], N2[1], N1[2]/2), dtype=complex)
+    Uc_hat_y  = zeros((N2[0], N[1], N1[2]/2), dtype=complex)
     globals().update(locals())
 
 def ifftn_mpi(fu, u):
@@ -210,7 +221,7 @@ def ifftn_mpi(fu, u):
 
     # Transform to x all but k=N/2 (the neglected Nyquist mode)
     Uc_hat_x[:] = 0
-    Uc_hat_x[:] = transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2, N1, N2)
+    Uc_hat_x[:] = transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2)
            
     # Communicate in xz-plane and do fft in x-direction
     commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
@@ -218,7 +229,7 @@ def ifftn_mpi(fu, u):
         
     # Communicate and transform in xy-plane
     commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
-    Uc_hat_z[:] = transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1, N1, N2)
+    Uc_hat_z[:] = transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1)
             
     # Do fft for y-direction
     Uc_hat_z[:, :, -1] = 0
@@ -232,7 +243,7 @@ def fftn_mpi(u, fu):
     Uc_hat_z[:] = rfft(u, axis=2)
     
     # Transform to x direction neglecting k=N/2 (Nyquist)
-    Uc_hat_x[:] = transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1, N1, N2)
+    Uc_hat_x[:] = transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1)
     
     # Communicate and do fft in x-direction
     commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
@@ -240,7 +251,7 @@ def fftn_mpi(u, fu):
     
     # Communicate and transform to final z-direction
     commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])  
-    Uc_hat_y[:] = transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2, N1, N2)
+    Uc_hat_y[:] = transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2)
                                    
     # Do fft for last direction 
     fu = fft(Uc_hat_y, axis=1)
