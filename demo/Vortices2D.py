@@ -26,7 +26,7 @@ def update(t, tstep, N, curl, U_hat, ifft2_mpi, K, P, P_hat, hdf5file, **kw):
     global im
     # initialize plot
     if tstep == 1:
-        im = plt.imshow(zeros((N, N)))
+        im = plt.imshow(zeros((N[0], N[1])))
         plt.colorbar(im)
         plt.draw()
         
@@ -48,7 +48,8 @@ if __name__ == '__main__':
       'nu': 0.001,
       'dt': 0.005,
       'T': 50,
-      'write_result': 100}
+      'write_result': 100,
+      'M': [5, 6]}
     )
 
     config.parser.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline

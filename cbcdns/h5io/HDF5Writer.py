@@ -67,8 +67,8 @@ try:
                 
                 Np =  N / self.comm.Get_size()                
                 for comp, val in self.components.iteritems():
-                    self.f["2D/"+comp].create_dataset(str(tstep), shape=(N, N), dtype=self.dtype)
-                    self.f["2D/%s/%d"%(comp,tstep)][self.rank*Np:(self.rank+1)*Np] = val                
+                    self.f["2D/"+comp].create_dataset(str(tstep), shape=(N[0], N[1]), dtype=self.dtype)
+                    self.f["2D/%s/%d"%(comp,tstep)][self.rank*Np[0]:(self.rank+1)*Np[0]] = val                
                     
             if tstep % config.write_yz_slice[1] == 0 and config.decomposition == 'slab':
                 i = config.write_yz_slice[0]

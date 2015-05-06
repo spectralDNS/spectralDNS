@@ -21,12 +21,16 @@ def get_solver(update=None):
         import cbcdns.solvers.spectralDNSVV as solver
         
     elif config.solver == 'NS2D':
+        config.L = [config.L[0], config.L[1]]
+        config.M = [config.M[0], config.M[1]]    
         import cbcdns.solvers.spectralDNS2D as solver
         
     elif config.solver == 'MHD':
         import cbcdns.solvers.spectralMHD3D as solver
 
     elif config.solver == 'Bq2D':
+        config.L = [config.L[0], config.L[1]]
+        config.M = [config.M[0], config.M[1]]    
         import cbcdns.solvers.spectralDNS2D_Boussinesq as solver
         
     else:
