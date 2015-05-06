@@ -19,8 +19,8 @@ def weave_module(precision):
     dU = empty((3, 3, 3, 3), dtype=complex)
     U_hat = empty((3, 3, 3, 3), dtype=complex)
     P_hat = empty((3, 3, 3), dtype=complex)
-    K = empty((3, 3, 3, 3), dtype=int)
-    K2 = empty((3, 3, 3), dtype=int)
+    K = empty((3, 3, 3, 3), dtype=float)
+    K2 = empty((3, 3, 3), dtype=float)
     K_over_K2 = empty((3, 3, 3, 3), dtype=float)
     dealias = empty((3, 3, 3), dtype=uint8)
  
