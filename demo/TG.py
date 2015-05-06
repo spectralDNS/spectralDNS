@@ -61,7 +61,7 @@ if __name__ == "__main__":
         'nu': 0.000625,             # Viscosity
         'dt': 0.01,                 # Time step
         'T': 0.1,                   # End time
-        'L': [4*pi, 2*pi, 2*pi]
+        'L': [2*pi, 2*pi, 2*pi]
         }
     )
     config.parser.add_argument("--compute_energy", type=int, default=2)

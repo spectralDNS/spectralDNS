@@ -12,10 +12,6 @@ def get_solver(update=None):
     if args.solver in ('NS2D', 'Bq2D'):
         args.decomposition = 'line'
     vars(config).update(vars(args))
-    if isinstance(config.M, str):
-        config.M = eval(config.M)
-    if isinstance(config.L, str):
-        config.L = eval(config.L)
         
     #with mpi_import():
     if config.solver == 'NS':

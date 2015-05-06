@@ -25,7 +25,7 @@ def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
              sum, where, num_processes, rank, pi, **kwargs):
     
     if not num_processes in [2**i for i in range(config.M[0]+1)]:
-        raise IOError("Number of cpus must be in ", [2**i for i in range(config.M+1)])
+        raise IOError("Number of cpus must be in ", [2**i for i in range(config.M[0]+1)])
 
     # Each cpu gets ownership of Np slices
     Np = N / num_processes     
@@ -56,7 +56,7 @@ def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
     dU     = empty((3, N[0], Np[1], Nf), dtype=complex)
 
     # work arrays (Not required by all convection methods)
-    U_tmp  = empty((3, Np[0], N[0], N[0]), dtype=float)
+    U_tmp  = empty((3, Np[0], N[1], N[2]), dtype=float)
     F_tmp  = empty((3, N[0], Np[1], Nf), dtype=complex)
     curl   = empty((3, Np[0], N[1], N[2]), dtype=float)   
     Source = None
@@ -69,9 +69,9 @@ def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
     kz = fftfreq(N[2], 1./N[2])[:Nf]
     kz[-1] *= -1
     Lp = 2*pi/L
-    K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=int)
+    K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
     K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] # scale with physical mesh size. This takes care of mapping the physical domain to a computational cube of size (2pi)**3
-    K2 = sum(K*K, 0, dtype=int)
+    K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
     # Filter for dealiasing nonlinear convection
@@ -82,16 +82,17 @@ def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
     return locals() # Lazy (need only return what is needed)
 
 def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
-             sum, where, num_processes, rank, **kwargs):
+             sum, where, num_processes, rank, pi, **kwargs):
     
-    if not num_processes in [2**i for i in range(config.M+1)]:
-        raise IOError("Number of cpus must be in ", [2**i for i in range(config.M+1)])
+    if not num_processes in [2**i for i in range(config.M[0]+1)]:
+        raise IOError("Number of cpus must be in ", [2**i for i in range(config.M[0]+1)])
 
     # Each cpu gets ownership of Np slices
     Np = N / num_processes     
 
     # Create the physical mesh
-    X = mgrid[rank*Np:(rank+1)*Np, :N, :N].astype(float)*L/N
+    X = mgrid[rank*Np[0]:(rank+1)*Np[0], :N[1], :N[2]].astype(float)
+    X[0] *= L[0]/N[0]; X[1] *= L[1]/N[1]; X[2] *= L[2]/N[2]
 
     """
     Solution U is real and as such its transform, U_hat = fft(U)(k), 
@@ -103,11 +104,11 @@ def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
     is N/2+1 in Fourier space.
     """
 
-    Nf = N/2+1
-    UB     = empty((6, Np, N, N), dtype=float)  
-    UB_hat = empty((6, N, Np, Nf), dtype=complex)
-    P      = empty((Np, N, N), dtype=float)
-    P_hat  = empty((N, Np, Nf), dtype=complex)
+    Nf = N[2]/2+1
+    UB     = empty((6, Np[0], N[1], N[2]), dtype=float)  
+    UB_hat = empty((6, N[0], Np[1], Nf), dtype=complex)
+    P      = empty((Np[0], N[1], N[2]), dtype=float)
+    P_hat  = empty((N[0], Np[1], Nf), dtype=complex)
     
     # Create views into large data structures
     U     = UB[:3] 
@@ -116,29 +117,32 @@ def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
     B_hat = UB_hat[3:]
 
     # Temporal storage arrays (Not required by all temporal integrators)
-    UB_hat0 = empty((6, N, Np, Nf), dtype=complex)
-    UB_hat1 = empty((6, N, Np, Nf), dtype=complex)
-    dU      = empty((6, N, Np, Nf), dtype=complex)
+    UB_hat0 = empty((6, N[0], Np[1], Nf), dtype=complex)
+    UB_hat1 = empty((6, N[0], Np[1], Nf), dtype=complex)
+    dU      = empty((6, N[0], Np[1], Nf), dtype=complex)
 
     # work arrays (Not required by all convection methods)
-    U_tmp  = empty((3, Np, N, N), dtype=float)
-    F_tmp  = empty((3, 3, N, Np, Nf), dtype=complex)
-    curl   = empty((3, Np, N, N), dtype=float)   
+    U_tmp  = empty((3, Np[0], N[1], N[2]), dtype=float)
+    F_tmp  = empty((3, 3, N[0], Np[1], Nf), dtype=complex)
+    curl   = empty((3, Np[0], N[1], N[2]), dtype=float)   
     Source = None
     
     init_fft(N, Nf, Np, complex, num_processes, comm, rank, mpitype)
     
-    # Set wavenumbers in grid
-    kx = fftfreq(N, 1./N).astype(int)
-    kz = kx[:Nf].copy(); kz[-1] *= -1
-    K  = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
-    K2 = sum(K*K, 0, dtype=int)
+    kx = fftfreq(N[0], 1./N[0])
+    ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
+    kz = fftfreq(N[2], 1./N[2])[:Nf]
+    kz[-1] *= -1
+    Lp = 2*pi/L
+    K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
+    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] # scale with physical mesh size. This takes care of mapping the physical domain to a computational cube of size (2pi)**3
+    K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
-    dealias = array((abs(K[0]) < kmax)*(abs(K[1]) < kmax)*
-                    (abs(K[2]) < kmax), dtype=uint8)
+    dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
+                    (abs(K[2]) < kmax[2]), dtype=uint8)
     del kwargs
     return locals() # Lazy (need only return what is needed)
 
