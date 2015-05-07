@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 import matplotlib.pyplot as plt
 from numpy import array, pi
+=======
+from numpy import array
+>>>>>>> master
 
 def initialize(config, **kw):
     if config.solver == 'NS':
@@ -47,15 +51,6 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, float64, dx, L, sum,
             w.append(ww)
             print t, float(kk), float(ww)
 
-def finalize(rank, dt, **kw):
-    global k
-
-    if rank == 0:
-        plt.figure()
-        k = array(k)
-        dkdt = (k[1:]-k[:-1])/dt
-        plt.plot(-dkdt)
-        plt.show()
 
 if __name__ == "__main__":
     from cbcdns import config, get_solver
@@ -64,12 +59,16 @@ if __name__ == "__main__":
         'nu': 0.000625,             # Viscosity
         'dt': 0.01,                 # Time step
         'T': 0.1,                   # End time
+<<<<<<< HEAD
         'L': [2*pi, 4*pi, 6*pi],
         'M': [4, 5, 6]
+=======
+        'write_result': 1000
+>>>>>>> master
         }
     )
     config.parser.add_argument("--compute_energy", type=int, default=2)
     solver = get_solver(update)
     initialize(**vars(solver))
     solver.solve()
-    #finalize(**vars(solver))
+

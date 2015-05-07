@@ -5,7 +5,7 @@ from numpy import zeros, exp
 def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, Np, N, pi, fft2_mpi, float, **kwargs):
 
     Um = 0.5*(config.U1 - config.U2)
-    U[1] = config.A*sin(6*X[0])
+    U[1] = config.A*sin(2*X[0])
     #U[0, :, :N/4] = config.U1 - Um*exp((X[1,:, :N/4] - 0.5*pi)/config.delta) 
     #U[0, :, N/4:N/2] = config.U2 + Um*exp(-1.0*(X[1, :, N/4:N/2] - 0.5*pi)/config.delta) 
     #U[0, :, N/2:3*N/4] = config.U2 + Um*exp((X[1, :, N/2:3*N/4] - 1.5*pi)/config.delta) 
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     'A': 0.01,      # Amplitude of perturbation
     'Ri': 0.167,    # Richardson number
     'Pr': 12.0,     # Prantl number
-    'delta': 0.1,   # Width of perturbations
+    'delta': 0.05,   # Width of perturbations
     'bb': 0.8,
     'k0': 2,
     'rho1': 1.0,

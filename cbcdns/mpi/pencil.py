@@ -236,6 +236,7 @@ def ifftn_mpi(fu, u):
     u = irfft(Uc_hat_z, axis=2)
     return u
         
+@profile
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """    

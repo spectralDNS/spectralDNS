@@ -84,11 +84,20 @@ def transform_Uc_zx(np.ndarray[complex_t, ndim=3] Uc_hat_z,
     cdef unsigned int n1 = Uc_hat_xr.shape[1]
     cdef unsigned int n2 = Uc_hat_xr.shape[2]
     for i in xrange(P1):
+<<<<<<< HEAD
         for j in xrange(i*n0, (i+1)*n0):
             i0 = j-i*n0
             for k in xrange(n1):
                 for l in xrange(n2):
                     Uc_hat_z[i0, k, l+i*n2] = Uc_hat_xr[j, k, l]
+=======
+        for i0 in xrange(N1):
+            j = i0+i*N1
+            for k in xrange(N2):
+                for l in xrange(N1/2):
+                    Uc_hat_z[i0, k, l+i*N1/2] = Uc_hat_xr[j, k, l]
+                    
+>>>>>>> master
     return Uc_hat_z
 
 def transpose_x_2D(np.ndarray[complex_t, ndim=3] U_send,

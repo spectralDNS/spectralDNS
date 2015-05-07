@@ -10,14 +10,14 @@ __all__ = ['cross1', 'cross2']
 @optimizer
 def cross1(c, a, b):
     """Regular c = a x b, where type(a) = type(b) is real"""
-    if c.shape[0] == 3:
+    if len(c.shape) == 3:
         #c[:] = cross(a, b, axisa=0, axisb=0, axisc=0) # Very slow
         c[0] = a[1]*b[2]-a[2]*b[1]
         c[1] = a[2]*b[0]-a[0]*b[2]
         c[2] = a[0]*b[1]-a[1]*b[0]
         
-    elif c.shape[0] == 1:
-        c = a[0]*b[1] - a[1]*b[0]
+    elif len(c.shape) == 2:
+        c[:] = a[0]*b[1] - a[1]*b[0]
         
     return c
 
