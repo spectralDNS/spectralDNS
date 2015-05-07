@@ -28,8 +28,7 @@ def generate_xdmf(h5filename):
     if len(f["/".join(("3D", comps[0]))]) > 0:
         xf3d = copy.copy(xdmffile)
         timesteps = f["/".join(("3D", comps[0]))].keys()
-        #N = f.attrs["N"]
-        N = 4096
+        N = f.attrs["N"]
         tt = ""
         for i in timesteps:
             tt += "%s " %i
@@ -68,8 +67,7 @@ def generate_xdmf(h5filename):
     
     xf2d = copy.copy(xdmffile)
     timesteps = f["/".join(("2D", comps[0]))].keys()
-    #N = f.attrs["N"]
-    N = 4096
+    N = f.attrs["N"]
     dtype = f["/".join(("2D", comps[0]))].values()[0].dtype
     tt = ""
     for i in timesteps:
