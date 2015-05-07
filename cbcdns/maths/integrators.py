@@ -40,16 +40,18 @@ def getintegrator(dU, ComputeRHS, float, array, **kw):
     """Return integrator using choice in global parameter integrator.
     """
     if config.solver in ("NS", "VV", "NS2D"):
-        u0, u1, u2 = kw['U_hat'], kw['U_hat0'], kw['U_hat1'] 
+        u0 = kw['U_hat']
     elif config.solver == "MHD":
-        u0, u1, u2 = kw['UB_hat'], kw['UB_hat0'], kw['UB_hat1']
+        u0 = kw['UB_hat']
     elif config.solver == "Bq2D":
-        u0, u1, u2 = kw['Ur_hat'], kw['Ur_hat0'], kw['Ur_hat1']
+        u0 = kw['Ur_hat']
+    u1 = u0.copy()    
         
     if config.integrator == "RK4": 
         # RK4 parameters
         a = array([1./6., 1./3., 1./3., 1./6.], dtype=float)
         b = array([0.5, 0.5, 1.], dtype=float)
+        u2 = u0.copy()
         @wraps(RK4)
         def func(t, tstep, dt):
             return RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS)
