@@ -15,10 +15,10 @@ def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, Np, N, pi, fft2_mpi, 
     #rho[:, N/2:] =-tanh((X[1][:, N/2:]-(1.5*pi))/config.delta)
                 
     rho0 = 0.5*(config.rho1 + config.rho2)
-    U[0, :, :N/2] = tanh((X[1, :, :N/2] -0.5*pi)/config.delta)
-    U[0, :, N/2:] = -tanh((X[1, :, N/2:]-1.5*pi)/config.delta)
-    rho[:, :N/2] = 2.0 + tanh((X[1, :, :N/2] -0.5*pi)/config.delta)
-    rho[:, N/2:] = 2.0 -tanh((X[1, :, N/2:]-1.5*pi)/config.delta) 
+    U[0, :, :N[1]/2] = tanh((X[1, :, :N[1]/2] -0.5*pi)/config.delta)
+    U[0, :, N[1]/2:] = -tanh((X[1, :, N[1]/2:]-1.5*pi)/config.delta)
+    rho[:, :N[1]/2] = 2.0 + tanh((X[1, :, :N[1]/2] -0.5*pi)/config.delta)
+    rho[:, N[1]/2:] = 2.0 -tanh((X[1, :, N[1]/2:]-1.5*pi)/config.delta) 
     rho -= rho0
     
     for i in range(3):
@@ -35,7 +35,7 @@ def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, ifft2_mpi, U_hat, U, su
         ax.set_xlabel('x')
         ax.set_ylabel('y')
 
-        im = ax.imshow(zeros((N, N)),cmap=plt.cm.bwr, extent=[0, L, 0, L])
+        im = ax.imshow(zeros((N[0], N[1])),cmap=plt.cm.bwr, extent=[0, L[0], 0, L[1]])
         plt.colorbar(im)
         plt.draw() 
 
@@ -44,7 +44,7 @@ def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, ifft2_mpi, U_hat, U, su
         ax2.set_xlabel('x')
         ax2.set_ylabel('y')
 
-        im2 = ax2.imshow(zeros((N, N)),cmap=plt.cm.bwr, extent=[0, L, 0, L])
+        im2 = ax2.imshow(zeros((N[0], N[1])),cmap=plt.cm.bwr, extent=[0, L[0], 0, L[1]])
         plt.colorbar(im2)
         plt.draw()
         globals().update(dict(im=im, im2=im2))
@@ -65,13 +65,14 @@ def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, ifft2_mpi, U_hat, U, su
         hdf5file.write(tstep)           
 
     if tstep % config.compute_energy == 0:
-        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx/L**2/2)
+        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
         if rank == 0:
             print tstep, kk
 
 if __name__ == "__main__":
     config.update(
     {
+    'solver': 'Bq2D',
     'nu': 1.0e-08,
     'dt': 0.001,
     'T': 1.0,

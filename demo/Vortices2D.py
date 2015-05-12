@@ -1,6 +1,7 @@
 """
 2D test case with three vortices
 """
+from cbcdns import config, get_solver
 from numpy import zeros
 import matplotlib.pyplot as plt
 
@@ -42,14 +43,13 @@ def update(t, tstep, N, curl, U_hat, ifft2_mpi, K, P, P_hat, hdf5file, **kw):
         plt.pause(1e-6)
         
 if __name__ == '__main__':
-    from cbcdns import config, get_solver
     config.update(
     {
       'nu': 0.001,
       'dt': 0.005,
       'T': 50,
       'write_result': 100,
-      'M': [5, 6]}
+      'M': [6, 6]}
     )
 
     config.parser.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline

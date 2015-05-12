@@ -5,10 +5,10 @@ from numpy import zeros
 def initialize(X, U, U_hat, exp, sin, cos, tanh, Np, N, pi, fft2_mpi, **kwargs):
     Um = 0.5*(config.U1 - config.U2)
     U[1] = config.A*sin(2*X[0])       
-    U[0, :, :N/4] = config.U1 - Um*exp((X[1,:, :N/4] - 0.5*pi)/config.delta)
-    U[0, :, N/4:N/2] = config.U2 + Um*exp(-1.0*(X[1, :, N/4:N/2] - 0.5*pi)/config.delta)
-    U[0, :, N/2:3*N/4] = config.U2 + Um*exp((X[1, :, N/2:3*N/4] - 1.5*pi)/config.delta)
-    U[0, :, 3*N/4:] = config.U1 - Um*exp(-1.0*(X[1, :, 3*N/4:] - 1.5*pi)/config.delta)
+    U[0, :, :N[1]/4] = config.U1 - Um*exp((X[1,:, :N[1]/4] - 0.5*pi)/config.delta)
+    U[0, :, N[1]/4:N[1]/2] = config.U2 + Um*exp(-1.0*(X[1, :, N[1]/4:N[1]/2] - 0.5*pi)/config.delta)
+    U[0, :, N[1]/2:3*N[1]/4] = config.U2 + Um*exp((X[1, :, N[1]/2:3*N[1]/4] - 1.5*pi)/config.delta)
+    U[0, :, 3*N[1]/4:] = config.U1 - Um*exp(-1.0*(X[1, :, 3*N[1]/4:] - 1.5*pi)/config.delta)
           
     for i in range(2):
         U_hat[i] = fft2_mpi(U[i], U_hat[i])
@@ -22,7 +22,7 @@ def update(t, tstep, comm, rank, N, L, dx, ifft2_mpi, U_hat, U, sum,
         hdf5file.write(tstep)           
 
     if tstep % config.compute_energy == 0:
-        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx*dx/L**2/2)
+        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
         if rank == 0:
             print tstep, kk
             
@@ -32,7 +32,7 @@ def update(t, tstep, comm, rank, N, L, dx, ifft2_mpi, U_hat, U, sum,
         ax.set_xlabel('x')
         ax.set_ylabel('y')
 
-        im = ax.imshow(zeros((N, N)),cmap=plt.cm.bwr, extent=[0, L, 0, L])
+        im = ax.imshow(zeros((N[0], N[1])),cmap=plt.cm.bwr, extent=[0, L[0], 0, L[1]])
         plt.colorbar(im)
         plt.draw() 
 
@@ -41,7 +41,7 @@ def update(t, tstep, comm, rank, N, L, dx, ifft2_mpi, U_hat, U, sum,
         ax2.set_xlabel('x')
         ax2.set_ylabel('y')
 
-        im2 = ax2.imshow(zeros((N, N)),cmap=plt.cm.bwr, extent=[0, L, 0, L])
+        im2 = ax2.imshow(zeros((N[0], N[1])),cmap=plt.cm.bwr, extent=[0, L[0], 0, L[1]])
         plt.colorbar(im2)
         plt.draw()
         globals().update(dict(im=im, im2=im2))
@@ -61,6 +61,7 @@ def update(t, tstep, comm, rank, N, L, dx, ifft2_mpi, U_hat, U, sum,
 if __name__ == "__main__":
     config.update(
     {
+    'solver': 'NS2D',
     'nu': 1.0e-05,
     'dt': 0.007,
     'T': 25.0,

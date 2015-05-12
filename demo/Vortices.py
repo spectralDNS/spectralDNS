@@ -1,3 +1,4 @@
+from cbcdns import config, get_solver
 import matplotlib.pyplot as plt
 from numpy import array, sqrt, random, exp, pi
 
@@ -74,7 +75,6 @@ def finalize(rank, Nf, X, U, W_hat, Curl, **soak):
     plt.pause(1e-6)
 
 if __name__ == "__main__":
-    from cbcdns import config, get_solver
     config.update(
         {
         'nu': 0.000625,              # Viscosity
@@ -85,9 +85,8 @@ if __name__ == "__main__":
     )        
     config.parser.add_argument("--init", default='random', choices=('random', 'vortex'))
     config.parser.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
-    solver = get_solver()
+    solver = get_solver(update)
     assert config.decomposition == 'slab'
-    solver.update = update
     solver.W, solver.W_hat = initialize(**vars(solver))
     solver.Source = set_source(**vars(solver))
     solver.solve()

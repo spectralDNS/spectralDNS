@@ -1,3 +1,4 @@
+from cbcdns import config, get_solver
 import matplotlib.pyplot as plt
 from numpy import array, pi
 
@@ -58,7 +59,6 @@ def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, **kw):
         assert round(w - 0.375249930801, 7) == 0
 
 if __name__ == "__main__":
-    from cbcdns import config, get_solver
     config.update(
         {
         'nu': 0.000625,             # Viscosity

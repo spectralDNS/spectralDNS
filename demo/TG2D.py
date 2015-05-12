@@ -36,7 +36,6 @@ def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, X, nu, *
         assert round(k - ke, 7) == 0
 
 if __name__ == '__main__':
-    from cbcdns import config, get_solver
     config.update(
     {
       'nu': 0.01,
