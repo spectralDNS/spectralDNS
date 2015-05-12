@@ -6,14 +6,14 @@ cimport numpy as np
 
 def add_pressure_diffusion_NS(np.ndarray[complex_t, ndim=4] du,
                               np.ndarray[complex_t, ndim=4] u_hat,
-                              np.ndarray[int_t, ndim=3] ksq,
-                              np.ndarray[int_t, ndim=4] kk,
+                              np.ndarray[real_t, ndim=3] ksq,
+                              np.ndarray[real_t, ndim=4] kk,
                               np.ndarray[complex_t, ndim=3] p_hat,
                               np.ndarray[real_t, ndim=4] k_over_k2,
                               real_t nu):
     cdef unsigned int i, j, k
     cdef real_t z
-    cdef int_t k0, k1, k2
+    cdef real_t k0, k1, k2
     for i in xrange(ksq.shape[0]):
         for j in xrange(ksq.shape[1]):
             for k in xrange(ksq.shape[2]):
@@ -32,11 +32,11 @@ def add_pressure_diffusion_Bq2D(np.ndarray[complex_t, ndim=3] du,
                                 np.ndarray[complex_t, ndim=3] u_hat,
                                 np.ndarray[complex_t, ndim=2] rho_hat,
                                 np.ndarray[real_t, ndim=3] k_over_k2, 
-                                np.ndarray[int_t, ndim=3] k, 
-                                np.ndarray[int_t, ndim=2] ksq, 
+                                np.ndarray[real_t, ndim=3] k, 
+                                np.ndarray[real_t, ndim=2] ksq, 
                                 real_t nu, real_t Ri, real_t Pr):
     cdef unsigned int i, j
-    cdef int_t k0, k1, k2
+    cdef real_t k0, k1, k2
     cdef real_t z
     # Compute pressure (To get actual pressure multiply by 1j)
     for i in xrange(ksq.shape[0]):
@@ -56,13 +56,13 @@ def add_pressure_diffusion_Bq2D(np.ndarray[complex_t, ndim=3] du,
 def add_pressure_diffusion_NS2D(np.ndarray[complex_t, ndim=3] du,
                                 np.ndarray[complex_t, ndim=2] p_hat,                  
                                 np.ndarray[complex_t, ndim=3] u_hat,
-                                np.ndarray[int_t, ndim=3] k,
-                                np.ndarray[int_t, ndim=2] ksq,
+                                np.ndarray[real_t, ndim=3] k,
+                                np.ndarray[real_t, ndim=2] ksq,
                                 np.ndarray[real_t, ndim=3] k_over_k2,
                                 real_t nu):
     cdef unsigned int i, j
     cdef real_t z
-    cdef int_t k0, k1
+    cdef real_t k0, k1
     for i in xrange(ksq.shape[0]):
         for j in xrange(ksq.shape[1]):
             z = nu*ksq[i,j]

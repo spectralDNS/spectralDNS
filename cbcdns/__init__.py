@@ -7,13 +7,14 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 #with mpi_import():
 from cbcdns import config
 
-def get_solver(update=None):
+def get_solver(update=None, regression_test=None):
     args = config.parser.parse_args()
     if args.solver in ('NS2D', 'Bq2D'):
         args.decomposition = 'line'
     vars(config).update(vars(args))
-
+        
     #with mpi_import():
+    
     if config.solver == 'NS':
         import cbcdns.solvers.spectralDNS as solver
         
@@ -21,16 +22,21 @@ def get_solver(update=None):
         import cbcdns.solvers.spectralDNSVV as solver
         
     elif config.solver == 'NS2D':
+        config.L = [config.L[0], config.L[1]]
+        config.M = [config.M[0], config.M[1]]    
         import cbcdns.solvers.spectralDNS2D as solver
         
     elif config.solver == 'MHD':
         import cbcdns.solvers.spectralMHD3D as solver
 
     elif config.solver == 'Bq2D':
+        config.L = [config.L[0], config.L[1]]
+        config.M = [config.M[0], config.M[1]]    
         import cbcdns.solvers.spectralDNS2D_Boussinesq as solver
         
     else:
         raise AttributeError("Wrong solver!")
             
     if update: solver.update = update
+    if regression_test: solver.regression_test = regression_test
     return solver

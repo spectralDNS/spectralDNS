@@ -25,11 +25,12 @@ float, complex, mpitype = {"single": (float32, complex64, MPI.F_FLOAT_COMPLEX),
                            "double": (float64, complex128, MPI.F_DOUBLE_COMPLEX)}[config.precision]
 
 # Apply correct precision and set mesh size
-dt = float(config.dt)
-nu = float(config.nu)
-N = 2**config.M
-L = float(2*pi)
-dx = float(L/N)
+dt = config.dt = float(config.dt)
+nu = config.nu = float(config.nu)
+M = config.M = array([eval(str(f)) for f in config.M], dtype=int)  # Convert from possible commandline, which is parsed as strings
+L = config.L = array([eval(str(f)) for f in config.L], dtype=float)
+N = 2**M
+dx = (L/N).astype(float)
 
 if config.make_profile: profiler = cProfile.Profile()
 

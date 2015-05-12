@@ -12,9 +12,9 @@ def cross1(c, a, b):
     """Regular c = a x b, where type(a) = type(b) is real"""
     if len(c.shape) == 4:
         #c[:] = cross(a, b, axisa=0, axisb=0, axisc=0) # Very slow
-        c[0] = a[1]*b[2]-a[2]*b[1]
-        c[1] = a[2]*b[0]-a[0]*b[2]
-        c[2] = a[0]*b[1]-a[1]*b[0]
+        c[0] = a[1]*b[2] - a[2]*b[1]
+        c[1] = a[2]*b[0] - a[0]*b[2]
+        c[2] = a[0]*b[1] - a[1]*b[0]
         
     elif len(c.shape) == 2:
         c[:] = a[0]*b[1] - a[1]*b[0]

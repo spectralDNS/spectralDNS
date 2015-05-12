@@ -5,8 +5,8 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
             
-hdf5file = HDF5Writer(comm, N, float, {"U":U[0], "V":U[1], "W":U[2], "P":P, 
-                                       "Bx": B[0], "By": B[1], "Bz":B[2]}, config.solver+".h5")
+hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P, 
+                                    "Bx": B[0], "By": B[1], "Bz":B[2]}, config.solver+".h5")
 
 eta = float(config.eta)
 
@@ -63,6 +63,9 @@ def ComputeRHS(dU, rk):
     
     return dU
 
+def regression_test(t, tstep, **kw):
+    pass
+
 # Set up function to perform temporal integration (using config.integrator parameter)
 integrate = getintegrator(**vars())
 
@@ -92,4 +95,6 @@ def solve():
     if config.make_profile:
         results = create_profile(**vars())
         
+    regression_test(t, tstep, **globals())
+    
     hdf5file.close()

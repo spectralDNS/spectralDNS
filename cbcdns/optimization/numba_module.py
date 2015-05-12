@@ -144,7 +144,7 @@ def dealias_rhs(du, dealias):
 
   
 @jit(complex[:,:,:,:](complex[:,:,:,:], complex[:,:,:,:], 
-                      int64[:,:,:], int64[:,:,:,:], complex[:,:,:],
+                      float[:,:,:], float[:,:,:,:], complex[:,:,:],
                       float[:,:,:,:], float), nopython=True)
 def add_pressure_diffusion(du, u_hat, ksq, kk, p_hat, k_over_k2, nu):    
     for i in xrange(ksq.shape[0]):

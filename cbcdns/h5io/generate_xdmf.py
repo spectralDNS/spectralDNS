@@ -10,25 +10,26 @@ xdmffile = """<?xml version="1.0" encoding="utf-8"?>
 timeattr = """      <Time TimeType="List"><DataItem Format="XML" Dimensions="{1}"> {0} </DataItem></Time>"""
 attribute3D = """
         <Attribute Name="{0}" Center="Node">
-          <DataItem Format="HDF" NumberType="Float" Precision="{5}" Dimensions="{1} {1} {1}">
-            {2}:/3D/{3}/{4}
+          <DataItem Format="HDF" NumberType="Float" Precision="{7}" Dimensions="{1} {2} {3}">
+            {4}:/3D/{5}/{6}
           </DataItem>
         </Attribute>"""
 
 attribute2D = """
         <Attribute Name="{0}_2D" Center="Node">
-          <DataItem Format="HDF" NumberType="Float" Precision="{5}" Dimensions="{1} {1}">
-            {2}:/2D/{3}/{4}
+          <DataItem Format="HDF" NumberType="Float" Precision="{6}" Dimensions="{1} {2}">
+            {3}:/2D/{4}/{5}
           </DataItem>
         </Attribute>"""
 
 def generate_xdmf(h5filename):
     f = h5py.File(h5filename)
     comps = f["3D"].keys()
+    N = f.attrs["N"]
+    L = f.attrs["L"]
     if len(f["/".join(("3D", comps[0]))]) > 0:
         xf3d = copy.copy(xdmffile)
         timesteps = f["/".join(("3D", comps[0]))].keys()
-        N = f.attrs["N"]
         tt = ""
         for i in timesteps:
             tt += "%s " %i
@@ -42,14 +43,14 @@ def generate_xdmf(h5filename):
       <Grid GridType="Uniform">
         <Geometry Type="ORIGIN_DXDYDZ">
           <DataItem DataType="UInt" Dimensions="3" Format="XML" Precision="4">0 0 0</DataItem>
-          <DataItem DataType="Float" Dimensions="3" Format="XML" Precision="4">{0} {0} {0}</DataItem>
-        </Geometry>""".format(2*pi)
+          <DataItem DataType="Float" Dimensions="3" Format="XML" Precision="4">{0} {1} {2}</DataItem>
+        </Geometry>""".format(L[0]/N[0], L[1]/N[1], L[2]/N[2])
 
             xf3d += """
-        <Topology Dimensions="{0} {0} {0}" Type="3DCoRectMesh"/>""".format(N)
+        <Topology Dimensions="{0} {1} {2}" Type="3DCoRectMesh"/>""".format(*N)
             prec = 4 if dtype == float32 else 8
             for comp in f["3D"]:
-                xf3d += attribute3D.format(comp, N, h5filename, comp, tstep, prec)
+                xf3d += attribute3D.format(comp, N[0], N[1], N[2], h5filename, comp, tstep, prec)
             xf3d += """  
       </Grid>
 """
@@ -67,7 +68,6 @@ def generate_xdmf(h5filename):
     
     xf2d = copy.copy(xdmffile)
     timesteps = f["/".join(("2D", comps[0]))].keys()
-    N = f.attrs["N"]
     dtype = f["/".join(("2D", comps[0]))].values()[0].dtype
     tt = ""
     for i in timesteps:
@@ -80,14 +80,14 @@ def generate_xdmf(h5filename):
       <Grid GridType="Uniform">
         <Geometry Type="ORIGIN_DXDY">
           <DataItem DataType="UInt" Dimensions="2" Format="XML" Precision="4">0 0</DataItem>
-          <DataItem DataType="Float" Dimensions="2" Format="XML" Precision="4">{0} {0}</DataItem>
-        </Geometry>""".format(2*pi)
+          <DataItem DataType="Float" Dimensions="2" Format="XML" Precision="4">{0} {1}</DataItem>
+        </Geometry>""".format(L[0]/N[0], L[1]/N[1])
 
         xf2d += """
-        <Topology Dimensions="{0} {0}" Type="2DCoRectMesh"/>""".format(N)
+        <Topology Dimensions="{0} {1}" Type="2DCoRectMesh"/>""".format(N[0], N[1])
         prec = 4 if dtype is float32 else 8
         for comp in f["2D"]:
-            xf2d += attribute2D.format(comp, N, h5filename, comp, tstep, prec)
+            xf2d += attribute2D.format(comp, N[0], N[1], h5filename, comp, tstep, prec)
         xf2d += """  
       </Grid>
 """

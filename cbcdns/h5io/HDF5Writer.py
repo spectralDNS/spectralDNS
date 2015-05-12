@@ -13,14 +13,13 @@ try:
     import h5py
     class HDF5Writer(object):
     
-        def __init__(self, comm, N, dtype, comps, filename="U.h5"):
+        def __init__(self, comm, dtype, comps, filename="U.h5"):
             self.comm = comm
             self.components = comps
             self.fname = filename
             self.dtype = dtype
-            self.dt = config.dt
-            self.N = N
             self.f = None
+            self.N = 2**config.M
             self.rank = self.comm.Get_rank()
             num_processes = self.comm.Get_size()
             if config.decomposition == "pencil":
@@ -29,10 +28,10 @@ try:
                 xzrank = commxz.Get_rank() # Local rank in xz-plane
                 xyrank = commxy.Get_rank() # Local rank in xy-plane 
                 P2 = num_processes / config.P1
-                N1 = N/config.P1
-                N2 = N/P2
-                self.x1 = slice(xzrank * N1, (xzrank+1) * N1, 1)
-                self.x2 = slice(xyrank * N2, (xyrank+1) * N2, 1)
+                N1 = self.N/config.P1
+                N2 = self.N/P2
+                self.x1 = slice(xzrank * N1[0], (xzrank+1) * N1[0], 1)
+                self.x2 = slice(xyrank * N2[1], (xyrank+1) * N2[1], 1)
             
         def init_h5file(self):
             self.f = h5py.File(self.fname, "w", driver="mpio", comm=self.comm)            
@@ -41,8 +40,9 @@ try:
             for c in self.components:
                 self.f["3D"].create_group(c)
                 self.f["2D"].create_group(c)
-            self.f.attrs.create("dt", self.dt)
+            self.f.attrs.create("dt", config.dt)
             self.f.attrs.create("N", self.N)    
+            self.f.attrs.create("L", config.L)    
             self.f["2D"].attrs.create("i", config.write_yz_slice[0])            
             
         def write(self, tstep):
@@ -53,38 +53,38 @@ try:
                 
                 Np = N / self.comm.Get_size()                
                 for comp, val in self.components.iteritems():
-                    self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype=self.dtype)
-                    self.f["3D/%s/%d"%(comp,tstep)][self.rank*Np:(self.rank+1)*Np] = val
+                    self.f["3D/"+comp].create_dataset(str(tstep), shape=N, dtype=self.dtype)
+                    self.f["3D/%s/%d"%(comp,tstep)][self.rank*Np[0]:(self.rank+1)*Np[0]] = val
 
             elif tstep % config.write_result == 0 and config.decomposition == 'pencil':
                 
                 x1, x2 = self.x1, self.x2
                 for comp, val in self.components.iteritems():
-                    self.f["3D/"+comp].create_dataset(str(tstep), shape=(N, N, N), dtype=self.dtype)
+                    self.f["3D/"+comp].create_dataset(str(tstep), shape=N, dtype=self.dtype)
                     self.f["3D/%s/%d"%(comp, tstep)][x1, x2, :] = val
                     
             elif tstep % config.write_result == 0 and config.decomposition == 'line':
                 
                 Np =  N / self.comm.Get_size()                
                 for comp, val in self.components.iteritems():
-                    self.f["2D/"+comp].create_dataset(str(tstep), shape=(N, N), dtype=self.dtype)
-                    self.f["2D/%s/%d"%(comp,tstep)][self.rank*Np:(self.rank+1)*Np] = val                
+                    self.f["2D/"+comp].create_dataset(str(tstep), shape=(N[0], N[1]), dtype=self.dtype)
+                    self.f["2D/%s/%d"%(comp,tstep)][self.rank*Np[0]:(self.rank+1)*Np[0]] = val                
                     
             if tstep % config.write_yz_slice[1] == 0 and config.decomposition == 'slab':
                 i = config.write_yz_slice[0]
                 Np = N / self.comm.Get_size()     
                 for comp in self.components:
-                    self.f["2D/"+comp].create_dataset(str(tstep), shape=(N, N), dtype=self.dtype)
+                    self.f["2D/"+comp].create_dataset(str(tstep), shape=(N[1], N[2]), dtype=self.dtype)
                                     
-                if i >= self.rank*Np and i < (self.rank+1)*Np:
+                if i >= self.rank*Np[0] and i < (self.rank+1)*Np[0]:
                     for comp, val in self.components.iteritems():                
-                        self.f["2D/%s/%d"%(comp, tstep)][:] = val[i-self.rank*Np]
+                        self.f["2D/%s/%d"%(comp, tstep)][:] = val[i-self.rank*Np[0]]
 
             elif tstep % config.write_yz_slice[1] == 0 and config.decomposition == 'pencil':
                 i = config.write_yz_slice[0]
                 x1, x2 = self.x1, self.x2
                 for comp in self.components:
-                    self.f["2D/"+comp].create_dataset(str(tstep), shape=(N, N), dtype=self.dtype)
+                    self.f["2D/"+comp].create_dataset(str(tstep), shape=(N[1], N[2]), dtype=self.dtype)
                     for comp, val in self.components.iteritems():                                    
                         self.f["2D/%s/%d"%(comp, tstep)][x1, x2] = val[:, :, i]
                             
