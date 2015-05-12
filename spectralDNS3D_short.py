@@ -7,24 +7,20 @@ from numpy import *
 from numpy.fft import fftfreq, fft, ifft, irfft2, rfft2, rfftn, irfftn
 from mpi4py import MPI
 
-try:
-    from cbcdns.fft.wrappyfftw import *
-except ImportError:
-    pass # Rely on numpy.fft routines
+#try:
+    #from cbcdns.fft.wrappyfftw import *
+#except ImportError:
+    #pass # Rely on numpy.fft routines
 
 nu = 0.000625
 T = 0.1
 dt = 0.01
-M = 6
-N = 2**M
-L = 2 * pi
-dx = L / N
+N = 2**6
 comm = MPI.COMM_WORLD
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
 Np = N / num_processes
-X = mgrid[rank*Np:(rank+1)*Np, :N, :N].astype(float)*L/N
-Nf = N/2+1
+X = mgrid[rank*Np:(rank+1)*Np, :N, :N].astype(float)*2*pi/N
 U     = empty((3, Np, N, N))
 U_hat = empty((3, N, Np, Nf), dtype="complex")
 P     = empty((Np, N, N))
@@ -36,7 +32,6 @@ Uc_hat  = empty((N, Np, Nf), dtype="complex")
 Uc_hatT = empty((Np, N, Nf), dtype="complex")
 U_mpi   = empty((num_processes, Np, Np, Nf), dtype="complex")
 curl    = empty((3, Np, N, N))
-
 kx = fftfreq(N, 1./N)
 kz = kx[:Nf].copy(); kz[-1] *= -1
 K = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
@@ -77,7 +72,6 @@ def Curl(a, c):
     return c
 
 def ComputeRHS(dU, rk):
-    #global curl
     if rk > 0:
         for i in range(3):
             U[i] = ifftn_mpi(U_hat[i], U[i])
@@ -107,7 +101,7 @@ while t < T-1e-8:
     U_hat[:] = U_hat1[:]
     for i in range(3):
         U[i] = ifftn_mpi(U_hat[i], U[i])
-        
-kk = comm.reduce(0.5*sum(U*U)*dx*dx*dx/L**3)
+
+kk = comm.reduce(0.5*sum(U*U)*(1./N)**3)
 if rank == 0:
     print kk

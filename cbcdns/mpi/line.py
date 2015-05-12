@@ -48,10 +48,6 @@ def setupNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid, mgrid,
     P_hat = empty((N[0], Npf), dtype=complex)
     curl  = empty((Np[0], N[1]), dtype=float)
     F_tmp = empty((2, N[0], Npf), dtype=complex)
-
-    # RK4 arrays
-    U_hat0 = empty((2, N[0], Npf), dtype=complex)
-    U_hat1 = empty((2, N[0], Npf), dtype=complex)
     dU     = empty((2, N[0], Npf), dtype=complex)
     
     init_fft(N, Nf, Np, Npf, complex, num_processes, comm, rank, mpitype, conj)
@@ -92,10 +88,6 @@ def setupBoussinesq(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     U_tmp = empty((2, Np[0], N[1]), dtype=float)
     F_tmp = empty((2, N[0], Npf), dtype=complex)
 
-    # RK4 arrays
-    Ur_hat0 = empty((3, N[0], Npf), dtype=complex)
-    Ur_hat1 = empty((3, N[0], Npf), dtype=complex)
-    
     init_fft(N, Nf, Np, Npf, complex, num_processes, comm, rank, mpitype, conj)
 
     K, K2, K_over_K2, dealias = create_wavenumber_arrays(N, Nf, Np, rank, float)

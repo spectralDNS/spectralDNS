@@ -39,7 +39,7 @@ def ComputeRHS(dU, rk):
 
 integrate = getintegrator(**vars())   
 
-def regression_test(**kw):
+def regression_test(t, tstep, **kw):
     pass
 
 def solve():
@@ -68,7 +68,7 @@ def solve():
     if config.make_profile:
         results = create_profile(**globals())
     
-    regression_test(**globals())
+    regression_test(t, tstep, **globals())
     
     hdf5file.close()
 

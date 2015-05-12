@@ -63,6 +63,9 @@ def ComputeRHS(dU, rk):
     
     return dU
 
+def regression_test(t, tstep, **kw):
+    pass
+
 # Set up function to perform temporal integration (using config.integrator parameter)
 integrate = getintegrator(**vars())
 
@@ -92,4 +95,6 @@ def solve():
     if config.make_profile:
         results = create_profile(**vars())
         
+    regression_test(t, tstep, **globals())
+    
     hdf5file.close()

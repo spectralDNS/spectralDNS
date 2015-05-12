@@ -53,10 +53,8 @@ if __name__ == '__main__':
     )
 
     config.parser.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
-    solver = get_solver()
+    solver = get_solver(update=update, regression_test=regression_test)
     solver.hdf5file.components["curl"] = solver.curl
     initialize(**vars(solver))
-    solver.update = update
-    solver.regression_test = regression_test
     solver.solve()
 

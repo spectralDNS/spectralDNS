@@ -71,9 +71,7 @@ def setupDNS(comm, float, complex, mpitype, N, L, mgrid,
     P     = empty((Np[0], N[1], N[2]), dtype=float)
     P_hat = empty((N[0], Np[1], Nf), dtype=complex)
 
-    # Temporal storage arrays (Not required by all temporal integrators)
-    U_hat0 = empty((3, N[0], Np[1], Nf), dtype=complex)
-    U_hat1 = empty((3, N[0], Np[1], Nf), dtype=complex)
+    # RHS array
     dU     = empty((3, N[0], Np[1], Nf), dtype=complex)
 
     # work arrays (Not required by all convection methods)
@@ -124,10 +122,8 @@ def setupMHD(comm, float, complex, mpitype, N, L, mgrid,
     B     = UB[3:]
     B_hat = UB_hat[3:]
 
-    # Temporal storage arrays (Not required by all temporal integrators)
-    UB_hat0 = empty((6, N[0], Np[1], Nf), dtype=complex)
-    UB_hat1 = empty((6, N[0], Np[1], Nf), dtype=complex)
-    dU      = empty((6, N[0], Np[1], Nf), dtype=complex)
+    # RHS array
+    dU = empty((6, N[0], Np[1], Nf), dtype=complex)
 
     # work arrays (Not required by all convection methods)
     U_tmp  = empty((3, Np[0], N[1], N[2]), dtype=float)

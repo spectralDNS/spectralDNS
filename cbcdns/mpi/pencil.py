@@ -62,8 +62,8 @@ def create_wavenumber_arrays(N, N1, N2, xyrank, xzrank, float):
     
     return K, K2, K_over_K2, dealias
 
-def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
-             sum, where, num_processes, rank, mgrid, pi, **kwargs):
+def setupDNS(comm, float, complex, uint8, mpitype, N, L,
+             num_processes, rank, mgrid, **kwargs):
 
     # Each cpu gets ownership of a pencil of size N1*N2*N in real space
     # and (N1/2+1)*N2*N in Fourier space. However, the Nyquist mode is
@@ -110,10 +110,8 @@ def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     P     = empty((N1[0], N2[1], N[2]), dtype=float)
     P_hat = empty((N2[0], N[1], N1[2]/2), dtype=complex)
 
-    # Temporal storage arrays (Not required by all temporal integrators)
-    U_hat0  = empty((3, N2[0], N[1], N1[2]/2), dtype=complex)
-    U_hat1  = empty((3, N2[0], N[1], N1[2]/2), dtype=complex)
-    dU      = empty((3, N2[0], N[1], N1[2]/2), dtype=complex)
+    # RHS array
+    dU = empty((3, N2[0], N[1], N1[2]/2), dtype=complex)
     
     # work arrays (Not required by all convection methods)
     U_tmp  = empty((3, N1[0], N2[1], N[2]), dtype=float)
@@ -128,8 +126,8 @@ def setupDNS(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     del kwargs
     return locals()
 
-def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
-             sum, where, num_processes, rank, mgrid, **kwargs):
+def setupMHD(comm, float, complex, uint8, mpitype, N, L,
+             num_processes, rank, mgrid, **kwargs):
 
     # Each cpu gets ownership of a pencil of size N1*N2*N in real space
     # and (N1/2+1)*N2*N in Fourier space. However, the Nyquist mode is
@@ -161,15 +159,6 @@ def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     X = mgrid[x1, x2, :N[2]].astype(float)
     X[0] *= L[0]/N[0]; X[1] *= L[1]/N[1]; X[2] *= L[2]/N[2]
 
-    """
-    Solution U is real and as such its transform, U_hat = fft(U)(k), 
-    is such that fft(U)(k) = conj(fft(U)(N-k)) and thus it is sufficient 
-    to store N/2+1 Fourier coefficients in the first transformed direction 
-    (y). However, the Nyquist mode (k=N/2+1) is neglected in the 3D fft.
-    The Nyquist mode in included in temporary arrays simply because rfft/irfft 
-    expect N/2+1 modes.
-    """
-
     Nf = N[2]/2+1 # Total Fourier coefficients in z-direction
     UB     = empty((6, N1[0], N2[1], N[2]), dtype=float)
     UB_hat = empty((6, N2[0], N[1], N1[2]/2), dtype=complex)
@@ -182,10 +171,8 @@ def setupMHD(comm, float, complex, uint8, mpitype, N, L, array, meshgrid,
     B     = UB[3:]
     B_hat = UB_hat[3:]
 
-    # Temporal storage arrays (Not required by all temporal integrators)
-    UB_hat0  = empty((6, N2[0], N[1], N1[2]/2), dtype=complex)
-    UB_hat1  = empty((6, N2[0], N[1], N1[2]/2), dtype=complex)
-    dU       = empty((6, N2[0], N[1], N1[2]/2), dtype=complex)
+    # RHS array
+    dU = empty((6, N2[0], N[1], N1[2]/2), dtype=complex)
 
     # work arrays (Not required by all convection methods)
     U_tmp  = empty((3, N1[0], N2[1], N[2]), dtype=float)
@@ -212,6 +199,7 @@ def init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy):
     Uc_hat_y  = zeros((N2[0], N[1], N1[2]/2), dtype=complex)
     globals().update(locals())
 
+#@profile
 def ifftn_mpi(fu, u):
     """ifft in three directions using mpi.
     Need to do ifft in reversed order of fft
@@ -236,7 +224,7 @@ def ifftn_mpi(fu, u):
     u = irfft(Uc_hat_z, axis=2)
     return u
         
-@profile
+#@profile
 def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """    

@@ -10,7 +10,7 @@ from numpy import pi
 
 parser = argparse.ArgumentParser(prog='cbcdns')
 
-parser.add_argument('solver', choices=('NS', 'VV', 'NS2D', 'MHD', 'Bq2D'), 
+parser.add_argument('--solver', default='NS', choices=('NS', 'VV', 'NS2D', 'MHD', 'Bq2D'), 
                     help="""Choose solver. NS is a regular velocity-pressure formulation and VV uses a velocity-vorticity formulation. NS2D is a regular 2D solver. MHD is a 3D MagnetoHydroDynamics solver.""")
 parser.add_argument('--decomposition', default='slab', choices=('slab', 'pencil', 'line'), help="Choose 3D decomposition between slab and pencil. For 2D problems line is the only choice and is made automatically.")
 parser.add_argument('--precision', default='double', choices=('single', 'double'))

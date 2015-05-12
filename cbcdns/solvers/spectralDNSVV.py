@@ -11,7 +11,7 @@ from spectralDNS import Cross, hdf5file
 # Rename variable since we are working with a vorticity formulation
 W = U.copy()               # W is vorticity
 W_hat = U_hat              # U_hat is used in subroutines, rename here for convenience
-Source = U_hat.copy()
+Source = U_hat.copy()*0    # Possible source term initialized to zero
 
 def Curl(a, c):
     """c = curl(a) = F_inv(F(curl(a))/K2) = F_inv(1j*(K x a)/K2)"""
