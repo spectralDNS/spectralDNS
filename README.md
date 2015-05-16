@@ -19,3 +19,11 @@ The efficiency of the pure numpy/mpi4py solver may be enhanced using a few more 
     Weak scaling on the Abel cluster.
 </p>
 
+<p align="center">
+    <img src="https://www.dropbox.com/s/8oayxts0ix359hi/KHmovie2.gif?dl=1" width="600" height="400" alt="Kelvin Helmholtz instability"/>
+</p>
+
+<p align="center">
+    Vorticity. Kelvin Helmholtz shear instability.
+</p>
+
