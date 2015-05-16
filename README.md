@@ -24,6 +24,6 @@ The efficiency of the pure numpy/mpi4py solver may be enhanced using a few more 
 </p>
 
 <p align="center">
-    Vorticity. Kelvin Helmholtz shear instability.
+    Evolution of vorticity. Two-dimensional simulation of Kelvin Helmholtz shear instability using a Boussinesq formulation (solvers/spectralDNS2D_Boussinesq.py)
 </p>
 
