@@ -62,6 +62,7 @@ def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, ifft2_mpi, U_hat, U, su
             
     if tstep % config.write_result == 0 or tstep % config.write_yz_slice[1] == 0:
         P = ifft2_mpi(P_hat*1j, P)
+        curl = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         hdf5file.write(tstep)           
 
     if tstep % config.compute_energy == 0:
@@ -92,5 +93,6 @@ if __name__ == "__main__":
     config.parser.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline    
     config.parser.add_argument("--compute_energy", type=int, default=2)
     solver = get_solver(update)
+    solver.hdf5file.components["curl"] = solver.curl
     initialize(**vars(solver))
     solver.solve()

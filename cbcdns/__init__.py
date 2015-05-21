@@ -5,9 +5,18 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 #from utilities.MPI_knee import mpi_import
 #with mpi_import():
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
 from cbcdns import config
 
 def get_solver(update=None, regression_test=None):
+    #args = None
+    #try:
+        #if comm.Get_rank() == 0:
+            #args = config.parser.parse_args()
+    #finally:
+        #args = comm.bcast(args, root=0)
+        
     args = config.parser.parse_args()
     if args.solver in ('NS2D', 'Bq2D'):
         args.decomposition = 'line'

@@ -6,7 +6,7 @@ __all__ = ['create_profile']
 def create_profile(profiler, comm, MPI, rank, **params):
     profiler.disable()
     ps = pstats.Stats(profiler).sort_stats('cumulative')
-    #ps.print_stats(500)
+    #ps.print_stats(1000)
     
     results = {}
     for item in ['ifftn_mpi', 
@@ -24,6 +24,7 @@ def create_profile(profiler, comm, MPI, rank, **params):
                  'cross1',
                  'cross2',
                  'dealias_rhs',
+                 'transpose_Uc',
                  'Curl',
                  'Cross',
                  'project',
