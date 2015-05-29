@@ -8,14 +8,14 @@ The efficiency of the pure numpy/mpi4py solver may be enhanced using a few more 
     <img src="https://www.dropbox.com/s/nrwh0s7n25xg5mn/weak_scaling_shaheen_numpy.png?dl=1" width="600" height="400" alt="Weak scaling of pure numpy/mpi4py solver on Shaheen BlueGene/P"/>
 </p>
 <p align="center">
-    Weak scaling of pure numpy/mpi4py solver on Shaheen BlueGene/P.
+    Weak scaling of pure numpy/mpi4py solver on Shaheen BlueGene/P. The C++ solver uses slab decomposition and MPI communication is performed by the FFTW library.
 </p>
 
 <p align="center">
     <img src="https://www.dropbox.com/s/p7uapi7eaqjmham/strong_scaling_shaheen_512.png?dl=1" width="600" height="400" alt="Strong scaling of optimized Python/Cython solver on Shaheen BlueGene/P"/>
 </p>
 <p align="center">
-    Strong scaling of optimized Python/Cython solver on Shaheen BlueGene/P.
+    Strong scaling of optimized Python/Cython solver on Shaheen BlueGene/P. The C++ solver uses slab decomposition and MPI communication is performed by the FFTW library.
 </p>
 
 <p align="center">
