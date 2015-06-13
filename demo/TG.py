@@ -72,4 +72,3 @@ if __name__ == "__main__":
     solver = get_solver(update=update, regression_test=regression_test)
     initialize(**vars(solver))
     solver.solve()
-

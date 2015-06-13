@@ -9,9 +9,13 @@ from cbcdns import config
 def optimizer(func):
     """Decorator used to wrap calls to optimized versions of functions.
     
-    Optimized versions of functions are located in different modules 
-    in src/optimization, where the functions have the same name as
-    in the main module.
+    Optimized versions of functions have the same name as
+    in the main module. Two-dimensional version may be given the 
+    postfix "_2D" and solver-specific implementations may be given
+    as postfix the name of the solver. For example, the 
+    "add_pressure_diffusion_NS" function defined in cython_solvers.py
+    is an optimized version of "add_pressure_diffusion" for the 
+    NS solver.
     
     """
     try: # Look for optimized version of function

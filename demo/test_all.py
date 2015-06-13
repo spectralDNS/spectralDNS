@@ -28,7 +28,7 @@ def test_mpi_slab_DNS():
 def test_mpi_pencil_DNS():
     subprocess.call("mpirun -np 4 python TG.py --solver NS --decomposition pencil --P1 2 --compute_energy 1000", shell=True)
 
-def test_mpi_pencil_DNS2(): # Uneven number of processors in each direction
+def test_mpi_pencil_DNS2():
     subprocess.call("mpirun -np 8 python TG.py --solver NS --decomposition pencil --P1 2 --compute_energy 1000", shell=True)
     
 def test_mpi_slab_VV():

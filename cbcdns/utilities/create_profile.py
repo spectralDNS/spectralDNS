@@ -25,6 +25,7 @@ def create_profile(profiler, comm, MPI, rank, **params):
                  'cross2',
                  'dealias_rhs',
                  'transpose_Uc',
+                 'transpose_Umpi',
                  'Curl',
                  'Cross',
                  'project',
