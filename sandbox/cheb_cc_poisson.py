@@ -29,7 +29,7 @@ f = u.diff(x, 2)
 
 # Choices
 banded = True
-fast_transform = True
+fast_transform = False
 
 N = 20
 k = np.arange(N-2)
@@ -47,18 +47,27 @@ V = n_cheb.chebvander(points, N-3).T - n_cheb.chebvander(points, N-1)[:, 2:].T
 # Gauss-Chebyshev quadrature to compute rhs
 fj = np.array([f.subs(x, j) for j in points], dtype=float)     # Get f on quad points
 
+def fastChebScalar(fj):
+    return dct(fj, 1)*np.pi/(2*(len(fj)-1))
+
 def fastChebTrans(fj):
-    cj = dct(fj, 1)
-    cj /= (len(fj)-1)
+    cj = dct(fj, 1)/(len(fj)-1)
     cj[0] /= 2
     cj[-1] /= 2
+    return cj
+
+def ifastChebTrans(fj):
+    cj = 0.5*dct(fj, 1)
+    cj += 0.5*fj[0]
+    cj[::2] += 0.5*fj[-1]
+    cj[1::2] -= 0.5*fj[-1]
     return cj
 
 #@profile
 def fastShenTrans(fj):
     """Fast Shen transform on cos(j*pi/N).
     """
-    cj = forwardtransform(fj, fast_transform)
+    cj = fastShenScalar(fj)
     ck = np.ones(N-2); ck[0] = 2; ck[-1] = 2  # Note!! Shen paper has only ck[0] = 2, not ck[-1] = 2. For Gauss points ck[-1] = 1, but not here! 
     #B = np.zeros((5, N))
     #B[0, 2:] = -np.pi/2
@@ -69,14 +78,13 @@ def fastShenTrans(fj):
     a = np.ones(N-4)*(-np.pi/2)
     b = np.pi/2*(ck+1)
     c = a.copy()
-    cj = TDMA.TDMA_offset(a, b, c, cj)
+    cj = TDMA.TDMA_1D(a, b, c, cj)
     return cj
 
 def ifastShenTrans(fj):
     """Inverse fast Shen transform on cos(j*pi/N).
     """
-    cj = backtransform(fj, fast_transform)
-    return cj
+    return ifastShenScalar(fj)
 
 def fastShenScalar(fj):
     """Fast Shen scalar product on cos(j*pi/N).
@@ -84,41 +92,47 @@ def fastShenScalar(fj):
        Note, this is the non-normalized scalar product
 
     """
-    cj = dct(fj, 1)
-    cj *= (np.pi/((len(fj)-1)*2))
-    cj[:-2] -= cj[2:]
-    return cj[:-2]
+    if fast_transform:
+        cj = fastChebScalar(fj)
+        cj[:-2] -= cj[2:]
+        return cj[:-2]
+    else:
+        return np.dot(V, fj*weights)         
 
+def chebDerivativeCoefficients(f_k):
+    N = len(f_k)-1
+    f_1 = f_k.copy()
+    f_1[-1] = 0
+    f_1[-2] = 2*N*f_k[-1]
+    for k in range(N-2, 0, -1):
+        f_1[k] = 2*(k+1)*f_k[k+1]+f_1[k+2]
+    f_1[0] = f_k[1] + 0.5*f_1[2]
+    return f_1
+
+def fastChebDerivative(fj):
+    f_k = fastChebTrans(fj)
+    f_1 = chebDerivativeCoefficients(f_k)
+    df = ifastChebTrans(f_1)
+    return df
+     
 def ifastShenScalar(fk):
     """Fast inverse Shen scalar product
     Transform needs to take into account that phi_k = T_k - T_{k+2}
     
     """
-    w_hat = np.zeros(len(fk)+2)
-    w_hat[:-2] = fk - np.hstack([0, 0, fk[:-2]])    
-    w_hat[-2] = -fk[-2]
-    w_hat[-1] = -fk[-1]
-    fj = 0.5*dct(w_hat, 1)
-    fj += 0.5*w_hat[0]
-    fj[::2] += 0.5*w_hat[-1]
-    fj[1::2] -= 0.5*w_hat[-1]
-
-    return fj    
-
-def forwardtransform(u, fast=True):
-    if fast:
-        
-        u_k = fastShenScalar(u)
+    if fast_transform:
+        w_hat = np.zeros(len(fk)+2)
+        w_hat[:-2] = fk - np.hstack([0, 0, fk[:-2]])    
+        w_hat[-2] = -fk[-2]
+        w_hat[-1] = -fk[-1]
+        fj = ifastChebTrans(w_hat)
+        return fj    
+    
     else:
-        # Alternatively using Vandermonde matrix
-        u_k = np.dot(V, u*weights) 
-        
-    return u_k
-
-fj = forwardtransform(fj, fast_transform)
+        return np.dot(V.T, fk)
 
 #@profile
-def solve(banded=True):
+def solve(fj, banded=True):
     
     if banded:
         A = np.zeros((N-2, N-2))
@@ -136,21 +150,9 @@ def solve(banded=True):
 
     return uk_hat, A
 
-uk_hat, A = solve(banded)
-
-# Back transform
-#@profile
-def backtransform(u_hat, fast=True):
-    if fast:
-        uq = ifastShenScalar(u_hat)
-    
-    else:
-        # Alternatively using Vandermonde matrix
-        uq = np.dot(V.T, u_hat)
-        
-    return uq
-
-uq = backtransform(uk_hat, fast_transform)
+fj = fastShenScalar(fj)
+uk_hat, A = solve(fj, banded)
+uq = ifastShenScalar(uk_hat)
 
 print "Error in transforms = ", np.linalg.norm(ifastShenTrans(fastShenTrans(uq))-uq)
 
