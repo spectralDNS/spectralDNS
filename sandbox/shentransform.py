@@ -5,12 +5,21 @@ import SFTc
 
 """
 Fast transforms for pure Chebyshev basis or 
-Shen's Chebyshev basis: phi_k = T_k - T_{k+2}
+Shen's Chebyshev basis: 
 
-Use either Chebyshev-Gauss or Gauss-Lobatto points
+  For homogeneous Dirichlet boundary conditions:
+ 
+    phi_k = T_k - T_{k+2}
+    
+  For homogeneous Neumann boundary conditions:
+    
+    phi_k = T_k - (k/k+2)**2 * T_{k+2}
+
+Use either Chebyshev-Gauss or Gauss-Lobatto points for
+Dirichlet basis, but only Chebyshev-Gauss for Neumann.
 
 The ChebyshevTransform may be used to compute derivatives
-through fast Chebyshev transforms
+through fast Chebyshev transforms.
 
 """
 
@@ -88,7 +97,7 @@ class ChebyshevTransform(object):
             return dct(fj, 1, axis=0)*np.pi/(2*(N-1))
         
 
-class ShenTransform(ChebyshevTransform):
+class ShenDirichletBasis(ChebyshevTransform):
     
     def __init__(self, quad="GC", fast_transform=True):
         self.quad = quad
@@ -115,8 +124,13 @@ class ShenTransform(ChebyshevTransform):
             
         return points, weights
     
-    def wavenumbers(self):
-        return np.arange(self.N-2)
+    def wavenumbers(self, N, dim=1):
+        if dim == 1:            
+            return np.arange(N-2).astype(np.float)
+        
+        else:
+            kk = np.mgrid[:N-2, :N, :N/2+1].astype(float)
+            return kk[0]
         
     def fastShenScalar(self, fj):
                 
@@ -181,20 +195,83 @@ class ShenTransform(ChebyshevTransform):
         """
         return self.ifastShenScalar(fj)
     
-if __name__ == "__main__":
-    N = 6
-    a = np.random.random((N, N, N/2+1))+1j*np.random.random((N, N, N/2+1))
-    #a = np.random.random((N, N, N/2+1))
-    #a = np.random.random(N)
-    a[0,:,:] = 0
-    a[-1,:,:] = 0
-    #a[0] = 0
-    #a[-1] = 0
+
+class ShenNeumannBasis(ShenDirichletBasis):
     
-    ST = ShenTransform()
+    def __init__(self): 
+        ShenDirichletBasis.__init__(self, "GC")
+            
+    def init(self, N):
+        self.points, self.weights = self.points_and_weights(N)
+        k = self.wavenumbers(N)
+        # Build Vandermonde matrix. Note! N points in real space gives N-3 bases in spectral space
+        self.V = n_cheb.chebvander(self.points, N-3).T - ((k/(k+2))**2)[:, np.newaxis]*n_cheb.chebvander(self.points, N-1)[:, 2:].T
+        self.V = self.V[1:, :]
+
+    def fastShenScalar(self, fj):
+        """Fast Shen scalar product on cos(j*pi/N).
+        Chebyshev transform taking into account that phi_k = T_k - (k/(k+2))**2*T_{k+2}
+        Note, this is the non-normalized scalar product
+
+        """
+        N = fj.shape[0]
+        k = self.wavenumbers(N, dim=len(fj.shape))
+        ck = dct(fj, 1, axis=0)
+        ck *= (np.pi/((N-1)*2))
+        ck[:-2] -= ((k/(k+2))**2) * ck[2:]
+        return ck[1:-2]
+
+    def ifastShenScalar(self, fk):
+        """Fast inverse Shen scalar product
+        """
+        N = fk.shape[0]+3
+        k = self.wavenumbers(N, dim=len(fk.shape))
+        if len(fk.shape)==3:
+            w_hat = np.zeros((N, fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+            w_hat[1:-2] = fk
+            w_hat[3:] -= (k[1:]/(k[1:]+2))**2*fk
+            
+        if len(fk.shape)==1:
+            w_hat = np.zeros(N)       
+            w_hat[1:-2] = fk
+            w_hat[3:] -= (k[1:]/(k[1:]+2))**2*fk
+
+        fj = 0.5*dct(w_hat, 1, axis=0)
+        fj[::2] += 0.5*w_hat[-1]
+        fj[1::2] -= 0.5*w_hat[-1]
+        return fj
+        
+    def fst(self, fj):
+        """Fast Shen transform.
+        """
+        cj = self.fastShenScalar(fj)
+        N = fj.shape[0]
+        k = self.wavenumbers(N)
+        ck = np.ones(N-3); ck[-1] = 2 # Note not the first since basis phi_0 is not included        
+        a = np.ones(N-5)*(-np.pi/2)*(k[1:-2]/(k[1:-2]+2))**2
+        b = np.pi/2*(1+(k[1:]/(k[1:]+2))**4)
+        c = a.copy()
+        if len(cj.shape) == 3:
+            bc = b.copy()
+            cj = SFTc.TDMA_3D_complex(a, b, bc, c, cj)
+
+        elif len(cj.shape) == 1:
+            cj = SFTc.TDMA_1D(a, b, c, cj)
+
+        return cj
+    
+if __name__ == "__main__":
+    N = 8
+    #a = np.random.random((N, N, N/2+1))+1j*np.random.random((N, N, N/2+1))
+    #a = np.random.random((N, N, N/2+1))
+    a = np.random.random(N)
+    #a[0,:,:] = 0
+    #a[-1,:,:] = 0
+    a[0] = 0
+    a[-1] = 0
+    
+    ST = ShenDirichletBasis()
     fst1 = ST.ifst(ST.fst(a))
     assert np.allclose(fst1, a)
-    
-    
-    
+        
      

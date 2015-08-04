@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.linalg import solve_banded
 from scipy.sparse import diags
 import scipy.sparse.linalg as la
-from shentransform import ShenTransform
+from shentransform import ShenDirichletBasis
 
 """
 Solve Poisson equation on (-1, 1) with homogeneous bcs
@@ -30,7 +30,7 @@ f = u.diff(x, 2)
 banded = True
 N = 20
 
-ST = ShenTransform(quad="GC")
+ST = ShenDirichletBasis(quad="GC")
 points, weights = ST.points_and_weights(N) 
 
 # Gauss-Chebyshev quadrature to compute rhs

@@ -47,7 +47,7 @@ def fastShenTransNeumann(fj):
     a = np.ones(N-5)*(-np.pi/2)*(k[1:-2]/(k[1:-2]+2))**2
     b = np.pi/2*(1+(k[1:]/(k[1:]+2))**4)
     c = a.copy()
-    cj = TDMA.TDMA_offset(a, b, c, cj)
+    cj = TDMA.TDMA_1D(a, b, c, cj)
     return cj
 
 def ifastShenTransNeumann(fj):
