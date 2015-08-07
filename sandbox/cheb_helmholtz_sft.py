@@ -1,0 +1,116 @@
+from numpy.polynomial import chebyshev as n_cheb
+from sympy import chebyshevt, Symbol, sin, cos, pi, lambdify, sqrt as Sqrt
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.linalg import solve_banded
+from scipy.sparse import diags
+import scipy.sparse.linalg as la
+from shentransform import ShenDirichletBasis
+import SFTc
+
+"""
+Solve Helmholtz equation on (-1, 1) with homogeneous bcs
+
+    -\nabla^2 u + kx^2u = f, u(\pm 1) = 0
+
+where kx is some integer wavenumber.
+
+Use Shen basis \phi_k = T_k - T_{k+2}, where T_k is k'th Chebyshev 
+polynomial of first kind. Solve using spectral Galerkin and the
+weighted L_w norm (u, v)_w = \int_{-1}^{1} u v / \sqrt(1-x^2) dx
+The equation to be solved for is
+
+    -(\nabla^2 u, \phi_k)_w + kx^2(u, phi_k)_w = (f, \phi_k)_w 
+    
+    Au + kx^2*Bu = f
+
+"""
+
+# Use sympy to compute a rhs, given an analytical solution
+x = Symbol("x")
+u = (1-x**2)**2*cos(np.pi*x)*(x-0.25)**2
+kx = 100
+f = -u.diff(x, 2) + kx**2*u
+
+# Choices
+solver = "lu"
+N = 41
+
+ST = ShenDirichletBasis(quad="GL")
+points, weights = ST.points_and_weights(N) 
+
+# Gauss-Chebyshev quadrature to compute rhs
+fj = np.array([f.subs(x, j) for j in points], dtype=float)     # Get f on quad points
+
+#@profile
+def solve(fk):
+    
+    k = ST.wavenumbers(N)
+        
+    if solver == "sparse":
+        aij = [2*np.pi*(k+1)*(k+2)]
+        for i in range(2, N-2, 2):
+            aij.append(np.array(4*np.pi*(k[:-i]+1)))    
+        A = diags(aij, range(0, N-2, 2))
+
+        bij = np.pi*np.ones(N-2); bij[0] *= 1.5; bij[-1] *= 1.5
+        bio = -np.pi/2*np.ones(N-4)                
+        B = diags([bio, bij, bio], range(-2, 3, 2)) 
+        
+        uk_hat = la.spsolve(A+kx**2*B, fk)
+
+    elif solver == "sparse-even/odd":
+        M = (N-3)/2
+        m = np.arange(M+1).astype(float)
+        aij_e = [2*np.pi*(2*m+1)*(2*m+2)]
+        for i in range(1, M+1):
+            aij_e.append(np.array(4*np.pi*(2*m[:-i]+1)))    
+        A_e = diags(aij_e, range(M+1))
+        bij_e = np.pi*np.ones(M+1); bij_e[0] *= 1.5
+        if N % 2 == 1:
+            bij_e[-1] *= 1.5
+        bio_e = -np.pi/2*np.ones(M)                
+        B_e = diags([bio_e, bij_e, bio_e], range(-1, 2, 1)) 
+        
+        Mo = (N-4)/2
+        m = np.arange(Mo+1).astype(float)
+        aij_o = [2*np.pi*(2*m+2)*(2*m+3)]
+        for i in range(1, Mo+1):
+            aij_o.append(np.array(4*np.pi*(2*m[:-i]+2)))    
+        A_o = diags(aij_o, range(Mo+1))
+        bij_o = np.pi*np.ones(Mo+1)
+        if N % 2 == 0:
+            bij_o[-1] *= 1.5
+        bio_o = -np.pi/2*np.ones(Mo)                
+        B_o = diags([bio_o, bij_o, bio_o], range(-1, 2, 1))         
+        
+        uk_hat = np.zeros(N-2)
+        uk_hat[::2] = la.spsolve(A_e+kx**2*B_e, fk[::2])
+        uk_hat[1::2] = la.spsolve(A_o+kx**2*B_o, fk[1::2])
+        
+    elif solver == "lu":        
+        
+        uk_hat = np.zeros(N-2)
+        
+        M = (N-3)/2
+        Mo = (N-4)/2
+        d0 = np.zeros((2, M+1))
+        d1 = np.zeros((2, M))
+        d2 = np.zeros((2, M-1))
+        L  = np.zeros((2, M))
+        SFTc.LU_Helmholtz_1D(N, 0, kx, d0, d1, d2, L)
+        SFTc.Solve_Helmholtz_1D(N, 0, kx, fk, uk_hat, d0, d1, d2, L)
+        
+    return uk_hat
+
+f_hat = ST.fastShenScalar(fj)
+uk_hat = solve(f_hat)
+uq = ST.ifst(uk_hat)
+
+print ST.ifst(ST.fst(uq)) - uq
+
+u_exact = np.array([u.subs(x, h) for h in points], dtype=np.float)
+plt.figure(); plt.plot(points, [u.subs(x, i) for i in points]); plt.title("U")    
+plt.figure(); plt.plot(points, uq - u_exact); plt.title("Error")
+print "Error = ", np.linalg.norm(uq - u_exact)
+#plt.show()

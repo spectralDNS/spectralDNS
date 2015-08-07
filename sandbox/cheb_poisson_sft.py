@@ -6,6 +6,7 @@ from scipy.linalg import solve_banded
 from scipy.sparse import diags
 import scipy.sparse.linalg as la
 from shentransform import ShenDirichletBasis
+import SFTc
 
 """
 Solve Poisson equation on (-1, 1) with homogeneous bcs
@@ -27,7 +28,7 @@ u = (1-x**2)**2*cos(np.pi*x)*(x-0.25)**2
 f = u.diff(x, 2) 
 
 # Choices
-banded = True
+solver = "bs"
 N = 20
 
 ST = ShenDirichletBasis(quad="GC")
@@ -37,28 +38,39 @@ points, weights = ST.points_and_weights(N)
 fj = np.array([f.subs(x, j) for j in points], dtype=float)     # Get f on quad points
 
 #@profile
-def solve(fk, banded=True):
+def solve(fk):
     
     N = len(fk)+2
-    k = ST.wavenumbers()
-    if banded:
+    k = ST.wavenumbers(N)
+    if solver == "banded":
         A = np.zeros((N-2, N-2))
         A[-1, :] = -2*np.pi*(k+1)*(k+2)
         for i in range(2, N-2, 2):
             A[-i-1, i:] = -4*np.pi*(k[:-i]+1)
         uk_hat = solve_banded((0, N-3), A, fk)
         
-    else:
+    elif solver == "sparse":
         aij = [-2*np.pi*(k+1)*(k+2)]
         for i in range(2, N-2, 2):
             aij.append(np.array(-4*np.pi*(k[:-i]+1)))    
         A = diags(aij, range(0, N-2, 2))
         uk_hat = la.spsolve(A, fk)
-
+        
+    elif solver == "bs":
+        fc = fk.copy()
+        uk_hat = np.zeros(N-2)        
+        uk_hat = SFTc.BackSubstitution_1D(uk_hat, fc)
+                
+        #for i in range(N-3, -1, -1):
+            #for l in range(i+2, N-2, 2):
+                #fc[i] += (4*np.pi*(i+1)uk_hat[l])
+            #uk_hat[i] = -fc[i] / (2*np.pi*(i+1)*(i+2))
+            
+            
     return uk_hat
 
 f_hat = ST.fastShenScalar(fj)
-uk_hat = solve(f_hat, banded)
+uk_hat = solve(f_hat)
 uq = ST.ifastShenScalar(uk_hat)
 
 plt.figure(); plt.plot(points, [u.subs(x, i) for i in points]); plt.title("U")    

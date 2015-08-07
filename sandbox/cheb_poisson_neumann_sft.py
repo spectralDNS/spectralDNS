@@ -54,10 +54,6 @@ def solve_neumann(f):
         A = diags(aij, range(0, N-3, 2))
         uk_hat = la.spsolve(A, f)
         
-    uk_hat = zeros(N-3)
-    diag = -2*np.pi*(k+1)*k**2/(k+2) 
-    uk_hat[-2:] = f[-2:]/diag[-2:]
-    while 
         
     return uk_hat, A
 

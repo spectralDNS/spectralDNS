@@ -15,8 +15,8 @@ Shen's Chebyshev basis:
     
     phi_k = T_k - (k/k+2)**2 * T_{k+2}
 
-Use either Chebyshev-Gauss or Gauss-Lobatto points for
-Dirichlet basis, but only Chebyshev-Gauss for Neumann.
+Use either Chebyshev-Gauss (GC) or Gauss-Lobatto (GL)
+points in real space.
 
 The ChebyshevTransform may be used to compute derivatives
 through fast Chebyshev transforms.
@@ -38,30 +38,19 @@ class ChebyshevTransform(object):
         self.quad = quad
         
     def chebDerivativeCoefficients(self, fk):
-        N = fk.shape[0]-1
         fl = fk.copy()
-        SFTc.chebDerivativeCoefficients(fk, fl)
-        #fl[-1] = 0
-        #fl[-2] = 2*N*fk[-1]
-        #for k in range(N-2, 0, -1):
-            #fl[k] = 2*(k+1)*fk[k+1]+fl[k+2]
-        #fl[0] = fk[1] + 0.5*fl[2]
-                        
+        SFTc.chebDerivativeCoefficients(fk, fl)                        
         return fl
     
     def fastChebDerivative(self, fj):
-        fk = self.fastChebTrans(fj)
+        """Compute derivative of fj at the same points."""
+        fk = self.fct(fj)
         fl = self.chebDerivativeCoefficients(fk)
-        df  = self.ifastChebTrans(fl)
+        df  = self.ifct(fl)
         return df
         
-    def fct(self, a):
-        return self.fastChebTrans(a)
-    
-    def ifct(self, a):
-        return self.ifastChebTrans(a)
-
-    def fastChebTrans(self, fj):
+    def fct(self, fj):
+        """Fast Chebyshev transform."""
         N = fj.shape[0]
         if self.quad == "GL":
             cj = dct(fj, 2, axis=0)
@@ -75,7 +64,8 @@ class ChebyshevTransform(object):
             
         return cj
 
-    def ifastChebTrans(self, fk):
+    def ifct(self, fk):
+        """Inverse fast Chebyshev transform."""
         if self.quad == "GL":
             cj = 0.5*dct(fk, 3, axis=0)
             cj += 0.5*fk[0]
@@ -89,6 +79,7 @@ class ChebyshevTransform(object):
         return cj
     
     def fastChebScalar(self, fj):
+        """Fast Chebyshev scalar product."""
         N = fj.shape[0]
         if self.quad == "GL":
             return dct(fj, 2, axis=0)*np.pi/(2*N)
@@ -107,6 +98,7 @@ class ShenDirichletBasis(ChebyshevTransform):
         self.N = -1
         
     def init(self, N):
+        """Vandermonde matrix is used just for verification"""
         self.points, self.weights = self.points_and_weights(N)
         # Build Vandermonde matrix. Note! N points in real space gives N-2 bases in spectral space
         self.V = n_cheb.chebvander(self.points, N-3).T - n_cheb.chebvander(self.points, N-1)[:, 2:].T
@@ -142,8 +134,8 @@ class ShenDirichletBasis(ChebyshevTransform):
             if not self.points: self.init(fj.shape[0])
             return np.dot(self.V, fj*self.weights)
         
-    def ifastShenScalar(self, fk):
-        """Fast inverse Shen scalar product
+    def ifst(self, fk):
+        """Fast inverse Shen transform
         Transform needs to take into account that phi_k = T_k - T_{k+2}
         
         """
@@ -159,7 +151,7 @@ class ShenDirichletBasis(ChebyshevTransform):
             
             w_hat[-2] = -fk[-2]
             w_hat[-1] = -fk[-1]
-            fj = self.ifastChebTrans(w_hat)            
+            fj = self.ifct(w_hat)
             return fj    
         
         else:
@@ -190,16 +182,11 @@ class ShenDirichletBasis(ChebyshevTransform):
             
         return cj
     
-    def ifst(self, fj):
-        """Inverse fast Shen transform
-        """
-        return self.ifastShenScalar(fj)
-    
 
 class ShenNeumannBasis(ShenDirichletBasis):
     
-    def __init__(self): 
-        ShenDirichletBasis.__init__(self, "GC")
+    def __init__(self, quad="GL"): 
+        ShenDirichletBasis.__init__(self, quad)
             
     def init(self, N):
         self.points, self.weights = self.points_and_weights(N)
@@ -209,20 +196,18 @@ class ShenNeumannBasis(ShenDirichletBasis):
         self.V = self.V[1:, :]
 
     def fastShenScalar(self, fj):
-        """Fast Shen scalar product on cos(j*pi/N).
+        """Fast Shen scalar product.
         Chebyshev transform taking into account that phi_k = T_k - (k/(k+2))**2*T_{k+2}
         Note, this is the non-normalized scalar product
 
         """
-        N = fj.shape[0]
-        k = self.wavenumbers(N, dim=len(fj.shape))
-        ck = dct(fj, 1, axis=0)
-        ck *= (np.pi/((N-1)*2))
-        ck[:-2] -= ((k/(k+2))**2) * ck[2:]
-        return ck[1:-2]
+        k = self.wavenumbers(fj.shape[0], dim=len(fj.shape))
+        u_k = self.fastChebScalar(fj)
+        u_k[:-2] -= ((k/(k+2))**2) * u_k[2:]
+        return u_k[1:-2]
 
-    def ifastShenScalar(self, fk):
-        """Fast inverse Shen scalar product
+    def ifst(self, fk):
+        """Fast inverse Shen scalar transform
         """
         N = fk.shape[0]+3
         k = self.wavenumbers(N, dim=len(fk.shape))
@@ -236,9 +221,7 @@ class ShenNeumannBasis(ShenDirichletBasis):
             w_hat[1:-2] = fk
             w_hat[3:] -= (k[1:]/(k[1:]+2))**2*fk
 
-        fj = 0.5*dct(w_hat, 1, axis=0)
-        fj[::2] += 0.5*w_hat[-1]
-        fj[1::2] -= 0.5*w_hat[-1]
+        fj = self.ifct(w_hat)
         return fj
         
     def fst(self, fj):
@@ -247,9 +230,10 @@ class ShenNeumannBasis(ShenDirichletBasis):
         cj = self.fastShenScalar(fj)
         N = fj.shape[0]
         k = self.wavenumbers(N)
-        ck = np.ones(N-3); ck[-1] = 2 # Note not the first since basis phi_0 is not included        
+        ck = np.ones(N-3)
+        if self.quad == "GC": ck[-1] = 2 # Note not the first since basis phi_0 is not included        
         a = np.ones(N-5)*(-np.pi/2)*(k[1:-2]/(k[1:-2]+2))**2
-        b = np.pi/2*(1+(k[1:]/(k[1:]+2))**4)
+        b = np.pi/2*(ck+(k[1:]/(k[1:]+2))**4)
         c = a.copy()
         if len(cj.shape) == 3:
             bc = b.copy()
@@ -262,16 +246,15 @@ class ShenNeumannBasis(ShenDirichletBasis):
     
 if __name__ == "__main__":
     N = 8
-    #a = np.random.random((N, N, N/2+1))+1j*np.random.random((N, N, N/2+1))
+    a = np.random.random((N, N, N/2+1))+1j*np.random.random((N, N, N/2+1))
     #a = np.random.random((N, N, N/2+1))
-    a = np.random.random(N)
-    #a[0,:,:] = 0
-    #a[-1,:,:] = 0
-    a[0] = 0
-    a[-1] = 0
+    #a = np.random.random(N)
+    a[0,:,:] = 0
+    a[-1,:,:] = 0
+    #a[0] = 0
+    #a[-1] = 0
     
     ST = ShenDirichletBasis()
-    fst1 = ST.ifst(ST.fst(a))
-    assert np.allclose(fst1, a)
-        
+    assert np.allclose(ST.ifst(ST.fst(a)), a)
+
      
