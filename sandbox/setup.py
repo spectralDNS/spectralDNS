@@ -7,9 +7,11 @@ from numpy import get_include
 
 ext = cythonize(Extension("TDMA", sources = ['TDMA.pyx'], language="c++"))
 ext += cythonize(Extension("Cheb", sources = ['Cheb.pyx']))
+ext += cythonize(Extension("Matvec", sources = ['Matvec.pyx']))
 
 ext[0].extra_compile_args.extend(["-O3"])  
 ext[1].extra_compile_args.extend(["-O3"])  
+ext[2].extra_compile_args.extend(["-O3"])  
 setup(
     name = "SFTc",
     ext_modules = ext,

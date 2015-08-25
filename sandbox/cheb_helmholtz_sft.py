@@ -33,7 +33,7 @@ kx = np.sqrt(2)
 f = -u.diff(x, 2) + kx**2*u
 
 # Choices
-solver = "lu"
+solver = "sparse"
 N = 32
 
 ST = ShenDirichletBasis(quad="GC")
@@ -52,6 +52,8 @@ def solve(fk):
         for i in range(2, N-2, 2):
             aij.append(np.array(4*np.pi*(k[:-i]+1)))    
         A = diags(aij, range(0, N-2, 2))
+        #from Matrices import Amat
+        #A = Amat(np.arange(N).astype(np.float)).diags()
 
         bij = np.pi*np.ones(N-2); bij[0] *= 1.5
         if ST.quad == "GC": bij[-1] *= 1.5
