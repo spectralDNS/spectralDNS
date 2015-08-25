@@ -54,12 +54,14 @@ def getConvection(convection):
         
         def Conv(dU):
             dU = standardConvection(dU)
+            dU[:] *= -1 
             return dU
         
     elif convection == "Divergence":
         
         def Conv(dU):
             dU = divergenceConvection(dU, False)
+            dU[:] *= -1
             return dU
         
     elif convection == "Skewed":
@@ -67,7 +69,7 @@ def getConvection(convection):
         def Conv(dU):
             dU = standardConvection(dU)
             dU = divergenceConvection(dU, True)        
-            dU *= 0.5
+            dU *= -0.5
             return dU
         
     elif convection == "Vortex":

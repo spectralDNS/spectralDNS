@@ -64,11 +64,13 @@ if __name__ == "__main__":
         'nu': 0.000625,             # Viscosity
         'dt': 0.01,                 # Time step
         'T': 0.1,                   # End time
-        'L': [2*pi, 4*pi, 6*pi],
-        'M': [4, 5, 6]
+        'L': [2*pi, 2*pi, 2*pi],
+        'M': [5, 5, 5]
         }
     )
     config.parser.add_argument("--compute_energy", type=int, default=2)
-    solver = get_solver(update=update, regression_test=regression_test)
+    #solver = get_solver(update=update, regression_test=regression_test)
+    solver = get_solver(update=update)
+    solver.hdf5file.fname = "NS7.h5"
     initialize(**vars(solver))
     solver.solve()

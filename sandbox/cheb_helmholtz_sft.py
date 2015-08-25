@@ -29,14 +29,14 @@ The equation to be solved for is
 # Use sympy to compute a rhs, given an analytical solution
 x = Symbol("x")
 u = (1-x**2)**2*cos(np.pi*x)*(x-0.25)**2
-kx = 100
+kx = np.sqrt(2)
 f = -u.diff(x, 2) + kx**2*u
 
 # Choices
 solver = "lu"
-N = 41
+N = 32
 
-ST = ShenDirichletBasis(quad="GL")
+ST = ShenDirichletBasis(quad="GC")
 points, weights = ST.points_and_weights(N) 
 
 # Gauss-Chebyshev quadrature to compute rhs
@@ -53,11 +53,14 @@ def solve(fk):
             aij.append(np.array(4*np.pi*(k[:-i]+1)))    
         A = diags(aij, range(0, N-2, 2))
 
-        bij = np.pi*np.ones(N-2); bij[0] *= 1.5; bij[-1] *= 1.5
+        bij = np.pi*np.ones(N-2); bij[0] *= 1.5
+        if ST.quad == "GC": bij[-1] *= 1.5
         bio = -np.pi/2*np.ones(N-4)                
         B = diags([bio, bij, bio], range(-2, 3, 2)) 
         
         uk_hat = la.spsolve(A+kx**2*B, fk)
+        
+        assert np.allclose(np.dot(A.toarray()+kx**2*B.toarray(), uk_hat), fk)
 
     elif solver == "sparse-even/odd":
         M = (N-3)/2
@@ -98,19 +101,75 @@ def solve(fk):
         d1 = np.zeros((2, M))
         d2 = np.zeros((2, M-1))
         L  = np.zeros((2, M))
-        SFTc.LU_Helmholtz_1D(N, 0, kx, d0, d1, d2, L)
-        SFTc.Solve_Helmholtz_1D(N, 0, kx, fk, uk_hat, d0, d1, d2, L)
+        SFTc.LU_Helmholtz_1D(N, 0, ST.quad=="GC", kx, d0, d1, d2, L)
+        SFTc.Solve_Helmholtz_1D(N, 0, fk[:-2], uk_hat, d0, d1, d2, L)
+        
+        b = np.zeros(N-2)
+        SFTc.Mult_Helmholtz_1D(N, ST.quad=="GC", 1, kx**2, uk_hat, b)
+        assert np.allclose(b, fk[:-2])
+
+        uk = np.zeros((N-2, 10, 10))
+        f_hat = np.zeros((N-2, 10, 10))
+        for i in range(10):
+            for j in range(10):
+                f_hat[:, i, j] = fk[:-2]
+
+        kx2 = np.meshgrid(np.arange(10), np.arange(10), indexing="ij")
+        alfa = np.sqrt(kx2[0]*kx2[0]+kx2[1]*kx2[1])
+        u0 = np.zeros((2, M+1, 10, 10))   # Diagonal entries of U
+        u1 = np.zeros((2, M, 10, 10))     # Diagonal+1 entries of U
+        u2 = np.zeros((2, M-1, 10, 10))   # Diagonal+2 entries of U
+        L  = np.zeros((2, M, 10, 10))     # The single nonzero row of L                 
+                
+        SFTc.LU_Helmholtz_3D(N, 0, ST.quad=="GC", alfa, u0, u1, u2, L)
+        SFTc.Solve_Helmholtz_3D(N, 0, f_hat, uk, u0, u1, u2, L)    
+        
+        assert np.allclose(uk[:, 1, 1], uk_hat)
+        
+        b = np.zeros((N-2, 10, 10))
+        SFTc.Mult_Helmholtz_3D(N, ST.quad=="GC", 1, alfa**2, uk, b)
+        
+        assert np.allclose(b[:, 1, 1], fk[:-2])
+        
+
+        uk = np.zeros((N-2, 10, 10), dtype=np.complex)
+        f_hat = np.zeros((N-2, 10, 10), dtype=np.complex)
+        for i in range(10):
+            for j in range(10):
+                f_hat[:, i, j].real = fk[:-2]
+                f_hat[:, i, j].imag = fk[:-2]
+                
+        SFTc.Solve_Helmholtz_3D_complex(N, 0, f_hat, uk, u0, u1, u2, L)     
+        
+        assert np.allclose(uk[:, 1, 1].real, uk_hat)
+        assert np.allclose(uk[:, 1, 1].imag, uk_hat)
+        
+        b = np.zeros((N-2, 10, 10), dtype=np.complex)
+        SFTc.Mult_Helmholtz_3D_complex(N, ST.quad=="GC", 1, alfa**2, uk, b)
+        
+        assert np.allclose(b[:, 1, 1].real, fk[:-2])
+        assert np.allclose(b[:, 1, 1].imag, fk[:-2])
+
+        
+        
         
     return uk_hat
 
-f_hat = ST.fastShenScalar(fj)
-uk_hat = solve(f_hat)
-uq = ST.ifst(uk_hat)
+f_hat = fj.copy()
+f_hat = ST.fastShenScalar(fj, f_hat)
+uk_hat = fj.copy()
+uk_hat[:-2] = solve(f_hat)
+uq = uk_hat.copy()
+uq = ST.ifst(uk_hat, uq)
 
-print ST.ifst(ST.fst(uq)) - uq
+uqf = uq.copy()
+uqf = ST.fst(uq, uqf)
+uq0 = uq.copy()
+assert np.allclose(ST.ifst(uqf, uq0), uq)
 
 u_exact = np.array([u.subs(x, h) for h in points], dtype=np.float)
 plt.figure(); plt.plot(points, [u.subs(x, i) for i in points]); plt.title("U")    
 plt.figure(); plt.plot(points, uq - u_exact); plt.title("Error")
 print "Error = ", np.linalg.norm(uq - u_exact)
 #plt.show()
+    
