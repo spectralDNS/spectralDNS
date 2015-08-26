@@ -9,12 +9,11 @@ python:
 env:
     - MPI=mpich3
     - MPI=mpich2
-    - MPI=mpich1
     - MPI=openmpi
 
 matrix:
   allow_failures:
-    - env: MPI=mpich1
+    - env: MPI=mpich3
 
 branches:
   only:
