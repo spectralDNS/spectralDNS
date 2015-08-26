@@ -24,9 +24,9 @@ nu = 1./Re
 #Re = 1./nu
 #Re_tau = 180.
 #utau = nu * Re_tau
-T = 0.0001
-dt = 0.00001
-M = 6
+T = 1
+dt = 0.001
+M = 5
 N = array([2**M, 2**(M), 2])
 #N = array([2**M, 4, 2])
 L = array([2, 2*pi, 2*pi/3.])
@@ -203,7 +203,7 @@ Chm = Chmat(K[0, :, 0, 0])
 Bhm = Bhmat(K[0, :, 0, 0], SN.quad)
 Cm = Cmat(K[0, :, 0, 0])
 
-@profile
+#@profile
 def pressuregrad(P_hat, dU):
     # Pressure gradient x-direction
     dU[0] -= Chm.matvec(P_hat)
