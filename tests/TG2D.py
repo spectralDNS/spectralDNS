@@ -7,19 +7,10 @@ def initialize(U, U_hat, X, sin, cos, fft2_mpi, **kw):
     for i in range(2):
         U_hat[i] = fft2_mpi(U[i], U_hat[i])
 
-im = None
 def update(t, tstep, N, U_hat, curl, X, nu, ifft2_mpi, K, P, P_hat, hdf5file, **kw):
-    global im
-    # initialize plot
-    if tstep == 1:
-        im = plt.imshow(zeros((N[0], N[1])))
-        plt.colorbar(im)
-        plt.draw()
-        
     if tstep % config.write_result == 0:
         P = ifft2_mpi(P_hat*1j, P)
         hdf5file.write(tstep)
-
         
 def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, X, nu, **kw):
     k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
