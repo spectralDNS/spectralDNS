@@ -6,9 +6,6 @@ python:
     - 2.7
     - 3.2
     - 3.3
-    - 3.4
-    - pypy
-    - pypy3
 
 env:
     - MPI=mpich3
@@ -18,8 +15,6 @@ env:
 
 matrix:
   allow_failures:
-    - python: pypy
-    - python: pypy3
     - env: MPI=mpich1
 
 branches:
@@ -46,9 +41,7 @@ before_script:
     - test $MPI == mpich2 && MPIEXEC='mpiexec -launcher fork' || true
     - test $MPI == mpich3 && MPIEXEC='mpiexec -launcher fork' || true
 
-script: 
-    - cd $PWD/tests
-    - py.test
+script: cd $PWD/tests; py.test
 
 #notifications:
 #  email: false
