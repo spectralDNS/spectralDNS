@@ -6,7 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 Velocity-vorticity formulation
 """
 from spectralinit import *
-from spectralDNS import Cross, hdf5file
+from spectralDNS import Cross, hdf5file, regression_test
 
 # Rename variable since we are working with a vorticity formulation
 W = U.copy()               # W is vorticity
@@ -62,5 +62,7 @@ def solve():
     
     if config.make_profile:
         results = create_profile(**vars())
+
+    regression_test(t, tstep, **globals())
         
     hdf5file.close()

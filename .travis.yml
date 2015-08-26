@@ -1,0 +1,54 @@
+# http://travis-ci.org/spectralDNS/spectralDNS
+
+language: python
+python:
+    - 2.6
+    - 2.7
+    - 3.2
+    - 3.3
+    - 3.4
+    - pypy
+    - pypy3
+
+env:
+    - MPI=mpich3
+    - MPI=mpich2
+    - MPI=mpich1
+    - MPI=openmpi
+
+matrix:
+  allow_failures:
+    - python: pypy
+    - python: pypy3
+    - env: MPI=mpich1
+
+branches:
+  only:
+    - master
+
+cache:
+  apt: true
+
+before_install:
+    - sudo apt-get update -q
+    - sh ./conf/travis-install-mpi.sh $MPI
+    - pip install -q Cython
+    - pip install -q mpi4py
+    - cython --version
+install:
+    - pip install .
+
+before_script:
+    - sudo hostname localhost
+    - MPIEXEC='mpiexec'; PYTHON='python';
+    - test $MPI == mpich1 && MPIEXEC='mpirun' || true
+    - test $MPI == mpich1 && PYTHON=$(command -v $PYTHON) || true
+    - test $MPI == mpich2 && MPIEXEC='mpiexec -launcher fork' || true
+    - test $MPI == mpich3 && MPIEXEC='mpiexec -launcher fork' || true
+
+script: 
+    - cd $PWD/tests
+    - py.test
+
+#notifications:
+#  email: false

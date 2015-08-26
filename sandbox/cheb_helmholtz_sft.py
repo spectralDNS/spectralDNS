@@ -48,21 +48,21 @@ def solve(fk):
     k = ST.wavenumbers(N)
         
     if solver == "sparse":
-        aij = [2*np.pi*(k+1)*(k+2)]
-        for i in range(2, N-2, 2):
-            aij.append(np.array(4*np.pi*(k[:-i]+1)))    
-        A = diags(aij, range(0, N-2, 2))
-        #from Matrices import Amat
-        #A = Amat(np.arange(N).astype(np.float)).diags()
+        #aij = [2*np.pi*(k+1)*(k+2)]
+        #for i in range(2, N-2, 2):
+            #aij.append(np.array(4*np.pi*(k[:-i]+1)))    
+        #A = diags(aij, range(0, N-2, 2))
+        from Matrices import Amat
+        A = Amat(np.arange(N).astype(np.float)).diags()
 
         bij = np.pi*np.ones(N-2); bij[0] *= 1.5
         if ST.quad == "GC": bij[-1] *= 1.5
         bio = -np.pi/2*np.ones(N-4)                
         B = diags([bio, bij, bio], range(-2, 3, 2)) 
         
-        uk_hat = la.spsolve(A+kx**2*B, fk)
+        uk_hat = la.spsolve(A+kx**2*B, fk[:-2])
         
-        assert np.allclose(np.dot(A.toarray()+kx**2*B.toarray(), uk_hat), fk)
+        assert np.allclose(np.dot(A.toarray()+kx**2*B.toarray(), uk_hat), fk[:-2])
 
     elif solver == "sparse-even/odd":
         M = (N-3)/2
