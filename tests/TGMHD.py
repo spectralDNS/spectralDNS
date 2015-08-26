@@ -23,7 +23,6 @@ def regression_test(t, tstep, comm, U, B, float64, dx, L, sum,  rank, **kw):
     k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
     b = comm.reduce(sum(B.astype(float64)*B.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     if rank == 0:
-        print k
         assert round(k - 0.124565408177, 7) == 0 
         assert round(b - 0.124637762143, 7) == 0
 
