@@ -31,7 +31,7 @@ cache:
 
 before_install:
     - sudo apt-get update -q
-    - sh ./conf/travis-install-mpi.sh $MPI
+    - sh ./tests/install-mpi.sh $MPI
     - pip install -q Cython
     - pip install -q mpi4py
     - cython --version
