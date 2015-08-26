@@ -1,5 +1,8 @@
 spectralDNS
 =======
+
+[![Build Status](https://travis-ci.org/mikaem/spectralDNS.svg?branch=master)](https://travis-ci.org/mikaem/spectralDNS)
+
 spectralDNS is a classical pseudo-spectral Navier-Stokes DNS solver for triply periodic domains. The only unique feature is that it's written entirely in python using numpy, mpi4py and pyfftw and, stripping away unnecessary pre- and post-processing steps, the solver is approximately 100 lines long, including the MPI. MPI decomposition is performed using either the "slab" or the "pencil" approach. The code has been found to scale very well in tests on the Shaheen BlueGene/P supercomputer at KAUST Supercomputing Laboratory. Results of both weak and strong scaling tests are shown below. In addition to incompressible Navier-Stokes there are also solvers for MHD and Navier-Stokes or MHD with variable density through a Boussinesq approximation.
 
 The efficiency of the pure numpy/mpi4py solver has been enhanced using Cython for certain routines. The strong scaling results on Shaheen shown below have used the optimized Python/Cython solver, which is found to be faster than a pure C++ implementation of the same solver.
