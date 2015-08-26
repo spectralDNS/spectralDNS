@@ -1,5 +1,4 @@
 from cbcdns import config, get_solver
-import matplotlib.pyplot as plt
 from numpy import array, pi
 
 def initialize(config, **kw):

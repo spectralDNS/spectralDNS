@@ -1,6 +1,5 @@
 from cbcdns import config, get_solver
 from numpy import pi, sin, cos, exp, zeros
-import matplotlib.pyplot as plt
 
 def initialize(U, U_hat, X, sin, cos, fft2_mpi, **kw):    
     U[0] = sin(X[0])*cos(X[1])
