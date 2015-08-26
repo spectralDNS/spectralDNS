@@ -6,7 +6,6 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from ..fft.wrappyfftw import *
 from cbcdns import config
 from ..optimization import optimizer
-from scipy.special import erf
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8
 
 __all__ = ['setup', 'ifft2_mpi', 'fft2_mpi']
