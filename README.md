@@ -7,6 +7,8 @@ spectralDNS is a classical pseudo-spectral Navier-Stokes DNS solver for triply p
 
 The efficiency of the pure numpy/mpi4py solver has been enhanced using Cython for certain routines. The strong scaling results on Shaheen shown below have used the optimized Python/Cython solver, which is found to be faster than a pure C++ implementation of the same solver.
 
+Work on a new solver with one nonperiodic direction using the Shen basis (Jie Shen, SIAM Journal on Scientific Computing, 16, 74-87, 1995) is in progress. 
+
 See the demo folder for usage.
 
 <p align="center">
