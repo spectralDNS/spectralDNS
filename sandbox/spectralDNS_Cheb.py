@@ -24,12 +24,13 @@ nu = 1./Re
 #Re = 1./nu
 #Re_tau = 180.
 #utau = nu * Re_tau
-T = 1
+
+T = 0.1
 dt = 0.001
 M = 5
-N = array([2**M, 2**(M), 2])
-#N = array([2**M, 4, 2])
-L = array([2, 2*pi, 2*pi/3.])
+#N = array([2**M, 2**M, 2**M])
+N = array([2**M, 2**M, 2])
+L = array([2, 2*pi, 4*pi/3.])
 dx = (L / N).astype(float)
 
 comm = MPI.COMM_WORLD
@@ -64,6 +65,7 @@ Pcorr = empty((N[0], Np[1], Nf), dtype="complex")
 U0      = empty((3, Np[0], N[1], N[2]))
 U_hat0  = empty((3, N[0], Np[1], Nf), dtype="complex")
 U_hat1  = empty((3, N[0], Np[1], Nf), dtype="complex")
+UT      = empty((3, N[0], Np[1], N[2]))
 
 U_tmp   = empty((3, Np[0], N[1], N[2]))
 U_tmp2  = empty((3, Np[0], N[1], N[2]))
@@ -80,6 +82,8 @@ Uc_hat2 = empty((N[0], Np[1], Nf), dtype="complex")
 Uc_hat3 = empty((N[0], Np[1], Nf), dtype="complex")
 Uc_hatT = empty((Np[0], N[1], Nf), dtype="complex")
 U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype="complex")
+U_mpi2  = empty((num_processes, Np[0], Np[1], N[2]))
+
 curl    = empty((3, Np[0], N[1], N[2]))
 conv0   = empty((3, N[0], Np[1], Nf), dtype="complex")
 conv1   = empty((3, N[0], Np[1], Nf), dtype="complex")
@@ -158,6 +162,31 @@ def ifct(fu, u):
     u[:] = irfft2(Uc_hatT, axes=(1,2))
     return u
 
+def fct0(u, fu):
+    """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do fct."""
+    n0 = U_mpi2.shape[2]
+    for i in range(num_processes):
+        U_mpi2[i] = u[:, i*n0:(i+1)*n0]
+    comm.Alltoall([U_mpi2, MPI.DOUBLE], [UT[0], MPI.DOUBLE])
+    fu = ST.fct(UT[0], fu)
+    return fu
+
+def ifct0(fu, u):
+    """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do ifct"""
+    UT[0] = ST.ifct(fu, UT[0])
+    comm.Alltoall([UT[0], MPI.DOUBLE], [U_mpi2, MPI.DOUBLE])
+    n0 = U_mpi2.shape[2]
+    for i in range(num_processes):
+        u[:, i*n0:(i+1)*n0] = U_mpi2[i]
+    return u
+
+#@profile
+def chebDerivative_3D0(fj, u0):
+    UT[0] = fct0(fj, UT[0])
+    UT[1] = SFTc.chebDerivativeCoefficients_3D(UT[0], UT[1]) 
+    u0[:] = ifct0(UT[1], u0)
+    return u0
+#@profile
 def chebDerivative_3D(fj, u0):
     Uc_hat2[:] = fct(fj, Uc_hat2)
     Uc_hat[:] = SFTc.chebDerivativeCoefficients_3D(Uc_hat2, Uc_hat)    
@@ -188,7 +217,8 @@ def energy(u):
 Source[:] = 0
 #Source[1, :] = -utau**2
 Source[1, :] = -2./Re
-#Source[2, :] = 0.00001*random.randn(*Source.shape[1:])
+#Source[2, :] = 0.001*random.randn(*Source.shape[1:])
+#Source[2, 0] = 0; Source[2, -1] = 0
 
 # Take Shen scalar product of body force
 Sk[:] = 0
@@ -253,7 +283,7 @@ def Curl(u0, uh, c):
     c[0] = ifst(1j*(K[1]*uh[2]-K[2]*uh[1]), c[0], ST)
     return c
 
-#@profile
+@profile
 def standardConvection(c):
     c[:] = 0
     U_tmp4[:] = 0
@@ -265,13 +295,13 @@ def standardConvection(c):
     F_tmp[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, F_tmp[0, u_slice])    
     dudx = U_tmp4[0] = ifst(F_tmp[0], U_tmp4[0], ST)        
     
-    #SFTc.Mult_DPhidT_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
-    #dvdx = U_tmp4[1] = ifct(F_tmp[1], U_tmp4[1])
-    #dwdx = U_tmp4[2] = ifct(F_tmp[2], U_tmp4[2])
+    SFTc.Mult_DPhidT_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
+    dvdx = U_tmp4[1] = ifct(F_tmp[1], U_tmp4[1])
+    dwdx = U_tmp4[2] = ifct(F_tmp[2], U_tmp4[2])
     
     #dudx = U_tmp4[0] = chebDerivative_3D(U0[0], U_tmp4[0])
-    dvdx = U_tmp4[1] = chebDerivative_3D(U0[1], U_tmp4[1])
-    dwdx = U_tmp4[2] = chebDerivative_3D(U0[2], U_tmp4[2])    
+    #dvdx = U_tmp4[1] = chebDerivative_3D0(U0[1], U_tmp4[1])
+    #dwdx = U_tmp4[2] = chebDerivative_3D0(U0[2], U_tmp4[2])    
     
     dudy_h = 1j*K[1]*U_hat0[0]
     dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], ST)
@@ -325,7 +355,7 @@ def divergenceConvection(c, add=False):
     c *= -1
     return c
 
-#@profile
+@profile
 def ComputeRHS(dU, jj):
     # Add convection to rhs
     if jj == 0:
@@ -432,8 +462,6 @@ initOS(OS, U, U_hat, t=dt)
 U0[:] = U
 U_hat0[:] = U_hat
 t = dt
-#conv0 = standardConvection(conv0)
-
 e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
 
 ## Compute pressure
@@ -443,12 +471,14 @@ e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
                  #dconv[0, u_slice], dconv[1, u_slice], dconv[2, u_slice], F_tmp[0, p_slice])
 
 #SFTc.Solve_Helmholtz_3D_complex(N[0], 1, F_tmp[0, p_slice], P_hat[p_slice], u0N, u1N, u2N, LN)
-P[:] = 0
-P = ifst(P_hat, P, SN)
+
 
 #U[:] = 0
-#U[1] = 1-X[0]**2
-
+#U[1] = (1-X[0]**2)
+#U0[:] = U
+#for i in range(3):
+    #U_hat[i] = fst(U[i], U_hat[i], ST)
+#U_hat0[:] = U_hat
 
 # Initialize solution
 ##U[0] = sin(pi*X[0])*cos(X[1])
@@ -492,45 +522,40 @@ P = ifst(P_hat, P, SN)
 
 
 #Y = where(X[0]<0, 1+X[0], 1-X[0])
-
 #Um = 20*utau
-
 #U[:] = 0
 #U[1] = Um*(Y-0.5*Y**2)
 #Xplus = Y*Re_tau
 #Yplus = X[1]*Re_tau
 #Zplus = X[2]*Re_tau
-
 #duplus = Um*0.25/utau 
 #alfaplus = 2*pi/500.
 #betaplus = 2*pi/200.
 #sigma = 0.00055
-#epsilon = Um/2000.
-#dev = 1+0.01*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
-
-#dd = utau*duplus/2.0*Xplus/400.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
+#epsilon = Um/200.
+#dev = 1+0.3*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+#dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
 #U[1] += dd
 #U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev
+#if rank == 0:
+    #U[:, 0] = 0
+#if rank == num_processes-1:
+    #U[:, -1] = 0
 
 #for i in range(3):
     #U_hat[i] = fst(U[i], U_hat[i], ST)
 
+U0[:] = U
+U_hat0[:] = U_hat
 
-#P[:] = 0
-#P_hat = fst(P, P_hat, SN)
+P[:] = 0
+P_hat = fst(P, P_hat, SN)
 
-#U0[:] = U
-#U_hat0[:] = U_hat
 
-#conv1 = divergenceConvection(conv1)
+#U_tmp4[2] = chebDerivative_3D(U0[2], U_tmp4[2])
+#U_tmp4[1] = chebDerivative_3D0(U0[2], U_tmp4[1])
 
-#curl = OSconv(OS, curl)
-
-#assert allclose(conv0, conv1)
-
-#curl[:] = Curl(U0, U_hat0, curl)
-#conv1[:] = Cross(U0, curl, conv1)
-
+#assert allclose(U_tmp4[2], U_tmp4[1])
 
 ## Check convection vs analytical solution
 #conv1 *= dealias
@@ -557,22 +582,24 @@ P = ifst(P_hat, P, SN)
 #assert allclose(U_tmp[0], U_tmp2[0], atol=1e-7)
 
 
-plt.figure()
-im1 = plt.imshow(U[0, :, :, 0])
-plt.colorbar(im1)
-plt.draw()
+#plt.figure()
+#im1 = plt.imshow(U[0, 4, :, :])
+#plt.colorbar(im1)
+#plt.draw()
 
-plt.figure()
-im2 = plt.imshow(U[1, :, :, 0]- (1-X[0,:,:,0]**2))
-plt.colorbar(im2)
-plt.draw()
+#plt.figure()
+##im2 = plt.imshow(U[1, :, :, 0]- (1-X[0,:,:,0]**2))
+##im2 = plt.imshow(U[1, :, :, 0])
+#im2 = plt.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0], 100)
+##plt.colorbar(im2)
+#plt.draw()
 
-plt.figure()
-im3 = plt.imshow(P[:, :, 0])
-plt.colorbar(im3)
-plt.draw()
+#plt.figure()
+#im3 = plt.imshow(P[4, :, :])
+#plt.colorbar(im3)
+#plt.draw()
 
-plt.pause(1e-6)
+#plt.pause(1e-6)
 
 def Divu(U, U_hat, c):
     c[:] = 0
@@ -582,7 +609,7 @@ def Divu(U, U_hat, c):
         
     return c
 
-e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
+#e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
 
 t = 0.0
 tstep = 0
@@ -597,6 +624,8 @@ while t < T-1e-8:
         SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[0, u_slice], U_hat[0, u_slice], u0, u1, u2, L0)
         SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[1, u_slice], U_hat[1, u_slice], u0, u1, u2, L0)
         SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[2, u_slice], U_hat[2, u_slice], u0, u1, u2, L0)
+        
+        #SFTc.Solve_Helmholtz_3Dall_complex(N[0], 0, dU[:, u_slice], U_hat[:, u_slice], u0, u1, u2, L0)
         
         # Pressure correction
         dU = pressurerhs(U_hat, dU) 
@@ -643,19 +672,28 @@ while t < T-1e-8:
         exact = exp(2*imag(OS.eigval)*t)
         if rank == 0:
             print "Time %2.5f Norms %2.12e %2.12e %2.12e %2.12e" %(t, e1/e0, e2/e0, exp(2*imag(OS.eigval)*t), e1/e0-exact)
-    #if tstep == 100:
-        #Source[2, :] = 0
-        #Sk[2] = fss(Source[2], Sk[2], ST)
+
+    #if tstep % 10 == 0:    
+        #e0 = energy(U0[0]**2)
+        #e1 = energy(U0[2]**2)
+        #if rank == 0:
+            #print "Time %2.5f Energy %2.12e %2.12e " %(t, e0, e1)
             
-    if tstep % 100 == 0:
-        im1.set_data(U[0, :, :, 0])
-        im1.autoscale()
-        im2.set_data(U[1, :, :, 0]-(1-X[0,:,:,0]**2))
-        im2.autoscale()
-        im3.set_data(P[:, :, 0])
-        im3.autoscale()
-        plt.pause(1e-6)
-        
+    if tstep == 100:
+        Source[2, :] = 0
+        Sk[2] = fss(Source[2], Sk[2], ST)
+            
+    #if tstep % 20 == 0:
+        #im1.set_data(U[0, :, :, 0])
+        #im1.autoscale()
+        ##im2.set_data(U[1, :, :, 0]-(1-X[0,:,:,0]**2))
+        ##im2.set_data(U[1, :, :, 0])
+        #im2.ax.clear()
+        #im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0], 100) 
+        #im2.autoscale()
+        #im3.set_data(P[:, :, 0])
+        #im3.autoscale()
+        #plt.pause(1e-6)        
 
 pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
 initOS(OS, U_tmp4, U_hat1, t=t)

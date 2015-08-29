@@ -38,19 +38,16 @@ def add_pressure_diffusion_Bq2D(np.ndarray[complex_t, ndim=3] du,
     cdef unsigned int i, j
     cdef real_t k0, k1, k2
     cdef real_t z
-    # Compute pressure (To get actual pressure multiply by 1j)
     for i in xrange(ksq.shape[0]):
         for j in xrange(ksq.shape[1]):
             z = nu*ksq[i,j]
             k0 = k[0,i,j]
             k1 = k[1,i,j]
             k2 = k[2,i,j]
-            p_hat[i,j] = du[0,i,j]*k_over_k2[0,i,j]+du[1,i,j]*k_over_k2[1,i,j] - Ri*rho_hat[i,j]*k_over_k2[1,i,j]
-            
+            p_hat[i,j] = du[0,i,j]*k_over_k2[0,i,j]+du[1,i,j]*k_over_k2[1,i,j] - Ri*rho_hat[i,j]*k_over_k2[1,i,j]            
             du[0,i,j] = du[0,i,j] - (p_hat[i,j]*k0+u_hat[0,i,j]*z)
             du[1,i,j] = du[1,i,j] - (p_hat[i,j]*k1+u_hat[1,i,j]*z+Ri*rho_hat[i,j])
-            du[2,i,j] = du[2,i,j] - rho_hat[i,j]*z/Pr
-            
+            du[2,i,j] = du[2,i,j] - rho_hat[i,j]*z/Pr            
     return du
 
 def add_pressure_diffusion_NS2D(np.ndarray[complex_t, ndim=3] du,

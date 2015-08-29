@@ -183,3 +183,27 @@ class dP2Tmat(LinearOperator):
         N = shape[0]
         return diags([self.dd] + self.ud, range(0, N-2, 2))
 
+
+class dSdTmat(LinearOperator):
+    """Matrix for inner product (u', T) = (phi', T) u_hat = dSdTmat * u_hat
+    
+    where u_hat is a vector of coefficients for a Shen Dirichlet basis
+    and T is a Chebyshev basis.
+    """
+
+    def __init__(self, K, **kwargs):
+        assert len(K.shape) == 1
+        shape = (K.shape[0], K.shape[0]-2)
+        N = shape[0]
+        LinearOperator.__init__(self, shape, None, **kwargs)
+        self.ld = -np.pi*(K[1:N]+1)   
+        self.ud = []
+        for i in range(1, N-2, 2):
+            self.ud.append(np.ones(N-2-i)*(-np.pi))
+
+    def matvec(self, v):
+        raise NotImplementedError
+
+    def diags(self):
+        N = self.shape[0]
+        return diags([self.ld] + self.ud, range(-1, N-2, 2), shape=self.shape)

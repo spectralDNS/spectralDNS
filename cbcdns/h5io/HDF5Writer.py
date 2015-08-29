@@ -6,6 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 """Wrap call to hdf5 to allow running without installing h5py
 """
 from cbcdns import config
+from numpy.linalg import norm
 
 __all__ = ['HDF5Writer']
 

@@ -51,7 +51,7 @@ the three smallest diagonals. All other values are equal to U_(k, k+2)
 
 # Use sympy to compute a rhs, given an analytical solution
 x = Symbol("x")
-u = 1./np.pi*cos(np.pi*x)
+u = cos(np.pi*x)
 kx = np.sqrt(0.0)
 f = -u.diff(x, 2) + kx**2*u
 

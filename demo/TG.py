@@ -1,6 +1,7 @@
 from cbcdns import config, get_solver
 import matplotlib.pyplot as plt
 from numpy import array, pi
+from numpy.linalg import norm
 
 def initialize(config, **kw):
     if config.solver == 'NS':
@@ -34,7 +35,7 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, float64, dx, L, sum,
            hdf5file, ifftn_mpi, **kw):
     global k, w
     if tstep % config.write_result == 0 or tstep % config.write_yz_slice[1] == 0:
-        P = ifftn_mpi(P_hat*1j, P)
+        P[:] = ifftn_mpi(P_hat*1j, P)
         hdf5file.write(tstep)
 
     if tstep % config.compute_energy == 0:
@@ -69,8 +70,11 @@ if __name__ == "__main__":
         }
     )
     config.parser.add_argument("--compute_energy", type=int, default=2)
-    #solver = get_solver(update=update, regression_test=regression_test)
+    #solver = get_solver(update=update, regression_test=regression_test)    
     solver = get_solver(update=update)
     solver.hdf5file.fname = "NS7.h5"
+    solver.hdf5file.components["W0"] = solver.curl[0]
+    solver.hdf5file.components["W1"] = solver.curl[1]
+    solver.hdf5file.components["W2"] = solver.curl[2]
     initialize(**vars(solver))
     solver.solve()

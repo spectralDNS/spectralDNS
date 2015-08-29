@@ -237,6 +237,71 @@ def Solve_Helmholtz_1D(np.int_t N,
             uk[i] = uk[i] / ((i+1)*(i+1))
             
 
+def Solve_oe_Helmholtz_1D(np.int_t N,
+                          bint odd,
+                          np.ndarray[np.float64_t, ndim=1] fk,
+                          np.ndarray[np.float64_t, ndim=1] u_hat,
+                          np.ndarray[np.float64_t, ndim=1] d0,
+                          np.ndarray[np.float64_t, ndim=1] d1,
+                          np.ndarray[np.float64_t, ndim=1] d2,
+                          np.ndarray[np.float64_t, ndim=1] L):
+    """
+    Solve (A+k**2*B)x = f, where A and B are stiffness and mass matrices of Shen with Dirichlet BC
+    """
+    cdef:
+        unsigned int M
+        int i
+        double tmp
+        vector[double] y
+        vector[double] u0
+
+    if not odd:
+        M = (N-3)/2
+    else:
+        M = (N-4)/2
+        
+    y.resize(M+1)
+    ForwardSolve_L(y, L, odd, fk)
+        
+    # Solve Backward U u = y 
+    u0.resize(M+1)
+    BackSolve_U(M, odd, y, u0, d0, d1, d2, u_hat)
+
+
+cdef BackSolve_U(int M,
+                 bint odd, 
+                 vector[double]& y,
+                 vector[double]& u0,
+                 np.ndarray[np.float64_t, ndim=1] d0,
+                 np.ndarray[np.float64_t, ndim=1] d1,
+                 np.ndarray[np.float64_t, ndim=1] d2,
+                 np.ndarray[np.float64_t, ndim=1] u_hat):
+    cdef:
+        int i, j
+        double sum_u0 = 0.0
+        
+    u0[M] = y[M] / d0[M]    
+    for i in xrange(M-1, -1, -1):
+        u0[i] = y[i] - d1[i]*u0[i+1]
+        if i < M-1:
+            sum_u0 += u0[i+2]
+            u0[i] -= sum_u0*d2[i]            
+        u0[i] /= d0[i]
+        u_hat[2*i+odd] = u0[i]
+    u_hat[2*M+odd] = u0[M]    
+    
+
+cdef ForwardSolve_L(vector[double]& y, 
+                    np.ndarray[np.float64_t, ndim=1] L, 
+                    bint odd,
+                    np.ndarray[np.float64_t, ndim=1] fk):
+    # Solve Forward Ly = f
+    cdef int i
+    y[0] = fk[odd]
+    for i in xrange(1, y.size()):
+        y[i] = fk[2*i+odd] - L[i-1]*y[i-1]
+    
+
 def LU_Helmholtz_1D(np.int_t N,
                     bint neumann,
                     bint GC,
@@ -397,71 +462,6 @@ def LU_oe_HelmholtzN_1D(np.int_t N,
         if i < M-2:
             d2[i+1] = g[i+1] - L[i]*d2[i]
 
-            
-def Solve_oe_Helmholtz_1D(np.int_t N,
-                          bint odd,
-                          np.ndarray[np.float64_t, ndim=1] fk,
-                          np.ndarray[np.float64_t, ndim=1] u_hat,
-                          np.ndarray[np.float64_t, ndim=1] d0,
-                          np.ndarray[np.float64_t, ndim=1] d1,
-                          np.ndarray[np.float64_t, ndim=1] d2,
-                          np.ndarray[np.float64_t, ndim=1] L):
-    """
-    Solve (A+k**2*B)x = f, where A and B are stiffness and mass matrices of Shen with Dirichlet BC
-    """
-    cdef:
-        unsigned int M
-        int i
-        double tmp
-        vector[double] y
-        vector[double] u0
-
-    if not odd:
-        M = (N-3)/2
-    else:
-        M = (N-4)/2
-        
-    y.resize(M+1)
-    ForwardSolve_L(y, L, odd, fk)
-        
-    # Solve Backward U u = y 
-    u0.resize(M+1)
-    BackSolve_U(M, odd, y, u0, d0, d1, d2, u_hat)
-
-
-cdef BackSolve_U(int M,
-                 bint odd, 
-                 vector[double]& y,
-                 vector[double]& u0,
-                 np.ndarray[np.float64_t, ndim=1] d0,
-                 np.ndarray[np.float64_t, ndim=1] d1,
-                 np.ndarray[np.float64_t, ndim=1] d2,
-                 np.ndarray[np.float64_t, ndim=1] u_hat):
-    cdef:
-        int i, j
-        double sum_u0 = 0.0
-        
-    u0[M] = y[M] / d0[M]    
-    for i in xrange(M-1, -1, -1):
-        u0[i] = y[i] - d1[i]*u0[i+1]
-        if i < M-1:
-            sum_u0 += u0[i+2]
-            u0[i] -= sum_u0*d2[i]            
-        u0[i] /= d0[i]
-        u_hat[2*i+odd] = u0[i]
-    u_hat[2*M+odd] = u0[M]    
-    
-
-cdef ForwardSolve_L(vector[double]& y, 
-                    np.ndarray[np.float64_t, ndim=1] L, 
-                    bint odd,
-                    np.ndarray[np.float64_t, ndim=1] fk):
-    # Solve Forward Ly = f
-    cdef int i
-    y[0] = fk[odd]
-    for i in xrange(1, y.size()):
-        y[i] = fk[2*i+odd] - L[i-1]*y[i-1]
-    
 
 def Mult_Helmholtz_3D_complex(np.int_t N,
                       bint GC, np.float_t factor,
@@ -807,10 +807,10 @@ def Mult_DPhidT_1D(np.int_t N,
             sum_u2.real += w_hat[i+1].real
             sum_u2.imag += w_hat[i+1].imag
             
-            bv[i].real -= sum_u0.real*4
-            bv[i].imag -= sum_u0.imag*4
-            bw[i].real -= sum_u2.real*4
-            bw[i].imag -= sum_u2.imag*4
+            bv[i].real -= sum_u0.real*2
+            bv[i].imag -= sum_u0.imag*2
+            bw[i].real -= sum_u2.real*2
+            bw[i].imag -= sum_u2.imag*2
             
         else:
             sum_u1.real += v_hat[i+1].real
@@ -818,17 +818,17 @@ def Mult_DPhidT_1D(np.int_t N,
             sum_u3.real += w_hat[i+1].real
             sum_u3.imag += w_hat[i+1].imag
             
-            bv[i].real -= sum_u1.real*4
-            bv[i].imag -= sum_u1.imag*4
-            bw[i].real -= sum_u3.real*4
-            bw[i].imag -= sum_u3.imag*4
+            bv[i].real -= sum_u1.real*2
+            bv[i].imag -= sum_u1.imag*2
+            bw[i].real -= sum_u3.real*2
+            bw[i].imag -= sum_u3.imag*2
 
     sum_u0.real += v_hat[1].real
     sum_u0.imag += v_hat[1].imag
-    bv[0].real -= sum_u0.real*2
-    bv[0].imag -= sum_u0.imag*2
+    bv[0].real = -sum_u0.real*1
+    bv[0].imag = -sum_u0.imag*1
     sum_u2.real += w_hat[1].real
     sum_u2.imag += w_hat[1].imag
-    bw[0].real -= sum_u2.real*2
-    bw[0].imag -= sum_u2.imag*2
+    bw[0].real = -sum_u2.real*1
+    bw[0].imag = -sum_u2.imag*1
     
