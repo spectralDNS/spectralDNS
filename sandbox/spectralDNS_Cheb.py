@@ -8,7 +8,7 @@ from numpy.fft import fftfreq, fft, ifft, irfft2, rfft2, rfftn, irfftn
 from mpi4py import MPI
 import matplotlib.pyplot as plt
 from shentransform import ShenDirichletBasis, ShenNeumannBasis
-from Matrices import Chmat, Cmat, Bhmat, Bmat
+from Matrices import Chmat, Cmat, Bhmat, Bmat, BDmat, Amat
 import SFTc
 from OrrSommerfeld_eig import OrrSommerfeld
 from scipy.fftpack import dct
