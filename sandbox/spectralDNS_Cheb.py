@@ -18,21 +18,28 @@ try:
 except ImportError:
     pass # Rely on numpy.fft routines
 
-Re = 8000.
-nu = 1./Re
-#nu = 2e-5
-#Re = 1./nu
-#Re_tau = 180.
-#utau = nu * Re_tau
+case = "OS"
+#case = "MKK"
 
-T = 0.1
+T = 10
 dt = 0.001
-M = 5
-#N = array([2**M, 2**M, 2**M])
-N = array([2**M, 2**M, 2])
-L = array([2, 2*pi, 4*pi/3.])
-dx = (L / N).astype(float)
+M = 7
 
+if case == "OS":
+    Re = 8000.
+    nu = 1./Re
+    N = array([2**M, 2**M, 2])
+    L = array([2, 2*pi, 4*pi/3.])
+
+elif case == "MKK":
+    nu = 2e-5
+    Re = 1./nu
+    Re_tau = 180.
+    utau = nu * Re_tau
+    N = array([2**M, 2**M, 2])
+    L = array([2, 4*pi, 4*pi/3.])
+
+dx = (L / N).astype(float)
 comm = MPI.COMM_WORLD
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
@@ -48,7 +55,6 @@ x2 = arange(N[2], dtype=float)*L[2]/N[2]
 
 # Get grid for velocity points
 X = array(meshgrid(points[rank*Np[0]:(rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)
-#Xp = array(meshgrid(pointsp[rank*Np[0]:(rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)
 
 Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
 Nu = N[0]-2   # Number of velocity modes in Shen basis
@@ -215,15 +221,17 @@ def energy(u):
 
 # Set body_force
 Source[:] = 0
-#Source[1, :] = -utau**2
-Source[1, :] = -2./Re
-#Source[2, :] = 0.001*random.randn(*Source.shape[1:])
-#Source[2, 0] = 0; Source[2, -1] = 0
+if case == "OS":
+    Source[1, :] = -2./Re
+    
+elif case == "MKK":
+    Source[1, :] = -utau**2
+
 
 # Take Shen scalar product of body force
 Sk[:] = 0
-Sk[1] = fss(Source[1], Sk[1], ST)
-#Sk[2] = fss(Source[2], Sk[2], ST)
+for i in range(3):
+    Sk[i] = fss(Source[i], Sk[i], ST)
 
 alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
 alfa1 = sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt)
@@ -283,7 +291,7 @@ def Curl(u0, uh, c):
     c[0] = ifst(1j*(K[1]*uh[2]-K[2]*uh[1]), c[0], ST)
     return c
 
-@profile
+#@profile
 def standardConvection(c):
     c[:] = 0
     U_tmp4[:] = 0
@@ -355,7 +363,7 @@ def divergenceConvection(c, add=False):
     c *= -1
     return c
 
-@profile
+#@profile
 def ComputeRHS(dU, jj):
     # Add convection to rhs
     if jj == 0:
@@ -454,108 +462,48 @@ def OSconv(OS, conv, t=0.):
     conv[2] = 0
     return conv
 
-    
-OS = OrrSommerfeld(Re=Re, N=N[0])
-initOS(OS, U0, U_hat0)
-conv1 = standardConvection(conv1)
-initOS(OS, U, U_hat, t=dt)
-U0[:] = U
-U_hat0[:] = U_hat
-t = dt
-e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
 
-## Compute pressure
-##dconv = 0.5*(conv0+conv1)
-#dconv = conv1
-#SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], 
-                 #dconv[0, u_slice], dconv[1, u_slice], dconv[2, u_slice], F_tmp[0, p_slice])
+if case == "OS":    
+    OS = OrrSommerfeld(Re=Re, N=N[0])
+    initOS(OS, U0, U_hat0)
+    conv1 = standardConvection(conv1)
+    initOS(OS, U, U_hat, t=dt)
+    t = dt
+    e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
+    P[:] = 0
+    P_hat = fst(P, P_hat, SN)
 
-#SFTc.Solve_Helmholtz_3D_complex(N[0], 1, F_tmp[0, p_slice], P_hat[p_slice], u0N, u1N, u2N, LN)
+elif case == "MKK":
+    # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
+    Y = where(X[0]<0, 1+X[0], 1-X[0])
+    Um = 20*utau
+    U[:] = 0
+    U[1] = Um*(Y-0.5*Y**2)
+    Xplus = Y*Re_tau
+    Yplus = X[1]*Re_tau
+    Zplus = X[2]*Re_tau
+    duplus = Um*0.25/utau 
+    alfaplus = 2*pi/500.
+    betaplus = 2*pi/200.
+    sigma = 0.00055
+    epsilon = Um/200.
+    dev = 1+0.3*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
+    U[1] += dd
+    U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev
+    if rank == 0:
+        U[:, 0] = 0
+    if rank == num_processes-1:
+        U[:, -1] = 0
 
+    for i in range(3):
+        U_hat[i] = fst(U[i], U_hat[i], ST)
 
-#U[:] = 0
-#U[1] = (1-X[0]**2)
-#U0[:] = U
-#for i in range(3):
-    #U_hat[i] = fst(U[i], U_hat[i], ST)
-#U_hat0[:] = U_hat
-
-# Initialize solution
-##U[0] = sin(pi*X[0])*cos(X[1])
-##U[1] = sin(pi*X[0])*cos(2*X[1])
-##U[2] = sin(pi*X[0])*cos(3*X[2])
-##U[0] = cos(pi*X[0])+1
-##U[1] = cos(pi*X[0])+1
-##U[2] = cos(pi*X[0])+1
-
-#dU[:] = 0+0*1j
-#dU = pressurerhs(U_hat, dU)
-#dU[3, p_slice] *= (dt)
-
-#SFTc.LU_Helmholtz_3D(N[0], 1, SN.quad=="GC", zeros((K[0].shape[1], K[0].shape[2])), u0N, u1N, u2N, LN)
-#SFTc.Solve_Helmholtz_3D_complex(N[0], 1, dU[3, p_slice], Pcorr[p_slice], u0N, u1N, u2N, LN)
-
-##P_hat[p_slice] = SFTc.TDMA_3D_complex(a0N, b0N, bcN, c0N, dU[3, p_slice])
-#Uc = ifst(Pcorr[p_slice], Uc, SN)
-
-##P[:] = pi*cos(pi*X[0])*cos(X[1]) - 2.*sin(pi*X[0])*sin(2*X[1]) - 3.*sin(pi*X[0])*sin(3.*X[2])
-
-##P[:] = -pi*sin(pi*X[0])
-
-#U[:] = 0
-##U[0] = (1-X[0]**2)*sin(pi*X[0])
-#for i in range(3):
-    #U_hat[i] = fst(U[i], U_hat[i], ST)
-
-#Pcorr[:] = 0
-#Pcorr[:Nu-1] += Cu[0]*U_hat[1, 1:Nu]
-#Pcorr[1:Nu]  += Cu[1]*U_hat[1, :Nu-1]
-#Pcorr[u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, Pcorr[u_slice])
-#Uc = ifst(Pcorr[u_slice], Uc, ST)
-
-#Pcorr[:] = 0
-#SFTc.Mult_Div_3D(N[0], zeros((K[0].shape[1], K[0].shape[2])), 
-                       #zeros((K[0].shape[1], K[0].shape[2])), 
-                       #U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], Pcorr[p_slice])
-#Pcorr[p_slice] = SFTc.TDMA_3D_complex(a0N, b0N, bcN, c0N, Pcorr[p_slice])
-#Uc = ifst(Pcorr[p_slice], Uc, SN)
-
-
-#Y = where(X[0]<0, 1+X[0], 1-X[0])
-#Um = 20*utau
-#U[:] = 0
-#U[1] = Um*(Y-0.5*Y**2)
-#Xplus = Y*Re_tau
-#Yplus = X[1]*Re_tau
-#Zplus = X[2]*Re_tau
-#duplus = Um*0.25/utau 
-#alfaplus = 2*pi/500.
-#betaplus = 2*pi/200.
-#sigma = 0.00055
-#epsilon = Um/200.
-#dev = 1+0.3*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
-#dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
-#U[1] += dd
-#U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev
-#if rank == 0:
-    #U[:, 0] = 0
-#if rank == num_processes-1:
-    #U[:, -1] = 0
-
-#for i in range(3):
-    #U_hat[i] = fst(U[i], U_hat[i], ST)
+    P[:] = 0
+    P_hat = fst(P, P_hat, SN)
 
 U0[:] = U
 U_hat0[:] = U_hat
-
-P[:] = 0
-P_hat = fst(P, P_hat, SN)
-
-
-#U_tmp4[2] = chebDerivative_3D(U0[2], U_tmp4[2])
-#U_tmp4[1] = chebDerivative_3D0(U0[2], U_tmp4[1])
-
-#assert allclose(U_tmp4[2], U_tmp4[1])
 
 ## Check convection vs analytical solution
 #conv1 *= dealias
@@ -569,37 +517,46 @@ P_hat = fst(P, P_hat, SN)
 ##plt.figure();plt.imshow(curl[1, :,:,0]);plt.colorbar()
 #assert allclose(curl, U_tmp2, atol=1e-7)
 
+if case == "OS":
+    plt.figure()
+    im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
+    plt.colorbar(im1)
+    plt.draw()
 
+    plt.figure()
+    im2 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[1,:,:,0] - (1-X[0,:,:,0]**2), 100)
+    plt.colorbar(im2)
+    plt.draw()
 
-## Check diffusion
-#dU[:] = 0
-#beta = K[1, 0]**2+K[2, 0]**2
-#SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", 1, beta, U_hat0[0], dU[0])
-#dU[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[0, u_slice])
-#U_tmp[0] = ifst(dU[0, u_slice], U_tmp[0], ST)
-#OSLaplace(OS, U, U_tmp2)
+    plt.figure()
+    im3 = plt.contourf(X[1,:,:,0], X[0,:,:,0], P[:,:,0], 100)
+    plt.colorbar(im3)
+    plt.draw()
+    
+    plt.figure()
+    im4 = plt.quiver(X[1, :,:,0], X[0,:,:,0], U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
+    plt.draw()
+    
+    plt.pause(1e-6)
 
-#assert allclose(U_tmp[0], U_tmp2[0], atol=1e-7)
+elif case == "MKK":
+    plt.figure()
+    im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
+    plt.colorbar(im1)
+    plt.draw()
 
+    plt.figure()
+    im2 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[1,:,:,0], 100)
+    plt.colorbar(im2)
+    plt.draw()
 
-#plt.figure()
-#im1 = plt.imshow(U[0, 4, :, :])
-#plt.colorbar(im1)
-#plt.draw()
+    plt.figure()
+    im3 = plt.contourf(X[1,:,:,0], X[0,:,:,0], P[:,:,0], 100)
+    plt.colorbar(im3)
+    plt.draw()
 
-#plt.figure()
-##im2 = plt.imshow(U[1, :, :, 0]- (1-X[0,:,:,0]**2))
-##im2 = plt.imshow(U[1, :, :, 0])
-#im2 = plt.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0], 100)
-##plt.colorbar(im2)
-#plt.draw()
-
-#plt.figure()
-#im3 = plt.imshow(P[4, :, :])
-#plt.colorbar(im3)
-#plt.draw()
-
-#plt.pause(1e-6)
+    plt.pause(1e-6)
+    
 
 def Divu(U, U_hat, c):
     c[:] = 0
@@ -609,97 +566,114 @@ def Divu(U, U_hat, c):
         
     return c
 
-#e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
+e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
 
 t = 0.0
 tstep = 0
-while t < T-1e-8:
-    t += dt; tstep += 1
-    #print "tstep ", tstep
-    # Tentative momentum solve
-    
-    for jj in range(2):
+
+@profile
+def steps():
+    global t, tstep, e0, dU, U_hat, P_hat, Pcorr, U_hat1, U_hat0, P
+    while t < T-1e-8:
+        t += dt; tstep += 1
+        #print "tstep ", tstep
+        # Tentative momentum solve
+        
+        for jj in range(2):
+            dU[:] = 0
+            dU = ComputeRHS(dU, jj)    
+            SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[0, u_slice], U_hat[0, u_slice], u0, u1, u2, L0)
+            SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[1, u_slice], U_hat[1, u_slice], u0, u1, u2, L0)
+            SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[2, u_slice], U_hat[2, u_slice], u0, u1, u2, L0)
+            
+            #SFTc.Solve_Helmholtz_3Dall_complex(N[0], 0, dU[:, u_slice], U_hat[:, u_slice], u0, u1, u2, L0)
+            
+            # Pressure correction
+            dU = pressurerhs(U_hat, dU) 
+            SFTc.Solve_Helmholtz_3D_complex(N[0], 1, dU[3, p_slice], Pcorr[p_slice], u0N, u1N, u2N, LN)
+
+            # Update pressure
+            #dU[3] *= (-dt)  # Get div(u) in dU[3]
+            #dU[3, p_slice] = SFTc.TDMA_3D_complex(a0N, b0N, bcN, c0N, dU[3, p_slice])
+            #P_hat[p_slice] += (Pcorr[p_slice] - nu*dU[3, p_slice])
+            P_hat[p_slice] += Pcorr[p_slice]
+
+            if jj == 0:
+                print "   Divergence error"
+            print "         Pressure correction norm %2.6e" %(linalg.norm(Pcorr))
+                            
+        # Update velocity
         dU[:] = 0
-        dU = ComputeRHS(dU, jj)    
-        SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[0, u_slice], U_hat[0, u_slice], u0, u1, u2, L0)
-        SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[1, u_slice], U_hat[1, u_slice], u0, u1, u2, L0)
-        SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[2, u_slice], U_hat[2, u_slice], u0, u1, u2, L0)
+        pressuregrad(Pcorr, dU)
         
-        #SFTc.Solve_Helmholtz_3Dall_complex(N[0], 0, dU[:, u_slice], U_hat[:, u_slice], u0, u1, u2, L0)
-        
-        # Pressure correction
-        dU = pressurerhs(U_hat, dU) 
-        SFTc.Solve_Helmholtz_3D_complex(N[0], 1, dU[3, p_slice], Pcorr[p_slice], u0N, u1N, u2N, LN)
+        dU[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[0, u_slice])
+        dU[1, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[1, u_slice])
+        dU[2, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[2, u_slice])    
+        U_hat[:3, u_slice] += dt*dU[:3, u_slice]  # + since pressuregrad computes negative pressure gradient
 
-        # Update pressure
-        #dU[3] *= (-dt)  # Get div(u) in dU[3]
-        #dU[3, p_slice] = SFTc.TDMA_3D_complex(a0N, b0N, bcN, c0N, dU[3, p_slice])
-        #P_hat[p_slice] += (Pcorr[p_slice] - nu*dU[3, p_slice])
-        P_hat[p_slice] += Pcorr[p_slice]
-
-        #for i in range(3):
-            #U[i] = ifst(U_hat[i, u_slice], U[i], ST)
-        #Uc_hat = Divu(U, U_hat, Uc_hat)
-        #Uc = ifst(Uc_hat[p_slice], Uc, SN)
-        #if jj == 0:
-            #print "   Divergence error"
-        #print "         Pressure correction norm %2.6e" %(linalg.norm(Pcorr))
-                        
-    # Update velocity
-    dU[:] = 0
-    pressuregrad(Pcorr, dU)
-    
-    dU[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[0, u_slice])
-    dU[1, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[1, u_slice])
-    dU[2, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[2, u_slice])    
-    U_hat[:3, u_slice] += dt*dU[:3, u_slice]  # + since pressuregrad computes negative pressure gradient
-
-    for i in range(3):
-        U[i] = ifst(U_hat[i], U[i], ST)
-        
-    # Rotate velocities
-    U_hat1[:] = U_hat0
-    U_hat0[:] = U_hat
-    U0[:] = U
-    
-    P = ifst(P_hat, P, SN)        
-    conv1[:] = conv0
-    if tstep % 10 == 0:    
-        pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
-        initOS(OS, U_tmp4, U_hat1, t=t)
-        e1 = 0.5*energy(pert)
-        e2 = 0.5*energy((U_tmp4[1] - (1-X[0]**2))**2 + U_tmp4[0]**2)
-        exact = exp(2*imag(OS.eigval)*t)
-        if rank == 0:
-            print "Time %2.5f Norms %2.12e %2.12e %2.12e %2.12e" %(t, e1/e0, e2/e0, exp(2*imag(OS.eigval)*t), e1/e0-exact)
-
-    #if tstep % 10 == 0:    
-        #e0 = energy(U0[0]**2)
-        #e1 = energy(U0[2]**2)
-        #if rank == 0:
-            #print "Time %2.5f Energy %2.12e %2.12e " %(t, e0, e1)
+        for i in range(3):
+            U[i] = ifst(U_hat[i], U[i], ST)
             
-    if tstep == 100:
-        Source[2, :] = 0
-        Sk[2] = fss(Source[2], Sk[2], ST)
-            
-    #if tstep % 20 == 0:
-        #im1.set_data(U[0, :, :, 0])
-        #im1.autoscale()
-        ##im2.set_data(U[1, :, :, 0]-(1-X[0,:,:,0]**2))
-        ##im2.set_data(U[1, :, :, 0])
-        #im2.ax.clear()
-        #im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0], 100) 
-        #im2.autoscale()
-        #im3.set_data(P[:, :, 0])
-        #im3.autoscale()
-        #plt.pause(1e-6)        
+        # Rotate velocities
+        U_hat1[:] = U_hat0
+        U_hat0[:] = U_hat
+        U0[:] = U
+        
+        P = ifst(P_hat, P, SN)        
+        conv1[:] = conv0
+        if tstep % 10 == 0:   
+            if case == "OS":
+                pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
+                initOS(OS, U_tmp4, U_hat1, t=t)
+                e1 = 0.5*energy(pert)
+                e2 = 0.5*energy((U_tmp4[1] - (1-X[0]**2))**2 + U_tmp4[0]**2)
+                exact = exp(2*imag(OS.eigval)*t)
+                if rank == 0:
+                    print "Time %2.5f Norms %2.12e %2.12e %2.12e %2.12e" %(t, e1/e0, e2/e0, exp(2*imag(OS.eigval)*t), e1/e0-exact)
 
-pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
-initOS(OS, U_tmp4, U_hat1, t=t)
-e1 = 0.5*energy(pert)
-e2 = 0.5*energy((U_tmp4[1] - (1-X[0]**2))**2 + U_tmp4[0]**2)
+            elif case == "MKK":
+                e0 = energy(U0[0]**2)
+                e1 = energy(U0[2]**2)
+                if rank == 0:
+                    print "Time %2.5f Energy %2.12e %2.12e " %(t, e0, e1)
+                
+        #if tstep == 100:
+            #Source[2, :] = 0
+            #Sk[2] = fss(Source[2], Sk[2], ST)
 
-if rank == 0:
-    print "Time %2.5f Norms %2.10e %2.10e %2.10e" %(t, e1/e0, e2/e0, exp(2*imag(OS.eigval)*t))
-    
+        if tstep % 10 == 0:
+            if case == "OS":
+                im1.ax.clear()
+                im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0]-(1-X[0,:,:,0]**2), 100)         
+                im1.autoscale()
+                im2.ax.clear()
+                im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100) 
+                im2.autoscale()
+                im3.ax.clear()
+                im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100) 
+                im3.autoscale()
+                im4.set_UVC(U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
+                
+            elif case == "MKK":
+                im1.ax.clear()
+                im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0], 100)         
+                im1.autoscale()
+                im2.ax.clear()
+                im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100) 
+                im2.autoscale()
+                im3.ax.clear()
+                im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100) 
+                im3.autoscale()
+                
+            plt.pause(1e-6)        
+                
+steps()
+
+if case == "OS":
+    pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
+    initOS(OS, U_tmp4, U_hat1, t=t)
+    e1 = 0.5*energy(pert)
+    e2 = 0.5*energy((U_tmp4[1] - (1-X[0]**2))**2 + U_tmp4[0]**2)
+
+    if rank == 0:
+        print "Time %2.5f Norms %2.10e %2.10e %2.10e" %(t, e1/e0, e2/e0, exp(2*imag(OS.eigval)*t))

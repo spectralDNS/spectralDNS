@@ -131,7 +131,42 @@ class Bmat(LinearOperator):
     
     def diags(self):
         return diags([self.ld, self.dd, self.ud], [-2, 0, 2], shape=self.shape)
-        
+
+class BDmat(LinearOperator):
+    """Matrix for inner product (u, phi)_w = BDmat * u_hat
+    
+    where u_hat is a vector of coefficients for a Shen Dirichlet basis
+    and phi is a Shen Dirichlet basis.
+    """
+
+    def __init__(self, K, quad, **kwargs):
+        assert len(K.shape) == 1
+        shape = (K.shape[0]-2, K.shape[0]-2)
+        LinearOperator.__init__(self, shape, None, **kwargs)
+        N = shape[0] 
+        ck = ones(K.shape)
+        ck[0] = 2
+        if quad == "GC": ck[N-1] = 2
+        self.dd = pi/2*(ck[:-2]+ck[2:])
+        self.ud = -pi/2
+        self.ld = -pi/2
+    
+    def matvec(self, v):
+        N = self.shape[0]
+        c = zeros(v.shape, dtype=complex)
+        if len(v.shape) > 1:
+            c[:(N-2)] = self.ud.repeat(array(v.shape[:]).prod()).reshape(v[2:N].shape)*v[2:N]
+            c[:N]    += self.dd.repeat(array(v.shape[:]).prod()).reshape(v[:N].shape)*v[:N]
+            c[2:N]    += self.ld.repeat(array(v.shape[:]).prod()).reshape(v[:(N-2)].shape)*v[:(N-2)] 
+        else:
+            c[:(N-2)] = self.ud*v[2:N]
+            c[:N]    += self.dd*v[:N]
+            c[2:N]    += self.ld*v[:(N-2)]
+        return c
+    
+    def diags(self):
+        return diags([self.ld, self.dd, self.ud], [-2, 0, 2], shape=self.shape)
+    
 class Amat(LinearOperator):
     """Matrix for inner product -(u'', phi) = -(phi'', phi) u_hat = Amat * u_hat
     
