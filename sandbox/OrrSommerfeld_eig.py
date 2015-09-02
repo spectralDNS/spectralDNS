@@ -9,6 +9,9 @@ from numpy import ones, cos, arange, pi, dot, eye, real, imag, resize, transpose
 from pylab import find, plot, figure, show, axis
 from numpy.linalg import inv
 from scipy.special import orthogonal
+from numpy.polynomial import chebyshev as n_cheb
+from scipy.sparse.linalg import LinearOperator
+from scipy.sparse import diags
 
 def cheb_derivative_matrix(N):
     x = arange(N)
@@ -114,6 +117,148 @@ class OrrSommerfeld(object):
         else:
             ss = sum(self.w/x2)
             self.f[:] = self.w/x2/ss
+
+
+class Amat(LinearOperator):
+    """Matrix for inner product -(u'', (phi*w)'') = -(phi'', (phi*w)'') u_hat = Amat * u_hat
+    
+    where u_hat is a vector of coefficients for a Shen Dirichlet/Neumann basis
+    and phi is a Shen Dirichlet/Neumann basis.
+    """
+
+    def __init__(self, K, **kwargs):
+        assert len(K.shape) == 1
+        shape = (K.shape[0]-4, K.shape[0]-4)
+        N = shape[0]
+        LinearOperator.__init__(self, shape, None, **kwargs)
+        self.dd = 8*pi*(K[:N]+1)**2*(K[:N]+2)*(K[:N]+4)   
+        self.ud = []
+        for i in range(2, N, 2):
+            self.ud.append(8*pi*(K[:-(i+4)]+1)*(K[:-(i+4)]+2)*(K[:-(i+4)]*(K[:-(i+4)]+4)+3*(arange(i, N)+2)**2)/((arange(i, N)+3)))
+
+        self.ld = None
+        
+    def matvec(self, v):
+        raise NotImplementedError
+
+    def diags(self):
+        N = self.shape[0]
+        return diags([self.dd] + self.ud, range(0, N, 2))
+
+class Bmat(LinearOperator):
+    """Matrix for inner product (u, phi) = (phi_j, phi_k) u_hat_j = Bmat * u_hat
+    
+    where u_hat is a vector of coefficients for a Shen Dirichlet/Neumann basis
+    and phi is a Shen Dirichlet/Neumann basis.
+    """
+
+    def __init__(self, K, quad, **kwargs):
+        assert len(K.shape) == 1
+        shape = (K.shape[0]-4, K.shape[0]-4)
+        N = shape[0]
+        LinearOperator.__init__(self, shape, None, **kwargs)
+        ck = ones(K.shape)
+        if quad == "GC": ck[N-1] = 2
+        self.dd = pi/2*(ck[:-4] + 4*(K[:N]+2)**2/(K[:N]+3)**2 + (K[:N]+1)**2/(K[:N]+3)**2)           
+        self.ud = [-pi*((K[:N-2]+2)/(K[:N-2]+3) + (K[:N-2]+4)/(K[:N-2]+5)*(K[:N-2]+1)/(K[:N-2]+3)),
+                   pi/2*(K[:N-4]+1)/(K[:N-4]+3)]
+        
+        self.ld = [pi/2*(K[:N-4]+1)/(K[:N-4]+3),
+                   -pi*((K[:N-2]+2)/(K[:N-2]+3) + (K[:N-2]+4)/(K[:N-2]+5)*(K[:N-2]+1)/(K[:N-2]+3))]
+        
+    def matvec(self, v):
+        raise NotImplementedError
+
+    def diags(self):
+        N = self.shape[0]
+        return diags(self.ld + [self.dd] + self.ud, [-4, -2, 0, 2, 4])
+
+
+class Cmat(LinearOperator):
+    """Matrix for inner product (u', (phi*w)') = (phi'_j, (phi_k*w)') u_hat_j = Cmat * u_hat
+    
+    where u_hat is a vector of coefficients for a Shen Dirichlet/Neumann basis
+    and phi is a Shen Dirichlet/Neumann basis.
+    """
+
+    def __init__(self, K, quad, **kwargs):
+        assert len(K.shape) == 1
+        shape = (K.shape[0]-4, K.shape[0]-4)
+        N = shape[0]
+        LinearOperator.__init__(self, shape, None, **kwargs)
+        ck = ones(K.shape)
+        if quad == "GC": ck[N-1] = 2
+        self.dd = -4*pi*(K[:N]+1)/(K[:N]+3)*(K[:N]+2)**2
+        self.ud = [2*pi*(K[:N-2]+1)*(K[:N-2]+2)]        
+        self.ld = [2*pi*(K[2:N]-1)*(K[2:N]+2)]
+        
+    def matvec(self, v):
+        raise NotImplementedError
+
+    def diags(self):
+        N = self.shape[0]
+        return diags(self.ld + [self.dd] + self.ud, [-2, 0, 2])
+
+## Use sympy to compute a rhs, given an analytical solution
+#from numpy import *
+#from sympy import chebyshevt, Symbol, sin, cos, lambdify, sqrt as Sqrt
+#import scipy.sparse.linalg as la
+
+#x = Symbol("x")
+#u = (1-x**2)*sin(2*pi*x)
+#f = u.diff(x, 4) - u.diff(x, 2) + u
+#N = 40
+#k = arange(N).astype(float)
+#Am = Amat(k)
+#Bm = Bmat(k, "GC")
+#Cm = Cmat(k, "GC")
+
+#points = n_cheb.chebpts2(N)[::-1]
+#weights = zeros((N))+pi/(N-1)
+#weights[0] /= 2
+#weights[-1] /= 2
+
+#fj = array([f.subs(x, j) for j in points], dtype=float)
+#V = (n_cheb.chebvander(points, N-5).T 
+     #- (2*(k[:N-4]+2)/(k[:N-4]+3))[:, newaxis]*n_cheb.chebvander(points, N-3)[:, 2:].T
+     #+ ((k[:N-4]+1)/(k[:N-4]+3))[:, newaxis]*n_cheb.chebvander(points, N-1)[:, 4:].T)
+
+#fk = dot(V, fj*weights)
+#uk = la.spsolve(Am.diags()-Cm.diags()+Bm.diags(), fk)
+#uj = dot(V.T, uk)
+#uq = array([u.subs(x, j) for j in points], dtype=float)
+
+
+
+class OrrSommerfeldShen(object):
+    def __init__(self,**kwargs):
+        self.par={'alfa':1.,
+                  'Re':8000.,
+                  'N':20,
+                  'order':None}
+        self.par.update(**kwargs)
+        [setattr(self, name, val) for name, val in self.par.iteritems()]
+        
+    def assemble(self):
+        k = arange(self.N).astype(float)
+        Am = Amat(k)
+        Bm = Bmat(k, "GC")
+        Cm = Cmat(k, "GC")
+        weights = zeros((self.N))+pi/(self.N-1)
+        weights[0] /= 2
+        weights[-1] /= 2
+        A = Am.diags().toarray()
+        B = Bm.diags().toarray()
+        C = Cm.diags().toarray()
+        points = n_cheb.chebpts2(self.N)[::-1]
+        self.B = -1j*self.alfa*self.Re*(C+self.alfa**2*B)
+        self.A = (A + (2*self.alfa**2+1j*self.alfa*self.Re*(1-points**2))*C + 
+                  (self.alfa**4+1j*self.alfa**3*self.Re*(1-points**2)-2*1j*self.alfa*self.Re)*B)
+
+    def solve(self):
+        self.assemble()
+        #return eig(self.A,self.B)
+        return eig(dot(inv(self.B), self.A))
 
 
 def ploteig(an,ev,nd=20):

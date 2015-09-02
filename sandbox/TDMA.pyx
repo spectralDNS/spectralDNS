@@ -382,8 +382,6 @@ def LU_oe_Helmholtz_1D(np.int_t N,
         if i < M-2:
             d2[i+1] = g[i+1] - L[i]*d2[i]
             
-        print i, d0[i+1]
-
 
 def LU_oe_HelmholtzN_1D(np.int_t N,
                         bint odd,

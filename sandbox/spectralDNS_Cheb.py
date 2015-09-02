@@ -21,14 +21,14 @@ except ImportError:
 case = "OS"
 #case = "MKK"
 
-T = 10
+T = 100
 dt = 0.001
-M = 7
+M = 6
 
 if case == "OS":
     Re = 8000.
     nu = 1./Re
-    N = array([2**M, 2**M, 2])
+    N = array([2**M, 2**(M-1), 2])
     L = array([2, 2*pi, 4*pi/3.])
 
 elif case == "MKK":
@@ -571,7 +571,7 @@ e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
 t = 0.0
 tstep = 0
 
-@profile
+#@profile
 def steps():
     global t, tstep, e0, dU, U_hat, P_hat, Pcorr, U_hat1, U_hat0, P
     while t < T-1e-8:
@@ -598,9 +598,9 @@ def steps():
             #P_hat[p_slice] += (Pcorr[p_slice] - nu*dU[3, p_slice])
             P_hat[p_slice] += Pcorr[p_slice]
 
-            if jj == 0:
-                print "   Divergence error"
-            print "         Pressure correction norm %2.6e" %(linalg.norm(Pcorr))
+            #if jj == 0:
+                #print "   Divergence error"
+            #print "         Pressure correction norm %2.6e" %(linalg.norm(Pcorr))
                             
         # Update velocity
         dU[:] = 0
@@ -621,7 +621,7 @@ def steps():
         
         P = ifst(P_hat, P, SN)        
         conv1[:] = conv0
-        if tstep % 10 == 0:   
+        if tstep % 100 == 0:   
             if case == "OS":
                 pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
                 initOS(OS, U_tmp4, U_hat1, t=t)
@@ -641,7 +641,7 @@ def steps():
             #Source[2, :] = 0
             #Sk[2] = fss(Source[2], Sk[2], ST)
 
-        if tstep % 10 == 0:
+        if tstep % 100 == 0:
             if case == "OS":
                 im1.ax.clear()
                 im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0]-(1-X[0,:,:,0]**2), 100)         

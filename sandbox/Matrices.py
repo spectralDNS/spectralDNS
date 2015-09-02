@@ -1,11 +1,11 @@
 import numpy as np
-from scipy.sparse.linalg import LinearOperator
+#from scipy.sparse.linalg import LinearOperator
 from SFTc import Chmat_matvec, Bhmat_matvec, Cmat_matvec
 from scipy.sparse import diags
 
 pi, zeros, ones, array = np.pi, np.zeros, np.ones, np.array
 
-class Chmat(LinearOperator):
+class Chmat(object):
     """Matrix for inner product (p', phi)_w = Chmat * p_hat
     
     where p_hat is a vector of coefficients for a Shen Neumann basis
@@ -14,8 +14,7 @@ class Chmat(LinearOperator):
     
     def __init__(self, K, **kwargs):
         assert len(K.shape) == 1
-        shape = (K.shape[0]-2, K.shape[0]-3)
-        LinearOperator.__init__(self, shape, None, **kwargs)
+        self.shape = shape = (K.shape[0]-2, K.shape[0]-3)
         N = shape[0]
         self.ud = (K[:(N-1)]+1)*pi
         self.ld = -((K[2:N]-1)/(K[2:N]+1))**2*(K[2:N]+1)*pi
@@ -32,7 +31,7 @@ class Chmat(LinearOperator):
             c[2:N]   += self.ld*v[1:(N-1)]
         return c
     
-class Bhmat(LinearOperator):
+class Bhmat(object):
     """Matrix for inner product (p, phi)_w = Bhmat * p_hat
     
     where p_hat is a vector of coefficients for a Shen Neumann basis
@@ -41,8 +40,7 @@ class Bhmat(LinearOperator):
 
     def __init__(self, K, quad, **kwargs):
         assert len(K.shape) == 1
-        shape = (K.shape[0]-2, K.shape[0]-3)
-        LinearOperator.__init__(self, shape, None, **kwargs)
+        self.shape = shape = (K.shape[0]-2, K.shape[0]-3)
         ck = ones(K.shape)
         N = shape[0]
         if quad == "GC": ck[N-1] = 2        
@@ -68,7 +66,7 @@ class Bhmat(LinearOperator):
     def diags(self):
         return diags([self.ld, self.dd, self.ud*ones(self.shape[1]-1)], [-3, -1, 1], shape=self.shape)
 
-class Cmat(LinearOperator):
+class Cmat(object):
     """Matrix for inner product (u', phi) = (phi', phi) u_hat =  Cmat * u_hat
     
     where u_hat is a vector of coefficients for a Shen Dirichlet basis
@@ -77,9 +75,8 @@ class Cmat(LinearOperator):
 
     def __init__(self, K, **kwargs):
         assert len(K.shape) == 1
-        shape = (K.shape[0]-2, K.shape[0]-2)
+        self.shape = shape = (K.shape[0]-2, K.shape[0]-2)
         N = shape[0]
-        LinearOperator.__init__(self, shape, None, **kwargs)
         self.ud = (K[:(N-1)]+1)*pi
         self.ld = -(K[1:N]+1)*pi
         
@@ -98,7 +95,7 @@ class Cmat(LinearOperator):
     def diags(self):
         return diags([self.ld, self.dd, self.ud], [-1, 0, 1], shape=self.shape)
 
-class Bmat(LinearOperator):
+class Bmat(object):
     """Matrix for inner product (p, phi_N)_w = Bmat * p_hat
     
     where p_hat is a vector of coefficients for a Shen Neumann basis
@@ -107,8 +104,7 @@ class Bmat(LinearOperator):
 
     def __init__(self, K, quad, **kwargs):
         assert len(K.shape) == 1
-        shape = (K.shape[0]-3, K.shape[0]-3)
-        LinearOperator.__init__(self, shape, None, **kwargs)
+        self.shape = shape = (K.shape[0]-3, K.shape[0]-3)
         ck = ones(K.shape)
         N = shape[0]+1        
         if quad == "GC": ck[N-1] = 2        
@@ -132,7 +128,7 @@ class Bmat(LinearOperator):
     def diags(self):
         return diags([self.ld, self.dd, self.ud], [-2, 0, 2], shape=self.shape)
 
-class BDmat(LinearOperator):
+class BDmat(object):
     """Matrix for inner product (u, phi)_w = BDmat * u_hat
     
     where u_hat is a vector of coefficients for a Shen Dirichlet basis
@@ -141,8 +137,7 @@ class BDmat(LinearOperator):
 
     def __init__(self, K, quad, **kwargs):
         assert len(K.shape) == 1
-        shape = (K.shape[0]-2, K.shape[0]-2)
-        LinearOperator.__init__(self, shape, None, **kwargs)
+        self.shape = shape = (K.shape[0]-2, K.shape[0]-2)
         N = shape[0] 
         ck = ones(K.shape)
         ck[0] = 2
@@ -167,7 +162,7 @@ class BDmat(LinearOperator):
     def diags(self):
         return diags([self.ld, self.dd, self.ud], [-2, 0, 2], shape=self.shape)
     
-class Amat(LinearOperator):
+class Amat(object):
     """Matrix for inner product -(u'', phi) = -(phi'', phi) u_hat = Amat * u_hat
     
     where u_hat is a vector of coefficients for a Shen Dirichlet basis
@@ -176,9 +171,8 @@ class Amat(LinearOperator):
 
     def __init__(self, K, **kwargs):
         assert len(K.shape) == 1
-        shape = (K.shape[0]-2, K.shape[0]-2)
+        self.shape = shape = (K.shape[0]-2, K.shape[0]-2)
         N = shape[0]
-        LinearOperator.__init__(self, shape, None, **kwargs)
         self.dd = 2*np.pi*(K[:N]+1)*(K[:N]+2)   
         self.ud = []
         for i in range(2, N-2, 2):
@@ -194,7 +188,33 @@ class Amat(LinearOperator):
         return diags([self.dd] + self.ud, range(0, N-2, 2))
 
 
-class dP2Tmat(LinearOperator):
+class ANmat(object):
+    """Matrix for inner product -(u'', phi_N) = -(phi_N'', phi_N) p_hat = ANmat * p_hat
+    
+    where u_hat is a vector of coefficients for a Shen Neumann basis
+    and phi is a Shen Neumann basis.
+    """
+
+    def __init__(self, K, **kwargs):
+        assert len(K.shape) == 1
+        self.shape = shape = (K.shape[0]-3, K.shape[0]-3)
+        N = shape[0]+1
+        self.dd = 2*np.pi*(K[1:N]+1)/(K[1:N]+2)        
+        self.ud = []
+        for i in range(2, N-1, 2):
+            self.ud.append(np.array(4*np.pi*(K[1:-(i+2)]+1)/(K[1:-(i+2)]+2)**2))    
+
+        self.ld = None
+        
+    def matvec(self, v):
+        raise NotImplementedError
+
+    def diags(self):
+        N = self.shape[0]
+        return diags([self.dd] + self.ud, range(0, N, 2))
+
+
+class dP2Tmat(object):
     """Matrix for projecting -(u', T) = -(phi', T) u_hat = dP2Tmat * u_hat
     
     where u_hat is a vector of coefficients for a Shen Dirichlet basis
@@ -203,9 +223,8 @@ class dP2Tmat(LinearOperator):
 
     def __init__(self, K, **kwargs):
         assert len(K.shape) == 1
-        shape = (K.shape[0], K.shape[0]-2)
+        self.shape = shape = (K.shape[0], K.shape[0]-2)
         N = shape[0]
-        LinearOperator.__init__(self, shape, None, **kwargs)
         self.dd = 0
         self.ud = -2*pi
         self.ld = -(K[1:(N-1)]+1)*pi
@@ -219,7 +238,7 @@ class dP2Tmat(LinearOperator):
         return diags([self.dd] + self.ud, range(0, N-2, 2))
 
 
-class dSdTmat(LinearOperator):
+class dSdTmat(object):
     """Matrix for inner product (u', T) = (phi', T) u_hat = dSdTmat * u_hat
     
     where u_hat is a vector of coefficients for a Shen Dirichlet basis
@@ -228,9 +247,8 @@ class dSdTmat(LinearOperator):
 
     def __init__(self, K, **kwargs):
         assert len(K.shape) == 1
-        shape = (K.shape[0], K.shape[0]-2)
+        self.shape = shape = (K.shape[0], K.shape[0]-2)
         N = shape[0]
-        LinearOperator.__init__(self, shape, None, **kwargs)
         self.ld = -np.pi*(K[1:N]+1)   
         self.ud = []
         for i in range(1, N-2, 2):

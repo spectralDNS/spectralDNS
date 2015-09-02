@@ -9,9 +9,9 @@ ext = cythonize(Extension("TDMA", sources = ['TDMA.pyx'], language="c++"))
 ext += cythonize(Extension("Cheb", sources = ['Cheb.pyx']))
 ext += cythonize(Extension("Matvec", sources = ['Matvec.pyx']))
 
-ext[0].extra_compile_args.extend(["-O3"])  
-ext[1].extra_compile_args.extend(["-O3"])  
-ext[2].extra_compile_args.extend(["-O3"])  
+[e.extra_compile_args.extend(["-O3"]) for e in ext]
+[e.include_dirs.extend([get_include()]) for e in ext]
+
 setup(
     name = "SFTc",
     ext_modules = ext,
