@@ -3,19 +3,34 @@ from numpy.polynomial import chebyshev as n_cheb
 from scipy.fftpack import dct, idct
 from scipy.sparse.linalg import LinearOperator
 from scipy.sparse import diags
+from scipy.sparse.linalg import splu
 import SFTc
+from numpy import linalg, inf
 
 """
 Fast transforms for pure Chebyshev basis or 
 Shen's Chebyshev basis: 
 
-  For homogeneous Dirichlet boundary conditions:
+  phi_k = T_k + a_k*T_{k+1} + b_k*T_{k+2},
+
+where for homogeneous Dirichlet boundary conditions:
  
-    phi_k = T_k - T_{k+2}
+    a_k = 0  and  b_k = -1
     
-  For homogeneous Neumann boundary conditions:
+For homogeneous Neumann boundary conditions:
     
-    phi_k = T_k - (k/k+2)**2 * T_{k+2}
+     a_k = 0  and  b_k = -(k/k+2)**2 
+     
+For Robin/mixed boundary conditions:
+
+     a_k = \pm 4*(k+1)/((k+1)**2 + (k+2)**2)  and  
+     b_k = -(k**2 + (k+1)**2)/((k+1)**2 + (k+2)**2)
+
+a_k is positive for Dirichlet BC at x = -1 and Neumann BC at x = +1 (DN),
+and it is negative for Neumann BC at x = -1 and Dirichlet BC at x = +1 (ND)
+
+It is therefore possible to choose DN boundary conditions (BC = "DN")
+or ND boundary conditions (BC = "ND").
 
 Use either Chebyshev-Gauss (GC) or Gauss-Lobatto (GL)
 points in real space.
@@ -256,28 +271,122 @@ class ShenNeumannBasis(ShenDirichletBasis):
         if len(fk.shape) == 3:
             bc = b.copy()
             fk[1:-2] = SFTc.TDMA_3D_complex(a, b, bc, c, fk[1:-2])
-
+	    
         elif len(fk.shape) == 1:
             fk[1:-2] = SFTc.TDMA_1D(a, b, c, fk[1:-2])
 
         return fk
 
 
+class ShenRobinBasis(ShenDirichletBasis):
+    
+    def __init__(self, quad="GL", BC = "ND"): 
+	self.BC = BC
+        ShenDirichletBasis.__init__(self, quad)
+               
+    def init(self, N):
+        self.points, self.weights = self.points_and_weights(N)
+        k = self.wavenumbers(N)
+
+    def shenCoefficients(self, k):
+	"""
+	Shen basis functions given by
+	phi_k = T_k + a_k*T_{k+1} + b_k*T_{k+2},
+        satisfy the imposed Robin (mixed) boundary conditions for a unique set of {a_k, b_k}.  
+	"""
+	if self.BC == "ND":
+	    ak = -4*(k+1)/((k+1)**2 + (k+2)**2)
+	elif self.BC == "DN":
+	    ak = 4*(k+1)/((k+1)**2 + (k+2)**2)
+	bk = -((k**2 + (k+1)**2)/((k+1)**2 + (k+2)**2))
+        return ak, bk
+    
+    def fastShenScalar(self, fj, fk):
+        """Fast Shen scalar product 
+        B u_hat = sum_{j=0}{N} u_j phi_k(x_j) w_j,
+        for Shen basis functions given by
+	phi_k = T_k + a_k*T_{k+1} + b_k*T_{k+2}
+        """
+        if self.fast_transform:
+            k  = self.wavenumbers(fj.shape)
+            fk = self.fastChebScalar(fj, fk)
+            ak, bk = self.shenCoefficients(k)
+            
+            fk_tmp = fk
+            fk[:-2] = fk_tmp[:-2] + ak*fk_tmp[1:-1] + bk*fk_tmp[2:]
+
+        return fk
+
+    def ifst(self, fk, fj):
+        """Fast inverse Shen scalar transform for Robin BC.
+        """
+        if len(fk.shape)==3:
+            k = self.wavenumbers(fk.shape)
+            w_hat = np.zeros(fk.shape, dtype=fk.dtype)
+        elif len(fk.shape)==1:
+	    k = self.wavenumbers(fk.shape[0])
+            w_hat = np.zeros(fk.shape[0])
+	ak, bk = self.shenCoefficients(k)
+	w_hat[:-2] = fk[:-2]
+	w_hat[1:-1] += ak*fk[:-2]
+	w_hat[2:]   += bk*fk[:-2]
+            
+        fj = self.ifct(w_hat, fj)
+        return fj
+        
+    def fst(self, fj, fk):
+        """Fast Shen transform for Robin BC.
+        """
+        fk = self.fastShenScalar(fj, fk)
+        N = fj.shape[0]
+        k = self.wavenumbers(N) 
+        k1 = self.wavenumbers(N+1) 
+        ak, bk = self.shenCoefficients(k)
+        ak1, bk1 = self.shenCoefficients(k1)
+        
+        if self.quad == "GL":
+            ck = ones(N-2); ck[0] = 2
+        elif self.quad == "GC":
+            ck = ones(N-2); ck[0] = 2; ck[-1] = 2  
+        
+        """
+        Here we use splu to solve  B u = f_k,
+        where B is the pentadiagonal mass matrix and f_k is the Shen scalar product 
+        """
+        if len(fk.shape) == 3:
+	    a = ((pi/2)*(ck + ak**2 + bk**2)).astype(complex) 
+	    b = (ones(N-3)*(pi/2)*(ak[:-1] + ak1[1:-1]*bk[:-1])).astype(complex)
+	    c = (ones(N-4)*(pi/2)* bk[:-2]).astype(complex)
+			    
+	    mat = diags([c, b, a, b, c], [-2, -1, 0, 1, 2])
+	    lu = splu(mat)
+	    for i in range(fk.shape[1]):
+		for j in range(fk.shape[2]):
+	            fk[:-2, i, j] = lu.solve(fk[:-2, i, j])
+        elif len(fk.shape) == 1:
+	    a = (pi/2)*(ck + ak**2 + bk**2)
+	    b = ones(N-3)*(pi/2)*(ak[:-1] + ak1[1:-1]*bk[:-1])
+	    c = ones(N-4)*(pi/2)* bk[:-2]
+			    
+	    mat = diags([c, b, a, b, c], [-2, -1, 0, 1, 2])
+	    lu = splu(mat)
+	    fk[:-2] = lu.solve(fk[:-2])
+	    
+	return fk    
     
 if __name__ == "__main__":
-    N = 8
-    a = np.random.random((N, N, N/2+1))+1j*np.random.random((N, N, N/2+1))
-    af = np.zeros((N, N, N/2+1), dtype=a.dtype)
-    a[0,:,:] = 0
-    a[-1,:,:] = 0
-    #a = np.random.random(N)
-    #af = np.zeros(N, dtype=np.complex)
-    #a[0] = 0
-    #a[-1] = 0
     
-    ST = ShenDirichletBasis(quad="GC")
-    af = ST.fst(a, af) 
+    N = 8
+    af = np.zeros(N, dtype=np.complex)
+    SR = ShenRobinBasis(quad="GC", BC="ND")
+    pointsr, weightsr = SR.points_and_weights(N)
+    x = pointsr
+    a = x -(8./13.)*(-1 + 2*x**2) - (5./13.)*(-3*x + 4*x**3) # Chebyshev polynomial that satisfies the Robin BC
+    
+    af = SR.fst(a, af)
     a0 = a.copy()
-    a0 = ST.ifst(af, a0)
+    a0 = SR.ifst(af, a0)
+    print "Error in Shen-Robin transform: ",linalg.norm((a - a0), inf) 
+    # Out: Error in Shen-Robin transform: 4.57966997658e-16
     assert np.allclose(a0, a)
      
