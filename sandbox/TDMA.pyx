@@ -74,6 +74,114 @@ def TDMA_3D_complex(np.ndarray[np.float64_t, ndim=1] a,
                 d[i, ii, jj] = d[i, ii, jj]/bc[i]
         
     return d
+
+
+def PDMA_1D(np.ndarray[np.float64_t, ndim=1] d, 
+            np.ndarray[np.float64_t, ndim=1] f, 
+            np.ndarray[np.float64_t, ndim=1] e, 
+            np.ndarray[np.float64_t, ndim=1] b):
+    cdef:
+        unsigned int N = d.shape[0]
+        int k
+
+    x = np.zeros(N)  
+
+    alpha = np.zeros(N)
+    gamma = np.zeros(N-1)
+    delta = np.zeros(N-2)
+    c     = np.zeros(N)
+    z     = np.zeros(N)
+    
+    # Factor A=LDL'
+    alpha[0] = d[0]
+    gamma[0] = f[0]/alpha[0]
+    delta[0] = e[0]/alpha[0]
+    
+    alpha[1] = d[1]-f[0]*gamma[0]
+    gamma[1] = (f[1]-e[0]*gamma[0])/alpha[1]
+    delta[1] = e[1]/alpha[1]
+    
+    for k in range(2, N-2):
+        alpha[k]=d[k]-e[k-2]*delta[k-2]-alpha[k-1]*gamma[k-1]**2
+        gamma[k]=(f[k]-e[k-1]*gamma[k-1])/alpha[k]
+        delta[k]=e[k]/alpha[k]
+    
+    alpha[-2]=d[N-1]-e[N-3]*delta[N-3]-alpha[N-2]*gamma[N-2]**2
+    gamma[-1]=(f[-1]-e[-1]*gamma[-2])/alpha[-2]
+    alpha[-1]=d[-1]-e[-1]*delta[-1]-alpha[-2]*gamma[-1]**2
+    
+    # Update Lx=b, Dc=z
+    
+    z[0]=b[0]
+    z[1]=b[1]-gamma[0]*z[0]
+    
+    for k in range(2,N):
+        z[k]=b[k]-gamma[k-1]*z[k-1]-delta[k-2]*z[k-2]
+
+    c = z/alpha 
+    # Backsubstitution L'x=c
+    x[-1] = c[-1]
+    x[-2] = c[-2]-gamma[-1]*x[-1]
+    
+    for k in range(N-3, -1, -1):
+        x[k] = c[k]-gamma[k]*x[k+1]-delta[k]*x[k+2]
+    return x
+
+def PDMA_3D_complex(np.ndarray[np.float64_t, ndim=1] d, 
+                    np.ndarray[np.float64_t, ndim=1] f, 
+                    np.ndarray[np.float64_t, ndim=1] e, 
+                    np.ndarray[np.complex128_t, ndim=3] b):
+    cdef:
+        unsigned int N = d.shape[0]
+        int k, i , j
+    
+    x = np.zeros((N, b.shape[1], b.shape[2]), dtype=np.complex)   
+
+    alpha = np.zeros(N)
+    gamma = np.zeros(N-1)
+    delta = np.zeros(N-2)
+    c     = np.zeros((N, b.shape[1], b.shape[2]), dtype=np.complex)
+    z     = np.zeros((N, b.shape[1], b.shape[2]), dtype=np.complex)
+    
+    # Factor A=LDL'
+    alpha[0] = d[0]
+    gamma[0] = f[0]/alpha[0]
+    delta[0] = e[0]/alpha[0]
+    
+    alpha[1] = d[1]-f[0]*gamma[0]
+    gamma[1] = (f[1]-e[0]*gamma[0])/alpha[1]
+    delta[1] = e[1]/alpha[1]
+    
+    for k in range(2, N-2):
+        alpha[k]=d[k]-e[k-2]*delta[k-2]-alpha[k-1]*gamma[k-1]**2
+        gamma[k]=(f[k]-e[k-1]*gamma[k-1])/alpha[k]
+        delta[k]=e[k]/alpha[k]
+    
+    alpha[-2]=d[N-1]-e[N-3]*delta[N-3]-alpha[N-2]*gamma[N-2]**2
+    gamma[-1]=(f[-1]-e[-1]*gamma[-2])/alpha[-2]
+    alpha[-1]=d[-1]-e[-1]*delta[-1]-alpha[-2]*gamma[-1]**2
+    
+    # Update Lx=b, Dc=z
+
+    z[0]=b[0]
+    z[1]=b[1]-gamma[0]*z[0]
+
+    for k in range(2,N):
+        z[k]=b[k]-gamma[k-1]*z[k-1]-delta[k-2]*z[k-2]
+    
+    for i in range(b.shape[1]):
+        for j in range(b.shape[2]):
+            c[:,i,j] = z[:,i,j]/alpha[:] 
+
+    # Backsubstitution L'x=c
+    for i in range(b.shape[1]):
+        for j in range(b.shape[2]):
+            x[-1,i,j] = c[-1,i,j]
+            x[-2,i,j] = c[-2,i,j]-gamma[-1]*x[-1,i,j]
+            for k in range(N-3, -1, -1):
+                x[k,i,j] = c[k,i,j]-gamma[k]*x[k+1,i,j]-delta[k]*x[k+2,i,j]
+    return x
+
     
 def BackSubstitution_1D(np.ndarray[np.float64_t, ndim=1] u, 
                         np.ndarray[np.float64_t, ndim=1] f):

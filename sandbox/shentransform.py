@@ -6,6 +6,7 @@ from scipy.sparse import diags
 from scipy.sparse.linalg import splu
 import SFTc
 from numpy import linalg, inf
+import time
 
 """
 Fast transforms for pure Chebyshev basis or 
@@ -349,34 +350,24 @@ class ShenRobinBasis(ShenDirichletBasis):
         elif self.quad == "GC":
             ck = ones(N-2); ck[0] = 2; ck[-1] = 2  
         
+        a = (pi/2)*(ck + ak**2 + bk**2)
+        b = ones(N-3)*(pi/2)*(ak[:-1] + ak1[1:-1]*bk[:-1])
+        c = ones(N-4)*(pi/2)* bk[:-2]
+        
         """
         Here we use splu to solve  B u = f_k,
         where B is the pentadiagonal mass matrix and f_k is the Shen scalar product 
         """
         if len(fk.shape) == 3:
-	    a = ((pi/2)*(ck + ak**2 + bk**2)).astype(complex) 
-	    b = (ones(N-3)*(pi/2)*(ak[:-1] + ak1[1:-1]*bk[:-1])).astype(complex)
-	    c = (ones(N-4)*(pi/2)* bk[:-2]).astype(complex)
-			    
-	    mat = diags([c, b, a, b, c], [-2, -1, 0, 1, 2])
-	    lu = splu(mat)
-	    for i in range(fk.shape[1]):
-		for j in range(fk.shape[2]):
-	            fk[:-2, i, j] = lu.solve(fk[:-2, i, j])
+	    fk[:-2] = SFTc.PDMA_3D_complex(a, b, c, fk[:-2])
+   
         elif len(fk.shape) == 1:
-	    a = (pi/2)*(ck + ak**2 + bk**2)
-	    b = ones(N-3)*(pi/2)*(ak[:-1] + ak1[1:-1]*bk[:-1])
-	    c = ones(N-4)*(pi/2)* bk[:-2]
-			    
-	    mat = diags([c, b, a, b, c], [-2, -1, 0, 1, 2])
-	    lu = splu(mat)
-	    fk[:-2] = lu.solve(fk[:-2])
-	    
+	    fk[:-2] = SFTc.PDMA_1D(a, b, c, fk[:-2])	    
 	return fk    
     
 if __name__ == "__main__":
     
-    N = 8
+    N = 2**12
     af = np.zeros(N, dtype=np.complex)
     SR = ShenRobinBasis(quad="GC", BC="ND")
     pointsr, weightsr = SR.points_and_weights(N)
@@ -387,6 +378,5 @@ if __name__ == "__main__":
     a0 = a.copy()
     a0 = SR.ifst(af, a0)
     print "Error in Shen-Robin transform: ",linalg.norm((a - a0), inf) 
-    # Out: Error in Shen-Robin transform: 4.57966997658e-16
     assert np.allclose(a0, a)
      
