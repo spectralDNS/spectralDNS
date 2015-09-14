@@ -127,6 +127,60 @@ def PDMA_1D(np.ndarray[np.float64_t, ndim=1] d,
         x[k] = c[k]-gamma[k]*x[k+1]-delta[k]*x[k+2]
     return x
 
+def PDMA_II_1D(np.ndarray[np.float64_t, ndim=1] d,
+               np.ndarray[np.float64_t, ndim=1] a,
+               np.ndarray[np.float64_t, ndim=1] b,
+               np.ndarray[np.float64_t, ndim=1] c,
+               np.ndarray[np.float64_t, ndim=1] e,
+               np.ndarray[np.float64_t, ndim=1] y):
+    
+    cdef:
+        unsigned int N = y.shape[0]
+        int k
+
+    x = np.zeros(N)    
+
+    w     = np.zeros(N)
+    psi   = np.zeros(N)
+    rho   = np.zeros(N)
+    phi   = np.zeros(N)
+    sigma = np.zeros(N)
+    
+    psi[-1]   = d[-1]
+    sigma[-1] = c[-1]/psi[-1]
+    phi[-1]   = e[-1]/psi[-1]
+    w[-1]     = y[-1]/psi[-1]
+    rho[-2]   = a[-2]
+    
+    psi[-2]   = d[-2] - sigma[-1]*rho[-2]
+    sigma[-2] = (c[-2] - phi[-1]*rho[-2]) /psi[-2]
+    phi[-2]   = e[-2] /psi[-2]
+    w[-2]     = (y[-2] - w[-1]*rho[-2]) /psi[-2]
+
+    for k in range(N-3, 1, -1):
+        rho[k]   = a[k] - sigma[k+2]*b[k]
+        psi[k]   = d[k] - phi[k+2]*b[k] - sigma[k+1]*rho[k]
+        sigma[k] = (c[k] - phi[k+1]*rho[k]) /psi[k]
+        phi[k]   = e[k]/psi[k]
+        w[k]     = (y[k] - w[k+2]*b[k] - w[k+1]*rho[k]) /psi[k]
+    
+    rho[1]   = a[1] - sigma[3]*b[1]
+    psi[1]   = d[1] - phi[3]*b[1] - sigma[2]*rho[1]
+    sigma[1] = (c[1] - phi[2]*rho[1]) /psi[1]
+    
+    rho[0]   = a[0] - sigma[2]*b[0]
+    psi[0]   = d[0] - phi[2]*b[0] - sigma[1]*rho[0]
+    
+    w[1]     = (y[1] - w[3]*b[1] - w[2]*rho[1]) /psi[1]
+    w[0]     = (y[0] - w[2]*b[0] - w[1]*rho[0]) /psi[0]
+    
+    x[0] = w[0]
+    x[1] = w[1]-sigma[1]*x[0]
+    
+    for k in range(2,N):
+        x[k] = w[k] - sigma[k]*x[k-1] - phi[k]*x[k-2]
+    return x
+
 def PDMA_3D_complex(np.ndarray[np.float64_t, ndim=1] d, 
                     np.ndarray[np.float64_t, ndim=1] f, 
                     np.ndarray[np.float64_t, ndim=1] e, 
@@ -182,6 +236,60 @@ def PDMA_3D_complex(np.ndarray[np.float64_t, ndim=1] d,
                 x[k,i,j] = c[k,i,j]-gamma[k]*x[k+1,i,j]-delta[k]*x[k+2,i,j]
     return x
 
+def PDMA_II_3D_complex(np.ndarray[np.float64_t, ndim=1] d,
+                       np.ndarray[np.float64_t, ndim=1] a,
+                       np.ndarray[np.float64_t, ndim=1] b,
+                       np.ndarray[np.float64_t, ndim=1] c,
+                       np.ndarray[np.float64_t, ndim=1] e,
+                       np.ndarray[np.complex128_t, ndim=3] y):
+    
+    cdef:
+        unsigned int N = y.shape[0]
+        int k, i, j
+
+    x = np.zeros((N, y.shape[1], y.shape[2]), dtype=np.complex)    
+
+    w     = np.zeros((N, y.shape[1], y.shape[2]), dtype=np.complex)
+    psi   = np.zeros(N)
+    rho   = np.zeros(N)
+    phi   = np.zeros(N)
+    sigma = np.zeros(N)
+
+    psi[-1]   = d[-1]
+    sigma[-1] = c[-1]/psi[-1]
+    phi[-1]   = e[-1]/psi[-1]
+    w[-1,:,:]     = y[-1,:,:]/psi[-1]
+    rho[-2]   = a[-2]
+ 
+    psi[-2]   = d[-2] - sigma[-1]*rho[-2]
+    sigma[-2] = (c[-2] - phi[-1]*rho[-2]) /psi[-2]
+    phi[-2]   = e[-2] /psi[-2]
+    w[-2,:,:]     = (y[-2,:,:] - w[-1,:,:]*rho[-2]) /psi[-2]
+
+    for k in range(N-3, 1, -1):
+        rho[k]   = a[k] - sigma[k+2]*b[k]
+        psi[k]   = d[k] - phi[k+2]*b[k] - sigma[k+1]*rho[k]
+        sigma[k] = (c[k] - phi[k+1]*rho[k]) /psi[k]
+        phi[k]   = e[k]/psi[k]
+        w[k,:,:]     = (y[k,:,:] - w[k+2,:,:]*b[k] - w[k+1,:,:]*rho[k]) /psi[k]
+
+    rho[1]   = a[1] - sigma[3]*b[1]
+    psi[1]   = d[1] - phi[3]*b[1] - sigma[2]*rho[1]
+    sigma[1] = (c[1] - phi[2]*rho[1]) /psi[1]
+    
+    rho[0]   = a[0] - sigma[2]*b[0]
+    psi[0]   = d[0] - phi[2]*b[0] - sigma[1]*rho[0]
+    
+    w[1,:,:]     = (y[1,:,:] - w[3,:,:]*b[1] - w[2,:,:]*rho[1]) /psi[1]
+    w[0,:,:]     = (y[0,:,:] - w[2,:,:]*b[0] - w[1,:,:]*rho[0]) /psi[0]
+
+    x[0] = w[0]
+    x[1] = w[1]-sigma[1]*x[0]  
+    for i in range(y.shape[1]):
+        for j in range(y.shape[2]):
+            for k in range(2,N):
+                x[k,i,j] = w[k,i,j] - sigma[k]*x[k-1,i,j] - phi[k]*x[k-2,i,j]
+    return x
     
 def BackSubstitution_1D(np.ndarray[np.float64_t, ndim=1] u, 
                         np.ndarray[np.float64_t, ndim=1] f):

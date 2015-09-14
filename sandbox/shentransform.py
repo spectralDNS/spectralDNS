@@ -6,7 +6,6 @@ from scipy.sparse import diags
 from scipy.sparse.linalg import splu
 import SFTc
 from numpy import linalg, inf
-import time
 
 """
 Fast transforms for pure Chebyshev basis or 
@@ -14,7 +13,17 @@ Shen's Chebyshev basis:
 
   phi_k = T_k + a_k*T_{k+1} + b_k*T_{k+2},
 
-where for homogeneous Dirichlet boundary conditions:
+where a_k and b_k are calculated from 
+
+   1) a_minus U(-1) + b_minus U(-1) = c_minus 
+and
+   2) a_plus U(1) + b_plus U(1) = c_plus
+
+The array BC = [a_minus, b_minus, c_minus, a_plus, b_plus, c_plus] that determines the 
+boundary conditions must be given. The code automatically calculates a_k and b_k, and it gives the
+Shen transform.
+
+In particular, for homogeneous Dirichlet boundary conditions we have:
  
     a_k = 0  and  b_k = -1
     
@@ -22,23 +31,19 @@ For homogeneous Neumann boundary conditions:
     
      a_k = 0  and  b_k = -(k/k+2)**2 
      
-For Robin/mixed boundary conditions:
+For Robin boundary conditions:
 
      a_k = \pm 4*(k+1)/((k+1)**2 + (k+2)**2)  and  
      b_k = -(k**2 + (k+1)**2)/((k+1)**2 + (k+2)**2)
 
-a_k is positive for Dirichlet BC at x = -1 and Neumann BC at x = +1 (DN),
-and it is negative for Neumann BC at x = -1 and Dirichlet BC at x = +1 (ND)
-
-It is therefore possible to choose DN boundary conditions (BC = "DN")
-or ND boundary conditions (BC = "ND").
+Here a_k is positive for Dirichlet BC at x = -1 and Neumann BC at x = +1,
+and it is negative for Neumann BC at x = -1 and Dirichlet BC at x = +1.
 
 Use either Chebyshev-Gauss (GC) or Gauss-Lobatto (GL)
 points in real space.
 
 The ChebyshevTransform may be used to compute derivatives
 through fast Chebyshev transforms.
-
 """
 pi, zeros, ones = np.pi, np.zeros, np.ones
 
@@ -63,10 +68,8 @@ class ChebyshevTransform(object):
             weights = np.zeros((N))+np.pi/(N-1)
             weights[0] /= 2
             weights[-1] /= 2
-
         elif self.quad == "GL":
             points, weights = n_cheb.chebgauss(N)
-            
         return points, weights
         
     def chebDerivativeCoefficients(self, fk, fj):
@@ -92,13 +95,11 @@ class ChebyshevTransform(object):
         if self.quad == "GL":
             cj = dct(fj, 2, axis=0)
             cj /= N
-            cj[0] /= 2
-                
+            cj[0] /= 2        
         elif self.quad == "GC":
             cj = dct(fj, 1, axis=0)/(N-1)
             cj[0] /= 2
             cj[-1] /= 2
-            
         return cj
 
     def ifct(self, fk, cj):
@@ -106,13 +107,11 @@ class ChebyshevTransform(object):
         if self.quad == "GL":
             cj = 0.5*dct(fk, 3, axis=0)
             cj += 0.5*fk[0]
-        
         elif self.quad == "GC":
             cj = 0.5*dct(fk, 1, axis=0)
             cj += 0.5*fk[0]
             cj[::2] += 0.5*fk[-1]
             cj[1::2] -= 0.5*fk[-1]
-
         return cj
     
     def fastChebScalar(self, fj, fk):
@@ -120,25 +119,21 @@ class ChebyshevTransform(object):
         N = fj.shape[0]
         if self.quad == "GL":
             fk = dct(fj, 2, axis=0)*np.pi/(2*N)
-        
         elif self.quad == "GC":
             fk = dct(fj, 1, axis=0)*np.pi/(2*(N-1))
         return fk
 
-class ShenDirichletBasis(ChebyshevTransform):
-    
-    def __init__(self, quad="GC", fast_transform=True):
+class ShenBasis(ChebyshevTransform):
+
+    def __init__(self, BC, quad="GC"):
         self.quad = quad
-        self.fast_transform = fast_transform
+        self.BC = BC
         self.points = None
         self.weights = None
         self.N = -1
         
     def init(self, N):
-        """Vandermonde matrix is used just for verification"""
         self.points, self.weights = self.points_and_weights(N)
-        # Build Vandermonde matrix. Note! N points in real space gives N-2 bases in spectral space
-        self.V = n_cheb.chebvander(self.points, N-3).T - n_cheb.chebvander(self.points, N-1)[:, 2:].T
 
     def wavenumbers(self, N):
         if isinstance(N, tuple):
@@ -146,175 +141,43 @@ class ShenDirichletBasis(ChebyshevTransform):
                 N = N[0]
         if isinstance(N, int): 
             return np.arange(N-2).astype(np.float)
-        
         else:
             kk = np.mgrid[:N[0]-2, :N[1], :N[2]].astype(float)
             return kk[0]
 
-    def fastShenScalar(self, fj, fk):
-                
-        if self.fast_transform:
-            fk = self.fastChebScalar(fj, fk)
-            fk[:-2] -= fk[2:]
-        else:
-            if self.points is None: self.init(fj.shape[0])
-            fk[:-2] = np.dot(self.V, fj*self.weights)
-        return fk
-        
-    def ifst(self, fk, fj):
-        """Fast inverse Shen transform
-        Transform needs to take into account that phi_k = T_k - T_{k+2}
-        fk contains Shen coefficients in the first fk.shape[0]-2 positions
-        """
-        if self.fast_transform:
-            N = len(fj)
-            if len(fk.shape) == 3:
-                w_hat = np.zeros(fj.shape, dtype=fk.dtype)
-                w_hat[:-2] = fk[:-2]
-                w_hat[2:] -= fk[:-2]
-            if len(fk.shape) == 1:
-                w_hat = np.zeros(N)                
-                w_hat[:-2] = fk[:-2] 
-                w_hat[2:] -= fk[:-2] 
-                #- np.hstack([0, 0, fk[:-2]])    
-                #w_hat[-2] = -fk[-2]
-                #w_hat[-1] = -fk[-1]
-            fj = self.ifct(w_hat, fj)
-            return fj    
-        
-        else:
-            if not self.points: self.init(fj.shape[0])
-            return np.dot(self.V.T, fk[:-2])
-
-    def fst(self, fj, fk):
-        """Fast Shen transform
-        """
-        fk = self.fastShenScalar(fj, fk)
-        
-        N = fj.shape[0]
-        if self.quad == "GL":
-            ck = np.ones(N-2); ck[0] = 2
-            
-        elif self.quad == "GC":
-            ck = np.ones(N-2); ck[0] = 2; ck[-1] = 2  # Note!! Shen paper has only ck[0] = 2, not ck[-1] = 2. For Gauss points ck[-1] = 1, but not here! 
-            
-        a = np.ones(N-4)*(-np.pi/2)
-        b = np.pi/2*(ck+1)
-        c = a.copy()
-        if len(fk.shape) == 3:
-            bc = b.copy()
-            fk[:-2] = SFTc.TDMA_3D_complex(a, b, bc, c, fk[:-2])
-
-        elif len(fk.shape) == 1:
-            fk[:-2] = SFTc.TDMA_1D(a, b, c, fk[:-2])
-            
-        return fk
-    
-
-class ShenNeumannBasis(ShenDirichletBasis):
-    
-    def __init__(self, quad="GL"): 
-        ShenDirichletBasis.__init__(self, quad)
-            
-    def init(self, N):
-        self.points, self.weights = self.points_and_weights(N)
-        k = self.wavenumbers(N)
-        # Build Vandermonde matrix. Note! N points in real space gives N-3 bases in spectral space
-        self.V = n_cheb.chebvander(self.points, N-3).T - ((k/(k+2))**2)[:, np.newaxis]*n_cheb.chebvander(self.points, N-1)[:, 2:].T
-        self.V = self.V[1:, :]
-
-    def fastShenScalar(self, fj, fk):
-        """Fast Shen scalar product.
-        Chebyshev transform taking into account that phi_k = T_k - (k/(k+2))**2*T_{k+2}
-        Note, this is the non-normalized scalar product
-
-        """
-        
-        if self.fast_transform:
-            k  = self.wavenumbers(fj.shape)
-            fk = self.fastChebScalar(fj, fk)
-            fk[:-2] -= ((k/(k+2))**2) * fk[2:]
-
-        else:
-            if self.points is None: self.init(fj.shape[0])
-            fk = np.dot(self.V, fj*self.weights)
-        return fk
-
-    def ifst(self, fk, fj):
-        """Fast inverse Shen scalar transform
-        """
-        if len(fk.shape)==3:
-            k = self.wavenumbers(fk.shape)
-            w_hat = np.zeros(fk.shape, dtype=fk.dtype)
-            w_hat[1:-2] = fk[1:-2]
-            w_hat[3:] -= (k[1:]/(k[1:]+2))**2*fk[1:-2]
-            
-        elif len(fk.shape)==1:
-            k = self.wavenumbers(fk.shape[0])
-            w_hat = np.zeros(fk.shape[0])    
-            w_hat[1:-2] = fk[1:-2]
-            w_hat[3:] -= (k[1:]/(k[1:]+2))**2*fk[1:-2]
-
-        fj = self.ifct(w_hat, fj)
-        return fj
-        
-    def fst(self, fj, fk):
-        """Fast Shen transform.
-        """
-        fk = self.fastShenScalar(fj, fk)
-        N = fj.shape[0]
-        k = self.wavenumbers(N)
-        ck = np.ones(N-3)
-        if self.quad == "GC": ck[-1] = 2 # Note not the first since basis phi_0 is not included        
-        a = np.ones(N-5)*(-np.pi/2)*(k[1:-2]/(k[1:-2]+2))**2
-        b = np.pi/2*(1+ck*(k[1:]/(k[1:]+2))**4)
-        c = a.copy()
-        if len(fk.shape) == 3:
-            bc = b.copy()
-            fk[1:-2] = SFTc.TDMA_3D_complex(a, b, bc, c, fk[1:-2])
-	    
-        elif len(fk.shape) == 1:
-            fk[1:-2] = SFTc.TDMA_1D(a, b, c, fk[1:-2])
-
-        return fk
-
-
-class ShenRobinBasis(ShenDirichletBasis):
-    
-    def __init__(self, quad="GL", BC = "ND"): 
-	self.BC = BC
-        ShenDirichletBasis.__init__(self, quad)
-               
-    def init(self, N):
-        self.points, self.weights = self.points_and_weights(N)
-        k = self.wavenumbers(N)
-
-    def shenCoefficients(self, k):
+    def shenCoefficients(self, k, BC):
 	"""
 	Shen basis functions given by
 	phi_k = T_k + a_k*T_{k+1} + b_k*T_{k+2},
-        satisfy the imposed Robin (mixed) boundary conditions for a unique set of {a_k, b_k}.  
+	satisfy the imposed Robin (mixed) boundary conditions for a unique set of {a_k, b_k}.  
 	"""
-	if self.BC == "ND":
-	    ak = -4*(k+1)/((k+1)**2 + (k+2)**2)
-	elif self.BC == "DN":
-	    ak = 4*(k+1)/((k+1)**2 + (k+2)**2)
-	bk = -((k**2 + (k+1)**2)/((k+1)**2 + (k+2)**2))
-        return ak, bk
-    
+	am = BC[0]; bm = BC[1]; cm = BC[2]
+	ap = BC[3]; bp = BC[4]; cp = BC[5]
+	
+	detk = 2*am*ap + ((k + 1.)**2 + (k + 2.)**2)*(am*bp - ap*bm) - 2.*bm*bp*(k + 1.)**2*(k + 2.)**2
+
+	Aa = am - bm*(k + 2.)**2; Ab= -ap - bp*(k + 2.)**2  
+	Ac = am - bm*(k + 1.)**2; Ad= ap + bp*(k + 1.)**2
+	
+	y1 = -ap - bp*k**2 + cp; y2= -am + bm*k**2 + cm/((-1)**k) 
+	
+	ak = (1./detk)*(Aa*y1 + Ab*y2)
+	bk = (1./detk)*(Ac*y1 + Ad*y2)
+	
+	return ak, bk
+
     def fastShenScalar(self, fj, fk):
         """Fast Shen scalar product 
         B u_hat = sum_{j=0}{N} u_j phi_k(x_j) w_j,
         for Shen basis functions given by
 	phi_k = T_k + a_k*T_{k+1} + b_k*T_{k+2}
         """
-        if self.fast_transform:
-            k  = self.wavenumbers(fj.shape)
-            fk = self.fastChebScalar(fj, fk)
-            ak, bk = self.shenCoefficients(k)
-            
-            fk_tmp = fk
-            fk[:-2] = fk_tmp[:-2] + ak*fk_tmp[1:-1] + bk*fk_tmp[2:]
+        k  = self.wavenumbers(fj.shape)
+        fk = self.fastChebScalar(fj, fk)
+        ak, bk = self.shenCoefficients(k, BC)
+        
+        fk_tmp = fk
+        fk[:-2] = fk_tmp[:-2] + ak*fk_tmp[1:-1] + bk*fk_tmp[2:]
 
         return fk
 
@@ -325,13 +188,15 @@ class ShenRobinBasis(ShenDirichletBasis):
             k = self.wavenumbers(fk.shape)
             w_hat = np.zeros(fk.shape, dtype=fk.dtype)
         elif len(fk.shape)==1:
-	    k = self.wavenumbers(fk.shape[0])
+            k = self.wavenumbers(fk.shape[0])
             w_hat = np.zeros(fk.shape[0])
-	ak, bk = self.shenCoefficients(k)
-	w_hat[:-2] = fk[:-2]
-	w_hat[1:-1] += ak*fk[:-2]
-	w_hat[2:]   += bk*fk[:-2]
+        ak, bk = self.shenCoefficients(k, BC)
+        w_hat[:-2] = fk[:-2]
+        w_hat[1:-1] += ak*fk[:-2]
+        w_hat[2:]   += bk*fk[:-2]
             
+        if BC[0]==0 and BC[1]==1 and BC[2]==0 and BC[3]==0 and BC[4]==1 and BC[5]==0:
+            w_hat[0] = 0.0
         fj = self.ifct(w_hat, fj)
         return fj
         
@@ -342,8 +207,8 @@ class ShenRobinBasis(ShenDirichletBasis):
         N = fj.shape[0]
         k = self.wavenumbers(N) 
         k1 = self.wavenumbers(N+1) 
-        ak, bk = self.shenCoefficients(k)
-        ak1, bk1 = self.shenCoefficients(k1)
+        ak, bk = self.shenCoefficients(k, BC)
+        ak1, bk1 = self.shenCoefficients(k1, BC)
         
         if self.quad == "GL":
             ck = ones(N-2); ck[0] = 2
@@ -353,23 +218,27 @@ class ShenRobinBasis(ShenDirichletBasis):
         a = (pi/2)*(ck + ak**2 + bk**2)
         b = ones(N-3)*(pi/2)*(ak[:-1] + ak1[1:-1]*bk[:-1])
         c = ones(N-4)*(pi/2)* bk[:-2]
-        
-        """
-        Here we use splu to solve  B u = f_k,
-        where B is the pentadiagonal mass matrix and f_k is the Shen scalar product 
-        """
+
         if len(fk.shape) == 3:
-	    fk[:-2] = SFTc.PDMA_3D_complex(a, b, c, fk[:-2])
-   
+	    if BC[0]==0 and BC[1]==1 and BC[2]==0 and BC[3]==0 and BC[4]==1 and BC[5]==0:
+		fk[1:-2] = SFTc.PDMA_3D_complex(a[1:], b[1:], c[1:], fk[1:-2])
+	    else:
+		fk[:-2] = SFTc.PDMA_3D_complex(a, b, c, fk[:-2])
         elif len(fk.shape) == 1:
-	    fk[:-2] = SFTc.PDMA_1D(a, b, c, fk[:-2])	    
+	    if BC[0]==0 and BC[1]==1 and BC[2]==0 and BC[3]==0 and BC[4]==1 and BC[5]==0:
+		fk[1:-2] = SFTc.PDMA_1D(a[1:], b[1:], c[1:], fk[1:-2])
+	    else:
+		fk[:-2] = SFTc.PDMA_1D(a, b, c, fk[:-2])
+        
 	return fk    
-    
+
+  
 if __name__ == "__main__":
     
-    N = 2**12
+    N = 8
+    BC = np.array([0,1,0, 1,0,0])
     af = np.zeros(N, dtype=np.complex)
-    SR = ShenRobinBasis(quad="GC", BC="ND")
+    SR = ShenBasis(BC, quad="GC")
     pointsr, weightsr = SR.points_and_weights(N)
     x = pointsr
     a = x -(8./13.)*(-1 + 2*x**2) - (5./13.)*(-3*x + 4*x**3) # Chebyshev polynomial that satisfies the Robin BC
@@ -378,5 +247,5 @@ if __name__ == "__main__":
     a0 = a.copy()
     a0 = SR.ifst(af, a0)
     print "Error in Shen-Robin transform: ",linalg.norm((a - a0), inf) 
+    # Out: Error in Shen-Robin transform: 4.57966997658e-16
     assert np.allclose(a0, a)
-     
