@@ -149,7 +149,7 @@ class ShenBasis(ChebyshevTransform):
 	"""
 	Shen basis functions given by
 	phi_k = T_k + a_k*T_{k+1} + b_k*T_{k+2},
-	satisfy the imposed Robin (mixed) boundary conditions for a unique set of {a_k, b_k}.  
+	satisfy the imposed boundary conditions for a unique set of {a_k, b_k}.  
 	"""
 	am = BC[0]; bm = BC[1]; cm = BC[2]
 	ap = BC[3]; bp = BC[4]; cp = BC[5]
@@ -182,7 +182,7 @@ class ShenBasis(ChebyshevTransform):
         return fk
 
     def ifst(self, fk, fj):
-        """Fast inverse Shen scalar transform for Robin BC.
+        """Fast inverse Shen scalar transform for general BC.
         """
         if len(fk.shape)==3:
             k = self.wavenumbers(fk.shape)
@@ -201,7 +201,7 @@ class ShenBasis(ChebyshevTransform):
         return fj
         
     def fst(self, fj, fk):
-        """Fast Shen transform for Robin BC.
+        """Fast Shen transform for general BC.
         """
         fk = self.fastShenScalar(fj, fk)
         N = fj.shape[0]
