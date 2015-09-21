@@ -29,10 +29,10 @@ def B_matvec(np.ndarray[np.float64_t, ndim=1] uud, np.ndarray[np.float64_t, ndim
             b[0, j, k] = v[0,j,k]*dd[0] + v[1,j,k]*ud[0] + v[2,j,k]*uud[0]
             b[1, j, k] = v[0,j,k]*ld[0] + v[1,j,k]*dd[1] + v[2, j, k]*ud[1] + v[3,j,k]*uud[1]
             
-            b[(N-1),j,k] = v[(N-3),j,k]*lld[-2] + v[(N-2),j,k]*ld[-2] + v[(N-1),j,k]*dd[-2] + v[N, j, k]*ud[-1] 
-            b[N,j,k]     = v[(N-2),j,k]*lld[-1] + v[(N-1),j,k]*ld[-1] + v[N,j,k]*dd[-1]
+            b[(N-2),j,k] = v[(N-3),j,k]*lld[-2] + v[(N-2),j,k]*ld[-2] + v[(N-1),j,k]*dd[-2] + v[N, j, k]*ud[-1] 
+            b[(N-1),j,k]     = v[(N-2),j,k]*lld[-1] + v[(N-1),j,k]*ld[-1] + v[N,j,k]*dd[-1]
             
-    for i in xrange(2, N-1):
+    for i in xrange(2, N-2):
         for j in xrange(b.shape[1]):
             for k in xrange(b.shape[2]):
                 b[i, j, k] = v[(i-2),i,j]*lld[i-2] + v[(i-1),i,j]*ld[i-1] + v[i,j,k]*dd[i] + v[(i+1),j,k]*ud[i] + v[(i+2),j,k]*uud[i]                    
@@ -40,39 +40,58 @@ def B_matvec(np.ndarray[np.float64_t, ndim=1] uud, np.ndarray[np.float64_t, ndim
 
                   
 def C_matvec(np.ndarray[np.float64_t, ndim=1] ld, np.ndarray[np.float64_t, ndim=1] ud,
-             uud, np.ndarray[np.float64_t, ndim=1] dd,
+             np.ndarray[np.float64_t] uud, np.ndarray[np.float64_t, ndim=1] dd,
              np.ndarray[T, ndim=3] v, np.ndarray[T, ndim=3] b):
 
     cdef:
-        int i, j, k
-        int N = v.shape[0]-2 
-              
-    for j in xrange(b.shape[1]):
-        for k in xrange(b.shape[2]):
-            b[0, j, k] = v[0,j,k]*dd[0] + v[1,j,k]*ud[0] + sum(v[2:,j,k]*uud[:][0])
-            b[(N-1),j,k] = v[(N-2),j,k]*ld[-2] + v[(N-1),j,k]*dd[-2] + v[N, j, k]*ud[-1] 
-            b[N,j,k]     = v[(N-1),j,k]*ld[-1] + v[N,j,k]*dd[-1]
+        int i, j, k, l
+        int N   = v.shape[0]-2
+        int Ny  = v.shape[1]
+        int Nz  = v.shape[2] 
+        np.ndarray row_sum = np.empty((Ny,Nz))
 
-    for i in xrange(1, N-1):
-        for j in xrange(b.shape[1]):
-            for k in xrange(b.shape[2]):
-                b[i:(N-1), j, k] = v[(i-1),j,k]*ld[i-1] + v[i,j,k]*dd[i] + v[(i+1), j, k]*ud[i] + sum(v[(i+2):,j,k]*uud[:-i][i])            
-                   
- 
-def A_matvec(np.ndarray[np.float64_t, ndim=1] ud, np.ndarray[np.float64_t, ndim=1] dd,
-             np.ndarray[T, ndim=3] v, np.ndarray[T, ndim=3] b):
-
-    cdef:
-        int i, j, k
-        int N = v.shape[0]-2
     
     for j in xrange(b.shape[1]):
         for k in xrange(b.shape[2]):
-            b[0, j, k] = v[0,j,k]*dd[0] + sum(v[1:,j,k]*ud[:][0])
-            b[N,j,k]   = v[N,j,k]*dd[-1]
+            row_sum[j,k] = 0
+            for i in xrange(N-1):
+                row_sum[j,k] += v[(i+2),j,k]*uud[i][0]     
+	    b[0, j, k] = v[0,j,k]*dd[0] + v[1,j,k]*ud[0] + row_sum[j,k]
+	    b[(N-2),j,k] = v[(N-2),j,k]*ld[-2] + v[(N-1),j,k]*dd[-2] + v[N, j, k]*ud[-1] 
+	    b[(N-1),j,k]     = v[(N-1),j,k]*ld[-1] + v[N,j,k]*dd[-1]
+
+    for i in xrange(1, N-2):
+        for j in xrange(b.shape[1]):
+            for k in xrange(b.shape[2]):
+                row_sum[j,k] = 0
+                for l in xrange(N-2-i):
+                    row_sum[j,k] += v[(l+2+i),j,k]*uud[l][i] 
+                b[i, j, k] = v[(i-1),j,k]*ld[i-1] + v[i,j,k]*dd[i] + v[(i+1), j, k]*ud[i] + row_sum[j,k]            
+                   
+ 
+def A_matvec(np.ndarray[np.float64_t] ud, np.ndarray[np.float64_t, ndim=1] dd,
+             np.ndarray[T, ndim=3] v, np.ndarray[T, ndim=3] b):
+
+    cdef:
+        int i, j, k, l
+        int N = v.shape[0]-2
+        int Ny  = v.shape[1]
+        int Nz  = v.shape[2] 
+        np.ndarray row_sum = np.empty((Ny,Nz))
+    
+    for j in xrange(b.shape[1]):
+        for k in xrange(b.shape[2]):
+            row_sum[j,k] = 0
+            for i in xrange(N-1):
+                row_sum[j,k] += v[(i+1),j,k]*ud[i][0] 
+            b[0, j, k] = v[0,j,k]*dd[0] + row_sum[j,k]   
+            b[(N-1),j,k]   = v[N,j,k]*dd[-1]
 
     for i in xrange(1, N-1):
         for j in xrange(b.shape[1]):
             for k in xrange(b.shape[2]):
-                b[i:N, j, k] = v[i,j,k]*dd[i] + sum(v[(i+1):,j,k]*ud[:-i][i])            
+                row_sum[j,k] = 0
+                for l in xrange(N-1-i):
+                    row_sum[j,k] += v[(l+i+2),j,k]*ud[l][i] 
+                b[i, j, k] = v[i,j,k]*dd[i] + row_sum[j,k]       
                            
