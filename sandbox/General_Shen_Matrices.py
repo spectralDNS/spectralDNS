@@ -35,7 +35,7 @@ class B_matrix(object):
         if len(v.shape) > 1:
             B_matvec(self.uud, self.ud, self.lld, self.ld, self.dd, v, c)
         else:
-	      c[:(N-1)]  = self.uud*v[2:]
+	    c[:(N-1)]  = self.uud*v[2:]
             c[:N]     += self.ud*v[1:]
             c[:]      += self.dd*v[:]
             c[1:]     += self.ld*v[:N]
@@ -118,7 +118,7 @@ class A_matrix(object):
             if (i+1)<N:
                 L1 = K[i:]*(K[i:]**2-K[:-i]**2) + b_j[i:]*(K[i:]+2)*((K[i:]+2)**2 - K[:-i]**2)
                 L2 = a_k[:-i]*( K[i:]*(K[i:]**2-(K[:-i]+1)**2) + b_j[i:]*(K[i:]+2)*((K[i:]+2)**2 - (K[:-i]+1)**2) )
-                L2 = b_k[:-i]*( K[i:]*(K[i:]**2-(K[:-i]+2)**2) + b_j[i:]*(K[i:]+2)*((K[i:]+2)**2 - (K[:-i]+2)**2) )
+                L3 = b_k[:-i]*( K[i:]*(K[i:]**2-(K[:-i]+2)**2) + b_j[i:]*(K[i:]+2)*((K[i:]+2)**2 - (K[:-i]+2)**2) )
                 self.ud.append(array((pi/2)*(L1 + L2 + L3)))  
 
     def matvec(self, v):
