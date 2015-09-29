@@ -33,6 +33,7 @@ def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, X, nu, *
     U[1] = sin(X[0])*cos(X[1])*exp(-2*nu*t)    
     ke = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)    
     if rank == 0:
+        print "Error", k-ke
         assert round(k - ke, 7) == 0
 
 if __name__ == '__main__':

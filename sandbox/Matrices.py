@@ -226,37 +226,40 @@ class dP2Tmat(object):
         self.shape = shape = (K.shape[0], K.shape[0]-2)
         N = shape[0]
         self.dd = 0
-        self.ud = -2*pi
-        self.ld = -(K[1:(N-1)]+1)*pi
+        self.ud = []
+        self.ld = -(K[1:N]+1)*pi
+        for i in range(1, N-2, 2):
+            self.ud.append(-2*pi)
+            
         self.c = zeros(K.shape, dtype=complex)
         
     def matvec(self, v):
         raise NotImplementedError
 
     def diags(self):
-        N = shape[0]
-        return diags([self.dd] + self.ud, range(0, N-2, 2))
+        N = self.shape[0]
+        return diags([self.ld] + self.ud, range(-1, N-2, 2), shape=self.shape)
 
 
-class dSdTmat(object):
-    """Matrix for inner product (u', T) = (phi', T) u_hat = dSdTmat * u_hat
+class dTSmat(object):
+    """Matrix for inner product (p', phi) = (T', phi) p_hat = dTSmat * p_hat
     
-    where u_hat is a vector of coefficients for a Shen Dirichlet basis
-    and T is a Chebyshev basis.
+    where p_hat is a vector of coefficients for a Chebyshev basis
+    and phi is a Shen Dirichlet basis.
     """
 
     def __init__(self, K, **kwargs):
         assert len(K.shape) == 1
-        self.shape = shape = (K.shape[0], K.shape[0]-2)
+        self.shape = shape = (K.shape[0]-2, K.shape[0])
         N = shape[0]
-        self.ld = -np.pi*(K[1:N]+1)   
-        self.ud = []
-        for i in range(1, N-2, 2):
-            self.ud.append(np.ones(N-2-i)*(-np.pi))
+        self.ld = []
+        self.ud = np.pi*(K[1:N]+1)
 
     def matvec(self, v):
-        raise NotImplementedError
+        N = self.shape[0]
+        c = zeros(v.shape, dtype=v.dtype)
+        c[:N] = self.ud.repeat(array(v.shape[:]).prod()).reshape(v[1:(N+1)].shape)*v[1:(N+1)]
+        return c        
 
     def diags(self):
-        N = self.shape[0]
-        return diags([self.ld] + self.ud, range(-1, N-2, 2), shape=self.shape)
+        return diags(self.ud, [1], shape=self.shape)

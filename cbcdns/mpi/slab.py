@@ -6,22 +6,24 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from ..fft.wrappyfftw import *
 from cbcdns import config
 from ..optimization import optimizer
-from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8
+from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis
 
 __all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
 @optimizer
 def transpose_Uc(Uc_hatT, U_mpi, num_processes):
-    n0 = U_mpi.shape[2]
-    for i in xrange(num_processes): 
-        Uc_hatT[:, i*n0:(i+1)*n0] = U_mpi[i]
+    #n0 = U_mpi.shape[2]
+    #for i in xrange(num_processes): 
+       #Uc_hatT[:, i*n0:(i+1)*n0] = U_mpi[i]
+    Uc_hatT[:] = rollaxis(U_mpi, 1, 0).reshape(Uc_hatT.shape)
     return Uc_hatT
 
 @optimizer
 def transpose_Umpi(U_mpi, Uc_hatT, num_processes):
-    n0 = U_mpi.shape[2]
-    for i in xrange(num_processes): 
-        U_mpi[i] = Uc_hatT[:, i*n0:(i+1)*n0]
+    #n0 = U_mpi.shape[2]
+    #for i in xrange(num_processes): 
+       #U_mpi[i] = Uc_hatT[:, i*n0:(i+1)*n0]  
+    U_mpi[:] = rollaxis(Uc_hatT.reshape(Np[0], num_processes, Np[1], Nf), 1, 0)
     return U_mpi
 
 def create_wavenumber_arrays(N, Np, Nf, rank, float):
@@ -156,7 +158,7 @@ def ifftn_mpi(fu, u):
     Need to do ifft in reversed order of fft
     """
     if num_processes == 1:
-        u = irfftn(fu, axes=(0,1,2))
+        u[:] = irfftn(fu, axes=(0,1,2))
         return u
     
     # Do first owned direction
@@ -182,7 +184,7 @@ def fftn_mpi(u, fu):
     """fft in three directions using mpi
     """
     if num_processes == 1:
-        fu = rfftn(u, axes=(0,1,2))
+        fu[:] = rfftn(u, axes=(0,1,2))
         return fu
     
     if config.communication == 'alltoall':
@@ -206,6 +208,6 @@ def fftn_mpi(u, fu):
         fu_send[:] = fu_send.transpose(0,2,1,3)
                       
     # Do fft for last direction 
-    fu = fft(fu, axis=0)
+    fu[:] = fft(fu, axis=0)
     return fu
      

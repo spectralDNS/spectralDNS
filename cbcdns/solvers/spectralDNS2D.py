@@ -31,7 +31,7 @@ def ComputeRHS(dU, rk):
     dU[1] = fft2_mpi(-U[0]*curl, dU[1])
 
     # Dealias the nonlinear convection
-    dU = dealias_rhs(dU, dealias)
+    #dU = dealias_rhs(dU, dealias)
 
     dU = add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, nu)
     

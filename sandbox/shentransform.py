@@ -1,8 +1,6 @@
 import numpy as np
 from numpy.polynomial import chebyshev as n_cheb
-from scipy.fftpack import dct, idct
-from scipy.sparse.linalg import LinearOperator
-from scipy.sparse import diags
+from cbcdns.fft.wrappyfftw import dct
 import SFTc
 
 """
@@ -26,14 +24,6 @@ through fast Chebyshev transforms.
 """
 pi, zeros, ones = np.pi, np.zeros, np.ones
 
-dct1 = dct
-def dct(x, i, axis=0):
-    if np.iscomplexobj(x):
-        xreal = dct1(x.real, i, axis=axis)
-        ximag = dct1(x.imag, i, axis=axis)
-        return xreal + ximag*1j
-    else:
-        return dct1(x, i, axis=axis)
 
 class ChebyshevTransform(object):
     
@@ -74,25 +64,26 @@ class ChebyshevTransform(object):
         """Fast Chebyshev transform."""
         N = fj.shape[0]
         if self.quad == "GL":
-            cj = dct(fj, 2, axis=0)
+            cj[:] = dct(fj, type=2, axis=0)            
             cj /= N
             cj[0] /= 2
                 
         elif self.quad == "GC":
-            cj = dct(fj, 1, axis=0)/(N-1)
+            cj[:] = dct(fj, type=1, axis=0)/(N-1)
             cj[0] /= 2
             cj[-1] /= 2
             
         return cj
 
+    #@profile
     def ifct(self, fk, cj):
         """Inverse fast Chebyshev transform."""
         if self.quad == "GL":
-            cj = 0.5*dct(fk, 3, axis=0)
+            cj[:] = 0.5*dct(fk, type=3, axis=0)
             cj += 0.5*fk[0]
         
         elif self.quad == "GC":
-            cj = 0.5*dct(fk, 1, axis=0)
+            cj[:] = 0.5*dct(fk, type=1, axis=0)
             cj += 0.5*fk[0]
             cj[::2] += 0.5*fk[-1]
             cj[1::2] -= 0.5*fk[-1]
@@ -103,10 +94,10 @@ class ChebyshevTransform(object):
         """Fast Chebyshev scalar product."""
         N = fj.shape[0]
         if self.quad == "GL":
-            fk = dct(fj, 2, axis=0)*np.pi/(2*N)
+            fk = dct(fj, type=2, axis=0)*np.pi/(2*N)
         
         elif self.quad == "GC":
-            fk = dct(fj, 1, axis=0)*np.pi/(2*(N-1))
+            fk = dct(fj, type=1, axis=0)*np.pi/(2*(N-1))
         return fk
 
 class ShenDirichletBasis(ChebyshevTransform):
@@ -157,7 +148,7 @@ class ShenDirichletBasis(ChebyshevTransform):
                 w_hat[:-2] = fk[:-2]
                 w_hat[2:] -= fk[:-2]
             if len(fk.shape) == 1:
-                w_hat = np.zeros(N)                
+                w_hat = np.zeros(N, dtype=fk.dtype)        
                 w_hat[:-2] = fk[:-2] 
                 w_hat[2:] -= fk[:-2] 
                 #- np.hstack([0, 0, fk[:-2]])    
@@ -187,7 +178,7 @@ class ShenDirichletBasis(ChebyshevTransform):
         c = a.copy()
         if len(fk.shape) == 3:
             bc = b.copy()
-            fk[:-2] = SFTc.TDMA_3D_complex(a, b, bc, c, fk[:-2])
+            fk[:-2] = SFTc.TDMA_3D(a, b, bc, c, fk[:-2])
 
         elif len(fk.shape) == 1:
             fk[:-2] = SFTc.TDMA_1D(a, b, c, fk[:-2])
@@ -255,7 +246,7 @@ class ShenNeumannBasis(ShenDirichletBasis):
         c = a.copy()
         if len(fk.shape) == 3:
             bc = b.copy()
-            fk[1:-2] = SFTc.TDMA_3D_complex(a, b, bc, c, fk[1:-2])
+            fk[1:-2] = SFTc.TDMA_3D(a, b, bc, c, fk[1:-2])
 
         elif len(fk.shape) == 1:
             fk[1:-2] = SFTc.TDMA_1D(a, b, c, fk[1:-2])
@@ -270,7 +261,7 @@ if __name__ == "__main__":
     af = np.zeros((N, N, N/2+1), dtype=a.dtype)
     a[0,:,:] = 0
     a[-1,:,:] = 0
-    #a = np.random.random(N)
+    #a = np.random.random(N)+np.random.random(N)*1j 
     #af = np.zeros(N, dtype=np.complex)
     #a[0] = 0
     #a[-1] = 0

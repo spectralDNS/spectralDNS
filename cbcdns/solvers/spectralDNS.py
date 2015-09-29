@@ -105,9 +105,10 @@ def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U
         for i in range(3):
             U[i] = ifftn_mpi(U_hat[i], U[i])
+                        
     dU = conv(dU)
 
-    dU = dealias_rhs(dU, dealias)
+    #dU = dealias_rhs(dU, dealias)
     
     dU = add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu)
         

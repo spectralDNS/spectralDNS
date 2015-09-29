@@ -6,40 +6,57 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from ..fft.wrappyfftw import *
 from cbcdns import config
 from ..optimization import optimizer
-from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8
+from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis
 
 __all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
 @optimizer
 def transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1):
-    n0 = Uc_hat_z.shape[0]
-    n1 = Uc_hat_x.shape[2]
-    for i in range(P1):
-        Uc_hat_x[i*n0:(i+1)*n0] = Uc_hat_z[:, :, i*n1:(i+1)*n1]
+    #n0 = Uc_hat_z.shape[0]
+    #n1 = Uc_hat_x.shape[2]
+    #for i in range(P1):
+        #Uc_hat_x[i*n0:(i+1)*n0] = Uc_hat_z[:, :, i*n1:(i+1)*n1]
+        
+    sz = Uc_hat_z.shape
+    sx = Uc_hat_x.shape
+    Uc_hat_x[:] = rollaxis(Uc_hat_z[:,:,:-1].reshape((sz[0], sz[1], P1, sx[2])), 2).reshape(sx)
     return Uc_hat_x
             
 @optimizer
 def transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1):
-    n0 = Uc_hat_z.shape[0]
-    n1 = Uc_hat_xr.shape[2]
-    for i in range(P1):
-        Uc_hat_z[:, :, i*n1:(i+1)*n1] = Uc_hat_xr[i*n0:(i+1)*n0]
+    #n0 = Uc_hat_z.shape[0]
+    #n1 = Uc_hat_xr.shape[2]
+    #for i in range(P1):
+        #Uc_hat_z[:, :, i*n1:(i+1)*n1] = Uc_hat_xr[i*n0:(i+1)*n0]
+        
+    sz = Uc_hat_z.shape
+    sx = Uc_hat_xr.shape
+    Uc_hat_z[:, :, :-1] = rollaxis(Uc_hat_xr.reshape((P1, sz[0], sz[1], sx[2])), 0, 3).reshape((sz[0], sz[1], sz[2]-1))        
     return Uc_hat_z
 
 @optimizer
 def transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2):
-    n0 = Uc_hat_y.shape[0]
-    n1 = Uc_hat_x.shape[1]
-    for i in range(P2): 
-        Uc_hat_x[i*n0:(i+1)*n0] = Uc_hat_y[:, i*n1:(i+1)*n1]
+    #n0 = Uc_hat_y.shape[0]
+    #n1 = Uc_hat_x.shape[1]
+    #for i in range(P2): 
+        #Uc_hat_x[i*n0:(i+1)*n0] = Uc_hat_y[:, i*n1:(i+1)*n1]
+        
+    sy = Uc_hat_y.shape
+    sx = Uc_hat_x.shape
+    Uc_hat_x[:] = rollaxis(Uc_hat_y.reshape((sy[0], P2, sx[1], sx[2])), 1).reshape(sx)        
     return Uc_hat_x
 
 @optimizer
 def transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2):
-    n0 = Uc_hat_y.shape[0]
-    n1 = Uc_hat_xr.shape[1]
-    for i in range(P2): 
-        Uc_hat_y[:, i*n1:(i+1)*n1] = Uc_hat_xr[i*n0:(i+1)*n0]
+    #n0 = Uc_hat_y.shape[0]
+    #n1 = Uc_hat_xr.shape[1]
+    #for i in range(P2): 
+        #Uc_hat_y[:, i*n1:(i+1)*n1] = Uc_hat_xr[i*n0:(i+1)*n0]
+        
+    sy = Uc_hat_y.shape
+    sx = Uc_hat_xr.shape
+    Uc_hat_y[:] = rollaxis(Uc_hat_xr.reshape((P2, sy[0], sx[1], sx[2])), 1).reshape(sy)  
+        
     return Uc_hat_y
 
 def create_wavenumber_arrays(N, N1, N2, xyrank, xzrank, float):
@@ -221,7 +238,7 @@ def ifftn_mpi(fu, u):
             
     # Do fft for y-direction
     Uc_hat_z[:, :, -1] = 0
-    u = irfft(Uc_hat_z, axis=2)
+    u[:] = irfft(Uc_hat_z, axis=2)
     return u
         
 #@profile
@@ -243,5 +260,5 @@ def fftn_mpi(u, fu):
     Uc_hat_y[:] = transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2)
                                    
     # Do fft for last direction 
-    fu = fft(Uc_hat_y, axis=1)
+    fu[:] = fft(Uc_hat_y, axis=1)
     return fu

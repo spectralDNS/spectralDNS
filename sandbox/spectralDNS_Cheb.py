@@ -282,7 +282,7 @@ def Curl(u0, uh, c):
     c[2] -= Uc
     
     #F_tmp[0] = -Cm.matvec(uh[2])
-    #F_tmp[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, F_tmp[0, u_slice])    
+    #F_tmp[0, u_slice] = SFTc.TDMA_3D(a0, b0, bc, c0, F_tmp[0, u_slice])    
     #c[1] = ifst(F_tmp[0], c[1], ST)    
     c[1] = ifct(F_tmp[2], c[1])    
     Uc[:] = ifst(1j*K[2]*uh[0, :Nu], Uc, ST) 
@@ -300,7 +300,7 @@ def standardConvection(c):
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
     F_tmp[0] = Cm.matvec(U_hat0[0])
-    F_tmp[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, F_tmp[0, u_slice])    
+    F_tmp[0, u_slice] = SFTc.TDMA_3D(a0, b0, bc, c0, F_tmp[0, u_slice])    
     dudx = U_tmp4[0] = ifst(F_tmp[0], U_tmp4[0], ST)        
     
     SFTc.Mult_DPhidT_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
@@ -562,7 +562,7 @@ def Divu(U, U_hat, c):
     c[:] = 0
     SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], 
                        U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], c[p_slice])
-    c[p_slice] = SFTc.TDMA_3D_complex(a0N, b0N, bcN, c0N, c[p_slice])
+    c[p_slice] = SFTc.TDMA_3D(a0N, b0N, bcN, c0N, c[p_slice])
         
     return c
 
@@ -606,9 +606,9 @@ def steps():
         dU[:] = 0
         pressuregrad(Pcorr, dU)
         
-        dU[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[0, u_slice])
-        dU[1, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[1, u_slice])
-        dU[2, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[2, u_slice])    
+        dU[0, u_slice] = SFTc.TDMA_3D(a0, b0, bc, c0, dU[0, u_slice])
+        dU[1, u_slice] = SFTc.TDMA_3D(a0, b0, bc, c0, dU[1, u_slice])
+        dU[2, u_slice] = SFTc.TDMA_3D(a0, b0, bc, c0, dU[2, u_slice])    
         U_hat[:3, u_slice] += dt*dU[:3, u_slice]  # + since pressuregrad computes negative pressure gradient
 
         for i in range(3):
