@@ -1,19 +1,26 @@
-__author__ = "Mikael Mortensen <mikaem@math.uio.no>"
-__date__ = "2015-01-02"
-__copyright__ = "Copyright (C) 2014 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Sep 22 15:55:26 2015
+
+@author: Diako Darian
+    
+
+The code below employs a projection method to solve the 3D incompressible Navier-Stokes equations. The spatial discretization is done by a spectral method using periodic Fourier basis functions in y and z directions, and non-periodic Chebyshev polynomials in x direction. Time discretization is done by a semi-implicit Crank-Nicolson scheme.
+
+"""
 
 from numpy import *
 from numpy.fft import fftfreq, fft, ifft, irfft2, rfft2, rfftn, irfftn
 from mpi4py import MPI
 import matplotlib.pyplot as plt
-from shentransformDNR import ShenDirichletBasis, ShenNeumannBasis
-from Matrices import Chmat, Cmat, Bhmat, Bmat, BDmat, Amat
+from shentransform import ShenBasis
+from Shen_Matrices import B_matrix, C_matrix, A_matrix, D_matrix 
 import SFTc
 from OrrSommerfeld_eig import OrrSommerfeld
 from scipy.fftpack import dct
-import sys
 import time
+import sys
+
 try:
     from cbcdns.fft.wrappyfftw import *
 except ImportError:
@@ -45,9 +52,15 @@ comm = MPI.COMM_WORLD
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
 Np = N / num_processes
+
 # Get points and weights for Chebyshev weighted integrals
-ST = ShenDirichletBasis(quad="GL")
-SN = ShenNeumannBasis(quad="GL")
+BC1 = array([1,0,0, 1,0,0])
+BC2 = array([0,1,0, 0,1,0])
+BC3 = array([0,1,0, 1,0,0])
+ST = ShenBasis(BC1, quad="GL")
+SN = ShenBasis(BC2, quad="GL")
+SR = ShenBasis(BC3, quad="GC")
+
 points, weights = ST.points_and_weights(N[0])
 pointsp, weightsp = SN.points_and_weights(N[0])
 
@@ -98,6 +111,22 @@ conv1   = empty((3, N[0], Np[1], Nf), dtype="complex")
 diff0   = empty((3, N[0], Np[1], Nf), dtype="complex")
 Source  = empty((3, Np[0], N[1], N[2])) 
 Sk      = empty((3, N[0], Np[1], Nf), dtype="complex") 
+
+Amat = zeros((N[0]-2,N[0]-2))
+Bmat = zeros((N[0]-2,N[0]-2))
+Cmat = zeros((N[0]-2,N[0]-2))
+
+A_tilde = zeros((N[0]-2,N[0]-2))
+B_tilde = zeros((N[0]-2,N[0]-2))
+C_tilde = zeros((N[0]-2,N[0]-2))
+
+A_breve = zeros((N[0]-2,N[0]-2))
+B_breve = zeros((N[0]-2,N[0]-2))
+C_breve = zeros((N[0]-2,N[0]-2))
+
+A_hat = zeros((N[0]-2,N[0]-2))
+B_hat = zeros((N[0]-2,N[0]-2))
+C_hat = zeros((N[0]-2,N[0]-2))
 
 kx = arange(N[0]).astype(float)
 ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
@@ -188,13 +217,13 @@ def ifct0(fu, u):
         u[:, i*n0:(i+1)*n0] = U_mpi2[i]
     return u
 
-#@profile
+
 def chebDerivative_3D0(fj, u0):
     UT[0] = fct0(fj, UT[0])
     UT[1] = SFTc.chebDerivativeCoefficients_3D(UT[0], UT[1]) 
     u0[:] = ifct0(UT[1], u0)
     return u0
-#@profile
+
 def chebDerivative_3D(fj, u0):
     Uc_hat2[:] = fct(fj, Uc_hat2)
     Uc_hat[:] = SFTc.chebDerivativeCoefficients_3D(Uc_hat2, Uc_hat)    
@@ -206,20 +235,15 @@ def energy(u):
     c = zeros(N[0])
     comm.Gather(uu, c)
     if rank == 0:
-        ak = 1./(N[0]-1)*dct(c, 1, axis=0)
+        akk = 1./(N[0]-1)*dct(c, 1, axis=0)
         w = arange(0, N[0], 1, dtype=float)
         w[2:] = 2./(1-w[2:]**2)
         w[0] = 1
         w[1::2] = 0
-        return sum(ak*w)*L[1]*L[2]/N[1]/N[2]
+        return sum(akk*w)*L[1]*L[2]/N[1]/N[2]
     else:
         return 0
     
-    #ww = repeat(w, ak.shape[-2]*ak.shape[-1]).reshape(ak.shape)
-    #c = comm.reduce(ww*ak)
-    #if rank == 0:
-        #return c*L[1]*L[2]/N[1]/N[2]
-
 # Set body_force
 Source[:] = 0
 if case == "OS":
@@ -233,97 +257,68 @@ elif case == "MKK":
 Sk[:] = 0
 for i in range(3):
     Sk[i] = fss(Source[i], Sk[i], ST)
-
-alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
-alfa1 = sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt)
-alfa2 = sqrt(K[1, 0]**2+K[2, 0]**2)
-
-
-Chm = Chmat(K[0, :, 0, 0])
-Bhm = Bhmat(K[0, :, 0, 0], SN.quad)
-Cm = Cmat(K[0, :, 0, 0])
-#Bm = BDmat(K[0, :, 0, 0], ST.quad)
-#@profile
-def pressuregrad(P_hat, dU):
-    # Pressure gradient x-direction
-    dU[0] -= Chm.matvec(P_hat)
     
+# The constant factors in the Helmholtz equations
+alpha1 = K[1, 0]**2+K[2, 0]**2+2.0/nu/dt
+alpha2 = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
+alpha3 = K[1, 0]**2+K[2, 0]**2
+
+# Shen coefficients for the basis functions
+a_k, b_k = ST.shenCoefficients(K[0,:-2,0,0],BC1)
+a_j, b_j = SN.shenCoefficients(K[0,:-2,0,0],BC2)
+
+
+# Chebyshev normalization factor
+ck = ST.chebNormalizationFactor(N, ST.quad)
+cj = SN.chebNormalizationFactor(N, SN.quad)
+
+# The components of non-zero diagonals of the matrix B = (phi_j,phi_k)_w
+a0 = zeros(N[0]-2)
+b0 = zeros(N[0]-2)
+Bm = B_matrix(K[0, :, 0, 0], ST.quad, a_k, b_k, a_k, b_k)
+a0[2:], b0[1:], c0, d0, e0 = Bm.diags()
+
+# Matrices
+# 1. Matrices from the same Dirichlet basis:
+Amat = SFTc.A_mat(K[0, :, 0, 0], a_k, b_k, a_k, b_k, Amat)
+Bmat = SFTc.B_mat(K[0, :, 0, 0], ck, a_k, b_k, a_k, b_k, Bmat)
+Cmat = SFTc.C_mat(K[0, :, 0, 0], a_k, b_k, a_k, b_k, Cmat)
+# 2. Matrices from the Neumann-Dirichlet basis functions: (phi^breve_j, phi_k)
+B_tilde = SFTc.B_mat(K[0, :, 0, 0], cj, a_j, b_j, a_k, b_k, B_tilde)
+C_tilde = SFTc.C_mat(K[0, :, 0, 0], a_j, b_j, a_k, b_k, C_tilde)
+# 3. Matrices from the Neumann basis functions: (phi^breve_j, phi^breve_k)
+A_breve = SFTc.A_mat(K[0, :, 0, 0], a_j, b_j, a_j, b_j, A_breve)
+B_breve = SFTc.B_mat(K[0, :, 0, 0], cj, a_j, b_j, a_j, b_j, B_breve) 
+# 4. Matrices from the Dirichlet-Neumann basis functions: (phi_j, phi^breve_k)
+B_hat = SFTc.B_mat(K[0, :, 0, 0], ck, a_k, b_k, a_j, b_j, B_hat)
+C_hat = SFTc.C_mat(K[0, :, 0, 0], a_k, b_k, a_j, b_j, C_hat)
+
+def pressuregrad(P_hat, dU):
+    
+    F_tmp[:] = 0.0
+    F_tmp[0] = SFTc.C_matvec(K[0,:,0,0], C_tilde, P_hat, F_tmp[0])  
+    F_tmp[1] = SFTc.B_matvec(K[0,:,0,0], B_tilde, P_hat, F_tmp[1])
+    
+    # Pressure gradient x-direction
+    dU[0] -= F_tmp[0]
     # pressure gradient y-direction
-    F_tmp[0] = Bhm.matvec(P_hat)
-    dU[1, :Nu] -= 1j*K[1, :Nu]*F_tmp[0, :Nu]
+    dU[1] -= 1j*K[1]*F_tmp[1]
     
     # pressure gradient z-direction
-    dU[2, :Nu] -= 1j*K[2, :Nu]*F_tmp[0, :Nu]    
+    dU[2] -= 1j*K[2]*F_tmp[1]    
     
     return dU
-
-
-# ---- Testing the pressure gradient:
-
-#P = (4./3.)*X[0]*(1.0 - (1.0/3.0)*X[0]**2)*sin(X[1])*cos(X[2])
-#P_hat = fst(P, P_hat, SN)
-#dU[:] = 0.0
-#dU = pressuregrad(P_hat, dU)
-
-#U_tmp[0] = -(4./3.)*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-#U_tmp[1] = -(4./3.)*X[0]*(1.0 - (1.0/3.0)*X[0]**2)*cos(X[1])*cos(X[2])
-#U_tmp[2] =  (4./3.)*X[0]*(1.0 - (1.0/3.0)*X[0]**2)*sin(X[1])*sin(X[2])
-#F_tmp[:] = 0.0
-#for i in range(3):
-    #if i == 0:
-	#U_hat[i] = fst(U_tmp[i], U_hat[i], ST)
-	#F_tmp[i] =  Bhm.matvec(U_hat[i])
-    #else:
-	#U_hat[i] = fst(U_tmp[i], U_hat[i],SN)
-	#F_tmp[i] =  Bhm.matvec(U_hat[i])
-#U[0] = ifst(dU[0],U[0],SN)    
-#print "Error: ", linalg.norm(dU[0,:,0,0]-F_tmp[0,:,0,0],inf) 
-#plt.plot(X[0,:,10,0], U[0,:,10,0], X[0,:,10,0], U_tmp[0,:,10,0])
-#plt.show()
-#sys.exit()
-
 
 def pressurerhs(U_hat, dU):
     dU[3] = 0.
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], dU[3, p_slice])    
-    dU[3, p_slice] *= -1./dt    
+    dU[3] = SFTc.Helmholtz_CB_vector(K[0,:,0,0],C_hat, B_hat, K[1,0], K[2,0], U_hat[0], U_hat[1], U_hat[2], dU[3])
+    dU[3] *= -1./dt    
     return dU
 
-
-
-## ---- Testing the rhs of the equation for the pressure correction:
-
-#U_tmp[0] = 2*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-#U_tmp[1] = 4.0*X[0]*(1-X[0]**2)*sin(X[1])*cos(X[2])
-#U_tmp[2] = 4.0*X[0]*(1-X[0]**2)*sin(X[1])*cos(X[2])
-
-#for i in range(3):
-    #U_hat[i] = fst(U_tmp[i], U_hat[i], ST)
-
-#dU = pressurerhs(U_hat, dU)
-
-#P = -2*X[0]*sin(X[1])*cos(X[2]) + 4.0*X[0]*(1-X[0]**2)*cos(X[1])*cos(X[2]) -4.0*X[0]*(1-X[0]**2)*sin(X[1])*sin(X[2])
-#P_hat = fst(P, P_hat, ST)
-
-
-
-#F_tmp[0] = 0.0
-#F_tmp[0] = Bhm.matvec(P_hat)
-#dU[3] *= -dt
-#U[0] = ifst(dU[3],U[0],ST)
-
-#ext = 4.0*X[0]*(1-X[0]**2)
-#print "Error: ", linalg.norm(dU[3,0,-1,:]-F_tmp[0,0,-1,:],inf)    
-#plt.plot(X[0,:,0,0], U[0,:,0,0],X[0,:,0,0], P[:,0,0])
-#plt.show()
-#sys.exit()
-
-# --------------------------------------------------------------------------------
-
 def body_force(Sk, dU):
-    dU[0, :Nu] -= Sk[0, :Nu]
-    dU[1, :Nu] -= Sk[1, :Nu]
-    dU[2, :Nu] -= Sk[2, :Nu]
+    dU[0] -= Sk[0]
+    dU[1] -= Sk[1]
+    dU[2] -= Sk[2]
     return dU
     
 def Cross(a, b, c):
@@ -332,43 +327,26 @@ def Cross(a, b, c):
     c[2] = fss(a[0]*b[1]-a[1]*b[0], c[2], ST)
     return c
 
-def Curl(u0, uh, c):
-    
-    #c[2] = chebDerivative_3D(u0[1], c[2])
-    SFTc.Mult_DPhidT_3D(N[0], uh[1], uh[2], F_tmp[1], F_tmp[2])
-    c[2] = ifct(F_tmp[1], c[2])        
-    Uc[:] = ifst(1j*K[1, :Nu]*uh[0, :Nu], Uc, ST)    
-    c[2] -= Uc
-    
-    #F_tmp[0] = -Cm.matvec(uh[2])
-    #F_tmp[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, F_tmp[0, u_slice])    
-    #c[1] = ifst(F_tmp[0], c[1], ST)    
-    c[1] = ifct(F_tmp[2], c[1])    
-    Uc[:] = ifst(1j*K[2]*uh[0, :Nu], Uc, ST) 
-    c[1] += Uc    
-    
-    c[0] = ifst(1j*(K[1]*uh[2]-K[2]*uh[1]), c[0], ST)
-    return c
-
-#@profile
 def standardConvection(c):
     c[:] = 0
     U_tmp4[:] = 0
     U_tmp3[:] = 0
-    
+    F_tmp[:] = 0
+    F_tmp2[:] = 0
+
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = Cm.matvec(U_hat0[0])
-    F_tmp[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, F_tmp[0, u_slice])    
-    dudx = U_tmp4[0] = ifst(F_tmp[0], U_tmp4[0], ST)        
+    F_tmp[0] = SFTc.C_matvec(K[0,:,0,0], Cmat,U_hat0[0], F_tmp[0])
+    F_tmp2[0] = SFTc.PDMA(a0, b0, c0, d0, e0, F_tmp[0], F_tmp2[0])    
+    dudx = U_tmp4[0] = ifst(F_tmp2[0], U_tmp4[0], ST)        
     
-    SFTc.Mult_DPhidT_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
-    dvdx = U_tmp4[1] = ifct(F_tmp[1], U_tmp4[1])
-    dwdx = U_tmp4[2] = ifct(F_tmp[2], U_tmp4[2])
+    F_tmp[1] = SFTc.C_matvec(K[0,:,0,0],Cmat,U_hat0[1], F_tmp[1])
+    F_tmp[2] = SFTc.C_matvec(K[0,:,0,0],Cmat,U_hat0[2], F_tmp[2])
+    F_tmp2[1] = SFTc.UTDMA(a_k, b_k, F_tmp[1],F_tmp2[1])  
+    F_tmp2[2] = SFTc.UTDMA(a_k, b_k, F_tmp[2], F_tmp2[2])  
     
-    #dudx = U_tmp4[0] = chebDerivative_3D(U0[0], U_tmp4[0])
-    #dvdx = U_tmp4[1] = chebDerivative_3D0(U0[1], U_tmp4[1])
-    #dwdx = U_tmp4[2] = chebDerivative_3D0(U0[2], U_tmp4[2])    
+    dvdx = U_tmp4[1] = ifct(F_tmp2[1], U_tmp4[1])
+    dwdx = U_tmp4[2] = ifct(F_tmp2[2], U_tmp4[2])  
     
     dudy_h = 1j*K[1]*U_hat0[0]
     dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], ST)
@@ -389,60 +367,24 @@ def standardConvection(c):
     dwdz_h = 1j*K[2]*U_hat0[2]
     dwdz = U_tmp3[1] = ifst(dwdz_h, U_tmp3[1], ST)
     c[2] = fss(U0[0]*dwdx + U0[1]*dwdy + U0[2]*dwdz, c[2], ST)
-
     c *= -1
     return c
 
 
-
-
-
-def divergenceConvection(c, add=False):
-    """c_i = div(u_i u_j)"""
-    if not add: c.fill(0)
-    #duudx = U_tmp[0] = chebDerivative_3D(U[0]*U[0], U_tmp[0])
-    #duvdx = U_tmp[1] = chebDerivative_3D(U[0]*U[1], U_tmp[1])
-    #duwdx = U_tmp[2] = chebDerivative_3D(U[0]*U[2], U_tmp[2])
-    
-    F_tmp[0] = fst(U0[0]*U0[0], F_tmp[0], ST)
-    F_tmp[1] = fst(U0[0]*U0[1], F_tmp[1], ST)
-    F_tmp[2] = fst(U0[0]*U0[2], F_tmp[2], ST)
-    
-    c[0] += Cm.matvec(F_tmp[0])
-    c[1] += Cm.matvec(F_tmp[1])
-    c[2] += Cm.matvec(F_tmp[2])
-    
-    F_tmp2[0] = fss(U0[0]*U0[1], F_tmp2[0], ST)
-    F_tmp2[1] = fss(U0[0]*U0[2], F_tmp2[1], ST)    
-    c[0] += 1j*K[1]*F_tmp2[0] # duvdy
-    c[0] += 1j*K[2]*F_tmp2[1] # duwdz
-    
-    F_tmp[0] = fss(U0[1]*U0[1], F_tmp[0], ST)
-    F_tmp[1] = fss(U0[1]*U0[2], F_tmp[1], ST)
-    F_tmp[2] = fss(U0[2]*U0[2], F_tmp[2], ST)
-    c[1] += 1j*K[1]*F_tmp[0]  # dvvdy
-    c[1] += 1j*K[2]*F_tmp[1]  # dvwdz  
-    c[2] += 1j*K[1]*F_tmp[1]  # dvwdy
-    c[2] += 1j*K[2]*F_tmp[2]  # dwwdz
-    c *= -1
-    return c
-
-#@profile
 def ComputeRHS(dU, jj):
     # Add convection to rhs
     if jj == 0:
-        #conv0[:] = divergenceConvection(conv0) 
         conv0[:] = standardConvection(conv0) 
         
         # Compute diffusion
         diff0[:] = 0
-        SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat0[0], diff0[0])
-        SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat0[1], diff0[1])
-        SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat0[2], diff0[2])    
+        diff0[0] = SFTc.Helmholtz_AB_vector(K[0,:,0,0], Amat, Bmat, alpha2, U_hat0[0], diff0[0])
+        diff0[1] = SFTc.Helmholtz_AB_vector(K[0,:,0,0], Amat, Bmat, alpha2, U_hat0[1], diff0[1])
+        diff0[2] = SFTc.Helmholtz_AB_vector(K[0,:,0,0], Amat, Bmat, alpha2, U_hat0[2], diff0[2])   
     
     dU[:3] = 1.5*conv0 - 0.5*conv1
     dU[:3] *= dealias    
-  
+    
     # Add pressure gradient and body force
     dU = pressuregrad(P_hat, dU)
     dU = body_force(Sk, dU)
@@ -450,147 +392,13 @@ def ComputeRHS(dU, jj):
     # Scale by 2/nu factor
     dU[:3] *= 2./nu
     
-    dU[:3] += diff0
+    dU[:3] -= diff0
         
     return dU
 
-# Set up for solving with TDMA
-if ST.quad == "GL":
-    ck = ones(N[0]-2); ck[0] = 2
-    
-elif ST.quad == "GC":
-    ck = ones(N[0]-2); ck[0] = 2; ck[-1] = 2
-a0 = ones(N[0]-4)*(-pi/2)
-b0 = pi/2*(ck+1)
-c0 = a0.copy()
-bc = b0.copy()
-
-# For Neumann basis:
-kk = SN.wavenumbers(N[0])
-ck = ones(N[0]-3)
-if SN.quad == "GC": ck[-1] = 2
-a0N = ones(N[0]-5)*(-pi/2)*(kk[1:-2]/(kk[1:-2]+2))**2
-b0N = pi/2*(1+ck*(kk[1:]/(kk[1:]+2))**4)
-c0N = a0N.copy()
-bcN = b0N.copy()
-
-# Prepare LU Helmholtz solver for velocity
-M = (N[0]-3)/2
-u0 = zeros((2, M+1, U_hat.shape[2], U_hat.shape[3]))   # Diagonal entries of U
-u1 = zeros((2, M, U_hat.shape[2], U_hat.shape[3]))     # Diagonal+1 entries of U
-u2 = zeros((2, M-1, U_hat.shape[2], U_hat.shape[3]))   # Diagonal+2 entries of U
-L0  = zeros((2, M, U_hat.shape[2], U_hat.shape[3]))     # The single nonzero row of L                 
-SFTc.LU_Helmholtz_3D(N[0], 0, ST.quad=="GC", alfa1, u0, u1, u2, L0)
-
-# Prepare LU Helmholtz solver Neumann for pressure
-MN = (N[0]-4)/2
-u0N = zeros((2, MN+1, U_hat.shape[2], U_hat.shape[3]))   # Diagonal entries of U
-u1N = zeros((2, MN, U_hat.shape[2], U_hat.shape[3]))     # Diagonal+1 entries of U
-u2N = zeros((2, MN-1, U_hat.shape[2], U_hat.shape[3]))   # Diagonal+2 entries of U
-LN  = zeros((2, MN, U_hat.shape[2], U_hat.shape[3]))     # The single nonzero row of L
-SFTc.LU_Helmholtz_3D(N[0], 1, SN.quad=="GC", alfa2, u0N, u1N, u2N, LN)
-
-
-
-
-
-# ---- Testing the convection term:------------------------------------------
-
-#U0[0] = 2*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-#U0[1] = 4.0*X[0]*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-#U0[2] = 4.0*X[0]*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-
-#for i in range(3):
-    #U_hat0[i] = fst(U0[i], U_hat0[i], ST)
-
-#F_tmp[0] = 0.0    
-#F_tmp[0] = Cm.matvec(U_hat0[1])
-#conv0[:] = standardConvection(conv0)
-#conv0 *= -1
-
-#U_tmp[0] = 8*X[0]*(X[0]**2 - 1)#*(X[0]**2*cos(X[1] + X[2]) + sqrt(2)*sin(X[1])*sin(X[2] + pi/4) - cos(X[1])*cos(X[2]))*sin(X[1])*cos(X[2])
-#U_tmp[1] = 0.#(8*X[0]**2 - 8)*(2*X[0]**4*cos(X[1] + X[2]) + 3*X[0]**2*sin(X[1])*cos(X[2]) - 2*X[0]**2*cos(X[1] + X[2]) - sin(X[1])*cos(X[2]))*sin(X[1])*cos(X[2])
-#U_tmp[2] = 0.#(8*X[0]**2 - 8)*(2*X[0]**4*cos(X[1] + X[2]) + 3*X[0]**2*sin(X[1])*cos(X[2]) - 2*X[0]**2*cos(X[1] + X[2]) - sin(X[1])*cos(X[2]))*sin(X[1])*cos(X[2])
-
-#for i in range(3):
-    #F_tmp[i] = fst(U_tmp[i], F_tmp[i], ST)
-    #F_tmp2[i] = 0.0
-    #F_tmp2[i] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, conv0[i])
-    #U_tmp2[i] = ifst(F_tmp2[i], U_tmp2[i], ST)
- 
-#assert allclose(F_tmp[0], F_tmp2[0])
-#plt.plot(X[0,:,10,0], U_tmp[0,:,10,0],X[0,:,10,0],U_tmp2[0,:,10,0])
-#plt.show()
-#sys.exit()
-
-# ---------------------------------------------------------------------------
-
-
-# ---- Testing the Diffusion term:------------------------------------------
-
-#U[0] = 2*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-#U[1] = 4.0*X[0]*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-#U[2] = 4.0*X[0]*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-
-#for i in range(3):
-    #U_hat[i] = fst(U[i], U_hat[i], ST)
-
-## Compute diffusion
-#diff0[:] = 0
-#SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat[0], diff0[0])
-#SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat[1], diff0[1])
-#SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat[2], diff0[2])    
-
-#sys.exit()
-
-# ---------------------------------------------------------------------------
-
-
-# ---- Testing the Helmholtz solver:------------------------------------------
-
-#U[0] = 2*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-#U[1] = 4.0*X[0]*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-#U[2] = 4.0*X[0]*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-#P = (4./3.)*X[0]*(1.0 - (1.0/3.0)*X[0]**2)*sin(X[1])*cos(X[2])
-
-#for i in range(3):
-    #dU[i] = fst(U[i], dU[i], ST)
-
-#dU[3] = fst(P, dU[3], SN)
-#U_hat[:] = 0.0
-
-#SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[0, u_slice], U_hat[0, u_slice], u0, u1, u2, L0)
-#SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[1, u_slice], U_hat[1, u_slice], u0, u1, u2, L0)
-#SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[2, u_slice], U_hat[2, u_slice], u0, u1, u2, L0)
-
-#SFTc.Solve_Helmholtz_3D_complex(N[0], 1, dU[3, p_slice], Pcorr[p_slice], u0N, u1N, u2N, LN)            
-#sys.exit()
-
-# ---------------------------------------------------------------------------
-
-
-# ---- Testing the computeRHS:------------------------------------------
-
-#U[0] = 2*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-#U[1] = 4.0*X[0]*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-#U[2] = 4.0*X[0]*(1.-X[0]**2)*sin(X[1])*cos(X[2])
-#P = (4./3.)*X[0]*(1.0 - (1.0/3.0)*X[0]**2)*sin(X[1])*cos(X[2])
-
-#for i in range(3):
-    #U_hat0[i] = fst(U[i], U_hat0[i], ST)
-
-#P_hat = fst(P, P_hat, SN)
-#dU[:] = 0 
-#conv1 = 0.0
-#ComputeRHS(dU, 0)
-
-#sys.exit()
-
-# ---------------------------------------------------------------------------
-
-
 def initOS(OS, U, U_hat, t=0.):
     eps = 1e-4
+    F_tmp[:] = 0.0
     for i in range(U.shape[1]):
         x = X[0, i, 0, 0]
         OS.interp(x)
@@ -632,11 +440,10 @@ if case == "OS":
     conv1 = standardConvection(conv1)
     initOS(OS, U, U_hat, t=dt)
     t = dt
-    e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
+    en0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
     P[:] = 0
     P_hat = fst(P, P_hat, SN)
-    
-    #sys.exit()
+
 elif case == "MKK":
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
@@ -666,20 +473,9 @@ elif case == "MKK":
     P[:] = 0
     P_hat = fst(P, P_hat, SN)
 
+
 U0[:] = U
 U_hat0[:] = U_hat
-
-## Check convection vs analytical solution
-#conv1 *= dealias
-#conv1 *= (-1.0)
-#conv1[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, conv1[0, u_slice])
-#conv1[1, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, conv1[1, u_slice])
-#U_tmp2[0] = ifst(conv1[0, u_slice], U_tmp2[0], ST)
-#U_tmp2[1] = ifst(conv1[1, u_slice], U_tmp2[1], ST)
-
-##plt.figure();plt.imshow(U_tmp2[1, :,:,0]);plt.colorbar()
-##plt.figure();plt.imshow(curl[1, :,:,0]);plt.colorbar()
-#assert allclose(curl, U_tmp2, atol=1e-7)
 
 if case == "OS":
     plt.figure()
@@ -721,59 +517,41 @@ elif case == "MKK":
 
     plt.pause(1e-6)
     
+en0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
 
-def Divu(U, U_hat, c):
-    c[:] = 0
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], 
-                       U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], c[p_slice])
-    c[p_slice] = SFTc.TDMA_3D_complex(a0N, b0N, bcN, c0N, c[p_slice])
-        
-    return c
-
-e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
 
 t = 0.0
 tstep = 0
 
-#@profile
 def steps():
-    global t, tstep, e0, dU, U_hat, P_hat, Pcorr, U_hat1, U_hat0, P
+    global t, tstep, en0, dU, U_hat, P_hat, Pcorr, U_hat1, U_hat0, P
     while t < T-1e-8:
         t += dt; tstep += 1
-        #print "tstep ", tstep
+        print "tstep ", tstep
         # Tentative momentum solve
         
         for jj in range(2):
             dU[:] = 0
-            dU = ComputeRHS(dU, jj)    
-            SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[0, u_slice], U_hat[0, u_slice], u0, u1, u2, L0)
-            SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[1, u_slice], U_hat[1, u_slice], u0, u1, u2, L0)
-            SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[2, u_slice], U_hat[2, u_slice], u0, u1, u2, L0)
-            
-            #SFTc.Solve_Helmholtz_3Dall_complex(N[0], 0, dU[:, u_slice], U_hat[:, u_slice], u0, u1, u2, L0)
+            dU = ComputeRHS(dU, jj)  
+            U_hat[0] = SFTc.Helmholtz_AB_Solver(K[0,:,0,0], alpha1, 0, dU[0], Amat, Bmat, U_hat[0])
+            U_hat[1] = SFTc.Helmholtz_AB_Solver(K[0,:,0,0], alpha1, 0, dU[1], Amat, Bmat, U_hat[1])
+            U_hat[2] = SFTc.Helmholtz_AB_Solver(K[0,:,0,0], alpha1, 0, dU[2], Amat, Bmat, U_hat[2])
             
             # Pressure correction
             dU = pressurerhs(U_hat, dU) 
-            SFTc.Solve_Helmholtz_3D_complex(N[0], 1, dU[3, p_slice], Pcorr[p_slice], u0N, u1N, u2N, LN)
+            Pcorr[:] = SFTc.Helmholtz_AB_Solver(K[0,:,0,0], alpha3, 1, dU[3], A_breve, B_breve, Pcorr)
 
             # Update pressure
-            #dU[3] *= (-dt)  # Get div(u) in dU[3]
-            #dU[3, p_slice] = SFTc.TDMA_3D_complex(a0N, b0N, bcN, c0N, dU[3, p_slice])
-            #P_hat[p_slice] += (Pcorr[p_slice] - nu*dU[3, p_slice])
-            P_hat[p_slice] += Pcorr[p_slice]
-
-            #if jj == 0:
-                #print "   Divergence error"
-            #print "         Pressure correction norm %2.6e" %(linalg.norm(Pcorr))
-                            
+            P_hat[:] += Pcorr[:]
+    
         # Update velocity
         dU[:] = 0
         pressuregrad(Pcorr, dU)
         
-        dU[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[0, u_slice])
-        dU[1, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[1, u_slice])
-        dU[2, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[2, u_slice])    
-        U_hat[:3, u_slice] += dt*dU[:3, u_slice]  # + since pressuregrad computes negative pressure gradient
+        dU[0] = SFTc.PDMA(a0, b0, c0, d0, e0, dU[0], dU[0])
+        dU[1] = SFTc.PDMA(a0, b0, c0, d0, e0, dU[1], dU[1])
+        dU[2] = SFTc.PDMA(a0, b0, c0, d0, e0, dU[2], dU[2])    
+        U_hat[:3, u_slice] += dt*dU[:3, u_slice]  
 
         for i in range(3):
             U[i] = ifst(U_hat[i], U[i], ST)
@@ -784,7 +562,7 @@ def steps():
         U0[:] = U
         
         P = ifst(P_hat, P, SN)        
-        conv1[:] = conv0
+        conv1[:] = conv0    
         if tstep % 1 == 0:   
             if case == "OS":
                 pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
@@ -793,13 +571,13 @@ def steps():
                 e2 = 0.5*energy((U_tmp4[1] - (1-X[0]**2))**2 + U_tmp4[0]**2)
                 exact = exp(2*imag(OS.eigval)*t)
                 if rank == 0:
-                    print "Time %2.5f Norms %2.12e %2.12e %2.12e %2.12e" %(t, e1/e0, e2/e0, exp(2*imag(OS.eigval)*t), e1/e0-exact)
+                    print "Time %2.5f Norms %2.12e %2.12e %2.12e %2.12e" %(t, e1/en0, e2/en0, exp(2*imag(OS.eigval)*t), e1/en0-exact)
 
             elif case == "MKK":
-                e0 = energy(U0[0]**2)
+                en0 = energy(U0[0]**2)
                 e1 = energy(U0[2]**2)
                 if rank == 0:
-                    print "Time %2.5f Energy %2.12e %2.12e " %(t, e0, e1)
+                    print "Time %2.5f Energy %2.12e %2.12e " %(t, en0, e1)
                 
         #if tstep == 100:
             #Source[2, :] = 0
@@ -829,9 +607,10 @@ def steps():
                 im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100) 
                 im3.autoscale()
                 
-            plt.pause(1e-6)        
-                
+            plt.pause(1e-6)                
 steps()
+
+# ---- Tests of the general Shen transform -------------
 
 if case == "OS":
     pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
@@ -840,4 +619,4 @@ if case == "OS":
     e2 = 0.5*energy((U_tmp4[1] - (1-X[0]**2))**2 + U_tmp4[0]**2)
 
     if rank == 0:
-        print "Time %2.5f Norms %2.10e %2.10e %2.10e" %(t, e1/e0, e2/e0, exp(2*imag(OS.eigval)*t))
+        print "Time %2.5f Norms %2.10e %2.10e %2.10e" %(t, e1/en0, e2/en0, exp(2*imag(OS.eigval)*t))

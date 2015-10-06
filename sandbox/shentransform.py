@@ -145,6 +145,13 @@ class ShenBasis(ChebyshevTransform):
             kk = np.mgrid[:N[0]-2, :N[1], :N[2]].astype(float)
             return kk[0]
 
+    def chebNormalizationFactor(self, N, quad):
+	if self.quad == "GL":
+            ck = ones(N[0]-2); ck[0] = 2
+        elif self.quad == "GC":
+            ck = ones(N[0]-2); ck[0] = 2; ck[-1] = 2
+        return ck
+    
     def shenCoefficients(self, k, BC):
 	"""
 	Shen basis functions given by
@@ -174,7 +181,7 @@ class ShenBasis(ChebyshevTransform):
         """
         k  = self.wavenumbers(fj.shape)
         fk = self.fastChebScalar(fj, fk)
-        ak, bk = self.shenCoefficients(k, BC)
+        ak, bk = self.shenCoefficients(k, self.BC)
         
         fk_tmp = fk
         fk[:-2] = fk_tmp[:-2] + ak*fk_tmp[1:-1] + bk*fk_tmp[2:]
@@ -190,12 +197,12 @@ class ShenBasis(ChebyshevTransform):
         elif len(fk.shape)==1:
             k = self.wavenumbers(fk.shape[0])
             w_hat = np.zeros(fk.shape[0])
-        ak, bk = self.shenCoefficients(k, BC)
+        ak, bk = self.shenCoefficients(k, self.BC)
         w_hat[:-2] = fk[:-2]
         w_hat[1:-1] += ak*fk[:-2]
         w_hat[2:]   += bk*fk[:-2]
             
-        if BC[0]==0 and BC[1]==1 and BC[2]==0 and BC[3]==0 and BC[4]==1 and BC[5]==0:
+        if self.BC[0]==0 and self.BC[1]==1 and self.BC[2]==0 and self.BC[3]==0 and self.BC[4]==1 and self.BC[5]==0:
             w_hat[0] = 0.0
         fj = self.ifct(w_hat, fj)
         return fj
@@ -207,8 +214,8 @@ class ShenBasis(ChebyshevTransform):
         N = fj.shape[0]
         k = self.wavenumbers(N) 
         k1 = self.wavenumbers(N+1) 
-        ak, bk = self.shenCoefficients(k, BC)
-        ak1, bk1 = self.shenCoefficients(k1, BC)
+        ak, bk = self.shenCoefficients(k, self.BC)
+        ak1, bk1 = self.shenCoefficients(k1, self.BC)
         
         if self.quad == "GL":
             ck = ones(N-2); ck[0] = 2
@@ -220,12 +227,12 @@ class ShenBasis(ChebyshevTransform):
         c = ones(N-4)*(pi/2)* bk[:-2]
 
         if len(fk.shape) == 3:
-	    if BC[0]==0 and BC[1]==1 and BC[2]==0 and BC[3]==0 and BC[4]==1 and BC[5]==0:
+	    if self.BC[0]==0 and self.BC[1]==1 and self.BC[2]==0 and self.BC[3]==0 and self.BC[4]==1 and self.BC[5]==0:
 		fk[1:-2] = SFTc.PDMA_3D_complex(a[1:], b[1:], c[1:], fk[1:-2])
 	    else:
 		fk[:-2] = SFTc.PDMA_3D_complex(a, b, c, fk[:-2])
         elif len(fk.shape) == 1:
-	    if BC[0]==0 and BC[1]==1 and BC[2]==0 and BC[3]==0 and BC[4]==1 and BC[5]==0:
+	    if self.BC[0]==0 and self.BC[1]==1 and self.BC[2]==0 and self.BC[3]==0 and self.BC[4]==1 and self.BC[5]==0:
 		fk[1:-2] = SFTc.PDMA_1D(a[1:], b[1:], c[1:], fk[1:-2])
 	    else:
 		fk[:-2] = SFTc.PDMA_1D(a, b, c, fk[:-2])
@@ -235,7 +242,7 @@ class ShenBasis(ChebyshevTransform):
   
 if __name__ == "__main__":
     
-    N = 8
+    N = 2**6
     BC = np.array([0,1,0, 1,0,0])
     af = np.zeros(N, dtype=np.complex)
     SR = ShenBasis(BC, quad="GC")
