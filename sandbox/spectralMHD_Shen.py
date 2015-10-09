@@ -14,6 +14,7 @@ from Matrices import Chmat, Cmat, Bhmat, Bmat, BDmat, Amat
 import SFTc
 from OrrSommerfeld_eig import OrrSommerfeld
 from scipy.fftpack import dct
+#from h5io import *
 import sys
 import time
 try:
@@ -21,7 +22,7 @@ try:
 except ImportError:
     pass # Rely on numpy.fft routines
 
-T = 1.0
+T = 0.5
 dt = 0.001
 M = 6
 
@@ -42,9 +43,15 @@ num_processes = comm.Get_size()
 rank = comm.Get_rank()
 Np = N / num_processes
 
+
+#hdf5file = HDF5Writer(comm, dt, N, params, float)
+
 # Get points and weights for Chebyshev weighted integrals
+BC = array([0,1,0, 0,1,0])
 ST = ShenDirichletBasis(quad="GL")
 SN = ShenNeumannBasis(quad="GL")
+SR = ShenBasis(BC, quad="GL")
+
 points, weights = ST.points_and_weights(N[0])
 pointsp, weightsp = SN.points_and_weights(N[0])
 
@@ -93,6 +100,7 @@ curl    = empty((6, Np[0], N[1], N[2]))
 conv0   = empty((3, N[0], Np[1], Nf), dtype="complex")
 conv1   = empty((3, N[0], Np[1], Nf), dtype="complex")
 magconv = empty((3, N[0], Np[1], Nf), dtype="complex")
+magconvU = empty((3, N[0], Np[1], Nf), dtype="complex")
 diff0   = empty((3, N[0], Np[1], Nf), dtype="complex")
 Source  = empty((6, Np[0], N[1], N[2])) 
 Sk      = empty((6, N[0], Np[1], Nf), dtype="complex") 
@@ -232,9 +240,9 @@ alfa2 = sqrt(K[1, 0]**2+K[2, 0]**2)
 alpha = K[1, 0]**2+K[2, 0]**2-2.0/eta/dt
 alpha1 = sqrt(K[1, 0]**2+K[2, 0]**2+2.0/eta/dt)
 
-BC = array([0,1,0, 0,1,0])
-a_j, b_j = SN.shenCoefficients(K[0,:-2,0,0],BC)
-cj = SN.chebNormalizationFactor(N, SN.quad)
+
+a_j, b_j = SR.shenCoefficients(K[0,:-2,0,0],BC)
+cj = SR.chebNormalizationFactor(N, SR.quad)
 
 # 3. Matrices from the Neumann basis functions: (phi^breve_j, phi^breve_k)
 A_breve = SFTc.A_mat(K[0, :, 0, 0], a_j, b_j, a_j, b_j, A_breve)
@@ -319,14 +327,14 @@ def magneticConvection(c):
 
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = SFTc.C_matvecNeumann(K[0,:,0,0], C_bereve, U_hat0[3], F_tmp[0])
-    F_tmp2[0] = SFTc.TDMA_3D_complex(a0N, b0N, c0N, bcN, F_tmp[0], F_tmp2[0])    
+    F_tmp[0] = SFTc.C_matvecNeumann(K[0,:,0,0], C_breve, U_hat0[3], F_tmp[0])
+    F_tmp2[0] = SFTc.TDMA_Neumann(a0Neu, b0Neu, b0Neu, F_tmp[0])    
     dudx = U_tmp4[0] = ifst(F_tmp2[0], U_tmp4[0], SN)        
     
-    F_tmp[1] = SFTc.C_matvecNeumann(K[0,:,0,0],C_bereve,U_hat0[4], F_tmp[1])
-    F_tmp[2] = SFTc.C_matvecNeumann(K[0,:,0,0],C_bereve,U_hat0[5], F_tmp[2])
-    F_tmp2[1] = SFTc.UTDMA_Neumann(b_k, F_tmp[1],F_tmp2[1])  
-    F_tmp2[2] = SFTc.UTDMA_Neumann(b_k, F_tmp[2], F_tmp2[2])  
+    F_tmp[1] = SFTc.C_matvecNeumann(K[0,:,0,0],C_breve,U_hat0[4], F_tmp[1])
+    F_tmp[2] = SFTc.C_matvecNeumann(K[0,:,0,0],C_breve,U_hat0[5], F_tmp[2])
+    F_tmp2[1] = SFTc.UTDMA_Neumann(b_j, F_tmp[1],F_tmp2[1])  
+    F_tmp2[2] = SFTc.UTDMA_Neumann(b_j, F_tmp[2], F_tmp2[2])  
     
     dvdx = U_tmp4[1] = ifct(F_tmp2[1], U_tmp4[1])
     dwdx = U_tmp4[2] = ifct(F_tmp2[2], U_tmp4[2])
@@ -401,14 +409,14 @@ def velMagConvection(c):
 
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = SFTc.C_matvecNeumann(K[0,:,0,0], C_bereve, U_hat0[3], F_tmp[0])
-    F_tmp2[0] = SFTc.TDMA_3D_complex(a0N, b0N, c0N, bcN, F_tmp[0], F_tmp2[0])    
+    F_tmp[0] = SFTc.C_matvecNeumann(K[0,:,0,0], C_breve, U_hat0[3], F_tmp[0])
+    F_tmp2[0] = SFTc.TDMA_Neumann(a0Neu, b0Neu, b0Neu, F_tmp[0])    
     dudx = U_tmp4[0] = ifst(F_tmp2[0], U_tmp4[0], SN)        
     
-    F_tmp[1] = SFTc.C_matvecNeumann(K[0,:,0,0],C_bereve,U_hat0[4], F_tmp[1])
-    F_tmp[2] = SFTc.C_matvecNeumann(K[0,:,0,0],C_bereve,U_hat0[5], F_tmp[2])
-    F_tmp2[1] = SFTc.UTDMA_Neumann(b_k, F_tmp[1],F_tmp2[1])  
-    F_tmp2[2] = SFTc.UTDMA_Neumann(b_k, F_tmp[2], F_tmp2[2])  
+    F_tmp[1] = SFTc.C_matvecNeumann(K[0,:,0,0],C_breve,U_hat0[4], F_tmp[1])
+    F_tmp[2] = SFTc.C_matvecNeumann(K[0,:,0,0],C_breve,U_hat0[5], F_tmp[2])
+    F_tmp2[1] = SFTc.UTDMA_Neumann(b_j, F_tmp[1],F_tmp2[1])  
+    F_tmp2[2] = SFTc.UTDMA_Neumann(b_j, F_tmp[2], F_tmp2[2])  
     
     dvdx = U_tmp4[1] = ifct(F_tmp2[1], U_tmp4[1])
     dwdx = U_tmp4[2] = ifct(F_tmp2[2], U_tmp4[2])
@@ -504,6 +512,8 @@ b0N = pi/2*(1+ck*(kk[1:]/(kk[1:]+2))**4)
 c0N = a0N.copy()
 bcN = b0N.copy()
 
+a0Neu = pi/2*(cj + b_j**2)
+b0Neu = -pi/2*b_j
 # Prepare LU Helmholtz solver for velocity
 M = (N[0]-3)/2
 u0 = zeros((2, M+1, U_hat.shape[2], U_hat.shape[3]))   # Diagonal entries of U
@@ -529,7 +539,7 @@ def initOS(U, U_hat, t=0.):
             y = X[1, i, j, 0]
             u = 0. 
             v = (1.0 - x**2)
-            Bx = B_strength#-x/Ha + sinh(Ha*x)/(cosh(Ha)*Ha**2)
+            Bx = (4./3.)*x*(1.-(x**2/3.))#-x/Ha + sinh(Ha*x)/(cosh(Ha)*Ha**2)
             By = 0.
             U[0, i, j, :] = u
             U[1, i, j, :] = v
@@ -565,7 +575,7 @@ def steps():
     global t, tstep, e0, dU, U_hat, P_hat, Pcorr, U_hat1, U_hat0, P
     while t < T-1e-8:
         t += dt; tstep += 1
-        #print "tstep ", tstep
+        print "tstep ", tstep
         
         #**********************************************************************************************
         #                           (I) Mechanincal phase 
@@ -620,7 +630,19 @@ def steps():
         for i in range(3,6):
 	    U[i] = ifst(U_hat[i], U[i], SN)
         
-        if tstep % 100 == 0: 
-	    if rank == 0:
-		print "Time %2.5f Norms %2.12e %2.12e %2.12e %2.12e" %(t, e1/e0, e2/e0, exp(2*imag(OS.eigval)*t), e1/e0-exact)        
+        #if tstep % 10 == 0: 
+	    #hdf5file.write(U, P, tstep)
+     
 steps()
+
+def analytical():
+    for i in range(U.shape[1]):
+        x = X[0, i, 0, 0]
+        v = (cosh(Ha)-cosh(Ha*x))/(cosh(Ha)-1.0)
+    return v
+
+u_analytical = analytical()            
+plt.plot(X[0,:,0,0], U[0,:,0,0], X[0,:,0,0],u_analytical)
+plt.show()
+#hdf5file.generate_xdmf()  
+#hdf5file.close()
