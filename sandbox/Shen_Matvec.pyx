@@ -123,6 +123,32 @@ def C_matvec_1D(np.ndarray[np.float64_t, ndim=1] K, np.ndarray[np.float64_t, ndi
 
     return b
 
+def C_matvecNeumann(np.ndarray[np.float64_t, ndim=1] K, np.ndarray[np.float64_t, ndim=2] C,
+             np.ndarray[T, ndim=3] v, np.ndarray[T, ndim=3] b):
+
+    cdef:
+        unsigned int ii, jj
+        
+    for ii in range(b.shape[1]):
+        for jj in range(b.shape[2]):
+            C_matvec_1D_Neumann(K,C, v[:, ii, jj].real, b[:, ii, jj].real)
+            C_matvec_1D_Neumann(K,C, v[:, ii, jj].imag, b[:, ii, jj].imag)
+    return b
+
+def C_matvec_1D_Neumann(np.ndarray[np.float64_t, ndim=1] K, np.ndarray[np.float64_t, ndim=2] C,
+                np.ndarray[np.float64_t, ndim=1] v, np.ndarray[np.float64_t, ndim=1] b):
+
+    cdef:
+        int k, j
+        int N = K.shape[0]-2
+    
+    for k in xrange(1,N):
+        if k%2 != 0:
+            b[0] += C[0,k]*v[k]
+        for j in xrange((k-1), N, 2):
+            b[k] += v[j]*C[k,j]
+      
+    return b
 
 def A_mat(np.ndarray[np.float64_t, ndim=1] K, 
           np.ndarray[np.float64_t, ndim=1] a_j, np.ndarray[np.float64_t, ndim=1] b_j,
@@ -232,6 +258,33 @@ def UTDMA_1D(np.ndarray[np.float64_t, ndim=1] a_k, np.ndarray[np.float64_t, ndim
 
     return b
 
+def UTDMA_Neumann(np.ndarray[np.float64_t, ndim=1] b_k,
+                  np.ndarray[T, ndim=3] v, np.ndarray[T, ndim=3] b):
+
+    cdef:
+        unsigned int ii, jj
+        
+    for ii in range(b.shape[1]):
+        for jj in range(b.shape[2]):
+            UTDMA_1D_Neumann(b_k, v[:, ii, jj].real, b[:, ii, jj].real)
+            UTDMA_1D_Neumann(b_k, v[:, ii, jj].imag, b[:, ii, jj].imag)
+    return b
+
+def UTDMA_1D_Neumann(np.ndarray[np.float64_t, ndim=1] b_k,
+                     np.ndarray[np.float64_t, ndim=1] v, np.ndarray[np.float64_t, ndim=1] b):
+    
+    cdef:
+        int i
+        int N = v.shape[0]-2
+        double pi = np.pi
+
+    b[N-1] = v[N-1]*(2.0/pi)
+    b[N-2] = v[N-2]*(2.0/pi) 
+    for i in xrange(N-3,-1,-1):
+        b[i] = v[i]*(2.0/pi) - b[i+2]*b_k[i] 
+    b[0] /= 2.0
+
+    return b    
 
 def PDMA(np.ndarray[np.float64_t, ndim=1] a, np.ndarray[np.float64_t, ndim=1] b,
          np.ndarray[np.float64_t, ndim=1] c, np.ndarray[np.float64_t, ndim=1] d,
@@ -323,6 +376,39 @@ def Helmholtz_AB_1D(np.ndarray[np.float64_t, ndim=1] K,
 
     return b
 
+def Helmholtz_AB_vectorNeumann(np.ndarray[np.float64_t, ndim=1] K, np.ndarray[np.float64_t, ndim=2] A, 
+                        np.ndarray[np.float64_t, ndim=2] B,
+                        np.ndarray[np.float64_t, ndim=2] alpha,
+                        np.ndarray[T, ndim=3] v, np.ndarray[T, ndim=3] b): 
+
+    cdef:
+        unsigned int ii, jj
+        
+    for ii in range(b.shape[1]):
+        for jj in range(b.shape[2]):
+            Helmholtz_AB_1D_Neumann(K, A, B, alpha[ii, jj], v[:, ii, jj].real, b[:, ii, jj].real)
+            Helmholtz_AB_1D_Neumann(K, A, B, alpha[ii, jj], v[:, ii, jj].imag, b[:, ii, jj].imag)
+
+    return b
+
+def Helmholtz_AB_1D_Neumann(np.ndarray[np.float64_t, ndim=1] K, 
+                    np.ndarray[np.float64_t, ndim=2] A, np.ndarray[np.float64_t, ndim=2] B,
+                    np.float64_t alpha, np.ndarray[np.float64_t, ndim=1] v, np.ndarray[np.float64_t, ndim=1] b):
+
+    cdef:
+        int j, k
+        int N = K.shape[0]-2 
+        
+    for k in xrange(N):
+        if k>=2:
+            b[k] += -alpha*B[k,k-2]*v[k-2]
+        for j in xrange(k,N,2):
+            b[k] += A[k,j]*v[j]
+            if j <= (k+2):
+                b[k] += -alpha*B[k,j]*v[j]
+                
+    return b
+    
 def Helmholtz_CB_vector(np.ndarray[np.float64_t, ndim=1] K,np.ndarray[np.float64_t, ndim=2] C, 
                         np.ndarray[np.float64_t, ndim=2] B,
                         np.ndarray[np.float64_t, ndim=2] m, np.ndarray[np.float64_t, ndim=2] n,

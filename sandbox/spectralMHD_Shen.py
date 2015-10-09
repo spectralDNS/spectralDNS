@@ -1,13 +1,15 @@
-__author__ = "Mikael Mortensen <mikaem@math.uio.no>"
-__date__ = "2015-01-02"
-__copyright__ = "Copyright (C) 2014 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Oct  7 17:22:12 2015
 
+@author: Diako Darian
+"""
 from numpy import *
 from numpy.fft import fftfreq, fft, ifft, irfft2, rfft2, rfftn, irfftn
 from mpi4py import MPI
 import matplotlib.pyplot as plt
 from shentransformDNR import ShenDirichletBasis, ShenNeumannBasis
+from shentransform import ShenBasis
 from Matrices import Chmat, Cmat, Bhmat, Bmat, BDmat, Amat
 import SFTc
 from OrrSommerfeld_eig import OrrSommerfeld
@@ -19,32 +21,27 @@ try:
 except ImportError:
     pass # Rely on numpy.fft routines
 
-case = "OS"
-#case = "MKK"
-
 T = 1.0
 dt = 0.001
 M = 6
 
-if case == "OS":
-    Re = 8000.
-    nu = 1./Re
-    N = array([2**M, 2**(M-1), 2])
-    L = array([2, 2*pi, 4*pi/3.])
+N = array([2**M, 2**(M-1), 2])
+L = array([2, 2*pi, 4*pi/3.])
 
-elif case == "MKK":
-    nu = 2e-5
-    Re = 1./nu
-    Re_tau = 180.
-    utau = nu * Re_tau
-    N = array([2**M, 2**M, 2])
-    L = array([2, 4*pi, 4*pi/3.])
+Re = 1.
+Rm = 1.
+nu = 1./Re
+eta = 1./Rm
+
+B_strength = 0.5
+Ha = B_strength*L[0]*sqrt(Re*Rm)
 
 dx = (L / N).astype(float)
 comm = MPI.COMM_WORLD
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
 Np = N / num_processes
+
 # Get points and weights for Chebyshev weighted integrals
 ST = ShenDirichletBasis(quad="GL")
 SN = ShenNeumannBasis(quad="GL")
@@ -64,25 +61,25 @@ Nq = N[0]-3   # Number of pressure modes in Shen basis
 u_slice = slice(0, Nu)
 p_slice = slice(1, Nu)
 
-U     = empty((3, Np[0], N[1], N[2]))
-U_hat = empty((3, N[0], Np[1], Nf), dtype="complex")
+U     = empty((6, Np[0], N[1], N[2]))
+U_hat = empty((6, N[0], Np[1], Nf), dtype="complex")
 P     = empty((Np[0], N[1], N[2]))
 P_hat = empty((N[0], Np[1], Nf), dtype="complex")
 Pcorr = empty((N[0], Np[1], Nf), dtype="complex")
 
-U0      = empty((3, Np[0], N[1], N[2]))
-U_hat0  = empty((3, N[0], Np[1], Nf), dtype="complex")
-U_hat1  = empty((3, N[0], Np[1], Nf), dtype="complex")
-UT      = empty((3, N[0], Np[1], N[2]))
+U0      = empty((6, Np[0], N[1], N[2]))
+U_hat0  = empty((6, N[0], Np[1], Nf), dtype="complex")
+U_hat1  = empty((6, N[0], Np[1], Nf), dtype="complex")
+UT      = empty((6, N[0], Np[1], N[2]))
 
-U_tmp   = empty((3, Np[0], N[1], N[2]))
-U_tmp2  = empty((3, Np[0], N[1], N[2]))
-U_tmp3  = empty((3, Np[0], N[1], N[2]))
-U_tmp4  = empty((3, Np[0], N[1], N[2]))
-F_tmp   = empty((3, N[0], Np[1], Nf), dtype="complex")
-F_tmp2  = empty((3, N[0], Np[1], Nf), dtype="complex")
+U_tmp   = empty((6, Np[0], N[1], N[2]))
+U_tmp2  = empty((6, Np[0], N[1], N[2]))
+U_tmp3  = empty((6, Np[0], N[1], N[2]))
+U_tmp4  = empty((6, Np[0], N[1], N[2]))
+F_tmp   = empty((6, N[0], Np[1], Nf), dtype="complex")
+F_tmp2  = empty((6, N[0], Np[1], Nf), dtype="complex")
 
-dU      = empty((4, N[0], Np[1], Nf), dtype="complex")
+dU      = empty((7, N[0], Np[1], Nf), dtype="complex")
 Uc      = empty((Np[0], N[1], N[2]))
 Uc2     = empty((Np[0], N[1], N[2]))
 Uc_hat  = empty((N[0], Np[1], Nf), dtype="complex")
@@ -92,12 +89,17 @@ Uc_hatT = empty((Np[0], N[1], Nf), dtype="complex")
 U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype="complex")
 U_mpi2  = empty((num_processes, Np[0], Np[1], N[2]))
 
-curl    = empty((3, Np[0], N[1], N[2]))
+curl    = empty((6, Np[0], N[1], N[2]))
 conv0   = empty((3, N[0], Np[1], Nf), dtype="complex")
 conv1   = empty((3, N[0], Np[1], Nf), dtype="complex")
+magconv = empty((3, N[0], Np[1], Nf), dtype="complex")
 diff0   = empty((3, N[0], Np[1], Nf), dtype="complex")
-Source  = empty((3, Np[0], N[1], N[2])) 
-Sk      = empty((3, N[0], Np[1], Nf), dtype="complex") 
+Source  = empty((6, Np[0], N[1], N[2])) 
+Sk      = empty((6, N[0], Np[1], Nf), dtype="complex") 
+
+A_breve = zeros((N[0]-2,N[0]-2))
+B_breve = zeros((N[0]-2,N[0]-2))
+C_breve = zeros((N[0]-2,N[0]-2))
 
 kx = arange(N[0]).astype(float)
 ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
@@ -188,13 +190,12 @@ def ifct0(fu, u):
         u[:, i*n0:(i+1)*n0] = U_mpi2[i]
     return u
 
-#@profile
 def chebDerivative_3D0(fj, u0):
     UT[0] = fct0(fj, UT[0])
     UT[1] = SFTc.chebDerivativeCoefficients_3D(UT[0], UT[1]) 
     u0[:] = ifct0(UT[1], u0)
     return u0
-#@profile
+
 def chebDerivative_3D(fj, u0):
     Uc_hat2[:] = fct(fj, Uc_hat2)
     Uc_hat[:] = SFTc.chebDerivativeCoefficients_3D(Uc_hat2, Uc_hat)    
@@ -214,20 +215,10 @@ def energy(u):
         return sum(ak*w)*L[1]*L[2]/N[1]/N[2]
     else:
         return 0
-    
-    #ww = repeat(w, ak.shape[-2]*ak.shape[-1]).reshape(ak.shape)
-    #c = comm.reduce(ww*ak)
-    #if rank == 0:
-        #return c*L[1]*L[2]/N[1]/N[2]
 
 # Set body_force
 Source[:] = 0
-if case == "OS":
-    Source[1, :] = -2./Re
-    
-elif case == "MKK":
-    Source[1, :] = -utau**2
-
+Source[1, :] = -2./Re
 
 # Take Shen scalar product of body force
 Sk[:] = 0
@@ -238,12 +229,23 @@ alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
 alfa1 = sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt)
 alfa2 = sqrt(K[1, 0]**2+K[2, 0]**2)
 
+alpha = K[1, 0]**2+K[2, 0]**2-2.0/eta/dt
+alpha1 = sqrt(K[1, 0]**2+K[2, 0]**2+2.0/eta/dt)
+
+BC = array([0,1,0, 0,1,0])
+a_j, b_j = SN.shenCoefficients(K[0,:-2,0,0],BC)
+cj = SN.chebNormalizationFactor(N, SN.quad)
+
+# 3. Matrices from the Neumann basis functions: (phi^breve_j, phi^breve_k)
+A_breve = SFTc.A_mat(K[0, :, 0, 0], a_j, b_j, a_j, b_j, A_breve)
+B_breve = SFTc.B_mat(K[0, :, 0, 0], cj, a_j, b_j, a_j, b_j, B_breve) 
+C_breve = SFTc.C_mat(K[0, :, 0, 0], a_j, b_j, a_j, b_j, C_breve)
 
 Chm = Chmat(K[0, :, 0, 0])
 Bhm = Bhmat(K[0, :, 0, 0], SN.quad)
 Cm = Cmat(K[0, :, 0, 0])
 #Bm = BDmat(K[0, :, 0, 0], ST.quad)
-#@profile
+
 def pressuregrad(P_hat, dU):
     # Pressure gradient x-direction
     dU[0] -= Chm.matvec(P_hat)
@@ -258,9 +260,9 @@ def pressuregrad(P_hat, dU):
     return dU
 
 def pressurerhs(U_hat, dU):
-    dU[3] = 0.
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], dU[3, p_slice])    
-    dU[3, p_slice] *= -1./dt    
+    dU[6] = 0.
+    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], dU[6, p_slice])    
+    dU[6, p_slice] *= -1./dt    
     return dU
 
 def body_force(Sk, dU):
@@ -269,31 +271,6 @@ def body_force(Sk, dU):
     dU[2, :Nu] -= Sk[2, :Nu]
     return dU
     
-def Cross(a, b, c):
-    c[0] = fss(a[1]*b[2]-a[2]*b[1], c[0], ST)
-    c[1] = fss(a[2]*b[0]-a[0]*b[2], c[1], ST)
-    c[2] = fss(a[0]*b[1]-a[1]*b[0], c[2], ST)
-    return c
-
-def Curl(u0, uh, c):
-    
-    #c[2] = chebDerivative_3D(u0[1], c[2])
-    SFTc.Mult_DPhidT_3D(N[0], uh[1], uh[2], F_tmp[1], F_tmp[2])
-    c[2] = ifct(F_tmp[1], c[2])        
-    Uc[:] = ifst(1j*K[1, :Nu]*uh[0, :Nu], Uc, ST)    
-    c[2] -= Uc
-    
-    #F_tmp[0] = -Cm.matvec(uh[2])
-    #F_tmp[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, F_tmp[0, u_slice])    
-    #c[1] = ifst(F_tmp[0], c[1], ST)    
-    c[1] = ifct(F_tmp[2], c[1])    
-    Uc[:] = ifst(1j*K[2]*uh[0, :Nu], Uc, ST) 
-    c[1] += Uc    
-    
-    c[0] = ifst(1j*(K[1]*uh[2]-K[2]*uh[1]), c[0], ST)
-    return c
-
-#@profile
 def standardConvection(c):
     c[:] = 0
     U_tmp4[:] = 0
@@ -308,11 +285,7 @@ def standardConvection(c):
     SFTc.Mult_DPhidT_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
     dvdx = U_tmp4[1] = ifct(F_tmp[1], U_tmp4[1])
     dwdx = U_tmp4[2] = ifct(F_tmp[2], U_tmp4[2])
-    
-    #dudx = U_tmp4[0] = chebDerivative_3D(U0[0], U_tmp4[0])
-    #dvdx = U_tmp4[1] = chebDerivative_3D0(U0[1], U_tmp4[1])
-    #dwdx = U_tmp4[2] = chebDerivative_3D0(U0[2], U_tmp4[2])    
-    
+       
     dudy_h = 1j*K[1]*U_hat0[0]
     dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], ST)
     dudz_h = 1j*K[2]*U_hat0[0]
@@ -336,43 +309,139 @@ def standardConvection(c):
     c *= -1
     return c
 
-def divergenceConvection(c, add=False):
-    """c_i = div(u_i u_j)"""
-    if not add: c.fill(0)
-    #duudx = U_tmp[0] = chebDerivative_3D(U[0]*U[0], U_tmp[0])
-    #duvdx = U_tmp[1] = chebDerivative_3D(U[0]*U[1], U_tmp[1])
-    #duwdx = U_tmp[2] = chebDerivative_3D(U[0]*U[2], U_tmp[2])
+def magneticConvection(c):
     
-    F_tmp[0] = fst(U0[0]*U0[0], F_tmp[0], ST)
-    F_tmp[1] = fst(U0[0]*U0[1], F_tmp[1], ST)
-    F_tmp[2] = fst(U0[0]*U0[2], F_tmp[2], ST)
+    c[:] = 0
+    U_tmp4[:] = 0
+    U_tmp3[:] = 0
+    F_tmp[:] = 0
+    F_tmp2[:] = 0
+
+    # dudx = 0 from continuity equation. Use Shen Dirichlet basis
+    # Use regular Chebyshev basis for dvdx and dwdx
+    F_tmp[0] = SFTc.C_matvecNeumann(K[0,:,0,0], C_bereve, U_hat0[3], F_tmp[0])
+    F_tmp2[0] = SFTc.TDMA_3D_complex(a0N, b0N, c0N, bcN, F_tmp[0], F_tmp2[0])    
+    dudx = U_tmp4[0] = ifst(F_tmp2[0], U_tmp4[0], SN)        
     
-    c[0] += Cm.matvec(F_tmp[0])
-    c[1] += Cm.matvec(F_tmp[1])
-    c[2] += Cm.matvec(F_tmp[2])
+    F_tmp[1] = SFTc.C_matvecNeumann(K[0,:,0,0],C_bereve,U_hat0[4], F_tmp[1])
+    F_tmp[2] = SFTc.C_matvecNeumann(K[0,:,0,0],C_bereve,U_hat0[5], F_tmp[2])
+    F_tmp2[1] = SFTc.UTDMA_Neumann(b_k, F_tmp[1],F_tmp2[1])  
+    F_tmp2[2] = SFTc.UTDMA_Neumann(b_k, F_tmp[2], F_tmp2[2])  
     
-    F_tmp2[0] = fss(U0[0]*U0[1], F_tmp2[0], ST)
-    F_tmp2[1] = fss(U0[0]*U0[2], F_tmp2[1], ST)    
-    c[0] += 1j*K[1]*F_tmp2[0] # duvdy
-    c[0] += 1j*K[2]*F_tmp2[1] # duwdz
+    dvdx = U_tmp4[1] = ifct(F_tmp2[1], U_tmp4[1])
+    dwdx = U_tmp4[2] = ifct(F_tmp2[2], U_tmp4[2])
+       
+    dudy_h = 1j*K[1]*U_hat0[3]
+    dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], ST)
+    dudz_h = 1j*K[2]*U_hat0[3]
+    dudz = U_tmp3[1] = ifst(dudz_h, U_tmp3[1], ST)
+    c[0] = fss(U0[3]*dudx + U0[4]*dudy + U0[5]*dudz, c[0], ST)
     
-    F_tmp[0] = fss(U0[1]*U0[1], F_tmp[0], ST)
-    F_tmp[1] = fss(U0[1]*U0[2], F_tmp[1], ST)
-    F_tmp[2] = fss(U0[2]*U0[2], F_tmp[2], ST)
-    c[1] += 1j*K[1]*F_tmp[0]  # dvvdy
-    c[1] += 1j*K[2]*F_tmp[1]  # dvwdz  
-    c[2] += 1j*K[1]*F_tmp[1]  # dvwdy
-    c[2] += 1j*K[2]*F_tmp[2]  # dwwdz
-    c *= -1
+    U_tmp3[:] = 0
+    dvdy_h = 1j*K[1]*U_hat0[4]
+    dvdy = U_tmp3[0] = ifst(dvdy_h, U_tmp3[0], ST)
+    dvdz_h = 1j*K[2]*U_hat0[4]
+    dvdz = U_tmp3[1] = ifst(dvdz_h, U_tmp3[1], ST)
+    c[1] = fss(U0[3]*dvdx + U0[4]*dvdy + U0[5]*dvdz, c[1], ST)
+    
+    U_tmp3[:] = 0
+    dwdy_h = 1j*K[1]*U_hat0[5]
+    dwdy = U_tmp3[0] = ifst(dwdy_h, U_tmp3[0], ST)
+    dwdz_h = 1j*K[2]*U_hat0[5]
+    dwdz = U_tmp3[1] = ifst(dwdz_h, U_tmp3[1], ST)
+    c[2] = fss(U0[3]*dwdx + U0[4]*dwdy + U0[5]*dwdz, c[2], ST)
+   
     return c
 
-#@profile
-def ComputeRHS(dU, jj):
+def magVelConvection(c):
+    
+    c[:] = 0
+    U_tmp4[:] = 0
+    U_tmp3[:] = 0
+    
+    # dudx = 0 from continuity equation. Use Shen Dirichlet basis
+    # Use regular Chebyshev basis for dvdx and dwdx
+    F_tmp[0] = Cm.matvec(U_hat[0])
+    F_tmp[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, F_tmp[0, u_slice])    
+    dudx = U_tmp4[0] = ifst(F_tmp[0], U_tmp4[0], ST)        
+    
+    SFTc.Mult_DPhidT_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
+    dvdx = U_tmp4[1] = ifct(F_tmp[1], U_tmp4[1])
+    dwdx = U_tmp4[2] = ifct(F_tmp[2], U_tmp4[2])
+       
+    dudy_h = 1j*K[1]*U_hat[0]
+    dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], ST)
+    dudz_h = 1j*K[2]*U_hat[0]
+    dudz = U_tmp3[1] = ifst(dudz_h, U_tmp3[1], ST)
+    c[0] = fss(U0[3]*dudx + U0[4]*dudy + U0[5]*dudz, c[0], ST)
+    
+    U_tmp3[:] = 0
+    dvdy_h = 1j*K[1]*U_hat[1]
+    dvdy = U_tmp3[0] = ifst(dvdy_h, U_tmp3[0], ST)
+    dvdz_h = 1j*K[2]*U_hat[1]
+    dvdz = U_tmp3[1] = ifst(dvdz_h, U_tmp3[1], ST)
+    c[1] = fss(U0[3]*dvdx + U0[4]*dvdy + U0[5]*dvdz, c[1], ST)
+    
+    U_tmp3[:] = 0
+    dwdy_h = 1j*K[1]*U_hat[2]
+    dwdy = U_tmp3[0] = ifst(dwdy_h, U_tmp3[0], ST)
+    dwdz_h = 1j*K[2]*U_hat[2]
+    dwdz = U_tmp3[1] = ifst(dwdz_h, U_tmp3[1], ST)
+    c[2] = fss(U0[3]*dwdx + U0[4]*dwdy + U0[5]*dwdz, c[2], ST)
+   
+    return c
+  
+def velMagConvection(c):
+    
+    c[:] = 0
+    U_tmp4[:] = 0
+    U_tmp3[:] = 0
+    F_tmp[:] = 0
+    F_tmp2[:] = 0
+
+    # dudx = 0 from continuity equation. Use Shen Dirichlet basis
+    # Use regular Chebyshev basis for dvdx and dwdx
+    F_tmp[0] = SFTc.C_matvecNeumann(K[0,:,0,0], C_bereve, U_hat0[3], F_tmp[0])
+    F_tmp2[0] = SFTc.TDMA_3D_complex(a0N, b0N, c0N, bcN, F_tmp[0], F_tmp2[0])    
+    dudx = U_tmp4[0] = ifst(F_tmp2[0], U_tmp4[0], SN)        
+    
+    F_tmp[1] = SFTc.C_matvecNeumann(K[0,:,0,0],C_bereve,U_hat0[4], F_tmp[1])
+    F_tmp[2] = SFTc.C_matvecNeumann(K[0,:,0,0],C_bereve,U_hat0[5], F_tmp[2])
+    F_tmp2[1] = SFTc.UTDMA_Neumann(b_k, F_tmp[1],F_tmp2[1])  
+    F_tmp2[2] = SFTc.UTDMA_Neumann(b_k, F_tmp[2], F_tmp2[2])  
+    
+    dvdx = U_tmp4[1] = ifct(F_tmp2[1], U_tmp4[1])
+    dwdx = U_tmp4[2] = ifct(F_tmp2[2], U_tmp4[2])
+       
+    dudy_h = 1j*K[1]*U_hat0[3]
+    dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], ST)
+    dudz_h = 1j*K[2]*U_hat0[3]
+    dudz = U_tmp3[1] = ifst(dudz_h, U_tmp3[1], ST)
+    c[0] = fss(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST)
+    
+    U_tmp3[:] = 0
+    dvdy_h = 1j*K[1]*U_hat0[4]
+    dvdy = U_tmp3[0] = ifst(dvdy_h, U_tmp3[0], ST)
+    dvdz_h = 1j*K[2]*U_hat0[4]
+    dvdz = U_tmp3[1] = ifst(dvdz_h, U_tmp3[1], ST)
+    c[1] = fss(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST)
+    
+    U_tmp3[:] = 0
+    dwdy_h = 1j*K[1]*U_hat0[5]
+    dwdy = U_tmp3[0] = ifst(dwdy_h, U_tmp3[0], ST)
+    dwdz_h = 1j*K[2]*U_hat0[5]
+    dwdz = U_tmp3[1] = ifst(dwdz_h, U_tmp3[1], ST)
+    c[2] = fss(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST)
+   
+    return c
+  
+  
+def ComputeRHS_U(dU, jj):
     # Add convection to rhs
     if jj == 0:
         #conv0[:] = divergenceConvection(conv0) 
         conv0[:] = standardConvection(conv0) 
-        
+        magconv[:] = magneticConvection(magconv)
         # Compute diffusion
         diff0[:] = 0
         SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat0[0], diff0[0])
@@ -380,6 +449,7 @@ def ComputeRHS(dU, jj):
         SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat0[2], diff0[2])    
     
     dU[:3] = 1.5*conv0 - 0.5*conv1
+    dU[:3] += magconv
     dU[:3] *= dealias    
   
     # Add pressure gradient and body force
@@ -393,6 +463,27 @@ def ComputeRHS(dU, jj):
         
     return dU
 
+def ComputeRHS_B(dU, jj):
+    # Add convection to rhs
+    if jj == 0:  
+        magconv[:]  = velMagConvection(magconv)
+        magconvU[:] = magVelConvection(magconvU)
+        # Compute diffusion
+        diff0[:] = 0   
+        diff0[0] = SFTc.Helmholtz_AB_vectorNeumann(K[0,:,0,0], A_breve, B_breve, alpha, U_hat0[3], diff0[0])
+        diff0[1] = SFTc.Helmholtz_AB_vectorNeumann(K[0,:,0,0], A_breve, B_breve, alpha, U_hat0[4], diff0[1])
+        diff0[2] = SFTc.Helmholtz_AB_vectorNeumann(K[0,:,0,0], A_breve, B_breve, alpha, U_hat0[5], diff0[2])   
+    
+    dU[3:6] = magconvU - magconv
+    dU[3:6] *= dealias    
+    
+    # Scale by 2/nu factor
+    dU[3:6] *= 2./eta
+    
+    dU[3:6] += diff0
+        
+    return dU
+  
 # Set up for solving with TDMA
 if ST.quad == "GL":
     ck = ones(N[0]-2); ck[0] = 2
@@ -430,177 +521,66 @@ LN  = zeros((2, MN, U_hat.shape[2], U_hat.shape[3]))     # The single nonzero ro
 SFTc.LU_Helmholtz_3D(N[0], 1, SN.quad=="GC", alfa2, u0N, u1N, u2N, LN)
 
 
-def initOS(OS, U, U_hat, t=0.):
-    eps = 1e-4
+
+def initOS(U, U_hat, t=0.):
     for i in range(U.shape[1]):
         x = X[0, i, 0, 0]
-        OS.interp(x)
         for j in range(U.shape[2]):
             y = X[1, i, j, 0]
-            v = (1-x**2) + eps*dot(OS.f, real(OS.dphidy*exp(1j*(y-OS.eigval*t))))
-            u = -eps*dot(OS.f, real(1j*OS.phi*exp(1j*(y-OS.eigval*t))))  
+            u = 0. 
+            v = (1.0 - x**2)
+            Bx = B_strength#-x/Ha + sinh(Ha*x)/(cosh(Ha)*Ha**2)
+            By = 0.
             U[0, i, j, :] = u
             U[1, i, j, :] = v
     U[2] = 0
-    for i in range(3):
-        U_hat[i] = fst(U[i], U_hat[i], ST)
-
-def OSconv(OS, conv, t=0.):
-    """For verification"""
-    eps = 1e-4
-    for i in range(U_tmp.shape[1]):
-        x = X[0, i, 0, 0]
-        OS.interp(x)
-        for j in range(U_tmp.shape[2]):
-            y = X[1, i, j, 0]
-            v = (1-x**2) + eps*dot(OS.f, real(OS.dphidy*exp(1j*(y-OS.eigval*t))))
-            u = -eps*dot(OS.f, real(1j*OS.phi*exp(1j*(y-OS.eigval*t))))  
-            dudx = -eps*dot(OS.f, real(1j*OS.dphidy*exp(1j*(y-OS.eigval*t))))
-            dudy = eps*dot(OS.f, real(OS.phi*exp(1j*(y-OS.eigval*t))))
-            d2phidy = dot(OS.D2, OS.phi)
-            dvdx = -2*x + eps*dot(OS.f, real(d2phidy*exp(1j*(y-OS.eigval*t))))
-            dvdy = eps*dot(OS.f, real(1j*OS.dphidy*exp(1j*(y-OS.eigval*t))))
-            
-            conv[0, i, j, :] = u*dudx+v*dudy
-            conv[1, i, j, :] = u*dvdx+v*dvdy
-    conv[2] = 0
-    return conv
+    U[3] = 0
+    U[4] = 0
+    U[5] = 0
+    for i in range(6):
+        if i<3:
+            U_hat[i] = fst(U[i], U_hat[i], ST)
+        else:
+	    U_hat[i] = fst(U[i], U_hat[i], SN)
 
 
-if case == "OS":    
-    OS = OrrSommerfeld(Re=Re, N=N[0])
-    initOS(OS, U0, U_hat0)
-    conv1 = standardConvection(conv1)
-    initOS(OS, U, U_hat, t=dt)
-    t = dt
-    e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
-    P[:] = 0
-    P_hat = fst(P, P_hat, SN)
+initOS(U0, U_hat0)
+conv1 = standardConvection(conv1)
+initOS(U, U_hat, t=dt)
+t = dt
+#e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
     
-    #sys.exit()
-elif case == "MKK":
-    # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
-    Y = where(X[0]<0, 1+X[0], 1-X[0])
-    Um = 20*utau
-    U[:] = 0
-    U[1] = Um*(Y-0.5*Y**2)
-    Xplus = Y*Re_tau
-    Yplus = X[1]*Re_tau
-    Zplus = X[2]*Re_tau
-    duplus = Um*0.25/utau 
-    alfaplus = 2*pi/500.
-    betaplus = 2*pi/200.
-    sigma = 0.00055
-    epsilon = Um/200.
-    dev = 1+0.3*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
-    dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
-    U[1] += dd
-    U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev
-    if rank == 0:
-        U[:, 0] = 0
-    if rank == num_processes-1:
-        U[:, -1] = 0
-
-    for i in range(3):
-        U_hat[i] = fst(U[i], U_hat[i], ST)
-
-    P[:] = 0
-    P_hat = fst(P, P_hat, SN)
+P[:] = 0
+P_hat = fst(P, P_hat, SN)
 
 U0[:] = U
 U_hat0[:] = U_hat
 
-## Check convection vs analytical solution
-#conv1 *= dealias
-#conv1 *= (-1.0)
-#conv1[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, conv1[0, u_slice])
-#conv1[1, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, conv1[1, u_slice])
-#U_tmp2[0] = ifst(conv1[0, u_slice], U_tmp2[0], ST)
-#U_tmp2[1] = ifst(conv1[1, u_slice], U_tmp2[1], ST)
-
-#plt.figure();plt.imshow(U_tmp2[1, :,:,0]);plt.colorbar()
-#plt.figure();plt.imshow(curl[1, :,:,0]);plt.colorbar()
-#assert allclose(curl, U_tmp2, atol=1e-7)
-
-if case == "OS":
-    plt.figure()
-    im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
-    plt.colorbar(im1)
-    plt.draw()
-
-    plt.figure()
-    im2 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[1,:,:,0] - (1-X[0,:,:,0]**2), 100)
-    plt.colorbar(im2)
-    plt.draw()
-
-    plt.figure()
-    im3 = plt.contourf(X[1,:,:,0], X[0,:,:,0], P[:,:,0], 100)
-    plt.colorbar(im3)
-    plt.draw()
-    
-    plt.figure()
-    im4 = plt.quiver(X[1, :,:,0], X[0,:,:,0], U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
-    plt.draw()
-    
-    plt.pause(1e-6)
-
-elif case == "MKK":
-    plt.figure()
-    im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
-    plt.colorbar(im1)
-    plt.draw()
-
-    plt.figure()
-    im2 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[1,:,:,0], 100)
-    plt.colorbar(im2)
-    plt.draw()
-
-    plt.figure()
-    im3 = plt.contourf(X[1,:,:,0], X[0,:,:,0], P[:,:,0], 100)
-    plt.colorbar(im3)
-    plt.draw()
-
-    plt.pause(1e-6)
-    
-
-def Divu(U, U_hat, c):
-    c[:] = 0
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], 
-                       U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], c[p_slice])
-    c[p_slice] = SFTc.TDMA_3D_complex(a0N, b0N, bcN, c0N, c[p_slice])
-        
-    return c
-
-e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
+#e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
 
 t = 0.0
 tstep = 0
 
-#@profile
 def steps():
     global t, tstep, e0, dU, U_hat, P_hat, Pcorr, U_hat1, U_hat0, P
     while t < T-1e-8:
         t += dt; tstep += 1
         #print "tstep ", tstep
-        # Tentative momentum solve
         
+        #**********************************************************************************************
+        #                           (I) Mechanincal phase 
+        #**********************************************************************************************
         for jj in range(2):
             dU[:] = 0
-            dU = ComputeRHS(dU, jj)    
+            dU = ComputeRHS_U(dU, jj)    
             SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[0, u_slice], U_hat[0, u_slice], u0, u1, u2, L0)
             SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[1, u_slice], U_hat[1, u_slice], u0, u1, u2, L0)
             SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[2, u_slice], U_hat[2, u_slice], u0, u1, u2, L0)
             
-            #SFTc.Solve_Helmholtz_3Dall_complex(N[0], 0, dU[:, u_slice], U_hat[:, u_slice], u0, u1, u2, L0)
-            
             # Pressure correction
             dU = pressurerhs(U_hat, dU) 
-            SFTc.Solve_Helmholtz_3D_complex(N[0], 1, dU[3, p_slice], Pcorr[p_slice], u0N, u1N, u2N, LN)
+            SFTc.Solve_Helmholtz_3D_complex(N[0], 1, dU[6, p_slice], Pcorr[p_slice], u0N, u1N, u2N, LN)
 
-            # Update pressure
-            #dU[3] *= (-dt)  # Get div(u) in dU[3]
-            #dU[3, p_slice] = SFTc.TDMA_3D_complex(a0N, b0N, bcN, c0N, dU[3, p_slice])
-            #P_hat[p_slice] += (Pcorr[p_slice] - nu*dU[3, p_slice])
             P_hat[p_slice] += Pcorr[p_slice]
 
             #if jj == 0:
@@ -614,71 +594,33 @@ def steps():
         dU[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[0, u_slice])
         dU[1, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[1, u_slice])
         dU[2, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, dU[2, u_slice])    
-        U_hat[:3, u_slice] += dt*dU[:3, u_slice]  # + since pressuregrad computes negative pressure gradient
+        U_hat[:3, u_slice] += dt*dU[:3, u_slice]
 
         for i in range(3):
-            U[i] = ifst(U_hat[i], U[i], ST)
-            
+	    U[i] = ifst(U_hat[i], U[i], ST)
+        
         # Rotate velocities
-        U_hat1[:] = U_hat0
-        U_hat0[:] = U_hat
-        U0[:] = U
+        U_hat1[:3] = U_hat0[:3]
+        U_hat0[:3] = U_hat[:3]
+        U0[:3] = U[:3]
         
         P = ifst(P_hat, P, SN)        
-        conv1[:] = conv0
-        if tstep % 100 == 0:   
-            if case == "OS":
-                pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
-                initOS(OS, U_tmp4, U_hat1, t=t)
-                e1 = 0.5*energy(pert)
-                e2 = 0.5*energy((U_tmp4[1] - (1-X[0]**2))**2 + U_tmp4[0]**2)
-                exact = exp(2*imag(OS.eigval)*t)
-                if rank == 0:
-                    print "Time %2.5f Norms %2.12e %2.12e %2.12e %2.12e" %(t, e1/e0, e2/e0, exp(2*imag(OS.eigval)*t), e1/e0-exact)
-
-            elif case == "MKK":
-                e0 = energy(U0[0]**2)
-                e1 = energy(U0[2]**2)
-                if rank == 0:
-                    print "Time %2.5f Energy %2.12e %2.12e " %(t, e0, e1)
-                
-        #if tstep == 100:
-            #Source[2, :] = 0
-            #Sk[2] = fss(Source[2], Sk[2], ST)
-
-        if tstep % 100 == 0:
-            if case == "OS":
-                im1.ax.clear()
-                im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0]-(1-X[0,:,:,0]**2), 100)         
-                im1.autoscale()
-                im2.ax.clear()
-                im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100) 
-                im2.autoscale()
-                im3.ax.clear()
-                im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100) 
-                im3.autoscale()
-                im4.set_UVC(U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
-                
-            elif case == "MKK":
-                im1.ax.clear()
-                im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0], 100)         
-                im1.autoscale()
-                im2.ax.clear()
-                im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100) 
-                im2.autoscale()
-                im3.ax.clear()
-                im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100) 
-                im3.autoscale()
-                
-            plt.pause(1e-6)        
-                
+        conv1[:] = conv0 
+        
+        #**********************************************************************************************
+        #                            (II) Magnetic phase 
+        #**********************************************************************************************
+        for jj in range(2):
+            dU[:] = 0
+            dU = ComputeRHS_B(dU, jj) 
+            SFTc.Solve_Helmholtz_3D_complex(N[0], 1, dU[3, p_slice], U_hat[3,p_slice], u0N, u1N, u2N, LN)
+            SFTc.Solve_Helmholtz_3D_complex(N[0], 1, dU[4, p_slice], U_hat[4,p_slice], u0N, u1N, u2N, LN)
+            SFTc.Solve_Helmholtz_3D_complex(N[0], 1, dU[5, p_slice], U_hat[5,p_slice], u0N, u1N, u2N, LN)
+        
+        for i in range(3,6):
+	    U[i] = ifst(U_hat[i], U[i], SN)
+        
+        if tstep % 100 == 0: 
+	    if rank == 0:
+		print "Time %2.5f Norms %2.12e %2.12e %2.12e %2.12e" %(t, e1/e0, e2/e0, exp(2*imag(OS.eigval)*t), e1/e0-exact)        
 steps()
-
-if case == "OS":
-    pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
-    initOS(OS, U_tmp4, U_hat1, t=t)
-    e1 = 0.5*energy(pert)
-    e2 = 0.5*energy((U_tmp4[1] - (1-X[0]**2))**2 + U_tmp4[0]**2)
-
-    if rank == 0:
-        print "Time %2.5f Norms %2.10e %2.10e %2.10e" %(t, e1/e0, e2/e0, exp(2*imag(OS.eigval)*t))
