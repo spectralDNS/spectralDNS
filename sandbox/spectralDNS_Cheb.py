@@ -370,7 +370,7 @@ def divergenceConvection(c, add=False):
 def ComputeRHS(dU, jj):
     # Add convection to rhs
     if jj == 0:
-        #conv0[:] = divergenceConvection(conv0) 
+        conv0[:] = divergenceConvection(conv0) 
         conv0[:] = standardConvection(conv0) 
         
         # Compute diffusion
@@ -466,7 +466,6 @@ def OSconv(OS, conv, t=0.):
     conv[2] = 0
     return conv
 
-
 if case == "OS":    
     OS = OrrSommerfeld(Re=Re, N=N[0])
     initOS(OS, U0, U_hat0)
@@ -477,7 +476,6 @@ if case == "OS":
     P[:] = 0
     P_hat = fst(P, P_hat, SN)
     
-    #sys.exit()
 elif case == "MKK":
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
@@ -576,7 +574,6 @@ e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
 t = 0.0
 tstep = 0
 
-#@profile
 def steps():
     global t, tstep, e0, dU, U_hat, P_hat, Pcorr, U_hat1, U_hat0, P
     while t < T-1e-8:
@@ -623,7 +620,7 @@ def steps():
         U_hat1[:] = U_hat0
         U_hat0[:] = U_hat
         U0[:] = U
-        
+ 
         P = ifst(P_hat, P, SN)        
         conv1[:] = conv0
         if tstep % 100 == 0:   

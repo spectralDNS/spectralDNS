@@ -456,11 +456,15 @@ def Helmholtz_AB_vectorNeumann(np.ndarray[np.float64_t, ndim=1] K, np.ndarray[np
 
     cdef:
         unsigned int ii, jj
+        np.ndarray[np.float64_t, ndim=2] C
         
     for ii in range(b.shape[1]):
         for jj in range(b.shape[2]):
-            Helmholtz_AB_1D_Neumann(K, A, B, alpha[ii, jj], v[:, ii, jj].real, b[:, ii, jj].real)
-            Helmholtz_AB_1D_Neumann(K, A, B, alpha[ii, jj], v[:, ii, jj].imag, b[:, ii, jj].imag)
+            C = A -alpha[ii, jj]*B
+            Helmholtz_AB_1D_Neumannv2(K, C, v[:, ii, jj].real, b[:, ii, jj].real)
+            Helmholtz_AB_1D_Neumannv2(K, C, v[:, ii, jj].imag, b[:, ii, jj].imag)
+            #Helmholtz_AB_1D_Neumann(K, A, B, alpha[ii, jj], v[:, ii, jj].real, b[:, ii, jj].real)
+            #Helmholtz_AB_1D_Neumann(K, A, B, alpha[ii, jj], v[:, ii, jj].imag, b[:, ii, jj].imag)
 
     return b
 
@@ -474,11 +478,25 @@ def Helmholtz_AB_1D_Neumann(np.ndarray[np.float64_t, ndim=1] K,
         
     for k in xrange(N):
         if k>=2:
-            b[k] += -alpha*B[k,k-2]*v[k-2]
+            b[k] -= alpha*B[k,k-2]*v[k-2]
         for j in xrange(k,N,2):
             b[k] += A[k,j]*v[j]
             if j <= (k+2):
-                b[k] += -alpha*B[k,j]*v[j]
+                b[k] -= alpha*B[k,j]*v[j]
+                
+    return b
+
+def Helmholtz_AB_1D_Neumannv2(np.ndarray[np.float64_t, ndim=1] K, 
+                    np.ndarray[np.float64_t, ndim=2] A, np.ndarray[np.float64_t, ndim=1] v, np.ndarray[np.float64_t, ndim=1] b):
+
+    cdef:
+        int j, k
+        int N = K.shape[0]-2 
+        
+    for k in xrange(N):
+        for j in xrange(N):
+            if j >= (k-2):
+                b[k] += A[k,j]*v[j]
                 
     return b
     

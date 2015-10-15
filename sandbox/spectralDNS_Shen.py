@@ -5,7 +5,11 @@ Created on Tue Sep 22 15:55:26 2015
 @author: Diako Darian
     
 
-The code below employs a projection method to solve the 3D incompressible Navier-Stokes equations. The spatial discretization is done by a spectral method using periodic Fourier basis functions in y and z directions, and non-periodic Chebyshev polynomials in x direction. Time discretization is done by a semi-implicit Crank-Nicolson scheme.
+The code below employs a projection method to solve the 3D incompressible Navier-Stokes equations. 
+The spatial discretization is done by a spectral method using periodic Fourier basis functions 
+in y and z directions, and non-periodic Chebyshev polynomials in x direction. 
+
+Time discretization is done by a semi-implicit Crank-Nicolson scheme.
 
 """
 
