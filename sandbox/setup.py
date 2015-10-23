@@ -9,6 +9,7 @@ ext = cythonize(Extension("TDMA", sources = ['TDMA.pyx'], language="c++"))
 ext += cythonize(Extension("Cheb", sources = ['Cheb.pyx']))
 ext += cythonize(Extension("Matvec", sources = ['Matvec.pyx']))
 ext += cythonize(Extension("Shen_Matvec", sources = ['Shen_Matvec.pyx']))
+ext += cythonize(Extension("LinAlg", sources = ['LinAlg.pyx']))
 
 [e.extra_compile_args.extend(["-O3"]) for e in ext]
 [e.include_dirs.extend([get_include()]) for e in ext]
