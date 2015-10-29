@@ -5,13 +5,14 @@ FIXME Should use Shen basis for fourth order problem
 
 """
 from scipy.linalg import eig
-from numpy import ones, cos, arange, pi, dot, eye, real, imag, resize, transpose, float, newaxis, sum, abs, max, complex, linspace, argmax, argmin, zeros, squeeze
+from numpy import ones, cos, arange, pi, dot, eye, real, imag, resize, transpose, float, newaxis, sum, abs, max, complex, linspace, argmax, argmin, zeros, squeeze, seterr, array, hstack
 from pylab import find, plot, figure, show, axis
 from numpy.linalg import inv
 from scipy.special import orthogonal
 from numpy.polynomial import chebyshev as n_cheb
 from scipy.sparse.linalg import LinearOperator
 from scipy.sparse import diags
+seterr(divide='ignore')
 
 def cheb_derivative_matrix(N):
     x = arange(N)
@@ -48,7 +49,7 @@ class OrrSommerfeld(object):
         self.b = eye(self.N)*2.
         self.II = (self.I - self.yI**2)
         self.S = eye(self.N)
-        self.S = self.S*1./(1. - self.y**2)
+        self.S = self.S*1./(1. - hstack((0, self.y[1:-1], 0))**2)
         self.S[0, 0]=0
         self.S[-1, -1]=0
         print 'Solving the Orr-Sommerfeld eigenvalue problem...'

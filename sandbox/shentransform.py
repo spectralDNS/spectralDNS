@@ -27,18 +27,18 @@ pi, zeros, ones = np.pi, np.zeros, np.ones
 
 class ChebyshevTransform(object):
     
-    def __init__(self, quad="GC"): 
+    def __init__(self, quad="GL"): 
         self.quad = quad
         
     def points_and_weights(self, N):
         self.N = N
-        if self.quad == "GC":
+        if self.quad == "GL":
             points = n_cheb.chebpts2(N)[::-1]
             weights = np.zeros((N))+np.pi/(N-1)
             weights[0] /= 2
             weights[-1] /= 2
 
-        elif self.quad == "GL":
+        elif self.quad == "GC":
             points, weights = n_cheb.chebgauss(N)
             
         return points, weights
@@ -63,12 +63,12 @@ class ChebyshevTransform(object):
     def fct(self, fj, cj):
         """Fast Chebyshev transform."""
         N = fj.shape[0]
-        if self.quad == "GL":
+        if self.quad == "GC":
             cj[:] = dct(fj, type=2, axis=0)            
             cj /= N
             cj[0] /= 2
                 
-        elif self.quad == "GC":
+        elif self.quad == "GL":
             cj[:] = dct(fj, type=1, axis=0)/(N-1)
             cj[0] /= 2
             cj[-1] /= 2
@@ -78,11 +78,11 @@ class ChebyshevTransform(object):
     #@profile
     def ifct(self, fk, cj):
         """Inverse fast Chebyshev transform."""
-        if self.quad == "GL":
+        if self.quad == "GC":
             cj[:] = 0.5*dct(fk, type=3, axis=0)
             cj += 0.5*fk[0]
         
-        elif self.quad == "GC":
+        elif self.quad == "GL":
             cj[:] = 0.5*dct(fk, type=1, axis=0)
             cj += 0.5*fk[0]
             cj[::2] += 0.5*fk[-1]
@@ -93,21 +93,23 @@ class ChebyshevTransform(object):
     def fastChebScalar(self, fj, fk):
         """Fast Chebyshev scalar product."""
         N = fj.shape[0]
-        if self.quad == "GL":
-            fk = dct(fj, type=2, axis=0)*np.pi/(2*N)
+        if self.quad == "GC":
+            fk[:] = dct(fj, type=2, axis=0)*np.pi/(2*N)
         
-        elif self.quad == "GC":
-            fk = dct(fj, type=1, axis=0)*np.pi/(2*(N-1))
+        elif self.quad == "GL":
+            fk[:] = dct(fj, type=1, axis=0)*np.pi/(2*(N-1))
         return fk
 
 class ShenDirichletBasis(ChebyshevTransform):
     
-    def __init__(self, quad="GC", fast_transform=True):
+    def __init__(self, quad="GL", fast_transform=True):
         self.quad = quad
         self.fast_transform = fast_transform
         self.points = None
         self.weights = None
         self.N = -1
+        self.ck = None
+        self.w_hat = None
         
     def init(self, N):
         """Vandermonde matrix is used just for verification"""
@@ -143,18 +145,13 @@ class ShenDirichletBasis(ChebyshevTransform):
         """
         if self.fast_transform:
             N = len(fj)
-            if len(fk.shape) == 3:
-                w_hat = np.zeros(fj.shape, dtype=fk.dtype)
-                w_hat[:-2] = fk[:-2]
-                w_hat[2:] -= fk[:-2]
-            if len(fk.shape) == 1:
-                w_hat = np.zeros(N, dtype=fk.dtype)        
-                w_hat[:-2] = fk[:-2] 
-                w_hat[2:] -= fk[:-2] 
-                #- np.hstack([0, 0, fk[:-2]])    
-                #w_hat[-2] = -fk[-2]
-                #w_hat[-1] = -fk[-1]
-            fj = self.ifct(w_hat, fj)
+            if self.w_hat is None:
+                self.w_hat = fk.copy()
+                
+            self.w_hat[:] = 0
+            self.w_hat[:-2] = fk[:-2] 
+            self.w_hat[2:] -= fk[:-2] 
+            fj = self.ifct(self.w_hat, fj)
             return fj    
         
         else:
@@ -167,29 +164,35 @@ class ShenDirichletBasis(ChebyshevTransform):
         fk = self.fastShenScalar(fj, fk)
         
         N = fj.shape[0]
-        if self.quad == "GL":
-            ck = np.ones(N-2); ck[0] = 2
+        if self.ck is None:
+            if self.quad == "GC":
+                self.ck = np.ones(N-2)
+                self.ck[0] = 2
+                
+            elif self.quad == "GL":
+                self.ck = np.ones(N-2) 
+                self.ck[0] = 2
+                self.ck[-1] = 2  # Note!! Shen paper has only ck[0] = 2, not ck[-1] = 2. 
             
-        elif self.quad == "GC":
-            ck = np.ones(N-2); ck[0] = 2; ck[-1] = 2  # Note!! Shen paper has only ck[0] = 2, not ck[-1] = 2. For Gauss points ck[-1] = 1, but not here! 
+            self.a = np.ones(N-4)*(-np.pi/2)
+            self.b = np.pi/2*(self.ck+1)
+            self.c = self.a.copy()
+            self.bc = self.b.copy()
             
-        a = np.ones(N-4)*(-np.pi/2)
-        b = np.pi/2*(ck+1)
-        c = a.copy()
         if len(fk.shape) == 3:
-            bc = b.copy()
-            fk[:-2] = SFTc.TDMA_3D(a, b, bc, c, fk[:-2])
+            fk[:-2] = SFTc.TDMA_3D(self.a, self.b, self.bc, self.c, fk[:-2])
 
         elif len(fk.shape) == 1:
-            fk[:-2] = SFTc.TDMA_1D(a, b, c, fk[:-2])
+            fk[:-2] = SFTc.TDMA_1D(self.a, self.b, self.c, fk[:-2])
             
         return fk
     
 
 class ShenNeumannBasis(ShenDirichletBasis):
     
-    def __init__(self, quad="GL"): 
+    def __init__(self, quad="GC"): 
         ShenDirichletBasis.__init__(self, quad)
+        self.factor = None        
             
     def init(self, N):
         self.points, self.weights = self.points_and_weights(N)
@@ -218,19 +221,18 @@ class ShenNeumannBasis(ShenDirichletBasis):
     def ifst(self, fk, fj):
         """Fast inverse Shen scalar transform
         """
-        if len(fk.shape)==3:
-            k = self.wavenumbers(fk.shape)
-            w_hat = np.zeros(fk.shape, dtype=fk.dtype)
-            w_hat[1:-2] = fk[1:-2]
-            w_hat[3:] -= (k[1:]/(k[1:]+2))**2*fk[1:-2]
-            
-        elif len(fk.shape)==1:
-            k = self.wavenumbers(fk.shape[0])
-            w_hat = np.zeros(fk.shape[0])    
-            w_hat[1:-2] = fk[1:-2]
-            w_hat[3:] -= (k[1:]/(k[1:]+2))**2*fk[1:-2]
-
-        fj = self.ifct(w_hat, fj)
+        if self.w_hat is None:
+            if len(fk.shape)==3:
+                k = self.wavenumbers(fk.shape)                
+            elif len(fk.shape)==1:
+                k = self.wavenumbers(fk.shape[0])
+                
+            self.w_hat = fk.copy()
+            self.factor = (k[1:]/(k[1:]+2))**2
+        self.w_hat[:] = 0
+        self.w_hat[1:-2] = fk[1:-2]
+        self.w_hat[3:] -= self.factor*fk[1:-2]
+        fj = self.ifct(self.w_hat, fj)
         return fj
         
     def fst(self, fj, fk):
@@ -238,18 +240,21 @@ class ShenNeumannBasis(ShenDirichletBasis):
         """
         fk = self.fastShenScalar(fj, fk)
         N = fj.shape[0]
-        k = self.wavenumbers(N)
-        ck = np.ones(N-3)
-        if self.quad == "GC": ck[-1] = 2 # Note not the first since basis phi_0 is not included        
-        a = np.ones(N-5)*(-np.pi/2)*(k[1:-2]/(k[1:-2]+2))**2
-        b = np.pi/2*(1+ck*(k[1:]/(k[1:]+2))**4)
-        c = a.copy()
+        if self.ck is None:
+            k = self.wavenumbers(N)
+            self.ck = np.ones(N-3)
+            if self.quad == "GL": 
+                ck[-1] = 2 # Note not the first since basis phi_0 is not included        
+            self.a = np.ones(N-5)*(-np.pi/2)*(k[1:-2]/(k[1:-2]+2))**2
+            self.b = np.pi/2*(1+self.ck*(k[1:]/(k[1:]+2))**4)
+            self.c = self.a.copy()
+            self.bc = self.b.copy()
+            
         if len(fk.shape) == 3:
-            bc = b.copy()
-            fk[1:-2] = SFTc.TDMA_3D(a, b, bc, c, fk[1:-2])
+            fk[1:-2] = SFTc.TDMA_3D(self.a, self.b, self.bc, self.c, fk[1:-2])
 
         elif len(fk.shape) == 1:
-            fk[1:-2] = SFTc.TDMA_1D(a, b, c, fk[1:-2])
+            fk[1:-2] = SFTc.TDMA_1D(self.a, self.b, self.c, fk[1:-2])
 
         return fk
 
@@ -266,9 +271,8 @@ if __name__ == "__main__":
     #a[0] = 0
     #a[-1] = 0
     
-    ST = ShenDirichletBasis(quad="GC")
+    ST = ShenDirichletBasis(quad="GL")
     af = ST.fst(a, af) 
     a0 = a.copy()
     a0 = ST.ifst(af, a0)
     assert np.allclose(a0, a)
-     

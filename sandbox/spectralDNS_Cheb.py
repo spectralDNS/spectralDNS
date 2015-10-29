@@ -12,6 +12,11 @@ from Matrices import Chmat, Cmat, Bhmat, Bmat, BDmat, Amat
 import SFTc
 from OrrSommerfeld_eig import OrrSommerfeld
 from scipy.fftpack import dct
+import sys
+import warnings
+import matplotlib.cbook
+warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
+from cbcdns.utilities import Timer
 
 try:
     from cbcdns.fft.wrappyfftw import *
@@ -21,14 +26,23 @@ except ImportError:
 case = "OS"
 #case = "MKK"
 
-T = 100
-dt = 0.001
-M = 6
+T = 0.02
+if len(sys.argv) == 2:
+    dt = 8*array([1./100., 1./120., 1./140., 1./160., 1./180, 1./200., 1./300. , 1./400.])
+    dt = dt[eval(sys.argv[-1])]
+else:
+    dt = 0.01
+    
+M = 10
+check_step = 1
+plot_step = 1
+enable_plotting = False
+velocity_pressure_iters = 4
 
 if case == "OS":
     Re = 8000.
     nu = 1./Re
-    N = array([2**M, 2**(M-1), 2])
+    N = array([2**M, 2**(M-0), 2])
     L = array([2, 2*pi, 4*pi/3.])
 
 elif case == "MKK":
@@ -45,8 +59,8 @@ num_processes = comm.Get_size()
 rank = comm.Get_rank()
 Np = N / num_processes
 # Get points and weights for Chebyshev weighted integrals
-ST = ShenDirichletBasis(quad="GC")
-SN = ShenNeumannBasis(quad="GL")
+ST = ShenDirichletBasis(quad="GL")
+SN = ShenNeumannBasis(quad="GC")
 points, weights = ST.points_and_weights(N[0])
 pointsp, weightsp = SN.points_and_weights(N[0])
 
@@ -121,9 +135,10 @@ dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
 def fss(u, fu, S):
     """Fast Shen scalar product of x-direction, Fourier transform of y and z"""
     Uc_hatT[:] = rfft2(u, axes=(1,2))
-    n0 = U_mpi.shape[2]
-    for i in range(num_processes):
-        U_mpi[i] = Uc_hatT[:, i*n0:(i+1)*n0]
+    #n0 = U_mpi.shape[2]
+    #for i in range(num_processes):
+        #U_mpi[i] = Uc_hatT[:, i*n0:(i+1)*n0]
+    U_mpi[:] = rollaxis(Uc_hatT.reshape(Np[0], num_processes, Np[1], Nf), 1)
     comm.Alltoall([U_mpi, MPI.DOUBLE_COMPLEX], [Uc_hat, MPI.DOUBLE_COMPLEX])
     fu = S.fastShenScalar(Uc_hat, fu)
     return fu
@@ -132,18 +147,20 @@ def ifst(fu, u, S):
     """Inverse Shen transform of x-direction, Fourier in y and z"""
     Uc_hat3[:] = S.ifst(fu, Uc_hat3)
     comm.Alltoall([Uc_hat3, MPI.DOUBLE_COMPLEX], [U_mpi, MPI.DOUBLE_COMPLEX])
-    n0 = U_mpi.shape[2]
-    for i in range(num_processes):
-        Uc_hatT[:, i*n0:(i+1)*n0] = U_mpi[i]
+    #n0 = U_mpi.shape[2]
+    #for i in range(num_processes):
+        #Uc_hatT[:, i*n0:(i+1)*n0] = U_mpi[i]
+    Uc_hatT[:] = rollaxis(U_mpi, 1).reshape(Uc_hatT.shape)
     u[:] = irfft2(Uc_hatT, axes=(1,2))
     return u
 
 def fst(u, fu, S):
     """Fast Shen transform of x-direction, Fourier transform of y and z"""
     Uc_hatT[:] = rfft2(u, axes=(1,2))
-    n0 = U_mpi.shape[2]
-    for i in range(num_processes):
-        U_mpi[i] = Uc_hatT[:, i*n0:(i+1)*n0]
+    #n0 = U_mpi.shape[2]
+    #for i in range(num_processes):
+        #U_mpi[i] = Uc_hatT[:, i*n0:(i+1)*n0]
+    U_mpi[:] = rollaxis(Uc_hatT.reshape(Np[0], num_processes, Np[1], Nf), 1)
     comm.Alltoall([U_mpi, MPI.DOUBLE_COMPLEX], [Uc_hat, MPI.DOUBLE_COMPLEX])
     fu = S.fst(Uc_hat, fu)
     return fu
@@ -151,9 +168,10 @@ def fst(u, fu, S):
 def fct(u, fu):
     """Fast Cheb transform of x-direction, Fourier transform of y and z"""
     Uc_hatT[:] = rfft2(u, axes=(1,2))
-    n0 = U_mpi.shape[2]
-    for i in range(num_processes):
-        U_mpi[i] = Uc_hatT[:, i*n0:(i+1)*n0]
+    #n0 = U_mpi.shape[2]
+    #for i in range(num_processes):
+        #U_mpi[i] = Uc_hatT[:, i*n0:(i+1)*n0]
+    U_mpi[:] = rollaxis(Uc_hatT.reshape(Np[0], num_processes, Np[1], Nf), 1)
     comm.Alltoall([U_mpi, MPI.DOUBLE_COMPLEX], [Uc_hat, MPI.DOUBLE_COMPLEX])
     fu = ST.fct(Uc_hat, fu)
     return fu
@@ -162,17 +180,19 @@ def ifct(fu, u):
     """Inverse Cheb transform of x-direction, Fourier in y and z"""
     Uc_hat3[:] = ST.ifct(fu, Uc_hat3)
     comm.Alltoall([Uc_hat3, MPI.DOUBLE_COMPLEX], [U_mpi, MPI.DOUBLE_COMPLEX])
-    n0 = U_mpi.shape[2]
-    for i in range(num_processes):
-        Uc_hatT[:, i*n0:(i+1)*n0] = U_mpi[i]
+    #n0 = U_mpi.shape[2]
+    #for i in range(num_processes):
+        #Uc_hatT[:, i*n0:(i+1)*n0] = U_mpi[i]
+    Uc_hatT[:] = rollaxis(U_mpi, 1).reshape(Uc_hatT.shape)
     u[:] = irfft2(Uc_hatT, axes=(1,2))
     return u
 
 def fct0(u, fu):
     """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do fct."""
-    n0 = U_mpi2.shape[2]
-    for i in range(num_processes):
-        U_mpi2[i] = u[:, i*n0:(i+1)*n0]
+    #n0 = U_mpi2.shape[2]
+    #for i in range(num_processes):
+        #U_mpi2[i] = u[:, i*n0:(i+1)*n0]
+    U_mpi2[:] = rollaxis(u.reshape(Np[0], num_processes, Np[1], N[2]), 1)
     comm.Alltoall([U_mpi2, MPI.DOUBLE], [UT[0], MPI.DOUBLE])
     fu = ST.fct(UT[0], fu)
     return fu
@@ -181,9 +201,10 @@ def ifct0(fu, u):
     """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do ifct"""
     UT[0] = ST.ifct(fu, UT[0])
     comm.Alltoall([UT[0], MPI.DOUBLE], [U_mpi2, MPI.DOUBLE])
-    n0 = U_mpi2.shape[2]
-    for i in range(num_processes):
-        u[:, i*n0:(i+1)*n0] = U_mpi2[i]
+    #n0 = U_mpi2.shape[2]
+    #for i in range(num_processes):
+        #u[:, i*n0:(i+1)*n0] = U_mpi2[i]
+    u[:] = rollaxis(U_mpi, 1).reshape(u.shape)
     return u
 
 #@profile
@@ -256,9 +277,9 @@ def pressuregrad(P_hat, dU):
     return dU
 
 def pressurerhs(U_hat, dU):
-    dU[3] = 0.
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], dU[3, p_slice])    
-    dU[3, p_slice] *= -1./dt    
+    dU[:] = 0.
+    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], dU[p_slice])    
+    dU[p_slice] *= -1./dt    
     return dU
 
 def body_force(Sk, dU):
@@ -361,7 +382,7 @@ def divergenceConvection(c, add=False):
     c[2] += 1j*K[1]*F_tmp[1]  # dvwdy
     c[2] += 1j*K[2]*F_tmp[2]  # dwwdz
     c *= -1
-    return c
+    return c    
 
 #@profile
 def ComputeRHS(dU, jj):
@@ -391,10 +412,10 @@ def ComputeRHS(dU, jj):
     return dU
 
 # Set up for solving with TDMA
-if ST.quad == "GL":
+if ST.quad == "GC":
     ck = ones(N[0]-2); ck[0] = 2
     
-elif ST.quad == "GC":
+elif ST.quad == "GL":
     ck = ones(N[0]-2); ck[0] = 2; ck[-1] = 2
 a0 = ones(N[0]-4)*(-pi/2)
 b0 = pi/2*(ck+1)
@@ -404,7 +425,7 @@ bc = b0.copy()
 # For Neumann basis:
 kk = SN.wavenumbers(N[0])
 ck = ones(N[0]-3)
-if SN.quad == "GC": ck[-1] = 2
+if SN.quad == "GL": ck[-1] = 2
 a0N = ones(N[0]-5)*(-pi/2)*(kk[1:-2]/(kk[1:-2]+2))**2
 b0N = pi/2*(1+ck*(kk[1:]/(kk[1:]+2))**4)
 c0N = a0N.copy()
@@ -416,7 +437,7 @@ u0 = zeros((2, M+1, U_hat.shape[2], U_hat.shape[3]))   # Diagonal entries of U
 u1 = zeros((2, M, U_hat.shape[2], U_hat.shape[3]))     # Diagonal+1 entries of U
 u2 = zeros((2, M-1, U_hat.shape[2], U_hat.shape[3]))   # Diagonal+2 entries of U
 L0  = zeros((2, M, U_hat.shape[2], U_hat.shape[3]))     # The single nonzero row of L                 
-SFTc.LU_Helmholtz_3D(N[0], 0, ST.quad=="GC", alfa1, u0, u1, u2, L0)
+SFTc.LU_Helmholtz_3D(N[0], 0, ST.quad=="GL", alfa1, u0, u1, u2, L0)
 
 # Prepare LU Helmholtz solver Neumann for pressure
 MN = (N[0]-4)/2
@@ -424,7 +445,51 @@ u0N = zeros((2, MN+1, U_hat.shape[2], U_hat.shape[3]))   # Diagonal entries of U
 u1N = zeros((2, MN, U_hat.shape[2], U_hat.shape[3]))     # Diagonal+1 entries of U
 u2N = zeros((2, MN-1, U_hat.shape[2], U_hat.shape[3]))   # Diagonal+2 entries of U
 LN  = zeros((2, MN, U_hat.shape[2], U_hat.shape[3]))     # The single nonzero row of L
-SFTc.LU_Helmholtz_3D(N[0], 1, SN.quad=="GC", alfa2, u0N, u1N, u2N, LN)
+SFTc.LU_Helmholtz_3D(N[0], 1, SN.quad=="GL", alfa2, u0N, u1N, u2N, LN)
+
+def solvePressure(P_hat, U_hat):
+    global F_tmp, F_tmp2
+    U_tmp4[:] = 0
+    U_tmp3[:] = 0
+    F_tmp2[:] = 0
+    Ni = F_tmp2
+    
+    # dudx = 0 from continuity equation. Use Shen Dirichlet basis
+    # Use regular Chebyshev basis for dvdx and dwdx
+    F_tmp[0] = Cm.matvec(U_hat[0])
+    F_tmp[0, u_slice] = SFTc.TDMA_3D(a0, b0, bc, c0, F_tmp[0, u_slice])    
+    dudx = U_tmp4[0] = ifst(F_tmp[0], U_tmp4[0], ST)        
+    
+    SFTc.Mult_DPhidT_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
+    dvdx = U_tmp4[1] = ifct(F_tmp[1], U_tmp4[1])
+    dwdx = U_tmp4[2] = ifct(F_tmp[2], U_tmp4[2])
+    
+    dudy_h = 1j*K[1]*U_hat[0]
+    dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], ST)
+    dudz_h = 1j*K[2]*U_hat[0]
+    dudz = U_tmp3[1] = ifst(dudz_h, U_tmp3[1], ST)
+    Ni[0] = fst(U0[0]*dudx + U0[1]*dudy + U0[2]*dudz, Ni[0], ST)
+    
+    U_tmp3[:] = 0
+    dvdy_h = 1j*K[1]*U_hat[1]
+    dvdy = U_tmp3[0] = ifst(dvdy_h, U_tmp3[0], ST)
+    dvdz_h = 1j*K[2]*U_hat[1]
+    dvdz = U_tmp3[1] = ifst(dvdz_h, U_tmp3[1], ST)
+    Ni[1] = fst(U0[0]*dvdx + U0[1]*dvdy + U0[2]*dvdz, Ni[1], ST)
+    
+    U_tmp3[:] = 0
+    dwdy_h = 1j*K[1]*U_hat[2]
+    dwdy = U_tmp3[0] = ifst(dwdy_h, U_tmp3[0], ST)
+    dwdz_h = 1j*K[2]*U_hat[2]
+    dwdz = U_tmp3[1] = ifst(dwdz_h, U_tmp3[1], ST)
+    Ni[2] = fst(U0[0]*dwdx + U0[1]*dwdy + U0[2]*dwdz, Ni[2], ST)
+    
+    F_tmp[0] = 0
+    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])
+    SFTc.Solve_Helmholtz_3D_complex(N[0], 1, F_tmp[0, p_slice], P_hat[p_slice], u0N, u1N, u2N, LN)
+
+    return P_hat
+    
 
 def initOS(OS, U, U_hat, t=0.):
     eps = 1e-4
@@ -469,9 +534,11 @@ if case == "OS":
     conv1 = standardConvection(conv1)
     initOS(OS, U, U_hat, t=dt)
     t = dt
-    e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
-    P[:] = 0
-    P_hat = fst(P, P_hat, SN)
+    e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)    
+    P_hat = solvePressure(P_hat, 0.5*(U_hat+U_hat0))
+    P = ifst(P_hat, P, SN)
+    #P[:] = 0
+    #P_hat = fst(P, P_hat, SN)
 
 elif case == "MKK":
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
@@ -517,45 +584,47 @@ U_hat0[:] = U_hat
 ##plt.figure();plt.imshow(curl[1, :,:,0]);plt.colorbar()
 #assert allclose(curl, U_tmp2, atol=1e-7)
 
-if case == "OS":
-    plt.figure()
-    im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
-    plt.colorbar(im1)
-    plt.draw()
+if enable_plotting:
+    if case == "OS":
+        
+        plt.figure()
+        im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
+        plt.colorbar(im1)
+        plt.draw()
 
-    plt.figure()
-    im2 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[1,:,:,0] - (1-X[0,:,:,0]**2), 100)
-    plt.colorbar(im2)
-    plt.draw()
+        plt.figure()
+        im2 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[1,:,:,0] - (1-X[0,:,:,0]**2), 100)
+        plt.colorbar(im2)
+        plt.draw()
 
-    plt.figure()
-    im3 = plt.contourf(X[1,:,:,0], X[0,:,:,0], P[:,:,0], 100)
-    plt.colorbar(im3)
-    plt.draw()
-    
-    plt.figure()
-    im4 = plt.quiver(X[1, :,:,0], X[0,:,:,0], U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
-    plt.draw()
-    
-    plt.pause(1e-6)
+        plt.figure()
+        im3 = plt.contourf(X[1,:,:,0], X[0,:,:,0], P[:,:,0], 100)
+        plt.colorbar(im3)
+        plt.draw()
+        
+        plt.figure()
+        im4 = plt.quiver(X[1, :,:,0], X[0,:,:,0], U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
+        plt.draw()
+        
+        plt.pause(1e-6)
 
-elif case == "MKK":
-    plt.figure()
-    im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
-    plt.colorbar(im1)
-    plt.draw()
+    elif case == "MKK":
+        plt.figure()
+        im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
+        plt.colorbar(im1)
+        plt.draw()
 
-    plt.figure()
-    im2 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[1,:,:,0], 100)
-    plt.colorbar(im2)
-    plt.draw()
+        plt.figure()
+        im2 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[1,:,:,0], 100)
+        plt.colorbar(im2)
+        plt.draw()
 
-    plt.figure()
-    im3 = plt.contourf(X[1,:,:,0], X[0,:,:,0], P[:,:,0], 100)
-    plt.colorbar(im3)
-    plt.draw()
+        plt.figure()
+        im3 = plt.contourf(X[1,:,:,0], X[0,:,:,0], P[:,:,0], 100)
+        plt.colorbar(im3)
+        plt.draw()
 
-    plt.pause(1e-6)
+        plt.pause(1e-6)
     
 
 def Divu(U, U_hat, c):
@@ -575,11 +644,12 @@ tstep = 0
 def steps():
     global t, tstep, e0, dU, U_hat, P_hat, Pcorr, U_hat1, U_hat0, P
     while t < T-1e-8:
+        #plt.pause(2)
         t += dt; tstep += 1
         #print "tstep ", tstep
         # Tentative momentum solve
         
-        for jj in range(2):
+        for jj in range(velocity_pressure_iters):
             dU[:] = 0
             dU = ComputeRHS(dU, jj)    
             SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[0, u_slice], U_hat[0, u_slice], u0, u1, u2, L0)
@@ -589,7 +659,7 @@ def steps():
             #SFTc.Solve_Helmholtz_3Dall_complex(N[0], 0, dU[:, u_slice], U_hat[:, u_slice], u0, u1, u2, L0)
             
             # Pressure correction
-            dU = pressurerhs(U_hat, dU) 
+            dU[3] = pressurerhs(U_hat, dU[3]) 
             SFTc.Solve_Helmholtz_3D_complex(N[0], 1, dU[3, p_slice], Pcorr[p_slice], u0N, u1N, u2N, LN)
 
             # Update pressure
@@ -621,7 +691,10 @@ def steps():
         
         P = ifst(P_hat, P, SN)        
         conv1[:] = conv0
-        if tstep % 100 == 0:   
+        
+        timer()
+        
+        if tstep % check_step == 0:   
             if case == "OS":
                 pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
                 initOS(OS, U_tmp4, U_hat1, t=t)
@@ -629,7 +702,7 @@ def steps():
                 e2 = 0.5*energy((U_tmp4[1] - (1-X[0]**2))**2 + U_tmp4[0]**2)
                 exact = exp(2*imag(OS.eigval)*t)
                 if rank == 0:
-                    print "Time %2.5f Norms %2.12e %2.12e %2.12e %2.12e" %(t, e1/e0, e2/e0, exp(2*imag(OS.eigval)*t), e1/e0-exact)
+                    print "Time %2.5f Norms %2.12e %2.12e %2.12e %2.12e" %(t, e1/e0, e2/e0, exact, e1/e0-exact)
 
             elif case == "MKK":
                 e0 = energy(U0[0]**2)
@@ -641,7 +714,7 @@ def steps():
             #Source[2, :] = 0
             #Sk[2] = fss(Source[2], Sk[2], ST)
 
-        if tstep % 100 == 0:
+        if tstep % plot_step == 0 and enable_plotting:
             if case == "OS":
                 im1.ax.clear()
                 im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0]-(1-X[0,:,:,0]**2), 100)         
@@ -666,14 +739,17 @@ def steps():
                 im3.autoscale()
                 
             plt.pause(1e-6)        
+
+timer = Timer()
                 
 steps()
 
+timer.final(MPI, rank)
+
 if case == "OS":
     pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
-    initOS(OS, U_tmp4, U_hat1, t=t)
     e1 = 0.5*energy(pert)
-    e2 = 0.5*energy((U_tmp4[1] - (1-X[0]**2))**2 + U_tmp4[0]**2)
-
+    exact = exp(2*imag(OS.eigval)*t)
     if rank == 0:
-        print "Time %2.5f Norms %2.10e %2.10e %2.10e" %(t, e1/e0, e2/e0, exp(2*imag(OS.eigval)*t))
+        print "Computed error = %2.8e %2.8e " %(abs(e1/e0-exact), dt)
+

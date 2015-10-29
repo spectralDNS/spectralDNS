@@ -22,18 +22,18 @@ rank = comm.Get_rank()
 Np = N / num_processes
 X = mgrid[rank*Np:(rank+1)*Np, :N, :N].astype(float)*2*pi/N
 U     = empty((3, Np, N, N))
-U_hat = empty((3, N, Np, Nf), dtype="complex")
+U_hat = empty((3, N, Np, N/2+1), dtype="complex")
 P     = empty((Np, N, N))
-P_hat = empty((N, Np, Nf), dtype="complex")
-U_hat0  = empty((3, N, Np, Nf), dtype="complex")
-U_hat1  = empty((3, N, Np, Nf), dtype="complex")
-dU      = empty((3, N, Np, Nf), dtype="complex")
-Uc_hat  = empty((N, Np, Nf), dtype="complex")
-Uc_hatT = empty((Np, N, Nf), dtype="complex")
-U_mpi   = empty((num_processes, Np, Np, Nf), dtype="complex")
+P_hat = empty((N, Np, N/2+1), dtype="complex")
+U_hat0  = empty((3, N, Np, N/2+1), dtype="complex")
+U_hat1  = empty((3, N, Np, N/2+1), dtype="complex")
+dU      = empty((3, N, Np, N/2+1), dtype="complex")
+Uc_hat  = empty((N, Np, N/2+1), dtype="complex")
+Uc_hatT = empty((Np, N, N/2+1), dtype="complex")
+U_mpi   = empty((num_processes, Np, Np, N/2+1), dtype="complex")
 curl    = empty((3, Np, N, N))
 kx = fftfreq(N, 1./N)
-kz = kx[:Nf].copy(); kz[-1] *= -1
+kz = kx[:(N/2+1)].copy(); kz[-1] *= -1
 K = array(meshgrid(kx, kx[rank*Np:(rank+1)*Np], kz, indexing='ij'), dtype=int)
 K2 = sum(K*K, 0, dtype=int)
 K_over_K2 = K.astype(float) / where(K2 == 0, 1, K2).astype(float)
@@ -46,15 +46,13 @@ b = [0.5, 0.5, 1.]
 def ifftn_mpi(fu, u):
     Uc_hat[:] = ifft(fu, axis=0)
     comm.Alltoall([Uc_hat, MPI.DOUBLE_COMPLEX], [U_mpi, MPI.DOUBLE_COMPLEX])
-    for i in range(num_processes):
-        Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
-    u[:] = irfft2(Uc_hatT, axes=(1,2))
+    Uc_hatT[:] = rollaxis(U_mpi, 1).reshape(Uc_hatT.shape)
+    u[:] = irfft2(Uc_hatT, axes=(1, 2))
     return u
 
 def fftn_mpi(u, fu):
     Uc_hatT[:] = rfft2(u, axes=(1,2))
-    for i in range(num_processes):
-        U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
+    U_mpi[:] = rollaxis(Uc_hatT.reshape(Np, num_processes, Np, N/2+1), 1, 0)
     comm.Alltoall([U_mpi, MPI.DOUBLE_COMPLEX], [fu, MPI.DOUBLE_COMPLEX])
     fu[:] = fft(fu, axis=0)
     return fu
@@ -70,17 +68,17 @@ def Curl(a, c):
     c[1] = ifftn_mpi(1j*(K[2]*a[0]-K[0]*a[2]), c[1])
     c[0] = ifftn_mpi(1j*(K[1]*a[2]-K[2]*a[1]), c[0])
     return c
-
+@profile
 def ComputeRHS(dU, rk):
     if rk > 0:
         for i in range(3):
             U[i] = ifftn_mpi(U_hat[i], U[i])
     curl[:] = Curl(U_hat, curl)
     dU = Cross(U, curl, dU)
-    dU[:] *= dealias
+    dU *= dealias
     P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
-    dU[:] -= P_hat*K
-    dU[:] -= nu*K2*U_hat
+    dU -= P_hat*K
+    dU -= nu*K2*U_hat
     return dU
 
 U[0] = sin(X[0])*cos(X[1])*cos(X[2])
@@ -102,6 +100,6 @@ while t < T-1e-8:
     for i in range(3):
         U[i] = ifftn_mpi(U_hat[i], U[i])
 
-kk = comm.reduce(0.5*sum(U*U)*(1./N)**3)
+k = comm.reduce(0.5*sum(U*U)*(1./N)**3)
 if rank == 0:
-    print kk
+    assert round(k - 0.124953117517, 7) == 0

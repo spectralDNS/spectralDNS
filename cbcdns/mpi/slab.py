@@ -12,18 +12,12 @@ __all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
 
 @optimizer
 def transpose_Uc(Uc_hatT, U_mpi, num_processes):
-    #n0 = U_mpi.shape[2]
-    #for i in xrange(num_processes): 
-       #Uc_hatT[:, i*n0:(i+1)*n0] = U_mpi[i]
-    Uc_hatT[:] = rollaxis(U_mpi, 1, 0).reshape(Uc_hatT.shape)
+    Uc_hatT[:] = rollaxis(U_mpi, 1).reshape(Uc_hatT.shape)
     return Uc_hatT
 
 @optimizer
 def transpose_Umpi(U_mpi, Uc_hatT, num_processes):
-    #n0 = U_mpi.shape[2]
-    #for i in xrange(num_processes): 
-       #U_mpi[i] = Uc_hatT[:, i*n0:(i+1)*n0]  
-    U_mpi[:] = rollaxis(Uc_hatT.reshape(Np[0], num_processes, Np[1], Nf), 1, 0)
+    U_mpi[:] = rollaxis(Uc_hatT.reshape(Np[0], num_processes, Np[1], Nf), 1)
     return U_mpi
 
 def create_wavenumber_arrays(N, Np, Nf, rank, float):

@@ -33,10 +33,10 @@ kx = np.sqrt(2)
 f = -u.diff(x, 2) + kx**2*u
 
 # Choices
-solver = "sparse"
+solver = "lu"
 N = 32
 
-ST = ShenDirichletBasis(quad="GC")
+ST = ShenDirichletBasis(quad="GL")
 points, weights = ST.points_and_weights(N) 
 
 # Gauss-Chebyshev quadrature to compute rhs
