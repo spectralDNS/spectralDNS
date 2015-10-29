@@ -12,7 +12,7 @@ Work on a new solver with one nonperiodic direction using the Shen basis (Jie Sh
 See the demo folder for usage.
 
 <p align="center">
-    <img src="https://www.dropbox.com/s/nrwh0s7n25xg5mn/weak_scaling_shaheen_numpy.png?dl=1" width="600" height="400" alt="Weak scaling of pure numpy/mpi4py solver on Shaheen BlueGene/P"/>
+    <img src="https://www.dropbox.com/s/pi4f25c0pyluxz0/weak_scaling_shaheen_numpy_noopt.png?dl=1" width="600" height="400" alt="Weak scaling of pure numpy/mpi4py solver on Shaheen BlueGene/P"/>
 </p>
 <p align="center">
     Weak scaling of pure numpy/mpi4py solver on Shaheen BlueGene/P. The C++ solver uses slab decomposition and MPI communication is performed by the FFTW library.
