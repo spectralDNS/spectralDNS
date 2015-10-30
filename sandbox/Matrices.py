@@ -43,7 +43,7 @@ class Bhmat(object):
         self.shape = shape = (K.shape[0]-2, K.shape[0]-3)
         ck = ones(K.shape)
         N = shape[0]
-        if quad == "GC": ck[N-1] = 2        
+        if quad == "GL": ck[N-1] = 2        
         self.dd = pi/2.*(1+ck[1:N]*(K[1:N]/(K[1:N]+2))**2)
         self.ud = -pi/2
         self.ld = -pi/2*((K[3:N]-2)/(K[3:N]))**2
@@ -107,7 +107,7 @@ class Bmat(object):
         self.shape = shape = (K.shape[0]-3, K.shape[0]-3)
         ck = ones(K.shape)
         N = shape[0]+1        
-        if quad == "GC": ck[N-1] = 2        
+        if quad == "GL": ck[N-1] = 2        
         self.dd = pi/2*(1+ck[1:N]*(K[1:N]/(K[1:N]+2))**4)/K[1:N]**2
         self.ud = -pi/2*(K[1:(N-2)]/(K[1:(N-2)]+2))**2/(K[1:(N-2)]+2)**2
         self.ld = -pi/2*((K[3:N]-2)/(K[3:N]))**2/(K[3:N]-2)**2
@@ -141,7 +141,7 @@ class BDmat(object):
         N = shape[0] 
         ck = ones(K.shape)
         ck[0] = 2
-        if quad == "GC": ck[N-1] = 2
+        if quad == "GL": ck[N-1] = 2
         self.dd = pi/2*(ck[:-2]+ck[2:])
         self.ud = -pi/2
         self.ld = -pi/2

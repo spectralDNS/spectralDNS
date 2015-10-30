@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 import os, sys, platform
-from setuptools import setup, Extension
+#from setuptools import setup, Extension
+from distutils.core import setup, Extension
 import subprocess
 from numpy import get_include
  
@@ -32,6 +33,7 @@ maintenance = 0
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 cdir = os.path.join(cwd, "cbcdns", "optimization")
+sdir = os.path.join(cwd, "cbcdns", "shen")
 
 ext = None
 cmdclass = {}
@@ -40,12 +42,25 @@ if not "sdist" in sys.argv:
         args += "build_ext --inplace"
     subprocess.call([sys.executable, os.path.join(cdir, "setup.py"),
                     args], cwd=cdir)
+    subprocess.call([sys.executable, os.path.join(sdir, "setup.py"),
+                    args], cwd=sdir)    
                     
     ext = []
+    for prec in ("single", "double"):
+        for s in ("LUsolve", "TDMA"):
+            ext += cythonize(Extension("cbcdns.shen.{}_{}".format(s, prec), sources = [os.path.join(sdir, '{}_{}.pyx'.format(s, prec))], language="c++"))
+        
+        for s in ("Cheb", "Matvec"):
+            ext += cythonize(Extension("cbcdns.shen.{}_{}".format(s, prec), sources = [os.path.join(sdir, '{}_{}.pyx'.format(s, prec))]))
+    
+    
+    [e.extra_compile_args.extend(["-Ofast"]) for e in ext]
+    [e.include_dirs.extend([get_include()]) for e in ext]
     if use_cython:
-        ext = cythonize(os.path.join(cdir, "*.pyx"))
-        [e.extra_compile_args.extend(["-Ofast"]) for e in ext]
-        [e.include_dirs.extend([get_include()]) for e in ext]
+        ext0 = cythonize(os.path.join(cdir, "*.pyx"))
+        [e.extra_compile_args.extend(["-Ofast"]) for e in ext0]
+        [e.include_dirs.extend([get_include()]) for e in ext0]
+        ext += ext0
         cmdclass = {'build_ext': build_ext}
         
     if use_weave:

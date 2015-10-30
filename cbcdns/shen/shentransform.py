@@ -1,7 +1,13 @@
 import numpy as np
 from numpy.polynomial import chebyshev as n_cheb
-from cbcdns.fft.wrappyfftw import dct
-import SFTc
+from ..fft.wrappyfftw import dct
+from cbcdns import config
+
+if config.precision == "double":
+    import SFTc_double as SFTc
+else:
+    import SFTc_single as SFTc
+
 
 """
 Fast transforms for pure Chebyshev basis or 

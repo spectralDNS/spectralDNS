@@ -73,8 +73,9 @@ if __name__ == "__main__":
     'write_result': 500
     }
     )
-    config.parser.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline    
-    config.parser.add_argument("--compute_energy", type=int, default=10)
+    # Adding new arguments required here to allow overloading through commandline
+    config.Isotropic.add_argument("--plot_result", type=int, default=10)    
+    config.Isotropic.add_argument("--compute_energy", type=int, default=10)
     solver = get_solver(update)
     initialize(**vars(solver))
     solver.solve()

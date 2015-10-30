@@ -28,21 +28,22 @@ case = "OS"
 
 T = 0.02
 if len(sys.argv) == 2:
-    dt = 8*array([1./100., 1./120., 1./140., 1./160., 1./180, 1./200., 1./300. , 1./400.])
+    dt = 10*array([1./100., 1./120., 1./140., 1./160., 1./180, 1./200., 1./300. , 1./400.])
     dt = dt[eval(sys.argv[-1])]
 else:
     dt = 0.01
     
-M = 10
+#T=2*dt    
+M = 7
 check_step = 1
 plot_step = 1
 enable_plotting = False
-velocity_pressure_iters = 4
+velocity_pressure_iters = 1
 
 if case == "OS":
     Re = 8000.
     nu = 1./Re
-    N = array([2**M, 2**(M-0), 2])
+    N = array([2**M, 2**(M-1), 2])
     L = array([2, 2*pi, 4*pi/3.])
 
 elif case == "MKK":
@@ -327,7 +328,7 @@ def standardConvection(c):
     SFTc.Mult_DPhidT_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
     dvdx = U_tmp4[1] = ifct(F_tmp[1], U_tmp4[1])
     dwdx = U_tmp4[2] = ifct(F_tmp[2], U_tmp4[2])
-    
+        
     #dudx = U_tmp4[0] = chebDerivative_3D(U0[0], U_tmp4[0])
     #dvdx = U_tmp4[1] = chebDerivative_3D0(U0[1], U_tmp4[1])
     #dwdx = U_tmp4[2] = chebDerivative_3D0(U0[2], U_tmp4[2])    
@@ -393,12 +394,14 @@ def ComputeRHS(dU, jj):
         
         # Compute diffusion
         diff0[:] = 0
-        SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat0[0], diff0[0])
-        SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat0[1], diff0[1])
-        SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat0[2], diff0[2])    
-    
+        SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, U_hat0[0], diff0[0])
+        SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, U_hat0[1], diff0[1])
+        SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, U_hat0[2], diff0[2])    
+
+        
     dU[:3] = 1.5*conv0 - 0.5*conv1
     dU[:3] *= dealias    
+    
     
     # Add pressure gradient and body force
     dU = pressuregrad(P_hat, dU)
@@ -532,9 +535,10 @@ if case == "OS":
     OS = OrrSommerfeld(Re=Re, N=N[0])
     initOS(OS, U0, U_hat0)
     conv1 = standardConvection(conv1)
+    e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2)    
     initOS(OS, U, U_hat, t=dt)
     t = dt
-    e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)    
+    tstep = 1
     P_hat = solvePressure(P_hat, 0.5*(U_hat+U_hat0))
     P = ifst(P_hat, P, SN)
     #P[:] = 0
@@ -635,10 +639,8 @@ def Divu(U, U_hat, c):
         
     return c
 
-e0 = 0.5*energy(U[0]**2+(U[1]-(1-X[0]**2))**2)
-
-t = 0.0
-tstep = 0
+#t = 0.0
+#tstep = 0
 
 #@profile
 def steps():
@@ -652,9 +654,11 @@ def steps():
         for jj in range(velocity_pressure_iters):
             dU[:] = 0
             dU = ComputeRHS(dU, jj)    
+
             SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[0, u_slice], U_hat[0, u_slice], u0, u1, u2, L0)
             SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[1, u_slice], U_hat[1, u_slice], u0, u1, u2, L0)
             SFTc.Solve_Helmholtz_3D_complex(N[0], 0, dU[2, u_slice], U_hat[2, u_slice], u0, u1, u2, L0)
+            
             
             #SFTc.Solve_Helmholtz_3Dall_complex(N[0], 0, dU[:, u_slice], U_hat[:, u_slice], u0, u1, u2, L0)
             
@@ -671,7 +675,7 @@ def steps():
             #if jj == 0:
                 #print "   Divergence error"
             #print "         Pressure correction norm %2.6e" %(linalg.norm(Pcorr))
-                            
+                       
         # Update velocity
         dU[:] = 0
         pressuregrad(Pcorr, dU)
@@ -697,12 +701,10 @@ def steps():
         if tstep % check_step == 0:   
             if case == "OS":
                 pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
-                initOS(OS, U_tmp4, U_hat1, t=t)
                 e1 = 0.5*energy(pert)
-                e2 = 0.5*energy((U_tmp4[1] - (1-X[0]**2))**2 + U_tmp4[0]**2)
                 exact = exp(2*imag(OS.eigval)*t)
                 if rank == 0:
-                    print "Time %2.5f Norms %2.12e %2.12e %2.12e %2.12e" %(t, e1/e0, e2/e0, exact, e1/e0-exact)
+                    print "Time %2.5f Norms %2.12e %2.12e %2.12e" %(t, e1/e0, exact, e1/e0-exact)
 
             elif case == "MKK":
                 e0 = energy(U0[0]**2)
@@ -739,7 +741,7 @@ def steps():
                 im3.autoscale()
                 
             plt.pause(1e-6)        
-
+            
 timer = Timer()
                 
 steps()

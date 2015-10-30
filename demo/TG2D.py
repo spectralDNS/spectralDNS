@@ -39,6 +39,7 @@ def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, X, nu, *
 if __name__ == '__main__':
     config.update(
     {
+      'solver': 'NS2D',
       'nu': 0.01,
       'dt': 0.05,
       'T': 10,
@@ -46,7 +47,7 @@ if __name__ == '__main__':
       'M': [6, 6]}
     )
 
-    config.parser.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
+    config.Isotropic.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
     solver = get_solver(update=update, regression_test=regression_test)
     solver.hdf5file.components["curl"] = solver.curl
     initialize(**vars(solver))

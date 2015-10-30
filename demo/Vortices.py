@@ -77,14 +77,15 @@ def finalize(rank, Nf, X, U, W_hat, Curl, **soak):
 if __name__ == "__main__":
     config.update(
         {
+        'solver': 'VV',
         'nu': 0.000625,              # Viscosity
         'dt': 0.01,                  # Time step
         'T': 50,                     # End time
         'write_result': 100
         }
     )        
-    config.parser.add_argument("--init", default='random', choices=('random', 'vortex'))
-    config.parser.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
+    config.Isotropic.add_argument("--init", default='random', choices=('random', 'vortex'))
+    config.Isotropic.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
     solver = get_solver(update)
     assert config.decomposition == 'slab'
     solver.W, solver.W_hat = initialize(**vars(solver))

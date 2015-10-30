@@ -72,26 +72,26 @@ def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, ifft2_mpi, U_hat, U, su
 
 if __name__ == "__main__":
     config.update(
-    {
-    'solver': 'Bq2D',
-    'nu': 1.0e-08,
-    'dt': 0.001,
-    'T': 1.0,
-    'U1':-0.5,
-    'U2':0.5,
-    'l0': 0.001,    # Smoothing parameter
-    'A': 0.01,      # Amplitude of perturbation
-    'Ri': 0.167,    # Richardson number
-    'Pr': 12.0,     # Prantl number
-    'delta': 0.05,   # Width of perturbations
-    'bb': 0.8,
-    'k0': 2,
-    'rho1': 1.0,
-    'rho2': 3.0,
-    }
+        {
+            'solver': 'Bq2D',
+            'nu': 1.0e-08,
+            'dt': 0.001,
+            'T': 1.0,
+            'U1':-0.5,
+            'U2':0.5,
+            'l0': 0.001,    # Smoothing parameter
+            'A': 0.01,      # Amplitude of perturbation
+            'Ri': 0.167,    # Richardson number
+            'Pr': 12.0,     # Prantl number
+            'delta': 0.05,   # Width of perturbations
+            'bb': 0.8,
+            'k0': 2,
+            'rho1': 1.0,
+            'rho2': 3.0,
+        }
     )
-    config.parser.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline    
-    config.parser.add_argument("--compute_energy", type=int, default=2)
+    config.Isotropic.add_argument("--plot_result", type=int, default=10)
+    config.Isotropic.add_argument("--compute_energy", type=int, default=2)
     solver = get_solver(update)
     solver.hdf5file.components["curl"] = solver.curl
     initialize(**vars(solver))

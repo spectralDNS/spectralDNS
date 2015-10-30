@@ -9,42 +9,48 @@ from mpi4py import MPI
 comm = MPI.COMM_WORLD
 from cbcdns import config
 
-def get_solver(update=None, regression_test=None):
-    #args = None
-    #try:
-        #if comm.Get_rank() == 0:
-            #args = config.parser.parse_args()
-    #finally:
-        #args = comm.bcast(args, root=0)
-        
-    args = config.parser.parse_args()
-    if args.solver in ('NS2D', 'Bq2D'):
-        args.decomposition = 'line'
-    vars(config).update(vars(args))
-        
-    #with mpi_import():
+def get_solver(update=None, regression_test=None, family="Isotropic"):
     
-    if config.solver == 'NS':
-        import cbcdns.solvers.spectralDNS as solver
+    if family is "Isotropic":
+        args = config.Isotropic.parse_args()
         
-    elif config.solver == 'VV':
-        import cbcdns.solvers.spectralDNSVV as solver
+        if args.solver in ('NS2D', 'Bq2D'):
+            args.decomposition = 'line'
+        vars(config).update(vars(args))
+            
+        #with mpi_import():
         
-    elif config.solver == 'NS2D':
-        config.L = [config.L[0], config.L[1]]
-        config.M = [config.M[0], config.M[1]]    
-        import cbcdns.solvers.spectralDNS2D as solver
-        
-    elif config.solver == 'MHD':
-        import cbcdns.solvers.spectralMHD3D as solver
+        if config.solver == 'NS':
+            import cbcdns.solvers.spectralDNS as solver
+            
+        elif config.solver == 'VV':
+            import cbcdns.solvers.spectralDNSVV as solver
+            
+        elif config.solver == 'NS2D':
+            config.L = [config.L[0], config.L[1]]
+            config.M = [config.M[0], config.M[1]]    
+            import cbcdns.solvers.spectralDNS2D as solver
+            
+        elif config.solver == 'MHD':
+            import cbcdns.solvers.spectralMHD3D as solver
 
-    elif config.solver == 'Bq2D':
-        config.L = [config.L[0], config.L[1]]
-        config.M = [config.M[0], config.M[1]]    
-        import cbcdns.solvers.spectralDNS2D_Boussinesq as solver
+        elif config.solver == 'Bq2D':
+            config.L = [config.L[0], config.L[1]]
+            config.M = [config.M[0], config.M[1]]    
+            import cbcdns.solvers.spectralDNS2D_Boussinesq as solver
+            
+        else:
+            raise AttributeError("Wrong solver!")
+
+    elif family is "Shen":
+        args = config.Shen.parse_args()
+        vars(config).update(vars(args))
         
-    else:
-        raise AttributeError("Wrong solver!")
+        if config.solver == 'IPCS':
+            import cbcdns.solvers.ShenDNS as solver
+            
+        else:
+            raise AttributeError("Wrong solver!")
             
     if update: solver.update = update
     if regression_test: solver.regression_test = regression_test

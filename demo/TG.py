@@ -62,15 +62,14 @@ def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, **kw):
 if __name__ == "__main__":
     config.update(
         {
-        'nu': 0.000625,             # Viscosity
+        'nu': 0.00625,             # Viscosity
         'dt': 0.01,                 # Time step
         'T': 0.1,                   # End time
-        'L': [2*pi, 2*pi, 2*pi],
+        'L': [2*pi, 4*pi, 2*pi],
         'M': [5, 5, 5]
-        }
+        },  "Isotropic"
     )
-    config.parser.add_argument("--compute_energy", type=int, default=2)
-    #solver = get_solver(update=update, regression_test=regression_test)    
+    config.Isotropic.add_argument("--compute_energy", type=int, default=2)
     solver = get_solver(update=update)
     solver.hdf5file.fname = "NS7.h5"
     solver.hdf5file.components["W0"] = solver.curl[0]
