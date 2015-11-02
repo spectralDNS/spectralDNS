@@ -5,7 +5,10 @@ cimport cython
 #cython: wraparound=False
 from libcpp.vector cimport vector
 
-{0}
+ctypedef np.complex128_t complex_t
+ctypedef np.float64_t real_t
+ctypedef np.int64_t int_t
+ctypedef double real
 
 def LU_Helmholtz_3D(np.int_t N,
                     bint neumann,

@@ -2,7 +2,10 @@ cimport numpy as np
 #cython: boundscheck=False
 #cython: wraparound=False
 
-{0}
+ctypedef np.complex128_t complex_t
+ctypedef np.float64_t real_t
+ctypedef np.int64_t int_t
+ctypedef double real
 
 ctypedef fused T:
     real_t
