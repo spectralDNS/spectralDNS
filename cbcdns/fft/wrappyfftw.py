@@ -200,3 +200,12 @@ try:
 
 except:    
     print Warning("Install pyfftw, it is much faster than numpy fft")
+    dct1 = dct
+    def dct(x, type=2, axis=0):
+        if iscomplexobj(x):
+            xreal = dct1(x.real, type=type, axis=axis)
+            ximag = dct1(x.imag, type=type, axis=axis)
+            return xreal + ximag*1j
+        else:
+            return dct1(x, type=type, axis=axis)
+

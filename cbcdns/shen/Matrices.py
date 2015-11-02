@@ -4,6 +4,8 @@ from SFTc import Chmat_matvec, Bhmat_matvec, Cmat_matvec
 from scipy.sparse import diags
 
 pi, zeros, ones, array = np.pi, np.zeros, np.ones, np.array
+float, complex = {"single": (np.float32, np.complex64),
+                  "double": (np.float64, np.complex128)}[config.precision]
 
 class Chmat(object):
     """Matrix for inner product (p', phi)_w = Chmat * p_hat
@@ -21,7 +23,7 @@ class Chmat(object):
         
     def matvec(self, v):
         N = self.shape[0]
-        c = zeros(v.shape, dtype=complex)
+        c = zeros(v.shape, dtype=v.dtype)
         if len(v.shape) > 1:
             #c[:(N-1)] = self.ud.repeat(array(v.shape[1:]).prod()).reshape(v[1:N].shape)*v[1:N]
             #c[2:N]   += self.ld.repeat(array(v.shape[1:]).prod()).reshape(v[1:(N-1)].shape)*v[1:(N-1)]
@@ -41,16 +43,16 @@ class Bhmat(object):
     def __init__(self, K, quad, **kwargs):
         assert len(K.shape) == 1
         self.shape = shape = (K.shape[0]-2, K.shape[0]-3)
-        ck = ones(K.shape)
+        ck = ones(K.shape, int)
         N = shape[0]
         if quad == "GL": ck[N-1] = 2        
-        self.dd = pi/2.*(1+ck[1:N]*(K[1:N]/(K[1:N]+2))**2)
-        self.ud = -pi/2
+        self.dd = (pi/2.*(1+ck[1:N]*(K[1:N]/(K[1:N]+2))**2)).astype(float)
+        self.ud = float(-pi/2)
         self.ld = -pi/2*((K[3:N]-2)/(K[3:N]))**2
     
     def matvec(self, v):
         N = self.shape[0]
-        c = zeros(v.shape, dtype=complex)
+        c = zeros(v.shape, dtype=v.dtype)
         if len(v.shape) > 1:
             #c[:(N-2)] = self.ud*v[2:N]
             #c[1:N] += self.dd.repeat(array(v.shape[1:]).prod()).reshape(v[1:N].shape)*v[1:N]
@@ -64,7 +66,7 @@ class Bhmat(object):
         return c
     
     def diags(self):
-        return diags([self.ld, self.dd, self.ud*ones(self.shape[1]-1)], [-3, -1, 1], shape=self.shape)
+        return diags([self.ld, self.dd, self.ud*ones(self.shape[1]-1, float)], [-3, -1, 1], shape=self.shape)
 
 class Cmat(object):
     """Matrix for inner product (u', phi) = (phi', phi) u_hat =  Cmat * u_hat
@@ -105,7 +107,7 @@ class Bmat(object):
     def __init__(self, K, quad, **kwargs):
         assert len(K.shape) == 1
         self.shape = shape = (K.shape[0]-3, K.shape[0]-3)
-        ck = ones(K.shape)
+        ck = ones(K.shape, int)
         N = shape[0]+1        
         if quad == "GL": ck[N-1] = 2        
         self.dd = pi/2*(1+ck[1:N]*(K[1:N]/(K[1:N]+2))**4)/K[1:N]**2
@@ -139,12 +141,12 @@ class BDmat(object):
         assert len(K.shape) == 1
         self.shape = shape = (K.shape[0]-2, K.shape[0]-2)
         N = shape[0] 
-        ck = ones(K.shape)
+        ck = ones(K.shape, int)
         ck[0] = 2
         if quad == "GL": ck[N-1] = 2
         self.dd = pi/2*(ck[:-2]+ck[2:])
-        self.ud = -pi/2
-        self.ld = -pi/2
+        self.ud = float(-pi/2)
+        self.ld = float(-pi/2)
     
     def matvec(self, v):
         N = self.shape[0]
@@ -199,7 +201,7 @@ class ANmat(object):
         assert len(K.shape) == 1
         self.shape = shape = (K.shape[0]-3, K.shape[0]-3)
         N = shape[0]+1
-        self.dd = 2*np.pi*(K[1:N]+1)/(K[1:N]+2)        
+        self.dd = 2*pi*(K[1:N]+1)/(K[1:N]+2)        
         self.ud = []
         for i in range(2, N-1, 2):
             self.ud.append(np.array(4*np.pi*(K[1:-(i+2)]+1)/(K[1:-(i+2)]+2)**2))    
@@ -250,10 +252,10 @@ class dTSmat(object):
 
     def __init__(self, K, **kwargs):
         assert len(K.shape) == 1
-        self.shape = shape = (K.shape[0]-2, K.shape[0])
+        self.shape  = (K.shape[0]-2, K.shape[0])
         N = shape[0]
         self.ld = []
-        self.ud = np.pi*(K[1:N]+1)
+        self.ud = pi*(K[1:N]+1)
 
     def matvec(self, v):
         N = self.shape[0]

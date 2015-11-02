@@ -152,7 +152,6 @@ def ComputeRHS(dU, jj):
         SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat0[0], diff0[0])
         SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat0[1], diff0[1])
         SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GC", -1, alfa, U_hat0[2], diff0[2])    
-
     
     dU[:3] = 1.5*conv0 - 0.5*conv1
     dU[:3] *= dealias    
@@ -165,6 +164,8 @@ def ComputeRHS(dU, jj):
     dU[:3] *= 2./nu
     
     dU[:3] += diff0
+
+
         
     return dU
 
@@ -180,12 +181,12 @@ def solvePressure(P_hat, U_hat):
     F_tmp[0] = Cm.matvec(U_hat[0])
     #F_tmp[0, u_slice] = SFTc.TDMA_3D(a0, b0, bc, c0, F_tmp[0, u_slice])    
     F_tmp[0] = TDMASolverD(F_tmp[0])
-    dudx = U_tmp4[0] = ifst(F_tmp[0], U_tmp4[0], ST)        
+    dudx = U_tmp4[0] = ifst(F_tmp[0], U_tmp4[0], ST)      
     
     SFTc.Mult_DPhidT_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
     dvdx = U_tmp4[1] = ifct(F_tmp[1], U_tmp4[1], ST)
     dwdx = U_tmp4[2] = ifct(F_tmp[2], U_tmp4[2], ST)
-    
+
     dudy_h = 1j*K[1]*U_hat[0]
     dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], ST)
     dudz_h = 1j*K[2]*U_hat[0]
@@ -209,7 +210,9 @@ def solvePressure(P_hat, U_hat):
     F_tmp[0] = 0
     SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])    
     #SFTc.Solve_Helmholtz_3D_complex(N[0], 1, F_tmp[0, p_slice], P_hat[p_slice], u0N, u1N, u2N, LN)
+    print sum(F_tmp[0]*F_tmp[0])
     P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
+    print sum(P_hat*P_hat)
 
     return P_hat
     
@@ -226,7 +229,7 @@ def Divu(U, U_hat, c):
 #@profile
 def solve():
     timer = Timer()
-
+    
     while config.t < config.T-1e-8:
         config.t += dt
         config.tstep += 1
@@ -237,7 +240,7 @@ def solve():
             dU[0] = HelmholtzSolverU(U_hat[0], dU[0])
             dU[1] = HelmholtzSolverU(U_hat[1], dU[1])
             dU[2] = HelmholtzSolverU(U_hat[2], dU[2])
-            
+        
             # Pressure correction
             dU[3] = pressurerhs(U_hat, dU[3]) 
             Pcorr[:] = HelmholtzSolverP(Pcorr, dU[3])
