@@ -7,8 +7,8 @@ import sys
 # Compile cython extension modules for single and double precision
 precision = {
 "single": """
-ctypedef np.complex64_t complex_t
-ctypedef np.float32_t real_t
+ctypedef np.complex256_t complex_t
+ctypedef np.float128_t real_t
 ctypedef np.int64_t int_t
 ctypedef float real
 """,

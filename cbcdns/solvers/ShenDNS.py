@@ -8,6 +8,7 @@ from ..shen.Matrices import Chmat, Cmat, Bhmat, Bmat, BDmat, Amat
 from ..shen.Helmholtz import Helmholtz, TDMA
 from  ..shen import SFTc
 
+assert config.precision == "double"
 hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5")    
 
 HelmholtzSolverU = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), "GL", False)
@@ -210,9 +211,7 @@ def solvePressure(P_hat, U_hat):
     F_tmp[0] = 0
     SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])    
     #SFTc.Solve_Helmholtz_3D_complex(N[0], 1, F_tmp[0, p_slice], P_hat[p_slice], u0N, u1N, u2N, LN)
-    print sum(F_tmp[0]*F_tmp[0])
     P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
-    print sum(P_hat*P_hat)
 
     return P_hat
     

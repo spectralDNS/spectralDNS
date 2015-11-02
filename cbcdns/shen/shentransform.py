@@ -24,13 +24,8 @@ The ChebyshevTransform may be used to compute derivatives
 through fast Chebyshev transforms.
 
 """
-float, complex = {"single": (np.float32, np.complex64),
-                  "double": (np.float64, np.complex128)}[config.precision]
-pi = np.pi
-def zeros(N, dtype=float):
-    return np.zeros(N, dtype=dtype)
-def ones(N, dtype=float):
-    return np.ones(N, dtype=dtype)
+float, complex = np.float64, np.complex128
+pi, zeros, ones = np.pi, np.zeros, np.ones
 
 class ChebyshevTransform(object):
     

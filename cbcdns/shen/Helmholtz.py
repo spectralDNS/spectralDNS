@@ -1,9 +1,6 @@
 from cbcdns import config
-from numpy import zeros, ones, arange, pi, float32, float64, complex64, complex128, int
+from numpy import zeros, ones, arange, pi, float, complex, int
 import SFTc
-
-float, complex = {"single": (float32, complex64),
-                  "double": (float64, complex128)}[config.precision]
 
 class Helmholtz(object):
 

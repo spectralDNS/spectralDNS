@@ -290,7 +290,6 @@ def Solve_oe_Helmholtz_1D(np.int_t N,
     u0.resize(M+1)
     BackSolve_U(M, odd, y, u0, d0, d1, d2, u_hat)
 
-
 cdef BackSolve_U(int M,
                  bint odd, 
                  vector[real]& y,

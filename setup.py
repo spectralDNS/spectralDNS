@@ -42,17 +42,13 @@ if not "sdist" in sys.argv:
         args += "build_ext --inplace"
     subprocess.call([sys.executable, os.path.join(cdir, "setup.py"),
                     args], cwd=cdir)
-    subprocess.call([sys.executable, os.path.join(sdir, "setup.py"),
-                    args], cwd=sdir)    
                     
     ext = []
-    for prec in ("single", "double"):
-        for s in ("LUsolve", "TDMA"):
-            ext += cythonize(Extension("cbcdns.shen.{}_{}".format(s, prec), sources = [os.path.join(sdir, '{}_{}.pyx'.format(s, prec))], language="c++"))
+    for s in ("LUsolve", "TDMA"):
+        ext += cythonize(Extension("cbcdns.shen.{}".format(s), sources = [os.path.join(sdir, '{}.pyx'.format(s))], language="c++"))
         
-        for s in ("Cheb", "Matvec"):
-            ext += cythonize(Extension("cbcdns.shen.{}_{}".format(s, prec), sources = [os.path.join(sdir, '{}_{}.pyx'.format(s, prec))]))
-    
+    for s in ("Cheb", "Matvec"):
+        ext += cythonize(Extension("cbcdns.shen.{}".format(s), sources = [os.path.join(sdir, '{}.pyx'.format(s))]))    
     
     [e.extra_compile_args.extend(["-Ofast"]) for e in ext]
     [e.include_dirs.extend([get_include()]) for e in ext]

@@ -4,8 +4,7 @@ from SFTc import Chmat_matvec, Bhmat_matvec, Cmat_matvec
 from scipy.sparse import diags
 
 pi, zeros, ones, array = np.pi, np.zeros, np.ones, np.array
-float, complex = {"single": (np.float32, np.complex64),
-                  "double": (np.float64, np.complex128)}[config.precision]
+float, complex = np.float64, np.complex128
 
 class Chmat(object):
     """Matrix for inner product (p', phi)_w = Chmat * p_hat

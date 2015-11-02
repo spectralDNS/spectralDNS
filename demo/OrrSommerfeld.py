@@ -45,7 +45,6 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, conv1, fst,
     conv1 = standardConvection(conv1)
     initOS(OS, U, U_hat, X, fst, ST, t=dt)
     P_hat = solvePressure(P_hat, 0.5*(U_hat+U_hat0))
-    print "P", sum(P_hat*P_hat)
 
     P = ifst(P_hat, P, SN)   
     U0[:] = U
