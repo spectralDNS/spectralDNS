@@ -3,9 +3,9 @@ __date__ = "2014-12-30"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
+from cbcdns import config
 from ..fft.wrappyfftw import *
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis
-from cbcdns import config
 from ..optimization import optimizer
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange
 

@@ -1,10 +1,6 @@
 import numpy as np
 from cbcdns import config
-if config.precision == "double":
-    from SFTc_double import Chmat_matvec, Bhmat_matvec, Cmat_matvec
-else:
-    from SFTc_single import Chmat_matvec, Bhmat_matvec, Cmat_matvec
-    
+from SFTc import Chmat_matvec, Bhmat_matvec, Cmat_matvec
 from scipy.sparse import diags
 
 pi, zeros, ones, array = np.pi, np.zeros, np.ones, np.array

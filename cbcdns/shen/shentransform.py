@@ -2,12 +2,8 @@ import numpy as np
 from numpy.polynomial import chebyshev as n_cheb
 from ..fft.wrappyfftw import dct
 from cbcdns import config
-
-if config.precision == "double":
-    import SFTc_double as SFTc
-else:
-    import SFTc_single as SFTc
-
+import SFTc
+from ..shen.Helmholtz import TDMA
 
 """
 Fast transforms for pure Chebyshev basis or 
@@ -28,8 +24,13 @@ The ChebyshevTransform may be used to compute derivatives
 through fast Chebyshev transforms.
 
 """
-pi, zeros, ones = np.pi, np.zeros, np.ones
-
+float, complex = {"single": (np.float32, np.complex64),
+                  "double": (np.float64, np.complex128)}[config.precision]
+pi = np.pi
+def zeros(N, dtype=float):
+    return np.zeros(N, dtype=dtype)
+def ones(N, dtype=float):
+    return np.ones(N, dtype=dtype)
 
 class ChebyshevTransform(object):
     
@@ -39,13 +40,15 @@ class ChebyshevTransform(object):
     def points_and_weights(self, N):
         self.N = N
         if self.quad == "GL":
-            points = n_cheb.chebpts2(N)[::-1]
-            weights = np.zeros((N))+np.pi/(N-1)
+            points = (n_cheb.chebpts2(N)[::-1]).astype(float)
+            weights = zeros(N)+pi/(N-1)
             weights[0] /= 2
             weights[-1] /= 2
 
         elif self.quad == "GC":
             points, weights = n_cheb.chebgauss(N)
+            points = points.astype(float)
+            weights = weights.astype(float)
             
         return points, weights
         
@@ -100,10 +103,10 @@ class ChebyshevTransform(object):
         """Fast Chebyshev scalar product."""
         N = fj.shape[0]
         if self.quad == "GC":
-            fk[:] = dct(fj, type=2, axis=0)*np.pi/(2*N)
+            fk[:] = dct(fj, type=2, axis=0)*pi/(2*N)
         
         elif self.quad == "GL":
-            fk[:] = dct(fj, type=1, axis=0)*np.pi/(2*(N-1))
+            fk[:] = dct(fj, type=1, axis=0)*pi/(2*(N-1))
         return fk
 
 class ShenDirichletBasis(ChebyshevTransform):
@@ -116,6 +119,7 @@ class ShenDirichletBasis(ChebyshevTransform):
         self.N = -1
         self.ck = None
         self.w_hat = None
+        self.TDMASolver = None
         
     def init(self, N):
         """Vandermonde matrix is used just for verification"""
@@ -128,7 +132,7 @@ class ShenDirichletBasis(ChebyshevTransform):
             if len(N) == 1:
                 N = N[0]
         if isinstance(N, int): 
-            return np.arange(N-2).astype(np.float)
+            return np.arange(N-2).astype(float)
         
         else:
             kk = np.mgrid[:N[0]-2, :N[1], :N[2]].astype(float)
@@ -170,26 +174,30 @@ class ShenDirichletBasis(ChebyshevTransform):
         fk = self.fastShenScalar(fj, fk)
         
         N = fj.shape[0]
-        if self.ck is None:
-            if self.quad == "GC":
-                self.ck = np.ones(N-2)
-                self.ck[0] = 2
+        if self.TDMASolver is None:
+            self.TDMASolver = TDMA(N, self.quad, False)
+        fk = self.TDMASolver(fk)
+        
+        #if self.ck is None:
+            #if self.quad == "GC":
+                #self.ck = ones(N-2, int)
+                #self.ck[0] = 2
                 
-            elif self.quad == "GL":
-                self.ck = np.ones(N-2) 
-                self.ck[0] = 2
-                self.ck[-1] = 2  # Note!! Shen paper has only ck[0] = 2, not ck[-1] = 2. 
+            #elif self.quad == "GL":
+                #self.ck = ones(N-2, int) 
+                #self.ck[0] = 2
+                #self.ck[-1] = 2  # Note!! Shen paper has only ck[0] = 2, not ck[-1] = 2. 
             
-            self.a = np.ones(N-4)*(-np.pi/2)
-            self.b = np.pi/2*(self.ck+1)
-            self.c = self.a.copy()
-            self.bc = self.b.copy()
+            #self.a = ones(N-4)*(-pi/2)
+            #self.b = pi/2*(self.ck+1)
+            #self.c = self.a.copy()
+            #self.bc = self.b.copy()
             
-        if len(fk.shape) == 3:
-            fk[:-2] = SFTc.TDMA_3D(self.a, self.b, self.bc, self.c, fk[:-2])
+        #if len(fk.shape) == 3:
+            #fk[:-2] = SFTc.TDMA_3D(self.a, self.b, self.bc, self.c, fk[:-2])
 
-        elif len(fk.shape) == 1:
-            fk[:-2] = SFTc.TDMA_1D(self.a, self.b, self.c, fk[:-2])
+        #elif len(fk.shape) == 1:
+            #fk[:-2] = SFTc.TDMA_1D(self.a, self.b, self.c, fk[:-2])
             
         return fk
     
@@ -246,34 +254,36 @@ class ShenNeumannBasis(ShenDirichletBasis):
         """
         fk = self.fastShenScalar(fj, fk)
         N = fj.shape[0]
-        if self.ck is None:
-            k = self.wavenumbers(N)
-            self.ck = np.ones(N-3)
-            if self.quad == "GL": 
-                ck[-1] = 2 # Note not the first since basis phi_0 is not included        
-            self.a = np.ones(N-5)*(-np.pi/2)*(k[1:-2]/(k[1:-2]+2))**2
-            self.b = np.pi/2*(1+self.ck*(k[1:]/(k[1:]+2))**4)
-            self.c = self.a.copy()
-            self.bc = self.b.copy()
-            
-        if len(fk.shape) == 3:
-            fk[1:-2] = SFTc.TDMA_3D(self.a, self.b, self.bc, self.c, fk[1:-2])
+        if self.TDMASolver is None:
+            self.TDMASolver = TDMA(N, self.quad, True)
+        fk = self.TDMASolver(fk)
 
-        elif len(fk.shape) == 1:
-            fk[1:-2] = SFTc.TDMA_1D(self.a, self.b, self.c, fk[1:-2])
+        #if self.ck is None:
+            #k = self.wavenumbers(N)
+            #self.ck = ones(N-3)
+            #if self.quad == "GL": 
+                #ck[-1] = 2 # Note not the first since basis phi_0 is not included        
+            #self.a = ones(N-5)*(-pi/2)*(k[1:-2]/(k[1:-2]+2))**2
+            #self.b = pi/2*(1+self.ck*(k[1:]/(k[1:]+2))**4)
+            #self.c = self.a.copy()
+            #self.bc = self.b.copy()
+            
+        #if len(fk.shape) == 3:
+            #fk[1:-2] = SFTc.TDMA_3D(self.a, self.b, self.bc, self.c, fk[1:-2])
+
+        #elif len(fk.shape) == 1:
+            #fk[1:-2] = SFTc.TDMA_1D(self.a, self.b, self.c, fk[1:-2])
 
         return fk
-
-
     
 if __name__ == "__main__":
     N = 8
     a = np.random.random((N, N, N/2+1))+1j*np.random.random((N, N, N/2+1))
-    af = np.zeros((N, N, N/2+1), dtype=a.dtype)
+    af = zeros((N, N, N/2+1), dtype=a.dtype)
     a[0,:,:] = 0
     a[-1,:,:] = 0
     #a = np.random.random(N)+np.random.random(N)*1j 
-    #af = np.zeros(N, dtype=np.complex)
+    #af = zeros(N, dtype=np.complex)
     #a[0] = 0
     #a[-1] = 0
     
