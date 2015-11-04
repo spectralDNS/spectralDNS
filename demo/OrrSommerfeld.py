@@ -59,9 +59,10 @@ def set_Source(Source, Sk, fss, ST, **kw):
     Sk[:] = 0
     for i in range(3):
         Sk[i] = fss(Source[i], Sk[i], ST)
-    
-def update(dt, rank, X, U, P, U_tmp4, OS, N, comm, L, e0, **kw):
-    if config.tstep == 1 and rank == 1:
+
+def update(rank, X, U, P, OS, N, comm, L, e0, **kw):
+    global im1, im2, im3, im4
+    if config.tstep == 2 and rank == 0:
         plt.figure()
         im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
         plt.colorbar(im1)
@@ -82,8 +83,22 @@ def update(dt, rank, X, U, P, U_tmp4, OS, N, comm, L, e0, **kw):
         plt.draw()
         
         plt.pause(1e-6)
-        globals().update(im=im, im2=im2, im3=im3, im4=im4)
+        globals().update(im1=im1, im2=im2, im3=im3, im4=im4)
     
+    if config.tstep % config.plot_step == 0:
+        im1.ax.clear()
+        im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0]-(1-X[0,:,:,0]**2), 100)         
+        im1.autoscale()
+        im2.ax.clear()
+        im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100) 
+        im2.autoscale()
+        im3.ax.clear()
+        im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100) 
+        im3.autoscale()
+        im4.set_UVC(U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
+        plt.pause(1e-6)
+                
+
     if config.tstep % config.compute_energy == 0: 
         pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
         e1 = 0.5*energy(pert, N, comm, rank, L)
@@ -104,6 +119,7 @@ if __name__ == "__main__":
         },  "Shen"
     )
     config.Shen.add_argument("--compute_energy", type=int, default=1)
+    config.Shen.add_argument("--plot_step", type=int, default=10)
     solver = get_solver(update=update, family="Shen")    
     vars(solver).update(initialize(**vars(solver)))
     set_Source(**vars(solver))

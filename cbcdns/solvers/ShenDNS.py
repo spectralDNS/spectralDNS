@@ -13,8 +13,8 @@ hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config
 
 HelmholtzSolverU = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), "GL", False)
 HelmholtzSolverP = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2), SN.quad, True)
-TDMASolverD = TDMA(N[0], ST.quad, False)
-TDMASolverN = TDMA(N[0], SN.quad, True)
+TDMASolverD = TDMA(ST.quad, False)
+TDMASolverN = TDMA(SN.quad, True)
 
 alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
 Chm = Chmat(K[0, :, 0, 0])
@@ -46,67 +46,46 @@ def body_force(Sk, dU):
     dU[1, :Nu] -= Sk[1, :Nu]
     dU[2, :Nu] -= Sk[2, :Nu]
     return dU
-    
-def Cross(a, b, c):
-    c[0] = fss(a[1]*b[2]-a[2]*b[1], c[0], ST)
-    c[1] = fss(a[2]*b[0]-a[0]*b[2], c[1], ST)
-    c[2] = fss(a[0]*b[1]-a[1]*b[0], c[2], ST)
-    return c
-
-def Curl(u0, uh, c):
-    
-    SFTc.Mult_DPhidT_3D(N[0], uh[1], uh[2], F_tmp[1], F_tmp[2])
-    c[2] = ifct(F_tmp[1], c[2], ST)        
-    Uc[:] = ifst(1j*K[1, :Nu]*uh[0, :Nu], Uc, ST)    
-    c[2] -= Uc
-    
-    c[1] = ifct(F_tmp[2], c[1], ST)    
-    Uc[:] = ifst(1j*K[2]*uh[0, :Nu], Uc, ST) 
-    c[1] += Uc    
-    
-    c[0] = ifst(1j*(K[1]*uh[2]-K[2]*uh[1]), c[0], ST)
-    return c
 
 #@profile
 def standardConvection(c):
     c[:] = 0
-    U_tmp4[:] = 0
-    U_tmp3[:] = 0
+    U_tmp[:] = 0
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
     F_tmp[0] = Cm.matvec(U_hat0[0])
-    #F_tmp[0, u_slice] = SFTc.TDMA_3D(a0, b0, bc, c0, F_tmp[0, u_slice])    
     F_tmp[0] = TDMASolverD(F_tmp[0])
     
-    dudx = U_tmp4[0] = ifst(F_tmp[0], U_tmp4[0], ST)        
+    dudx = U_tmp[0] = ifst(F_tmp[0], U_tmp[0], ST)        
     
     SFTc.Mult_DPhidT_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
-    dvdx = U_tmp4[1] = ifct(F_tmp[1], U_tmp4[1], ST)
-    dwdx = U_tmp4[2] = ifct(F_tmp[2], U_tmp4[2], ST)
+    dvdx = U_tmp[1] = ifct(F_tmp[1], U_tmp[1], ST)
+    dwdx = U_tmp[2] = ifct(F_tmp[2], U_tmp[2], ST)
     
     #dudx = U_tmp4[0] = chebDerivative_3D(U0[0], U_tmp4[0])
     #dvdx = U_tmp4[1] = chebDerivative_3D0(U0[1], U_tmp4[1])
     #dwdx = U_tmp4[2] = chebDerivative_3D0(U0[2], U_tmp4[2])    
     
+    U_tmp2[:] = 0
     dudy_h = 1j*K[1]*U_hat0[0]
-    dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], ST)
+    dudy = U_tmp2[0] = ifst(dudy_h, U_tmp2[0], ST)
     dudz_h = 1j*K[2]*U_hat0[0]
-    dudz = U_tmp3[1] = ifst(dudz_h, U_tmp3[1], ST)
+    dudz = U_tmp2[1] = ifst(dudz_h, U_tmp2[1], ST)
     c[0] = fss(U0[0]*dudx + U0[1]*dudy + U0[2]*dudz, c[0], ST)
     
-    U_tmp3[:] = 0
+    U_tmp2[:] = 0
     dvdy_h = 1j*K[1]*U_hat0[1]
-    dvdy = U_tmp3[0] = ifst(dvdy_h, U_tmp3[0], ST)
+    dvdy = U_tmp2[0] = ifst(dvdy_h, U_tmp2[0], ST)
     dvdz_h = 1j*K[2]*U_hat0[1]
-    dvdz = U_tmp3[1] = ifst(dvdz_h, U_tmp3[1], ST)
+    dvdz = U_tmp2[1] = ifst(dvdz_h, U_tmp2[1], ST)
     c[1] = fss(U0[0]*dvdx + U0[1]*dvdy + U0[2]*dvdz, c[1], ST)
     
-    U_tmp3[:] = 0
+    U_tmp2[:] = 0
     dwdy_h = 1j*K[1]*U_hat0[2]
-    dwdy = U_tmp3[0] = ifst(dwdy_h, U_tmp3[0], ST)
+    dwdy = U_tmp2[0] = ifst(dwdy_h, U_tmp2[0], ST)
     dwdz_h = 1j*K[2]*U_hat0[2]
-    dwdz = U_tmp3[1] = ifst(dwdz_h, U_tmp3[1], ST)
+    dwdz = U_tmp2[1] = ifst(dwdz_h, U_tmp2[1], ST)
     c[2] = fss(U0[0]*dwdx + U0[1]*dwdy + U0[2]*dwdz, c[2], ST)
     c *= -1
     return c
@@ -164,16 +143,14 @@ def ComputeRHS(dU, jj):
     # Scale by 2/nu factor
     dU[:3] *= 2./nu
     
+    # Add diffusion
     dU[:3] += diff0
-
-
         
     return dU
 
 def solvePressure(P_hat, U_hat):
     global F_tmp, F_tmp2
-    U_tmp4[:] = 0
-    U_tmp3[:] = 0
+    U_tmp[:] = 0
     F_tmp2[:] = 0
     Ni = F_tmp2
     
@@ -182,35 +159,35 @@ def solvePressure(P_hat, U_hat):
     F_tmp[0] = Cm.matvec(U_hat[0])
     #F_tmp[0, u_slice] = SFTc.TDMA_3D(a0, b0, bc, c0, F_tmp[0, u_slice])    
     F_tmp[0] = TDMASolverD(F_tmp[0])
-    dudx = U_tmp4[0] = ifst(F_tmp[0], U_tmp4[0], ST)      
+    dudx = U_tmp[0] = ifst(F_tmp[0], U_tmp[0], ST)      
     
     SFTc.Mult_DPhidT_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = U_tmp4[1] = ifct(F_tmp[1], U_tmp4[1], ST)
-    dwdx = U_tmp4[2] = ifct(F_tmp[2], U_tmp4[2], ST)
+    dvdx = U_tmp[1] = ifct(F_tmp[1], U_tmp[1], ST)
+    dwdx = U_tmp[2] = ifct(F_tmp[2], U_tmp[2], ST)
 
+    U_tmp2[:] = 0
     dudy_h = 1j*K[1]*U_hat[0]
-    dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], ST)
+    dudy = U_tmp2[0] = ifst(dudy_h, U_tmp2[0], ST)
     dudz_h = 1j*K[2]*U_hat[0]
-    dudz = U_tmp3[1] = ifst(dudz_h, U_tmp3[1], ST)
+    dudz = U_tmp2[1] = ifst(dudz_h, U_tmp2[1], ST)
     Ni[0] = fst(U0[0]*dudx + U0[1]*dudy + U0[2]*dudz, Ni[0], ST)
     
-    U_tmp3[:] = 0
+    U_tmp2[:] = 0
     dvdy_h = 1j*K[1]*U_hat[1]
-    dvdy = U_tmp3[0] = ifst(dvdy_h, U_tmp3[0], ST)
+    dvdy = U_tmp2[0] = ifst(dvdy_h, U_tmp2[0], ST)
     dvdz_h = 1j*K[2]*U_hat[1]
-    dvdz = U_tmp3[1] = ifst(dvdz_h, U_tmp3[1], ST)
+    dvdz = U_tmp2[1] = ifst(dvdz_h, U_tmp2[1], ST)
     Ni[1] = fst(U0[0]*dvdx + U0[1]*dvdy + U0[2]*dvdz, Ni[1], ST)
     
-    U_tmp3[:] = 0
+    U_tmp2[:] = 0
     dwdy_h = 1j*K[1]*U_hat[2]
-    dwdy = U_tmp3[0] = ifst(dwdy_h, U_tmp3[0], ST)
+    dwdy = U_tmp2[0] = ifst(dwdy_h, U_tmp2[0], ST)
     dwdz_h = 1j*K[2]*U_hat[2]
-    dwdz = U_tmp3[1] = ifst(dwdz_h, U_tmp3[1], ST)
+    dwdz = U_tmp2[1] = ifst(dwdz_h, U_tmp2[1], ST)
     Ni[2] = fst(U0[0]*dwdx + U0[1]*dwdy + U0[2]*dwdz, Ni[2], ST)
     
     F_tmp[0] = 0
     SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])    
-    #SFTc.Solve_Helmholtz_3D_complex(N[0], 1, F_tmp[0, p_slice], P_hat[p_slice], u0N, u1N, u2N, LN)
     P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
 
     return P_hat

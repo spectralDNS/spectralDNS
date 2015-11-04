@@ -173,16 +173,11 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
 
     U_tmp   = empty((3, Np[0], N[1], N[2]), dtype=float)
     U_tmp2  = empty((3, Np[0], N[1], N[2]), dtype=float)
-    U_tmp3  = empty((3, Np[0], N[1], N[2]), dtype=float)
-    U_tmp4  = empty((3, Np[0], N[1], N[2]), dtype=float)
     F_tmp   = empty((3, N[0], Np[1], Nf), dtype=complex)
     F_tmp2  = empty((3, N[0], Np[1], Nf), dtype=complex)
 
     dU      = empty((4, N[0], Np[1], Nf), dtype=complex)
-    Uc      = empty((Np[0], N[1], N[2]), dtype=float)
-    Uc2     = empty((Np[0], N[1], N[2]), dtype=float)
 
-    curl    = empty((3, Np[0], N[1], N[2]), dtype=float)
     conv0   = empty((3, N[0], Np[1], Nf), dtype=complex)
     conv1   = empty((3, N[0], Np[1], Nf), dtype=complex)
     diff0   = empty((3, N[0], Np[1], Nf), dtype=complex)

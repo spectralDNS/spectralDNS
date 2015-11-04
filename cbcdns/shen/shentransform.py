@@ -1,9 +1,9 @@
 import numpy as np
 from numpy.polynomial import chebyshev as n_cheb
-from ..fft.wrappyfftw import dct
+from cbcdns.fft.wrappyfftw import dct
 from cbcdns import config
 import SFTc
-from ..shen.Helmholtz import TDMA
+from cbcdns.shen.Helmholtz import TDMA
 
 """
 Fast transforms for pure Chebyshev basis or 
@@ -114,7 +114,7 @@ class ShenDirichletBasis(ChebyshevTransform):
         self.N = -1
         self.ck = None
         self.w_hat = None
-        self.TDMASolver = None
+        self.TDMASolver = TDMA(quad, False)
         
     def init(self, N):
         """Vandermonde matrix is used just for verification"""
@@ -167,33 +167,7 @@ class ShenDirichletBasis(ChebyshevTransform):
         """Fast Shen transform
         """
         fk = self.fastShenScalar(fj, fk)
-        
-        N = fj.shape[0]
-        if self.TDMASolver is None:
-            self.TDMASolver = TDMA(N, self.quad, False)
         fk = self.TDMASolver(fk)
-        
-        #if self.ck is None:
-            #if self.quad == "GC":
-                #self.ck = ones(N-2, int)
-                #self.ck[0] = 2
-                
-            #elif self.quad == "GL":
-                #self.ck = ones(N-2, int) 
-                #self.ck[0] = 2
-                #self.ck[-1] = 2  # Note!! Shen paper has only ck[0] = 2, not ck[-1] = 2. 
-            
-            #self.a = ones(N-4)*(-pi/2)
-            #self.b = pi/2*(self.ck+1)
-            #self.c = self.a.copy()
-            #self.bc = self.b.copy()
-            
-        #if len(fk.shape) == 3:
-            #fk[:-2] = SFTc.TDMA_3D(self.a, self.b, self.bc, self.c, fk[:-2])
-
-        #elif len(fk.shape) == 1:
-            #fk[:-2] = SFTc.TDMA_1D(self.a, self.b, self.c, fk[:-2])
-            
         return fk
     
 
@@ -202,6 +176,7 @@ class ShenNeumannBasis(ShenDirichletBasis):
     def __init__(self, quad="GC"): 
         ShenDirichletBasis.__init__(self, quad)
         self.factor = None        
+        self.TDMASolver.neumann = True
             
     def init(self, N):
         self.points, self.weights = self.points_and_weights(N)
@@ -248,27 +223,7 @@ class ShenNeumannBasis(ShenDirichletBasis):
         """Fast Shen transform.
         """
         fk = self.fastShenScalar(fj, fk)
-        N = fj.shape[0]
-        if self.TDMASolver is None:
-            self.TDMASolver = TDMA(N, self.quad, True)
         fk = self.TDMASolver(fk)
-
-        #if self.ck is None:
-            #k = self.wavenumbers(N)
-            #self.ck = ones(N-3)
-            #if self.quad == "GL": 
-                #ck[-1] = 2 # Note not the first since basis phi_0 is not included        
-            #self.a = ones(N-5)*(-pi/2)*(k[1:-2]/(k[1:-2]+2))**2
-            #self.b = pi/2*(1+self.ck*(k[1:]/(k[1:]+2))**4)
-            #self.c = self.a.copy()
-            #self.bc = self.b.copy()
-            
-        #if len(fk.shape) == 3:
-            #fk[1:-2] = SFTc.TDMA_3D(self.a, self.b, self.bc, self.c, fk[1:-2])
-
-        #elif len(fk.shape) == 1:
-            #fk[1:-2] = SFTc.TDMA_1D(self.a, self.b, self.c, fk[1:-2])
-
         return fk
     
 if __name__ == "__main__":

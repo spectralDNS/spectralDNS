@@ -24,11 +24,20 @@ class Helmholtz(object):
 
 class TDMA(object):
     
-    def __init__(self, N, quad="GL", neumann=False):
-        if neumann:
+    def __init__(self, quad="GL", neumann=False):
+        self.quad = quad
+        self.neumann = neumann
+        self.a0 = None
+        self.b0 = None
+        self.c0 = None
+        self.bc = None
+        self.s = None
+        
+    def init(self, N):
+        if self.neumann:
             kk = arange(N-2)
             ck = ones(N-3, int)
-            if quad == "GL": ck[-1] = 2
+            if self.quad == "GL": ck[-1] = 2
             self.a0 = ones(N-5, float)*(-pi/2)*(kk[1:-2]/(kk[1:-2]+2))**2
             self.b0 = pi/2*(1+ck*(kk[1:]/(kk[1:]+2))**4)
             self.c0 = self.a0.copy()
@@ -38,7 +47,7 @@ class TDMA(object):
         else:
             ck = ones(N-2, int)
             ck[0] = 2
-            if quad == "GL":
+            if self.quad == "GL":
                 ck[-1] = 2
             self.a0 = ones(N-4, float)*(-pi/2)
             self.b0 = (pi/2*(ck+1)).astype(float)
@@ -47,6 +56,9 @@ class TDMA(object):
             self.s = slice(0, N-2) 
         
     def __call__(self, u):
+        N = u.shape[0]
+        if self.a0 is None:
+            self.init(N)
         if len(u.shape) == 3:
             u[self.s] = SFTc.TDMA_3D(self.a0, self.b0, self.bc, self.c0, u[self.s])
         elif len(u.shape) == 1:
