@@ -201,6 +201,8 @@ def Divu(U, U_hat, c):
         
     return c
 
+def regression_test(**kw):
+    pass
 
 #@profile
 def solve():
@@ -256,10 +258,12 @@ def solve():
         if config.tstep == 1 and config.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
-
+            
     timer.final(MPI, rank)
     
     if config.make_profile:
         results = create_profile(**globals())
                 
+    regression_test(**globals())
+
     hdf5file.close()

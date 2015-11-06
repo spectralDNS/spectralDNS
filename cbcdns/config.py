@@ -21,6 +21,7 @@ parser.add_argument('--M', default=[6, 6, 6], nargs='+', help='Mesh size is pow(
 parser.add_argument('--P1', default=1, type=int, help='pencil decomposition in first direction')
 parser.add_argument('--write_result', default=1e8, type=int, help="Write results to HDF5 every...")
 parser.add_argument('--write_yz_slice',  default=[0, 1e8], help="Write 2D slice to HDF5 [x index, every]")
+parser.add_argument('--checkpoint',  default=1e8, type=int, help="Save intermediate result every...")
 parser.add_argument('--nu', default=0.000625, type=float, help='Viscosity')
 parser.add_argument('--t', default=0.0, type=float, help='Time')
 parser.add_argument('--tstep', default=0, type=int, help='Time step')
@@ -39,7 +40,7 @@ Shen = argparse.ArgumentParser(parents=[parser])
 Shen.add_argument('--solver', default='IPCS', choices=('IPCS',), help="""Choose solver.""")
 Shen.add_argument('--convection', default='Standard', choices=('Standard', 'Divergence'))
 Shen.add_argument('--L', default=[2, 2*pi, 2*pi], nargs='+', help='Physical mesh size')
-Shen.add_argument('--velocity_pressure_iters', default=1, help="Number of inner velocity pressure iterations")
+Shen.add_argument('--velocity_pressure_iters', default=1, type=int, help="Number of inner velocity pressure iterations")
 Shen.add_argument('--print_divergence_progress', default=False, help="Print the norm of the pressure correction on inner iterations")
 
 def update(new, par="Isotropic"):

@@ -1,15 +1,15 @@
 """Orr-Sommerfeld"""
 from cbcdns import config, get_solver
 from OrrSommerfeld_eig import OrrSommerfeld
-from numpy import dot, real, pi, exp, sum, zeros, arange, imag
+from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt
 from cbcdns.fft.wrappyfftw import dct
 import matplotlib.pyplot as plt
 import warnings
 import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
+eps = 1e-6
 def initOS(OS, U, U_hat, X, fst, ST, t=0.):
-    eps = 1e-4
     for i in range(U.shape[1]):
         x = X[0, i, 0, 0]
         OS.interp(x)
@@ -39,7 +39,7 @@ def energy(u, N, comm, rank, L):
 
 def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, conv1, fst, 
                ifst, ST, SN, X, N, comm, rank, L, standardConvection, dt, **kw):        
-    OS = OrrSommerfeld(Re=config.Re, N=128)
+    OS = OrrSommerfeld(Re=config.Re, N=80)
     initOS(OS, U0, U_hat0, X, fst, ST)
     e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
     conv1 = standardConvection(conv1)
@@ -62,7 +62,7 @@ def set_Source(Source, Sk, fss, ST, **kw):
 
 def update(rank, X, U, P, OS, N, comm, L, e0, **kw):
     global im1, im2, im3, im4
-    if config.tstep == 2 and rank == 0:
+    if config.tstep == 2 and rank == 0 and config.plot_step > 0:
         plt.figure()
         im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
         plt.colorbar(im1)
@@ -85,7 +85,7 @@ def update(rank, X, U, P, OS, N, comm, L, e0, **kw):
         plt.pause(1e-6)
         globals().update(im1=im1, im2=im2, im3=im3, im4=im4)
     
-    if config.tstep % config.plot_step == 0:
+    if config.tstep % config.plot_step == 0 and config.plot_step > 0:
         im1.ax.clear()
         im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0]-(1-X[0,:,:,0]**2), 100)         
         im1.autoscale()
@@ -106,6 +106,20 @@ def update(rank, X, U, P, OS, N, comm, L, e0, **kw):
         if rank == 0:
             print "Time %2.5f Norms %2.12e %2.12e %2.12e" %(config.t, e1/e0, exact, e1/e0-exact)
 
+def regression_test(U, X, OS, N, comm, rank, L, e0, fst, ST, U0, U_hat0,**kw):
+    #pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
+    #e1 = 0.5*energy(pert, N, comm, rank, L)
+    #exact = exp(2*imag(OS.eigval)*config.t)
+    #if rank == 0:
+        #print "Computed error = %2.8e %2.8e " %(sqrt(abs(e1/e0-exact)), config.dt)
+
+    initOS(OS, U0, U_hat0, X, fst, ST, t=config.t)
+    pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
+    e1 = 0.5*energy(pert, N, comm, rank, L)
+    #exact = exp(2*imag(OS.eigval)*config.t)
+    if rank == 0:
+        print "Computed error = %2.8e %2.8e " %(sqrt(e1), config.dt)
+
 if __name__ == "__main__":
     config.update(
         {
@@ -120,7 +134,7 @@ if __name__ == "__main__":
     )
     config.Shen.add_argument("--compute_energy", type=int, default=1)
     config.Shen.add_argument("--plot_step", type=int, default=10)
-    solver = get_solver(update=update, family="Shen")    
+    solver = get_solver(update=update, regression_test=regression_test, family="Shen")    
     vars(solver).update(initialize(**vars(solver)))
     set_Source(**vars(solver))
     solver.solve()

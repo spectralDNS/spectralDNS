@@ -41,13 +41,93 @@ try:
             for c in self.components:
                 self.f["3D"].create_group(c)
                 self.f["2D"].create_group(c)
+            self.f["3D"].create_group("checkpoint")
+            self.f["2D"].create_group("checkpoint")
+            self.f["3D"].create_group("oldcheckpoint")
+            self.f["2D"].create_group("oldcheckpoint")
+            self.f["3D/checkpoint"].create_group("U")
+            self.f["3D/checkpoint"].create_group("P")
+            self.f["2D/checkpoint"].create_group("U")
+            self.f["2D/checkpoint"].create_group("P")
+            self.f["3D/oldcheckpoint"].create_group("U")
+            self.f["3D/oldcheckpoint"].create_group("P")
+            self.f["2D/oldcheckpoint"].create_group("U")
+            self.f["2D/oldcheckpoint"].create_group("P")
+
             self.f.attrs.create("dt", config.dt)
             self.f.attrs.create("N", self.N)    
             self.f.attrs.create("L", config.L)    
             self.f["2D"].attrs.create("i", config.write_yz_slice[0])            
             
+        def checkpoint(self, U, P, U0):
+            if self.f is None: self.init_h5file() 
+            else:
+                self.f = h5py.File(self.fname, driver="mpio", comm=self.comm)
+            
+            if config.decomposition in ("slab", "pencil"):
+                shape = [3] + list(self.N)
+                if not "0" in self.f["3D/checkpoint/U"].keys():
+                    self.f["3D/checkpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
+                    self.f["3D/checkpoint/U"].create_dataset("1", shape=shape, dtype=self.dtype)
+                    self.f["3D/checkpoint/P"].create_dataset("1", shape=self.N, dtype=self.dtype)
+                    self.f["3D/oldcheckpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
+                    self.f["3D/oldcheckpoint/U"].create_dataset("1", shape=shape, dtype=self.dtype)
+                    self.f["3D/oldcheckpoint/P"].create_dataset("1", shape=self.N, dtype=self.dtype)
+
+            else:
+                shape = [2] + self.N
+                if not "0" in self.f["2D/checkpoint/U"].keys():
+                    self.f["2D/checkpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
+                    self.f["2D/checkpoint/U"].create_dataset("1", shape=shape, dtype=self.dtype)
+                    self.f["2D/checkpoint/P"].create_dataset("1", shape=self.N, dtype=self.dtype)
+                    self.f["2D/oldcheckpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
+                    self.f["2D/oldcheckpoint/U"].create_dataset("1", shape=shape, dtype=self.dtype)
+                    self.f["2D/oldcheckpoint/P"].create_dataset("1", shape=self.N, dtype=self.dtype)
+
+            if config.decomposition == 'slab':
+                
+                Np = self.N / self.comm.Get_size()
+                
+                # Backup previous solution
+                self.f["3D/oldcheckpoint/U/0"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = self.f["3D/checkpoint/U/0"][:, self.rank*Np[0]:(self.rank+1)*Np[0]]
+                self.f["3D/oldcheckpoint/U/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = self.f["3D/checkpoint/U/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]]
+                self.f["3D/oldcheckpoint/P/1"][self.rank*Np[0]:(self.rank+1)*Np[0]] = self.f["3D/checkpoint/P/1"][self.rank*Np[0]:(self.rank+1)*Np[0]]
+                
+                # Get new values
+                self.f["3D/checkpoint/U/0"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = U0
+                self.f["3D/checkpoint/U/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = U
+                self.f["3D/checkpoint/P/1"][self.rank*Np[0]:(self.rank+1)*Np[0]] = P
+
+            elif config.decomposition == 'pencil':
+                
+                x1, x2 = self.x1, self.x2
+                # Backup previous solution
+                self.f["3D/oldcheckpoint/U/0"][:, x1, x2] = self.f["3D/checkpoint/U/0"][:, x1, x2]
+                self.f["3D/oldcheckpoint/U/1"][:, x1, x2] = self.f["3D/checkpoint/U/1"][:, x1, x2]
+                self.f["3D/oldcheckpoint/P/1"][:, x1, x2] = self.f["3D/checkpoint/P/1"][:, x1, x2]
+                # Get new values
+                self.f["3D/checkpoint/U/0"][:, x1, x2] = U0
+                self.f["3D/checkpoint/U/1"][:, x1, x2] = U
+                self.f["3D/checkpoint/P/1"][x1, x2] = P
+                
+            elif config.decomposition == 'line':
+                
+                Np =  N / self.comm.Get_size()                
+                # Backup previous solution
+                self.f["2D/oldcheckpoint/U/0"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = self.f["2D/checkpoint/U/0"][:, self.rank*Np[0]:(self.rank+1)*Np[0]]
+                self.f["2D/oldcheckpoint/U/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = self.f["2D/checkpoint/U/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]]
+                self.f["2D/oldcheckpoint/P/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = self.f["2D/checkpoint/P/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]]
+                # Get new values
+                self.f["2D/checkpoint/U/0"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = U0
+                self.f["2D/checkpoint/U/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = U
+                self.f["2D/checkpoint/P/1"][self.rank*Np[0]:(self.rank+1)*Np[0]] = P
+            self.f.close()
+            
         def write(self, tstep):
-            if not self.f: self.init_h5file() 
+            if self.f is None: self.init_h5file() 
+            else:
+                self.f = h5py.File(self.fname, driver="mpio", comm=self.comm)
+                
             N = self.N
             
             if tstep % config.write_result == 0 and config.decomposition == 'slab':
@@ -88,7 +168,8 @@ try:
                     self.f["2D/"+comp].create_dataset(str(tstep), shape=(N[1], N[2]), dtype=self.dtype)
                     for comp, val in self.components.iteritems():                                    
                         self.f["2D/%s/%d"%(comp, tstep)][x1, x2] = val[:, :, i]
-                            
+            self.f.close()
+            
         def close(self):
             if self.f: self.f.close()
                             
