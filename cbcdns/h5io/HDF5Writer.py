@@ -14,7 +14,7 @@ try:
     import h5py
     class HDF5Writer(object):
     
-        def __init__(self, comm, dtype, comps, filename="U.h5"):
+        def __init__(self, comm, dtype, comps, filename="U.h5", mesh={}):
             self.comm = comm
             self.components = comps
             self.fname = filename
@@ -22,6 +22,8 @@ try:
             self.f = None
             self.N = 2**config.M
             self.rank = self.comm.Get_rank()
+            self.dim = len(comps[comps.keys()[0]].shape)
+            self.mesh = mesh
             num_processes = self.comm.Get_size()
             if config.decomposition == "pencil":
                 commxz = comm.Split(self.rank/config.P1)
@@ -37,27 +39,26 @@ try:
         def init_h5file(self):
             self.f = h5py.File(self.fname, "w", driver="mpio", comm=self.comm)            
             self.f.create_group("3D")
-            self.f.create_group("2D")
+            self.f.create_group("2D")    # For slices in 3D geometries
             for c in self.components:
-                self.f["3D"].create_group(c)
                 self.f["2D"].create_group(c)
-            self.f["3D"].create_group("checkpoint")
-            self.f["2D"].create_group("checkpoint")
-            self.f["3D"].create_group("oldcheckpoint")
-            self.f["2D"].create_group("oldcheckpoint")
-            self.f["3D/checkpoint"].create_group("U")
-            self.f["3D/checkpoint"].create_group("P")
-            self.f["2D/checkpoint"].create_group("U")
-            self.f["2D/checkpoint"].create_group("P")
-            self.f["3D/oldcheckpoint"].create_group("U")
-            self.f["3D/oldcheckpoint"].create_group("P")
-            self.f["2D/oldcheckpoint"].create_group("U")
-            self.f["2D/oldcheckpoint"].create_group("P")
-
+                self.f["3D"].create_group(c)
+                
+            # Create groups for intermediate checkpoint solutions
+            dim = str(self.dim)+"D"
+            self.f[dim].create_group("checkpoint")
+            self.f[dim].create_group("oldcheckpoint")            
+            self.f[dim+"/checkpoint"].create_group("U")
+            self.f[dim+"/checkpoint"].create_group("P")
+            self.f[dim+"/oldcheckpoint"].create_group("U")
+            self.f[dim+"/oldcheckpoint"].create_group("P")
             self.f.attrs.create("dt", config.dt)
             self.f.attrs.create("N", self.N)    
             self.f.attrs.create("L", config.L)    
-            self.f["2D"].attrs.create("i", config.write_yz_slice[0])            
+            self.f["2D"].attrs.create("i", config.write_yz_slice[0])
+            for key,val in self.mesh.iteritems():
+                self.f["3D"].create_dataset(key, shape=(len(val),), dtype=self.dtype)
+                self.f["3D/"+key][:] = val
             
         def checkpoint(self, U, P, U0):
             if self.f is None: self.init_h5file() 
@@ -89,14 +90,15 @@ try:
                 Np = self.N / self.comm.Get_size()
                 
                 # Backup previous solution
-                self.f["3D/oldcheckpoint/U/0"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = self.f["3D/checkpoint/U/0"][:, self.rank*Np[0]:(self.rank+1)*Np[0]]
-                self.f["3D/oldcheckpoint/U/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = self.f["3D/checkpoint/U/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]]
-                self.f["3D/oldcheckpoint/P/1"][self.rank*Np[0]:(self.rank+1)*Np[0]] = self.f["3D/checkpoint/P/1"][self.rank*Np[0]:(self.rank+1)*Np[0]]
+                s = slice(self.rank*Np[0], (self.rank+1)*Np[0], 1)
+                self.f["3D/oldcheckpoint/U/0"][:, s]  = self.f["3D/checkpoint/U/0"][:, s]
+                self.f["3D/oldcheckpoint/U/1"][:, s] = self.f["3D/checkpoint/U/1"][:, s]
+                self.f["3D/oldcheckpoint/P/1"][s] = self.f["3D/checkpoint/P/1"][s]
                 
                 # Get new values
-                self.f["3D/checkpoint/U/0"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = U0
-                self.f["3D/checkpoint/U/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = U
-                self.f["3D/checkpoint/P/1"][self.rank*Np[0]:(self.rank+1)*Np[0]] = P
+                self.f["3D/checkpoint/U/0"][:, s] = U0
+                self.f["3D/checkpoint/U/1"][:, s] = U
+                self.f["3D/checkpoint/P/1"][s] = P
 
             elif config.decomposition == 'pencil':
                 
@@ -114,13 +116,14 @@ try:
                 
                 Np =  N / self.comm.Get_size()                
                 # Backup previous solution
-                self.f["2D/oldcheckpoint/U/0"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = self.f["2D/checkpoint/U/0"][:, self.rank*Np[0]:(self.rank+1)*Np[0]]
-                self.f["2D/oldcheckpoint/U/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = self.f["2D/checkpoint/U/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]]
-                self.f["2D/oldcheckpoint/P/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = self.f["2D/checkpoint/P/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]]
+                s = slice(self.rank*Np[0], (self.rank+1)*Np[0], 1)
+                self.f["2D/oldcheckpoint/U/0"][:, ] = self.f["2D/checkpoint/U/0"][:, s]
+                self.f["2D/oldcheckpoint/U/1"][:, s] = self.f["2D/checkpoint/U/1"][:, s]
+                self.f["2D/oldcheckpoint/P/1"][:, s] = self.f["2D/checkpoint/P/1"][:, s]
                 # Get new values
-                self.f["2D/checkpoint/U/0"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = U0
-                self.f["2D/checkpoint/U/1"][:, self.rank*Np[0]:(self.rank+1)*Np[0]] = U
-                self.f["2D/checkpoint/P/1"][self.rank*Np[0]:(self.rank+1)*Np[0]] = P
+                self.f["2D/checkpoint/U/0"][:, s] = U0
+                self.f["2D/checkpoint/U/1"][:, s] = U
+                self.f["2D/checkpoint/P/1"][s] = P
             self.f.close()
             
         def write(self, tstep):

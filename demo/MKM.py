@@ -47,14 +47,16 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, conv1,
     N = U0.shape[1]
     s = slice(rank*N, (rank+1)*N, 1)
     U0[:] = f["3D/checkpoint/U/0"][:, s]
-    U [:] = f["3D/checkpoint/U/1"][:, s]
-    P [:] = f["3D/checkpoint/P/1"][s]
-    
     for i in range(3):
         U_hat0[i] = fst(U0[i], U_hat0[i], ST)
-        U_hat[i] = fst(U[i], U_hat[i], ST)
-    P_hat = fst(P, P_hat, SN)
     conv1[:] = standardConvection(conv1)
+    
+    U0[:] = f["3D/checkpoint/U/1"][:, s]
+    P [:] = f["3D/checkpoint/P/1"][s]
+    for i in range(3):
+        U_hat0[i] = fst(U0[i], U_hat0[i], ST)
+    
+    P_hat = fst(P, P_hat, SN)
     f.close()
 
 def set_Source(Source, Sk, fss, ST, **kw):
@@ -63,7 +65,6 @@ def set_Source(Source, Sk, fss, ST, **kw):
     Source[1, :] = -utau**2
     Sk[:] = 0
     Sk[1] = fss(Source[1], Sk[1], ST)
-    
     
 def Q(u, rank, comm, N, **kw):
     L = config.L
@@ -89,7 +90,7 @@ def update(U, P, U0, P_hat, rank, X, stats, ifst, hdf5file, SN, **kw):
     if config.tstep % config.checkpoint == 0:
         hdf5file.checkpoint(U, P, U0)
 
-    if config.tstep == 1 and rank == 0:
+    if config.tstep == 1 and rank == 0 and config.plot_result > 0:
         plt.figure()
         im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
         plt.colorbar(im1)
@@ -108,7 +109,7 @@ def update(U, P, U0, P_hat, rank, X, stats, ifst, hdf5file, SN, **kw):
         plt.pause(1e-6)    
         globals().update(im1=im1, im2=im2, im3=im3)
         
-    if config.tstep % config.plot_result == 0 and rank == 0:
+    if config.tstep % config.plot_result == 0 and rank == 0 and config.plot_result > 0:
         im1.ax.clear()
         im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100)         
         im1.autoscale()
@@ -222,8 +223,8 @@ if __name__ == "__main__":
     config.Shen.add_argument("--plot_result", type=int, default=100)
     config.Shen.add_argument("--sample_stats", type=int, default=100)
     solver = get_solver(update=update, family="Shen")    
-    initialize(**vars(solver))
-    #init_from_file("IPCS.h5", **vars(solver))
+    #initialize(**vars(solver))
+    init_from_file("IPCS.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="mystats")
     solver.solve()
