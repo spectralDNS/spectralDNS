@@ -41,7 +41,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, fst, ST, SN, X, comm, rank, num_p
     U_hat0[:] = U_hat[:]
     
 def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, conv1,
-                   rank, standardConvection, fst, ST, SN, **kw):
+                   rank, standardConvection, fst, ST, SN, num_processes, **kw):
     f = h5py.File(filename, driver="mpio", comm=comm)
     assert "0" in f["3D/checkpoint/U"]
     N = U0.shape[1]
@@ -53,6 +53,12 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, conv1,
     
     U0[:] = f["3D/checkpoint/U/1"][:, s]
     P [:] = f["3D/checkpoint/P/1"][s]
+    #U0[0] += 0.01*random.randn(*U0[0].shape)
+    #if rank == 0:
+        #U0[:, 0] = 0
+    #if rank == num_processes-1:
+        #U0[:, -1] = 0
+
     for i in range(3):
         U_hat0[i] = fst(U0[i], U_hat0[i], ST)
     
@@ -168,6 +174,7 @@ class Stats(object):
         self.UU[3] += sum(U[0]*U[1], axis=(1,2))
         self.UU[4] += sum(U[0]*U[2], axis=(1,2))
         self.UU[5] += sum(U[1]*U[2], axis=(1,2))
+        self.get_stats()
         
     def get_stats(self, tofile=True):
         N = self.shape[0]
@@ -226,7 +233,7 @@ if __name__ == "__main__":
     #initialize(**vars(solver))
     init_from_file("IPCS.h5", **vars(solver))
     set_Source(**vars(solver))
-    solver.stats = Stats(solver.U, solver.comm, filename="mystats")
+    solver.stats = Stats(solver.U, solver.comm, filename="MKMstats")
     solver.solve()
     s = solver.stats.get_stats()
     

@@ -22,9 +22,30 @@ attribute2D = """
           </DataItem>
         </Attribute>"""
 
+isotropic = """
+        <Geometry Type="ORIGIN_DXDYDZ">
+          <DataItem DataType="UInt" Dimensions="3" Format="XML" Precision="4">0 0 0</DataItem>
+          <DataItem DataType="Float" Dimensions="3" Format="XML" Precision="4">{0} {1} {2}</DataItem>
+        </Geometry>"""
+        
+channel =  """
+        <Geometry Type="VXVYVZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="{0}" Dimensions="{3}">
+           {4}:/3D/mesh/z
+          </DataItem>
+          <DataItem Format="HDF" NumberType="Float" Precision="{0}" Dimensions="{2}">
+           {4}:/3D/mesh/y
+          </DataItem>
+          <DataItem Format="HDF" NumberType="Float" Precision="{0}" Dimensions="{1}">
+           {4}:/3D/mesh/x
+          </DataItem>
+        </Geometry>"""
+
+        
 def generate_xdmf(h5filename):
     f = h5py.File(h5filename)
     comps = f["3D"].keys()
+    popped = [comps.remove(i) for i in ("checkpoint", "oldcheckpoint", "mesh")]
     N = f.attrs["N"]
     L = f.attrs["L"]
     if len(f["/".join(("3D", comps[0]))]) > 0:
@@ -37,19 +58,23 @@ def generate_xdmf(h5filename):
         xf3d += timeattr.format(tt, len(timesteps))
         
         dtype = f["/".join(("3D", comps[0]))].values()[0].dtype
+        prec = 4 if dtype is float32 else 8
 
         for tstep in timesteps:
             xf3d += """
-      <Grid GridType="Uniform">
-        <Geometry Type="ORIGIN_DXDYDZ">
-          <DataItem DataType="UInt" Dimensions="3" Format="XML" Precision="4">0 0 0</DataItem>
-          <DataItem DataType="Float" Dimensions="3" Format="XML" Precision="4">{0} {1} {2}</DataItem>
-        </Geometry>""".format(L[0]/N[0], L[1]/N[1], L[2]/N[2])
-
-            xf3d += """
+      <Grid GridType="Uniform">"""
+            
+            if "mesh" in f["3D"].keys():
+                xf3d += channel.format(prec, N[0], N[1], N[2], h5filename)
+                xf3d += """
+        <Topology Dimensions="{0} {1} {2}" Type="3DRectMesh"/>""".format(*N)
+            else:
+                xf3d += isotropic.format(L[0]/N[0], L[1]/N[1], L[2]/N[2])
+                xf3d += """
         <Topology Dimensions="{0} {1} {2}" Type="3DCoRectMesh"/>""".format(*N)
+        
             prec = 4 if dtype == float32 else 8
-            for comp in f["3D"]:
+            for comp in comps:
                 xf3d += attribute3D.format(comp, N[0], N[1], N[2], h5filename, comp, tstep, prec)
             xf3d += """  
       </Grid>

@@ -56,9 +56,11 @@ try:
             self.f.attrs.create("N", self.N)    
             self.f.attrs.create("L", config.L)    
             self.f["2D"].attrs.create("i", config.write_yz_slice[0])
+            if len(self.mesh) > 0:
+                self.f["3D"].create_group("mesh")
             for key,val in self.mesh.iteritems():
-                self.f["3D"].create_dataset(key, shape=(len(val),), dtype=self.dtype)
-                self.f["3D/"+key][:] = val
+                self.f["3D/mesh/"].create_dataset(key, shape=(len(val),), dtype=self.dtype)
+                self.f["3D/mesh/"+key][:] = val
             
         def checkpoint(self, U, P, U0):
             if self.f is None: self.init_h5file() 
