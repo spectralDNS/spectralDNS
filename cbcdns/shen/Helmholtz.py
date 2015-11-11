@@ -35,7 +35,7 @@ class TDMA(object):
         
     def init(self, N):
         if self.neumann:
-            kk = arange(N-2)
+            kk = arange(N-2).astype(float)
             ck = ones(N-3, int)
             if self.quad == "GL": ck[-1] = 2
             self.a0 = ones(N-5, float)*(-pi/2)*(kk[1:-2]/(kk[1:-2]+2))**2

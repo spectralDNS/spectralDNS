@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 from scipy.linalg import solve_banded
 from scipy.sparse import diags
 import scipy.sparse.linalg as la
-from shentransform import ShenDirichletBasis
-import SFTc
+from cbcdns.shen.shentransform import ShenDirichletBasis
+from cbcdns.shen import SFTc
+from cbcdns.shen.Matrices import Amat, BDmat
 
 """
 Solve Helmholtz equation on (-1, 1) with homogeneous bcs
@@ -29,12 +30,12 @@ The equation to be solved for is
 # Use sympy to compute a rhs, given an analytical solution
 x = Symbol("x")
 u = (1-x**2)**2*cos(np.pi*x)*(x-0.25)**2
-kx = np.sqrt(2)
+kx = np.sqrt(5)
 f = -u.diff(x, 2) + kx**2*u
 
 # Choices
 solver = "lu"
-N = 32
+N = 16
 
 ST = ShenDirichletBasis(quad="GL")
 points, weights = ST.points_and_weights(N) 
@@ -48,20 +49,9 @@ def solve(fk):
     k = ST.wavenumbers(N)
         
     if solver == "sparse":
-        #aij = [2*np.pi*(k+1)*(k+2)]
-        #for i in range(2, N-2, 2):
-            #aij.append(np.array(4*np.pi*(k[:-i]+1)))    
-        #A = diags(aij, range(0, N-2, 2))
-        from Matrices import Amat
         A = Amat(np.arange(N).astype(np.float)).diags()
-
-        bij = np.pi*np.ones(N-2); bij[0] *= 1.5
-        if ST.quad == "GC": bij[-1] *= 1.5
-        bio = -np.pi/2*np.ones(N-4)                
-        B = diags([bio, bij, bio], range(-2, 3, 2)) 
-        
-        uk_hat = la.spsolve(A+kx**2*B, fk[:-2])
-        
+        B = BDmat(np.arange(N).astype(np.float), "GL").diags()        
+        uk_hat = la.spsolve(A+kx**2*B, fk[:-2])        
         assert np.allclose(np.dot(A.toarray()+kx**2*B.toarray(), uk_hat), fk[:-2])
 
     elif solver == "sparse-even/odd":
@@ -103,11 +93,18 @@ def solve(fk):
         d1 = np.zeros((2, M))
         d2 = np.zeros((2, M-1))
         L  = np.zeros((2, M))
-        SFTc.LU_Helmholtz_1D(N, 0, ST.quad=="GC", kx, d0, d1, d2, L)
+        SFTc.LU_Helmholtz_1D(N, 0, ST.quad=="GL", kx, d0, d1, d2, L)
         SFTc.Solve_Helmholtz_1D(N, 0, fk[:-2], uk_hat, d0, d1, d2, L)
+
+        A = Amat(np.arange(N).astype(np.float)).diags()
+        B = BDmat(np.arange(N).astype(np.float), "GL").diags()        
+        uk_hat2 = la.spsolve(A+kx**2*B, fk[:-2])        
+
+        print np.linalg.norm(uk_hat-uk_hat2)
+        assert np.allclose(uk_hat, uk_hat2)
         
         b = np.zeros(N-2)
-        SFTc.Mult_Helmholtz_1D(N, ST.quad=="GC", 1, kx**2, uk_hat, b)
+        SFTc.Mult_Helmholtz_1D(N, ST.quad=="GL", 1, kx**2, uk_hat, b)
         assert np.allclose(b, fk[:-2])
 
         uk = np.zeros((N-2, 10, 10))
@@ -123,13 +120,14 @@ def solve(fk):
         u2 = np.zeros((2, M-1, 10, 10))   # Diagonal+2 entries of U
         L  = np.zeros((2, M, 10, 10))     # The single nonzero row of L                 
                 
-        SFTc.LU_Helmholtz_3D(N, 0, ST.quad=="GC", alfa, u0, u1, u2, L)
+        SFTc.LU_Helmholtz_3D(N, 0, ST.quad=="GL", alfa, u0, u1, u2, L)
         SFTc.Solve_Helmholtz_3D(N, 0, f_hat, uk, u0, u1, u2, L)    
         
-        assert np.allclose(uk[:, 1, 1], uk_hat)
+        print np.linalg.norm(uk[:, 1, 2]-uk_hat)
+        assert np.allclose(uk[:, 1, 2], uk_hat)
         
         b = np.zeros((N-2, 10, 10))
-        SFTc.Mult_Helmholtz_3D(N, ST.quad=="GC", 1, alfa**2, uk, b)
+        SFTc.Mult_Helmholtz_3D(N, ST.quad=="GL", 1, alfa**2, uk, b)
         
         assert np.allclose(b[:, 1, 1], fk[:-2])
         
@@ -147,7 +145,7 @@ def solve(fk):
         assert np.allclose(uk[:, 1, 1].imag, uk_hat)
         
         b = np.zeros((N-2, 10, 10), dtype=np.complex)
-        SFTc.Mult_Helmholtz_3D_complex(N, ST.quad=="GC", 1, alfa**2, uk, b)
+        SFTc.Mult_Helmholtz_3D_complex(N, ST.quad=="GL", 1, alfa**2, uk, b)
         
         assert np.allclose(b[:, 1, 1].real, fk[:-2])
         assert np.allclose(b[:, 1, 1].imag, fk[:-2])

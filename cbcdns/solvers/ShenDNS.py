@@ -216,9 +216,9 @@ def solve():
         for jj in range(config.velocity_pressure_iters):
             dU[:] = 0
             dU[:] = ComputeRHS(dU, jj)                
-            dU[0] = HelmholtzSolverU(U_hat[0], dU[0])
-            dU[1] = HelmholtzSolverU(U_hat[1], dU[1])
-            dU[2] = HelmholtzSolverU(U_hat[2], dU[2])
+            U_hat[0] = HelmholtzSolverU(U_hat[0], dU[0])
+            U_hat[1] = HelmholtzSolverU(U_hat[1], dU[1])
+            U_hat[2] = HelmholtzSolverU(U_hat[2], dU[2])
         
             # Pressure correction
             dU[3] = pressurerhs(U_hat, dU[3]) 

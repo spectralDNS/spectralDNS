@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from scipy.linalg import solve_banded
 from scipy.sparse import diags
 import scipy.sparse.linalg as la
-from shentransform import ShenNeumannBasis, ShenDirichletBasis
-import SFTc
+from cbcdns.shen.shentransform import ShenNeumannBasis, ShenDirichletBasis
+from cbcdns.shen import SFTc
 
 """
 Solve Helmholtz equation on (-1, 1) with homogeneous Neumann bcs
@@ -52,7 +52,7 @@ the three smallest diagonals. All other values are equal to U_(k, k+2)
 # Use sympy to compute a rhs, given an analytical solution
 x = Symbol("x")
 u = cos(np.pi*x)
-kx = np.sqrt(0.0)
+kx = np.sqrt(2.0)
 f = -u.diff(x, 2) + kx**2*u
 
 # Choices
@@ -67,7 +67,6 @@ points, weights = ST.points_and_weights(N)
 # Gauss-Chebyshev quadrature to compute rhs
 fj = np.array([f.subs(x, j) for j in points], dtype=float)     # Get f on quad points
 fj -= np.dot(fj, weights)/weights.sum()
-
 
 #k = ST.wavenumbers(N)
 #cij = [-np.pi*(k[1:]+1),
@@ -172,12 +171,12 @@ def solve(fk):
         SFTc.LU_Helmholtz_1D(N, 1, ST.quad=="GC", kx, u0, u1, u2, L) # do LU factorization
         SFTc.Solve_Helmholtz_1D(N, 1, fk[1:-2], uk_hat, u0, u1, u2, L) # Solve
         
-        kx2 = np.meshgrid(np.arange(10), np.arange(10), indexing="ij")
-        alfa = np.sqrt(kx2[0]*kx2[0]+kx2[1]*kx2[1])
-        u0 = np.zeros((2, M+1, 10, 10))   # Diagonal entries of U
-        u1 = np.zeros((2, M, 10, 10))     # Diagonal+1 entries of U
-        u2 = np.zeros((2, M-1, 10, 10))   # Diagonal+2 entries of U
-        L  = np.zeros((2, M, 10, 10))     # The single nonzero row of L 
+        #kx2 = np.meshgrid(np.arange(10), np.arange(10), indexing="ij")
+        #alfa = np.sqrt(kx2[0]*kx2[0]+kx2[1]*kx2[1])
+        #u0 = np.zeros((2, M+1, 10, 10))   # Diagonal entries of U
+        #u1 = np.zeros((2, M, 10, 10))     # Diagonal+1 entries of U
+        #u2 = np.zeros((2, M-1, 10, 10))   # Diagonal+2 entries of U
+        #L  = np.zeros((2, M, 10, 10))     # The single nonzero row of L 
 
         #uk = np.zeros((N-3, 10, 10))
         #fk = np.zeros((N-3, 10, 10))

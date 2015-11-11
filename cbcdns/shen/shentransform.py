@@ -141,6 +141,7 @@ class ShenDirichletBasis(ChebyshevTransform):
         else:
             if self.points is None: self.init(fj.shape[0])
             fk[:-2] = np.dot(self.V, fj*self.weights)
+        fk[-2:] = 0     # Last two not used by Shen
         return fk
         
     def ifst(self, fk, fj):
@@ -176,7 +177,6 @@ class ShenNeumannBasis(ShenDirichletBasis):
     def __init__(self, quad="GC"): 
         ShenDirichletBasis.__init__(self, quad)
         self.factor = None        
-        self.TDMASolver.neumann = True
             
     def init(self, N):
         self.points, self.weights = self.points_and_weights(N)
@@ -200,6 +200,79 @@ class ShenNeumannBasis(ShenDirichletBasis):
         else:
             if self.points is None: self.init(fj.shape[0])
             fk = np.dot(self.V, fj*self.weights)
+        return fk
+
+    def ifst(self, fk, fj):
+        """Fast inverse Shen scalar transform
+        """
+        if self.w_hat is None:
+            if len(fk.shape)==3:
+                k = self.wavenumbers(fk.shape)                
+            elif len(fk.shape)==1:
+                k = self.wavenumbers(fk.shape[0])
+                
+            self.w_hat = fk.copy()
+            self.factor = (k[1:]/(k[1:]+2))**2
+        self.w_hat[:] = 0
+        self.w_hat[1:-2] = fk[1:-2]
+        self.w_hat[3:] -= self.factor*fk[1:-2]
+        fj = self.ifct(self.w_hat, fj)
+        return fj
+        
+    def fst(self, fj, fk):
+        """Fast Shen transform.
+        """
+        fk = self.fastShenScalar(fj, fk)
+        N = fj.shape[0]
+        if self.ck is None:
+            k = self.wavenumbers(N)
+            self.ck = np.ones(N-3)
+            if self.quad == "GL": 
+                ck[-1] = 2 # Note not the first since basis phi_0 is not included        
+            self.a = np.ones(N-5)*(-pi/2)*(k[1:-2]/(k[1:-2]+2))**2
+            self.b = pi/2*(1+self.ck*(k[1:]/(k[1:]+2))**4)
+            self.c = self.a.copy()
+            self.bc = self.b.copy()
+            
+        if len(fk.shape) == 3:
+            fk[1:-2] = SFTc.TDMA_3D(self.a, self.b, self.bc, self.c, fk[1:-2])
+
+        elif len(fk.shape) == 1:
+            fk[1:-2] = SFTc.TDMA_1D(self.a, self.b, self.c, fk[1:-2])
+
+        return fk
+
+
+class ShenNeumannBasis2(ShenDirichletBasis):
+    
+    def __init__(self, quad="GC"): 
+        ShenDirichletBasis.__init__(self, quad)
+        self.factor = None        
+        self.TDMASolver = TDMA(quad, True)
+            
+    def init(self, N):
+        self.points, self.weights = self.points_and_weights(N)
+        k = self.wavenumbers(N)
+        # Build Vandermonde matrix. Note! N points in real space gives N-3 bases in spectral space
+        self.V = n_cheb.chebvander(self.points, N-3).T - ((k/(k+2))**2)[:, np.newaxis]*n_cheb.chebvander(self.points, N-1)[:, 2:].T
+        self.V = self.V[1:, :]
+
+    def fastShenScalar(self, fj, fk):
+        """Fast Shen scalar product.
+        Chebyshev transform taking into account that phi_k = T_k - (k/(k+2))**2*T_{k+2}
+        Note, this is the non-normalized scalar product
+
+        """
+        
+        if self.fast_transform:
+            k  = self.wavenumbers(fj.shape)
+            fk = self.fastChebScalar(fj, fk)
+            fk[:-2] -= ((k/(k+2))**2) * fk[2:]
+
+        else:
+            if self.points is None: self.init(fj.shape[0])
+            fk = np.dot(self.V, fj*self.weights)
+        fk[-2:] = 0
         return fk
 
     def ifst(self, fk, fj):

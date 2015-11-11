@@ -83,7 +83,7 @@ class Cmat(object):
         
     def matvec(self, v):
         N = self.shape[0]
-        c = zeros(v.shape, dtype=complex)
+        c = zeros(v.shape, dtype=v.dtype)
         if len(v.shape) > 1:
             #c[:N-1] = self.ud.repeat(array(v.shape[1:]).prod()).reshape(v[1:N].shape)*v[1:N]
             #c[1:N] += self.ld.repeat(array(v.shape[1:]).prod()).reshape(v[:(N-1)].shape)*v[:(N-1)]
@@ -106,9 +106,9 @@ class Bmat(object):
     def __init__(self, K, quad, **kwargs):
         assert len(K.shape) == 1
         self.shape = shape = (K.shape[0]-3, K.shape[0]-3)
-        ck = ones(K.shape, int)
         N = shape[0]+1        
-        if quad == "GL": ck[N-1] = 2        
+        ck = ones(N, int)
+        if quad == "GL": ck[-1] = 2        
         self.dd = pi/2*(1+ck[1:N]*(K[1:N]/(K[1:N]+2))**4)/K[1:N]**2
         self.ud = -pi/2*(K[1:(N-2)]/(K[1:(N-2)]+2))**2/(K[1:(N-2)]+2)**2
         self.ld = -pi/2*((K[3:N]-2)/(K[3:N]))**2/(K[3:N]-2)**2
@@ -140,9 +140,9 @@ class BDmat(object):
         assert len(K.shape) == 1
         self.shape = shape = (K.shape[0]-2, K.shape[0]-2)
         N = shape[0] 
-        ck = ones(K.shape, int)
+        ck = ones(K.shape[0], int)
         ck[0] = 2
-        if quad == "GL": ck[N-1] = 2
+        if quad == "GL": ck[-1] = 2
         self.dd = pi/2*(ck[:-2]+ck[2:])
         self.ud = float(-pi/2)
         self.ld = float(-pi/2)
@@ -153,11 +153,11 @@ class BDmat(object):
         if len(v.shape) > 1:
             c[:(N-2)] = self.ud.repeat(array(v.shape[:]).prod()).reshape(v[2:N].shape)*v[2:N]
             c[:N]    += self.dd.repeat(array(v.shape[:]).prod()).reshape(v[:N].shape)*v[:N]
-            c[2:N]    += self.ld.repeat(array(v.shape[:]).prod()).reshape(v[:(N-2)].shape)*v[:(N-2)] 
+            c[2:N]   += self.ld.repeat(array(v.shape[:]).prod()).reshape(v[:(N-2)].shape)*v[:(N-2)] 
         else:
             c[:(N-2)] = self.ud*v[2:N]
             c[:N]    += self.dd*v[:N]
-            c[2:N]    += self.ld*v[:(N-2)]
+            c[2:N]   += self.ld*v[:(N-2)]
         return c
     
     def diags(self):
@@ -176,7 +176,7 @@ class Amat(object):
         N = shape[0]
         self.dd = 2*np.pi*(K[:N]+1)*(K[:N]+2)   
         self.ud = []
-        for i in range(2, N-2, 2):
+        for i in range(2, N, 2):
             self.ud.append(np.array(4*np.pi*(K[:-(i+2)]+1)))    
 
         self.ld = None
@@ -186,7 +186,7 @@ class Amat(object):
 
     def diags(self):
         N = self.shape[0]
-        return diags([self.dd] + self.ud, range(0, N-2, 2))
+        return diags([self.dd] + self.ud, range(0, N, 2))
 
 
 class ANmat(object):
