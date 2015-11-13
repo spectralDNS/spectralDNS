@@ -558,7 +558,6 @@ def Mult_Div_1D(np.int_t N,
         
     sum_u0 = 0.0+0.0*1j
     sum_u1 = 0.0+0.0*1j
-    # Direct matvec using the fact that there are only three unique diagonals in matrix
     for i in range(1, M+1):
         bii.push_back(pi/2.0*(1.0+((i*1.0)/(i+2.0))**2 ))
         
@@ -624,7 +623,7 @@ def Mult_Div_1D(np.int_t N,
     b[0].real += sum_u0.real*cp3[0]
     b[0].imag += sum_u0.imag*cp3[0]
 
-def Mult_DPhidT_3D(np.int_t N,
+def Mult_CTD_3D(np.int_t N,
                 np.ndarray[complex_t, ndim=3] v_hat,
                 np.ndarray[complex_t, ndim=3] w_hat,
                 np.ndarray[complex_t, ndim=3] bv,
@@ -633,13 +632,13 @@ def Mult_DPhidT_3D(np.int_t N,
     
     for i in xrange(v_hat.shape[1]):
         for j in xrange(v_hat.shape[2]):
-            Mult_DPhidT_1D(N, 
-                           v_hat[:, i, j],
-                           w_hat[:, i, j],
-                           bv[:, i, j],
-                           bw[:, i, j])
+            Mult_CTD_1D(N, 
+                        v_hat[:, i, j],
+                        w_hat[:, i, j],
+                        bv[:, i, j],
+                        bw[:, i, j])
     
-def Mult_DPhidT_1D(np.int_t N,
+def Mult_CTD_1D(np.int_t N,
                 np.ndarray[complex_t, ndim=1] v_hat,
                 np.ndarray[complex_t, ndim=1] w_hat,
                 np.ndarray[complex_t, ndim=1] bv,
@@ -654,7 +653,6 @@ def Mult_DPhidT_1D(np.int_t N,
     sum_u2 = 0.0+0.0*1j
     sum_u3 = 0.0+0.0*1j
     
-    # Direct matvec using the fact that there are only three unique diagonals in matrix            
     bv[N-1] = 0.0
     bv[N-2] = -2.*(N-1)*v_hat[N-3]
     bv[N-3] = -2.*(N-2)*v_hat[N-4]
@@ -672,10 +670,10 @@ def Mult_DPhidT_1D(np.int_t N,
             sum_u2.real += w_hat[i+1].real
             sum_u2.imag += w_hat[i+1].imag
             
-            bv[i].real -= sum_u0.real*2
-            bv[i].imag -= sum_u0.imag*2
-            bw[i].real -= sum_u2.real*2
-            bw[i].imag -= sum_u2.imag*2
+            bv[i].real -= sum_u0.real*4
+            bv[i].imag -= sum_u0.imag*4
+            bw[i].real -= sum_u2.real*4
+            bw[i].imag -= sum_u2.imag*4
             
         else:
             sum_u1.real += v_hat[i+1].real
@@ -683,16 +681,16 @@ def Mult_DPhidT_1D(np.int_t N,
             sum_u3.real += w_hat[i+1].real
             sum_u3.imag += w_hat[i+1].imag
             
-            bv[i].real -= sum_u1.real*2
-            bv[i].imag -= sum_u1.imag*2
-            bw[i].real -= sum_u3.real*2
-            bw[i].imag -= sum_u3.imag*2
+            bv[i].real -= sum_u1.real*4
+            bv[i].imag -= sum_u1.imag*4
+            bw[i].real -= sum_u3.real*4
+            bw[i].imag -= sum_u3.imag*4
 
     sum_u0.real += v_hat[1].real
     sum_u0.imag += v_hat[1].imag
-    bv[0].real = -sum_u0.real*1
-    bv[0].imag = -sum_u0.imag*1
+    bv[0].real = -sum_u0.real*2
+    bv[0].imag = -sum_u0.imag*2
     sum_u2.real += w_hat[1].real
     sum_u2.imag += w_hat[1].imag
-    bw[0].real = -sum_u2.real*1
-    bw[0].imag = -sum_u2.imag*1
+    bw[0].real = -sum_u2.real*2
+    bw[0].imag = -sum_u2.imag*2

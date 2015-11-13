@@ -60,9 +60,9 @@ class TDMA(object):
         if self.a0 is None:
             self.init(N)
         if len(u.shape) == 3:
-            u[self.s] = SFTc.TDMA_3D(self.a0, self.b0, self.bc, self.c0, u[self.s])
+            SFTc.TDMA_3D(self.a0, self.b0, self.bc, self.c0, u[self.s])
         elif len(u.shape) == 1:
-            u[self.s] = SFTc.TDMA_1D(self.a0, self.b0, self.c0, u[self.s])
+            SFTc.TDMA_1D(self.a0, self.b0, self.bc, self.c0, u[self.s])
         else:
             raise NotImplementedError
         return u

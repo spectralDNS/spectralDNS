@@ -13,6 +13,7 @@ ctypedef fused T:
 
 def TDMA_1D(np.ndarray[real_t, ndim=1] a, 
             np.ndarray[real_t, ndim=1] b, 
+            np.ndarray[real_t, ndim=1] bc,
             np.ndarray[real_t, ndim=1] c, 
             np.ndarray[T, ndim=1] d):
     cdef:
@@ -21,16 +22,16 @@ def TDMA_1D(np.ndarray[real_t, ndim=1] a,
         unsigned int k = n - m
         int i
         
-    for i in range(m):
-        d[i + k] -= d[i] * a[i] / b[i]
-        b[i + k] -= c[i] * a[i] / b[i]
-    for i in range(m - 1, -1, -1):
-        d[i] -= d[i + k] * c[i] / b[i + k]
     for i in range(n):
-        d[i] /= b[i]
+        bc[i] = b[i]
+    for i in range(m):
+        d[i + k] -= d[i] * a[i] / bc[i]
+        bc[i + k] -= c[i] * a[i] / bc[i]
+    for i in range(m - 1, -1, -1):
+        d[i] -= d[i + k] * c[i] / bc[i + k]
+    for i in range(n):
+        d[i] /= bc[i]
         
-    return d
-
 
 def TDMA_3D(np.ndarray[real_t, ndim=1] a, 
             np.ndarray[real_t, ndim=1] b, 
@@ -54,5 +55,3 @@ def TDMA_3D(np.ndarray[real_t, ndim=1] a,
                 d[i, ii, jj] -= d[i + k, ii, jj] * c[i] / bc[i + k]
             for i in range(n):
                 d[i, ii, jj] = d[i, ii, jj] / bc[i]
-        
-    return d

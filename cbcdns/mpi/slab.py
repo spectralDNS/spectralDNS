@@ -9,7 +9,7 @@ from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis
 from ..optimization import optimizer
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange
 
-__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi', 'fss', 'fst', 'ifst', 'fct', 'ifct']
+__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi', 'fss', 'fst', 'ifst', 'fct', 'ifct', 'fct0', 'ifct0']
 
 @optimizer
 def transpose_Uc(Uc_hatT, U_mpi, num_processes):
@@ -136,7 +136,7 @@ def setupMHD(comm, float, complex, mpitype, N, L, mgrid,
     return locals() # Lazy (need only return what is needed)
 
 def setupShen(comm, float, complex, mpitype, N, L, mgrid,
-              num_processes, rank, **kwargs):
+              num_processes, rank, MPI, **kwargs):
     if not num_processes in [2**i for i in range(config.M[0]+1)]:
         raise IOError("Number of cpus must be in ", [2**i for i in range(config.M[0]+1)])
     
@@ -189,7 +189,8 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     kz = fftfreq(N[2], 1./N[2])[:Nf]
     kz[-1] *= -1.0
 
-    init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype)
+    mpidouble = MPI.DOUBLE
+    init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble)
     
     # scale with physical mesh size. 
     # This takes care of mapping the physical domain to a computational cube of size (2, 2pi, 2pi)
@@ -214,9 +215,11 @@ setup = {"MHD": setupMHD,
          "VV":  setupDNS,
          "IPCS": setupShen}[config.solver]        
 
-def init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype):
+def init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble):
     # Initialize MPI work arrays globally
     U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype=complex)
+    U_mpi2  = empty((num_processes, Np[0], Np[1], N[2]))
+    UT      = empty((3, N[0], Np[1], N[2]))
     Uc_hat  = empty((N[0], Np[1], Nf), dtype=complex)
     Uc_hatT = empty((Np[0], N[1], Nf), dtype=complex)
     globals().update(locals())
@@ -328,16 +331,16 @@ def ifct(fu, u, S):
     u[:] = irfft2(Uc_hatT, axes=(1,2))
     return u
 
-#def fct0(u, fu):
-    #"""Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do fct."""
-    #U_mpi2[:] = rollaxis(u.reshape(Np[0], num_processes, Np[1], N[2]), 1)
-    #comm.Alltoall([U_mpi2, MPI.DOUBLE], [UT[0], MPI.DOUBLE])
-    #fu = ST.fct(UT[0], fu)
-    #return fu
+def fct0(u, fu, S):
+    """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do fct."""
+    U_mpi2[:] = rollaxis(u.reshape(Np[0], num_processes, Np[1], N[2]), 1)
+    comm.Alltoall([U_mpi2, mpidouble], [UT[0], mpidouble])
+    fu = S.fct(UT[0], fu)
+    return fu
 
-#def ifct0(fu, u):
-    #"""Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do ifct"""
-    #UT[0] = ST.ifct(fu, UT[0])
-    #comm.Alltoall([UT[0], MPI.DOUBLE], [U_mpi2, MPI.DOUBLE])
-    #u[:] = rollaxis(U_mpi, 1).reshape(u.shape)
-    #return u
+def ifct0(fu, u, S):
+    """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do ifct"""
+    UT[0] = S.ifct(fu, UT[0])
+    comm.Alltoall([UT[0], mpidouble], [U_mpi2, mpidouble])
+    u[:] = rollaxis(U_mpi2, 1).reshape(u.shape)
+    return u

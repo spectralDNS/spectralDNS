@@ -4,7 +4,7 @@ __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
-from ..shen.Matrices import Chmat, Cmat, Bhmat, Bmat, BDmat, Amat
+from ..shen.Matrices import CDNmat, CDDmat, BNDmat
 from ..shen.Helmholtz import Helmholtz, TDMA
 from  ..shen import SFTc
 
@@ -18,9 +18,9 @@ TDMASolverD = TDMA(ST.quad, False)
 TDMASolverN = TDMA(SN.quad, True)
 
 alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
-Chm = Chmat(K[0, :, 0, 0])
-Bhm = Bhmat(K[0, :, 0, 0], SN.quad)
-Cm = Cmat(K[0, :, 0, 0])
+Chm = CDNmat(K[0, :, 0, 0])
+Bhm = BNDmat(K[0, :, 0, 0], SN.quad)
+Cm = CDDmat(K[0, :, 0, 0])
 
 #@profile
 def pressuregrad(P_hat, dU):
@@ -48,6 +48,12 @@ def body_force(Sk, dU):
     dU[2, :Nu] -= Sk[2, :Nu]
     return dU
 
+def chebDerivative_3D0(fj, u0):
+    UT[0] = fct0(fj, UT[0], ST)
+    UT[1] = SFTc.chebDerivativeCoefficients_3D(UT[0], UT[1]) 
+    u0[:] = ifct0(UT[1], u0, ST)
+    return u0
+
 #@profile
 def standardConvection(c):
     c[:] = 0
@@ -56,17 +62,16 @@ def standardConvection(c):
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
     F_tmp[0] = Cm.matvec(U_hat0[0])
-    F_tmp[0] = TDMASolverD(F_tmp[0])
-    
+    F_tmp[0] = TDMASolverD(F_tmp[0])    
     dudx = U_tmp[0] = ifst(F_tmp[0], U_tmp[0], ST)        
     
-    SFTc.Mult_DPhidT_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
+    SFTc.Mult_CTD_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
     dvdx = U_tmp[1] = ifct(F_tmp[1], U_tmp[1], ST)
     dwdx = U_tmp[2] = ifct(F_tmp[2], U_tmp[2], ST)
     
-    #dudx = U_tmp4[0] = chebDerivative_3D(U0[0], U_tmp4[0])
-    #dvdx = U_tmp4[1] = chebDerivative_3D0(U0[1], U_tmp4[1])
-    #dwdx = U_tmp4[2] = chebDerivative_3D0(U0[2], U_tmp4[2])    
+    #dudx = U_tmp[0] = chebDerivative_3D0(U0[0], U_tmp[0])
+    #dvdx = U_tmp[1] = chebDerivative_3D0(U0[1], U_tmp[1])
+    #dwdx = U_tmp[2] = chebDerivative_3D0(U0[2], U_tmp[2])    
     
     U_tmp2[:] = 0
     dudy_h = 1j*K[1]*U_hat0[0]
@@ -162,7 +167,7 @@ def solvePressure(P_hat, U_hat):
     F_tmp[0] = TDMASolverD(F_tmp[0])
     dudx = U_tmp[0] = ifst(F_tmp[0], U_tmp[0], ST)      
     
-    SFTc.Mult_DPhidT_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
+    SFTc.Mult_CTD_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
     dvdx = U_tmp[1] = ifct(F_tmp[1], U_tmp[1], ST)
     dwdx = U_tmp[2] = ifct(F_tmp[2], U_tmp[2], ST)
 

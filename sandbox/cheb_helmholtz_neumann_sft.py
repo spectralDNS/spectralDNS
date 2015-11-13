@@ -51,14 +51,14 @@ the three smallest diagonals. All other values are equal to U_(k, k+2)
 
 # Use sympy to compute a rhs, given an analytical solution
 x = Symbol("x")
-u = cos(np.pi*x)
+u = sin(np.pi*x)*(1-x**2)
 kx = np.sqrt(2.0)
 f = -u.diff(x, 2) + kx**2*u
 
 # Choices
 #solver = "sparse"
 solver = "lu"
-N = 20
+N = 10
 
 ST = ShenNeumannBasis("GC")
 SD = ShenDirichletBasis("GL")

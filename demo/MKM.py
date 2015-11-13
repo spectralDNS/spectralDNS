@@ -8,7 +8,7 @@ import warnings
 import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, fst, ST, SN, X, comm, rank, num_processes, **kw):
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, ST, SN, X, comm, rank, num_processes, **kw):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
     utau = config.nu * config.Re_tau
@@ -27,10 +27,13 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, fst, ST, SN, X, comm, rank, num_p
     dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
     U[1] += dd
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev
-    if rank == 0:
-        U[:, 0] = 0
-    if rank == num_processes-1:
-        U[:, -1] = 0
+
+    for i in range(3):
+        U_hat[i] = fst(U[i], U_hat[i], ST)
+        
+    # project to Dirichlet space and back because U above is not in the Shen Dirichlet space
+    for i in range(3):
+        U[i] = ifst(U_hat[i], U[i], ST)
 
     for i in range(3):
         U_hat[i] = fst(U[i], U_hat[i], ST)

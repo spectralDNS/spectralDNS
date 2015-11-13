@@ -13,8 +13,8 @@ ctypedef fused T:
     real_t
     complex_t
 
-def Chmat_matvec(np.ndarray[real_t, ndim=1] ud, np.ndarray[real_t, ndim=1] ld,
-                 np.ndarray[T, ndim=3] v, np.ndarray[T, ndim=3] b):
+def CDNmat_matvec(np.ndarray[real_t, ndim=1] ud, np.ndarray[real_t, ndim=1] ld,
+                  np.ndarray[T, ndim=3] v, np.ndarray[T, ndim=3] b):
     cdef:
         int i, j, k
         int N = v.shape[0]-2
@@ -29,7 +29,7 @@ def Chmat_matvec(np.ndarray[real_t, ndim=1] ud, np.ndarray[real_t, ndim=1] ld,
             for k in xrange(b.shape[2]):
                 b[i, j, k] = ud[i]*v[i+1, j, k] + ld[i-2]*v[i-1, j, k]
 
-def Bhmat_matvec(real_t ud, 
+def BNDmat_matvec(real_t ud, 
                  np.ndarray[real_t, ndim=1] ld,
                  np.ndarray[real_t, ndim=1] dd,
                  np.ndarray[T, ndim=3] v, np.ndarray[T, ndim=3] b):
@@ -49,7 +49,7 @@ def Bhmat_matvec(real_t ud,
             for k in xrange(b.shape[2]):
                 b[i, j, k] = ud*v[i+2, j, k] + dd[i-1]*v[i, j, k] + ld[i-3]*v[i-2, j, k]
 
-def Cmat_matvec(np.ndarray[real_t, ndim=1] ud, np.ndarray[real_t, ndim=1] ld,
+def CDDmat_matvec(np.ndarray[real_t, ndim=1] ud, np.ndarray[real_t, ndim=1] ld,
                  np.ndarray[T, ndim=3] v, np.ndarray[T, ndim=3] b):
     cdef:
         int i, j, k
