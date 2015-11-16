@@ -93,10 +93,10 @@ def update(rank, X, U, P, OS, N, comm, L, e0, **kw):
     
     if config.tstep % config.plot_step == 0 and config.plot_step > 0:
         im1.ax.clear()
-        im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0]-(1-X[0,:,:,0]**2), 100)         
+        im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100) 
         im1.autoscale()
         im2.ax.clear()
-        im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100) 
+        im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0]-(1-X[0,:,:,0]**2), 100)         
         im2.autoscale()
         im3.ax.clear()
         im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100) 
@@ -144,3 +144,22 @@ if __name__ == "__main__":
     vars(solver).update(initialize(**vars(solver)))
     set_Source(**vars(solver))
     solver.solve()
+    solver.F_tmp[0] = solver.Cm.matvec(solver.U_hat[0])
+    solver.F_tmp[0] = solver.TDMASolverD(solver.F_tmp[0])
+    dudx = solver.U_tmp[0] = solver.ifst(solver.F_tmp[0], solver.U_tmp[0], solver.ST)
+    
+    y = solver.points
+    SD = solver.ST
+    uj = solver.U[0, :, 30, 0]    
+    u_hat = uj.copy()
+    u_hat = SD.fst(uj, u_hat)
+    cs = solver.Cm.matvec(u_hat)
+    cs = solver.TDMASolverD(cs)
+    du = uj.copy()*0
+    du = SD.ifst(cs, du)
+    plt.close("all")
+    plt.figure();plt.plot(y, dudx[:, 30, 0]);plt.plot(y, du)
+    plt.show()
+    
+    
+    

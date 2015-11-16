@@ -1,6 +1,6 @@
 """Turbulent channel"""
 from cbcdns import config, get_solver
-from numpy import dot, real, pi, exp, sum, zeros, arange, imag, cos, where, pi, random, exp, sin
+from numpy import dot, real, pi, exp, sum, complex, float, zeros, arange, imag, cos, where, pi, random, exp, sin, log, array
 import h5py
 from cbcdns.fft.wrappyfftw import dct
 import matplotlib.pyplot as plt
@@ -8,30 +8,79 @@ import warnings
 import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, ST, SN, X, comm, rank, num_processes, **kw):
+# Use constant flux and adjust pressure gradient dynamically
+flux = array([1645.46])
+
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, ST, SN, X, comm, rank, num_processes, Curl, **kw):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
     utau = config.nu * config.Re_tau
-    Um = 40*utau
-    U[:] = 0
-    U[1] = Um*(Y-0.5*Y**2)
+    Um = 46.9091*utau
     Xplus = Y*config.Re_tau
     Yplus = X[1]*config.Re_tau
     Zplus = X[2]*config.Re_tau
-    duplus = Um*0.25/utau 
+    duplus = Um*0.2/utau  #Um*0.25/utau 
     alfaplus = 2*pi/500.
     betaplus = 2*pi/200.
     sigma = 0.00055
-    epsilon = Um/200.
-    dev = 1+0.2*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
-    dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
-    U[1] += dd
-    U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev
+    epsilon = Um/200. #Um/200.
+    #U[:] = 0
+    #U[1] = Um*(Y-0.5*Y**2)
+    #dev = 1+0.000001*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    #dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
+    #U[1] += dd
+    #U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
+    #U[0] = 0.00001*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
 
+    U[:] = 0.001*random.randn(*U.shape)
+    for i in range(3):
+        U_hat[i] = fst(U[i], U_hat[i], ST)    
+    U = Curl(U_hat, U, ST)
+    U[1] += Um*(Y-0.5*Y**2)
+    U[1] += utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)
+    U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)
+    
+    # project to Dirichlet space and back because U above is not in the Shen Dirichlet space
     for i in range(3):
         U_hat[i] = fst(U[i], U_hat[i], ST)
         
+    for i in range(3):
+        U[i] = ifst(U_hat[i], U[i], ST)
+
+    for i in range(3):
+        U_hat[i] = fst(U[i], U_hat[i], ST)
+
+
+    # Set the flux
+    flux[0] = Q(U[1], rank, comm, **kw)
+    comm.Bcast(flux)
+    
+    print "Flux", flux[0]
+
+    P[:] = 0
+    P_hat = fst(P, P_hat, SN)
+    U0[:] = U[:]
+    U_hat0[:] = U_hat[:]
+ 
+def initialize2(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, SN, ST, X, Curl, **kw):
+    """"""
+    # Random streamfunction
+    U[:] = 0.0001*random.randn(*U.shape)
+    for i in range(3):
+        U_hat[i] = fst(U[i], U_hat[i], ST)
+    
+    U = Curl(U_hat, U, ST)
+
+    Y = where(X[0]<0, 1+X[0], 1-X[0])
+    utau = config.nu * config.Re_tau
+    Y0 = where(Y < 1e-12, 1e-12, Y)
+    #U[1] += 1.25*(utau/0.41*log(Y0*utau/config.nu)+5*utau)
+    U[1] += 40*utau*(Y-0.5*Y**2)
+    
     # project to Dirichlet space and back because U above is not in the Shen Dirichlet space
+    for i in range(3):
+        U_hat[i] = fst(U[i], U_hat[i], ST)
+        
     for i in range(3):
         U[i] = ifst(U_hat[i], U[i], ST)
 
@@ -42,7 +91,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, ST, SN, X, comm, rank,
     P_hat = fst(P, P_hat, SN)
     U0[:] = U[:]
     U_hat0[:] = U_hat[:]
-    
+ 
 def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, conv1,
                    rank, standardConvection, fst, ST, SN, num_processes, **kw):
     f = h5py.File(filename, driver="mpio", comm=comm)
@@ -89,9 +138,20 @@ def Q(u, rank, comm, N, **kw):
         return sum(ak*w)*L[1]*L[2]/N[1]/N[2]
     else:
         return 0
+
+beta = zeros(1)    
+def update(U, U_hat, P, U0, P_hat, rank, X, stats, ifst, fst, fss, hdf5file, SN, Source, Sk, ST, U_tmp, F_tmp, comm, **kw):
+    global im1, im2, im3, flux
     
-def update(U, P, U0, P_hat, rank, X, stats, ifst, hdf5file, SN, **kw):
-    global im1, im2, im3
+    q = Q(U[1], rank, comm, **kw)
+    beta[0] = (flux[0] - q)/(array(config.L).prod())
+    comm.Bcast(beta)
+    U_tmp[1] = beta[0]    
+    F_tmp[1] = fst(U_tmp[1], F_tmp[1], ST)
+    U_hat[1] += F_tmp[1]
+    U[1] = ifst(U_hat[1], U[1], ST)
+    Source[1] -= beta[0]
+    Sk[1] = fss(Source[1], Sk[1], ST)
     
     if config.tstep % config.write_result == 0 or config.tstep % config.write_yz_slice[1] == 0:
         hdf5file.write(config.tstep)
@@ -131,16 +191,51 @@ def update(U, P, U0, P_hat, rank, X, stats, ifst, hdf5file, SN, **kw):
         plt.pause(1e-6)
     
     if config.tstep % config.compute_energy == 0: 
-        e0 = Q(U[0]*U[0], rank, **kw)
-        e1 = Q(U[1]*U[1], rank, **kw)
-        e2 = Q(U[2]*U[2], rank, **kw)
-        flux = Q(U[1], rank, **kw)
+        e0 = Q(U[0]*U[0], rank, comm, **kw)
+        e1 = Q(U[1]*U[1], rank, comm, **kw)
+        e2 = Q(U[2]*U[2], rank, comm, **kw)
         if rank == 0:
-            print "Time %2.5f Energy %2.12e %2.12e %2.12e Flux %2.12e" %(config.t, e0, e1, e2, flux)
+            print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.t, e0, e1, e2, q, beta, Source[1].mean())
 
     if config.tstep % config.sample_stats == 0:
         stats(U, P)
+
+def refine(x, y, z, infile, comm):
+    filename, ending = infile.split(".")
+    fin = h5py.File(infile, driver="mpio", comm=comm)    
+    fout = h5py.File(filename+"_refined.h5", "w", driver="mpio", comm=comm)
+    assert "checkpoint" in f["3D"]
+    N0 = Pold.shape
+    N1 = N0.copy()
+    if x: N1[0] *= 2
+    if y: N1[1] *= 2
+    if z: N1[2] *= 2
+    rank = comm.Get_rank()
+    
+    if config.decomposition == 'slab':
         
+        Np0 = N0 / comm.Get_size()        
+        Np1 = N1 / comm.Get_size()   
+        Nf0 = N0[2]/2+1
+        Nf1 = N1[2]/2+1
+        s = slice(rank*Np0[0], (rank+1)*Np0[0], 1)
+        U0 = f["3D/checkpoint/U/1"][s]
+        P0 = f["3D/checkpoint/P/1"][s]
+        U1 = np.zeros((3, Np1[0], N1[1], N1[2]), dtype=float)
+        P1 = np.zeros((Np1[0], N1[1], N1[2]), dtype=float)
+        U0_hat  = empty((3, N0[0], Np0[1], Nf0), dtype=complex)
+        P0_hat  = empty((N0[0], Np0[1], Nf0), dtype=complex)
+        U1_hat  = empty((3, N1[0], Np1[1], Nf1), dtype=complex)
+        P1_hat  = empty((N1[0], Np1[1], Nf1), dtype=complex)
+
+        U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype=complex)
+        U_mpi2  = empty((num_processes, Np[0], Np[1], N[2]))
+        UT      = empty((3, N[0], Np[1], N[2]))
+        Uc_hat  = empty((N[0], Np[1], Nf), dtype=complex)
+        Uc_hatT = empty((Np[0], N[1], Nf), dtype=complex)
+        
+
+    
 
 class Stats(object):
     
@@ -221,10 +316,10 @@ if __name__ == "__main__":
     config.update(
         {
         'solver': 'IPCS',
-        'nu': 2e-5,                  # Viscosity
+        'nu': 1./180.,                  # Viscosity
         'Re_tau': 180., 
-        'dt': 0.2,                  # Time step
-        'T': 1000.,                   # End time
+        'dt': 0.001,                  # Time step
+        'T': 100.,                   # End time
         'L': [2, 4*pi, 4*pi/3.],
         'M': [6, 6, 5]
         },  "Shen"
@@ -233,8 +328,8 @@ if __name__ == "__main__":
     config.Shen.add_argument("--plot_result", type=int, default=100)
     config.Shen.add_argument("--sample_stats", type=int, default=100)
     solver = get_solver(update=update, family="Shen")    
-    #initialize(**vars(solver))
-    init_from_file("IPCS.h5", **vars(solver))
+    initialize(**vars(solver))    
+    #init_from_file("IPCS.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="MKMstats")
     solver.solve()

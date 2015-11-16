@@ -219,14 +219,31 @@ def test_transforms(ST):
     
     
 def test_CDDmat(SD):
-    M = 2*N
-    u = (1-x**2)*sin(np.pi*x)
-    dudx = u.diff(x, 1)
+    M = 512
+    #u = (1-x**2)*sin(np.pi*6*x)
+    #dudx = u.diff(x, 1)
     points, weights = SD.points_and_weights(M)
-    dudx_j = np.array([dudx.subs(x, h) for h in points], dtype=np.float)
-    uj = np.array([u.subs(x, h) for h in points], dtype=np.float)
+    #dudx_j = np.array([dudx.subs(x, h) for h in points], dtype=np.float)
+    #uj = np.array([u.subs(x, h) for h in points], dtype=np.float)
+    
+    from OrrSommerfeld_eig import OrrSommerfeld
+    OS = OrrSommerfeld(Re=8000., N=80)
+    uj = np.zeros(M)
+    for i, y in enumerate(points):
+        OS.interp(y)
+        uj[i] = -np.dot(OS.f, np.real(1j*OS.phi*np.exp(1j*(5.89048-OS.eigval*0.01))))
+        
+    dudx_j = np.zeros(M)
     u_hat = np.zeros(M)
     u_hat = SD.fst(uj, u_hat)
+    uj = SD.ifst(u_hat, uj)
+    u_hat = SD.fst(uj, u_hat)
+    
+    uc_hat = np.zeros(M)
+    uc_hat = SD.fct(uj, uc_hat)
+    du_hat = np.zeros(M)
+    dudx_j = SD.fastChebDerivative(uj, dudx_j, uc_hat, du_hat)
+    
     Cm = CDDmat(np.arange(M).astype(np.float))
     TDMASolver = TDMA(SD.quad, False)
     
@@ -236,7 +253,7 @@ def test_CDDmat(SD):
     cs2 = np.zeros(M)
     cs2 = SD.fastShenScalar(dudx_j, cs2)
     
-    assert np.allclose(cs, cs2, 1e-6)
+    assert np.allclose(cs, cs2)
     
     cs = TDMASolver(cs)
     du = np.zeros(M)
@@ -519,4 +536,5 @@ def test_Mult_CTD(SD):
   
 #test_ADDmat(ShenNeumannBasis("GL")) 
 #test_Helmholtz(ShenDirichletBasis("GL")) 
-test_Mult_CTD(ShenDirichletBasis("GL"))
+#test_Mult_CTD(ShenDirichletBasis("GL"))
+test_CDDmat(ShenDirichletBasis("GL"))
