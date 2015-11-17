@@ -87,17 +87,17 @@ def standardConvection(c):
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    #F_tmp[0] = Cm.matvec(U_hat0[0])
-    #F_tmp[0] = TDMASolverD(F_tmp[0])    
-    #dudx = U_tmp[0] = ifst(F_tmp[0], U_tmp[0], ST)        
+    F_tmp[0] = Cm.matvec(U_hat0[0])
+    F_tmp[0] = TDMASolverD(F_tmp[0])    
+    dudx = U_tmp[0] = ifst(F_tmp[0], U_tmp[0], ST)        
     
-    #SFTc.Mult_CTD_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
-    #dvdx = U_tmp[1] = ifct(F_tmp[1], U_tmp[1], ST)
-    #dwdx = U_tmp[2] = ifct(F_tmp[2], U_tmp[2], ST)
+    SFTc.Mult_CTD_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
+    dvdx = U_tmp[1] = ifct(F_tmp[1], U_tmp[1], ST)
+    dwdx = U_tmp[2] = ifct(F_tmp[2], U_tmp[2], ST)
     
-    dudx = U_tmp[0] = chebDerivative_3D0(U0[0], U_tmp[0])
-    dvdx = U_tmp[1] = chebDerivative_3D0(U0[1], U_tmp[1])
-    dwdx = U_tmp[2] = chebDerivative_3D0(U0[2], U_tmp[2])    
+    #dudx = U_tmp[0] = chebDerivative_3D0(U0[0], U_tmp[0])
+    #dvdx = U_tmp[1] = chebDerivative_3D0(U0[1], U_tmp[1])
+    #dwdx = U_tmp[2] = chebDerivative_3D0(U0[2], U_tmp[2])    
     
     U_tmp2[:] = 0
     dudy_h = 1j*K[1]*U_hat0[0]
@@ -124,21 +124,24 @@ def standardConvection(c):
 
 def divergenceConvection(c, add=False):
     """c_i = div(u_i u_j)"""
-    if not add: c.fill(0)
-    U_tmp[0] = chebDerivative_3D0(U[0]*U[0], U_tmp[0])
-    U_tmp[1] = chebDerivative_3D0(U[0]*U[1], U_tmp[1])
-    U_tmp[2] = chebDerivative_3D0(U[0]*U[2], U_tmp[2])
-    c[0] = fss(U_tmp[0], c[0], ST)
-    c[1] = fss(U_tmp[1], c[1], ST)
-    c[2] = fss(U_tmp[2], c[2], ST)
+    if not add: 
+        c.fill(0)
+    else:
+        c *= -1
+    #U_tmp[0] = chebDerivative_3D0(U[0]*U[0], U_tmp[0])
+    #U_tmp[1] = chebDerivative_3D0(U[0]*U[1], U_tmp[1])
+    #U_tmp[2] = chebDerivative_3D0(U[0]*U[2], U_tmp[2])
+    #c[0] = fss(U_tmp[0], c[0], ST)
+    #c[1] = fss(U_tmp[1], c[1], ST)
+    #c[2] = fss(U_tmp[2], c[2], ST)
     
-    #F_tmp[0] = fst(U0[0]*U0[0], F_tmp[0], ST)
-    #F_tmp[1] = fst(U0[0]*U0[1], F_tmp[1], ST)
-    #F_tmp[2] = fst(U0[0]*U0[2], F_tmp[2], ST)
+    F_tmp[0] = fst(U0[0]*U0[0], F_tmp[0], ST)
+    F_tmp[1] = fst(U0[0]*U0[1], F_tmp[1], ST)
+    F_tmp[2] = fst(U0[0]*U0[2], F_tmp[2], ST)
     
-    #c[0] += Cm.matvec(F_tmp[0])
-    #c[1] += Cm.matvec(F_tmp[1])
-    #c[2] += Cm.matvec(F_tmp[2])
+    c[0] += Cm.matvec(F_tmp[0])
+    c[1] += Cm.matvec(F_tmp[1])
+    c[2] += Cm.matvec(F_tmp[2])
     
     F_tmp2[0] = fss(U0[0]*U0[1], F_tmp2[0], ST)
     F_tmp2[1] = fss(U0[0]*U0[2], F_tmp2[1], ST)    
@@ -160,9 +163,14 @@ def ComputeRHS(dU, jj):
     global conv0
     # Add convection to rhs
     if jj == 0:
-        conv0[:] = standardConvection(conv0) 
-        #conv0[:] = divergenceConvection(conv0)
-        #conv0 *= 0.5
+        if config.convection == "Standard":
+            conv0[:] = standardConvection(conv0) 
+        elif config.convection == "Divergence":
+            conv0[:] = divergenceConvection(conv0)
+        elif config.convection == "Skew":
+            conv0[:] = standardConvection(conv0) 
+            conv0[:] = divergenceConvection(conv0, True)
+            conv0 *= 0.5
         
         # Compute diffusion
         diff0[:] = 0
