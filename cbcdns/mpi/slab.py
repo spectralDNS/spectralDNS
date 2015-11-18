@@ -9,7 +9,7 @@ from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis
 from ..optimization import optimizer
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange
 
-__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi', 'fss', 'fst', 'ifst', 'fct', 'ifct', 'fct0', 'ifct0']
+__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi', 'FastShenFourierTransfers']
 
 @optimizer
 def transpose_Uc(Uc_hatT, U_mpi, num_processes):
@@ -159,39 +159,37 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     Nq = N[0]-3   # Number of pressure modes in Shen basis
     u_slice = slice(0, Nu)
     p_slice = slice(1, Nu)
+    
+    FST = FastShenFourierTransfers(N, MPI)
 
-    U     = empty((3, Np[0], N[1], N[2]), dtype=float)
-    U_hat = empty((3, N[0], Np[1], Nf), dtype=complex)
-    P     = empty((Np[0], N[1], N[2]), dtype=float)
-    P_hat = empty((N[0], Np[1], Nf), dtype=complex)
-    Pcorr = empty((N[0], Np[1], Nf), dtype=complex)
+    U     = empty((3,)+FST.real_shape(), dtype=float)
+    U_hat = empty((3,)+FST.complex_shape(), dtype=complex)
+    P     = empty(FST.real_shape(), dtype=float)
+    P_hat = empty(FST.complex_shape(), dtype=complex)
+    Pcorr = empty(FST.complex_shape(), dtype=complex)
 
-    U0      = empty((3, Np[0], N[1], N[2]), dtype=float)
-    U_hat0  = empty((3, N[0], Np[1], Nf), dtype=complex)
-    U_hat1  = empty((3, N[0], Np[1], Nf), dtype=complex)
-    UT      = empty((3, N[0], Np[1], N[2]), dtype=float)
+    U0      = empty((3,)+FST.real_shape(), dtype=float)
+    U_hat0  = empty((3,)+FST.complex_shape(), dtype=complex)
+    U_hat1  = empty((3,)+FST.complex_shape(), dtype=complex)
 
-    U_tmp   = empty((3, Np[0], N[1], N[2]), dtype=float)
-    U_tmp2  = empty((3, Np[0], N[1], N[2]), dtype=float)
-    F_tmp   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    F_tmp2  = empty((3, N[0], Np[1], Nf), dtype=complex)
+    U_tmp   = empty((3,)+FST.real_shape(), dtype=float)
+    U_tmp2  = empty((3,)+FST.real_shape(), dtype=float)
+    F_tmp   = empty((3,)+FST.complex_shape(), dtype=complex)
+    F_tmp2  = empty((3,)+FST.complex_shape(), dtype=complex)
 
-    dU      = empty((4, N[0], Np[1], Nf), dtype=complex)
+    dU      = empty((4,)+FST.complex_shape(), dtype=complex)
 
-    conv0   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    conv1   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    diff0   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    Source  = empty((3, Np[0], N[1], N[2]), dtype=float) 
-    Sk      = empty((3, N[0], Np[1], Nf), dtype=complex) 
+    conv0   = empty((3,)+FST.complex_shape(), dtype=complex)
+    conv1   = empty((3,)+FST.complex_shape(), dtype=complex)
+    diff0   = empty((3,)+FST.complex_shape(), dtype=complex)
+    Source  = empty((3,)+FST.real_shape(), dtype=float) 
+    Sk      = empty((3,)+FST.complex_shape(), dtype=complex) 
 
     kx = arange(N[0]).astype(float)
     ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
     kz = fftfreq(N[2], 1./N[2])[:Nf]
     kz[-1] *= -1.0
 
-    mpidouble = MPI.DOUBLE
-    init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble)
-    
     # scale with physical mesh size. 
     # This takes care of mapping the physical domain to a computational cube of size (2, 2pi, 2pi)
     # Note that first direction cannot be different from 2 (yet)
@@ -203,7 +201,7 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
-    kmax[0] = N[0]*2./3.
+    kmax[0] = N[0]
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
     
@@ -214,15 +212,6 @@ setup = {"MHD": setupMHD,
          "NS":  setupDNS,
          "VV":  setupDNS,
          "IPCS": setupShen}[config.solver]        
-
-def init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble):
-    # Initialize MPI work arrays globally
-    U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype=complex)
-    U_mpi2  = empty((num_processes, Np[0], Np[1], N[2]))
-    UT      = empty((3, N[0], Np[1], N[2]))
-    Uc_hat  = empty((N[0], Np[1], Nf), dtype=complex)
-    Uc_hatT = empty((Np[0], N[1], Nf), dtype=complex)
-    globals().update(locals())
 
 def init_fft(N, Nf, Np, complex, num_processes, comm, rank, mpitype):
     # Initialize MPI work arrays globally
@@ -291,67 +280,15 @@ def fftn_mpi(u, fu):
     fu[:] = fft(fu, axis=0)
     return fu
      
-def fss(u, fu, S):
-    """Fast Shen scalar product of x-direction, Fourier transform of y and z"""
-    Uc_hatT[:] = rfft2(u, axes=(1,2))
-    U_mpi[:] = rollaxis(Uc_hatT.reshape(Np[0], num_processes, Np[1], Nf), 1)
-    comm.Alltoall([U_mpi, mpitype], [Uc_hat, mpitype])
-    fu = S.fastShenScalar(Uc_hat, fu)
-    return fu
-
-def ifst(fu, u, S):
-    """Inverse Shen transform of x-direction, Fourier in y and z"""
-    Uc_hat[:] = S.ifst(fu, Uc_hat)
-    comm.Alltoall([Uc_hat, mpitype], [U_mpi, mpitype])
-    Uc_hatT[:] = rollaxis(U_mpi, 1).reshape(Uc_hatT.shape)
-    u[:] = irfft2(Uc_hatT, axes=(1,2))
-    return u
-
-def fst(u, fu, S):
-    """Fast Shen transform of x-direction, Fourier transform of y and z"""
-    Uc_hatT[:] = rfft2(u, axes=(1,2))
-    U_mpi[:] = rollaxis(Uc_hatT.reshape(Np[0], num_processes, Np[1], Nf), 1)
-    comm.Alltoall([U_mpi, mpitype], [Uc_hat, mpitype])
-    fu = S.fst(Uc_hat, fu)
-    return fu
-
-def fct(u, fu, S):
-    """Fast Cheb transform of x-direction, Fourier transform of y and z"""
-    Uc_hatT[:] = rfft2(u, axes=(1,2))
-    U_mpi[:] = rollaxis(Uc_hatT.reshape(Np[0], num_processes, Np[1], Nf), 1)
-    comm.Alltoall([U_mpi, mpitype], [Uc_hat, mpitype])
-    fu = S.fct(Uc_hat, fu)
-    return fu
-
-def ifct(fu, u, S):
-    """Inverse Cheb transform of x-direction, Fourier in y and z"""
-    Uc_hat[:] = S.ifct(fu, Uc_hat)
-    comm.Alltoall([Uc_hat, mpitype], [U_mpi, mpitype])
-    Uc_hatT[:] = rollaxis(U_mpi, 1).reshape(Uc_hatT.shape)
-    u[:] = irfft2(Uc_hatT, axes=(1,2))
-    return u
-
-def fct0(u, fu, S):
-    """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do fct."""
-    U_mpi2[:] = rollaxis(u.reshape(Np[0], num_processes, Np[1], N[2]), 1)
-    comm.Alltoall([U_mpi2, mpidouble], [UT[0], mpidouble])
-    fu = S.fct(UT[0], fu)
-    return fu
-
-def ifct0(fu, u, S):
-    """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do ifct"""
-    UT[0] = S.ifct(fu, UT[0])
-    comm.Alltoall([UT[0], mpidouble], [U_mpi2, mpidouble])
-    u[:] = rollaxis(U_mpi2, 1).reshape(u.shape)
-    return u
-
-class FST(object):
-    def __init__(self, N, comm):
+     
+class FastShenFourierTransfers(object):
+    def __init__(self, N, MPI):
         self.N = N         # The global size of the problem
         self.Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
-        self.num_processes = comm.Get_size()
-        self.rank = comm.Get_rank()
-        self.Np = N / num_processes     
+        self.comm = MPI.COMM_WORLD
+        self.num_processes = self.comm.Get_size()
+        self.rank = self.comm.Get_rank()
+        self.Np = N / self.num_processes     
         self.mpitype = MPI.F_DOUBLE_COMPLEX
         
         # Initialize intermediate MPI work arrays
@@ -374,7 +311,7 @@ class FST(object):
         return (self.Np[0], self.N[1], self.Nf)
         
     def complex_shape_I(self):
-        """The local intermediate shape of the complex data"""
+        """A local intermediate shape of the complex data"""
         return (self.Np[0], self.num_processes, self.Np[1], self.Nf)
     
     def fss(self, u, fu, S):
