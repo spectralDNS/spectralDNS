@@ -4,7 +4,7 @@ __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
-from ..shen.Matrices import CDNmat, CDDmat, BNDmat
+from ..shen.Matrices import CDNmat, CDDmat, BDNmat
 from ..shen.Helmholtz import Helmholtz, TDMA
 from  ..shen import SFTc
 
@@ -19,7 +19,7 @@ TDMASolverN = TDMA(SN.quad, True)
 
 alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
 Chm = CDNmat(K[0, :, 0, 0])
-Bhm = BNDmat(K[0, :, 0, 0], SN.quad)
+Bhm = BDNmat(K[0, :, 0, 0], ST.quad)
 Cm = CDDmat(K[0, :, 0, 0])
 
 #@profile

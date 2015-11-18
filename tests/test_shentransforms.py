@@ -139,19 +139,19 @@ def test_BDNmat(SDSN):
     f_hat = np.zeros(M)
     B = BDNmat(np.arange(M).astype(np.float), SN.quad)
     
-    u0 = SN.fastShenScalar(fN, u0)
+    u0 = SD.fastShenScalar(fD, u0)
 
-    f_hat = SD.fst(fD, f_hat)
+    f_hat = SN.fst(fN, f_hat)
     u2 = B.matvec(f_hat)
     
     assert np.allclose(u2, u0)
     
     # Multidimensional version
-    fN = fN.repeat(16).reshape((M, 4, 4))
+    fD = fD.repeat(16).reshape((M, 4, 4))
     f_hat = f_hat.repeat(16).reshape((M, 4, 4))
     
     u0 = np.zeros((M, 4, 4))
-    u0 = SN.fastShenScalar(fN, u0)    
+    u0 = SD.fastShenScalar(fD, u0)    
     u2 = B.matvec(f_hat)
     assert np.linalg.norm(u2-u0)/(M*16) < 1e-12
 
@@ -174,22 +174,23 @@ def test_BNDmat(SDSN):
     f_hat = np.zeros(M)
     B = BNDmat(np.arange(M).astype(np.float), SD.quad)
     
-    u0 = SD.fastShenScalar(fD, u0)
+    u0 = SN.fastShenScalar(fN, u0)
 
-    f_hat = SN.fst(fN, f_hat)
+    f_hat = SD.fst(fD, f_hat)
     u2 = B.matvec(f_hat)
     
     assert np.allclose(u2, u0)
     
     # Multidimensional version
-    fD = fD.repeat(16).reshape((M, 4, 4)) + 1j*fD.repeat(16).reshape((M, 4, 4))
+    fN = fN.repeat(16).reshape((M, 4, 4)) + 1j*fN.repeat(16).reshape((M, 4, 4))
     f_hat = f_hat.repeat(16).reshape((M, 4, 4)) + 1j*f_hat.repeat(16).reshape((M, 4, 4))
     
     u0 = np.zeros((M, 4, 4), dtype=np.complex)
-    u0 = SD.fastShenScalar(fD, u0)    
+    u0 = SN.fastShenScalar(fN, u0)    
     u2 = B.matvec(f_hat)
     assert np.linalg.norm(u2-u0)/(M*16) < 1e-12
 
+#test_BNDmat((ShenDirichletBasis("GC"), ShenNeumannBasis("GC")))
 
 def test_transforms(ST):
     points, weights = ST.points_and_weights(N)
@@ -368,7 +369,7 @@ def test_Mult_Div():
     SN = ShenDirichletBasis("GC")
     
     Cm = CNDmat(np.arange(N).astype(np.float))
-    Bm = BDNmat(np.arange(N).astype(np.float), "GC")
+    Bm = BNDmat(np.arange(N).astype(np.float), "GC")
     
     uk = np.random.randn((N))+np.random.randn((N))*1j
     vk = np.random.randn((N))+np.random.randn((N))*1j

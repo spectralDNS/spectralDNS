@@ -1,6 +1,6 @@
 import numpy as np
 from cbcdns import config
-from SFTc import CDNmat_matvec, BNDmat_matvec, CDDmat_matvec
+from SFTc import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec
 from scipy.sparse import diags
 
 pi, zeros, ones, array = np.pi, np.zeros, np.ones, np.array
@@ -16,45 +16,10 @@ class BNDmat(object):
 
     def __init__(self, K, quad, **kwargs):
         assert len(K.shape) == 1
-        self.shape = shape = (K.shape[0]-2, K.shape[0]-3)
-        ck = ones(K.shape, int)
-        N = shape[0]
-        if quad == "GL": ck[N-1] = 2
-        self.dd = (pi/2.*(1+ck[1:N]*(K[1:N]/(K[1:N]+2))**2)).astype(float)
-        self.ud = float(-pi/2)
-        self.ld = -pi/2*((K[3:N]-2)/(K[3:N]))**2
-    
-    def matvec(self, v):
-        N = self.shape[0]
-        c = zeros(v.shape, dtype=v.dtype)
-        if len(v.shape) > 1:
-            #c[:(N-2)] = self.ud*v[2:N]
-            #c[1:N] += self.dd.repeat(array(v.shape[1:]).prod()).reshape(v[1:N].shape)*v[1:N]
-            #c[3:N] += self.ld.repeat(array(v.shape[1:]).prod()).reshape(v[1:(N-2)].shape)*v[1:(N-2)]
-            BNDmat_matvec(self.ud, self.ld, self.dd, v, c)
-
-        else:
-            c[:(N-2)] = self.ud*v[2:N]
-            c[1:N]   += self.dd*v[1:N]
-            c[3:N]   += self.ld*v[1:(N-2)]
-        return c
-    
-    def diags(self):
-        return diags([self.ld, self.dd, self.ud*ones(self.shape[1]-1, float)], [-3, -1, 1], shape=self.shape)
-
-class BDNmat(object):
-    """Matrix for inner product (p, phi_N)_w = BDNmat * u_hat
-    
-    where u_hat is a vector of coefficients for a Shen Dirichlet basis
-    and phi_N is a Shen Neumann basis.
-    """
-
-    def __init__(self, K, quad, **kwargs):
-        assert len(K.shape) == 1
         self.shape = shape = (K.shape[0]-3, K.shape[0]-2)
         ck = ones(K.shape, int)
         N = shape[1]
-        if quad == "GL": ck[N-1] = 2        
+        if quad == "GL": ck[N-1] = 2
         self.dd = (pi/2.*(1+ck[1:N]*(K[1:N]/(K[1:N]+2))**2)).astype(float)
         self.ud = (-pi/2*(K[1:N-2]/(K[1:N-2]+2))**2).astype(float)
         self.ld = -pi/2
@@ -68,13 +33,51 @@ class BDNmat(object):
             c[2:N] += self.ld*v[:(N-2)]
 
         else:
-            c[1:(N-2)] = self.ud*v[3:N]
+            c[1:(N-2)]= self.ud*v[3:N]
             c[1:N]   += self.dd*v[1:N]
             c[2:N]   += self.ld*v[:(N-2)]
+
         return c
-    
+
     def diags(self):
         return diags([self.ld*ones(self.shape[0]-1), self.dd, self.ud], [-1, 1, 3], shape=self.shape)
+    
+
+class BDNmat(object):
+    """Matrix for inner product (p, phi_N)_w = BDNmat * u_hat
+    
+    where u_hat is a vector of coefficients for a Shen Dirichlet basis
+    and phi_N is a Shen Neumann basis.
+    """
+
+    def __init__(self, K, quad, **kwargs):
+        assert len(K.shape) == 1
+        self.shape = shape = (K.shape[0]-2, K.shape[0]-3)
+        ck = ones(K.shape, int)
+        N = shape[0]
+        if quad == "GL": ck[N-1] = 2        
+        self.dd = (pi/2.*(1+ck[1:N]*(K[1:N]/(K[1:N]+2))**2)).astype(float)
+        self.ud = -pi/2
+        self.ld = -pi/2*((K[3:N]-2)/(K[3:N]))**2
+    
+    def matvec(self, v):
+        N = self.shape[0]
+        c = zeros(v.shape, dtype=v.dtype)
+        if len(v.shape) > 1:
+            #c[:(N-2)] = self.ud*v[2:N]
+            #c[1:N] += self.dd.repeat(array(v.shape[1:]).prod()).reshape(v[1:N].shape)*v[1:N]
+            #c[3:N] += self.ld.repeat(array(v.shape[1:]).prod()).reshape(v[1:(N-2)].shape)*v[1:(N-2)]
+            BDNmat_matvec(self.ud, self.ld, self.dd, v, c)
+
+        else:
+            c[:(N-2)] = self.ud*v[2:N]
+            c[1:N]   += self.dd*v[1:N]
+            c[3:N]   += self.ld*v[1:(N-2)]
+        return c
+
+    def diags(self):
+        return diags([self.ld, self.dd, self.ud*ones(self.shape[1]-1, float)], [-3, -1, 1], shape=self.shape)
+    
 
 class BCCmat(object):
     """Matrix for inner product (p, T)_w = BCCmat * p_hat
