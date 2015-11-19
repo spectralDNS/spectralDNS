@@ -9,7 +9,7 @@ from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis
 from ..optimization import optimizer
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange
 
-__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi', 'FastShenFourierTransfers']
+__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi', 'FastShenFourierTransform']
 
 @optimizer
 def transpose_Uc(Uc_hatT, U_mpi, num_processes):
@@ -160,7 +160,7 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     u_slice = slice(0, Nu)
     p_slice = slice(1, Nu)
     
-    FST = FastShenFourierTransfers(N, MPI)
+    FST = FastShenFourierTransform(N, MPI)
 
     U     = empty((3,)+FST.real_shape(), dtype=float)
     U_hat = empty((3,)+FST.complex_shape(), dtype=complex)
@@ -201,7 +201,7 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
-    kmax[0] = N[0]
+    kmax[0] = N[0]*2./3.
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
     
@@ -211,7 +211,8 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
 setup = {"MHD": setupMHD,
          "NS":  setupDNS,
          "VV":  setupDNS,
-         "IPCS": setupShen}[config.solver]        
+         "IPCS": setupShen,
+         "IPCSR": setupShen}[config.solver]        
 
 def init_fft(N, Nf, Np, complex, num_processes, comm, rank, mpitype):
     # Initialize MPI work arrays globally
@@ -281,7 +282,7 @@ def fftn_mpi(u, fu):
     return fu
      
      
-class FastShenFourierTransfers(object):
+class FastShenFourierTransform(object):
     def __init__(self, N, MPI):
         self.N = N         # The global size of the problem
         self.Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 

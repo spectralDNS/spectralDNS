@@ -49,6 +49,9 @@ def get_solver(update=None, regression_test=None, family="Isotropic"):
         if config.solver == 'IPCS':
             import cbcdns.solvers.ShenDNS as solver
             
+        elif config.solver == 'IPCSR':
+            import cbcdns.solvers.ShenDNSR as solver
+            
         else:
             raise AttributeError("Wrong solver!")
             

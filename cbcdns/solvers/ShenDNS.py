@@ -4,9 +4,9 @@ __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
-from ..shen.Matrices import CDNmat, CDDmat, BDNmat
+from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat
 from ..shen.Helmholtz import Helmholtz, TDMA
-from  ..shen import SFTc
+from ..shen import SFTc
 
 assert config.precision == "double"
 hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5", 
@@ -18,17 +18,18 @@ TDMASolverD = TDMA(ST.quad, False)
 TDMASolverN = TDMA(SN.quad, True)
 
 alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
-Chm = CDNmat(K[0, :, 0, 0])
-Bhm = BDNmat(K[0, :, 0, 0], ST.quad)
-Cm = CDDmat(K[0, :, 0, 0])
+CDN = CDNmat(K[0, :, 0, 0])
+BDN = BDNmat(K[0, :, 0, 0], ST.quad)
+CDD = CDDmat(K[0, :, 0, 0])
+BDD = BDDmat(K[0, :, 0, 0], ST.quad)
 
 #@profile
 def pressuregrad(P_hat, dU):
     # Pressure gradient x-direction
-    dU[0] -= Chm.matvec(P_hat)
+    dU[0] -= CDN.matvec(P_hat)
     
     # pressure gradient y-direction
-    F_tmp[0] = Bhm.matvec(P_hat)
+    F_tmp[0] = BDN.matvec(P_hat)
     dU[1, :Nu] -= 1j*K[1, :Nu]*F_tmp[0, :Nu]
     
     # pressure gradient z-direction
@@ -60,10 +61,10 @@ def Curl(a, c, S):
     SFTc.Mult_CTD_3D(N[0], a[1], a[2], F_tmp[1], F_tmp[2])
     dvdx = U_tmp[1] = FST.ifct(F_tmp[1], U_tmp[1], ST)
     dwdx = U_tmp[2] = FST.ifct(F_tmp[2], U_tmp[2], ST)
-    c[0] = ifst(1j*K[1]*a[2] - 1j*K[2]*a[1], c[0], S)
-    c[1] = ifst(1j*K[2]*a[0], c[1], S)
+    c[0] = FST.ifst(1j*K[1]*a[2] - 1j*K[2]*a[1], c[0], S)
+    c[1] = FST.ifst(1j*K[2]*a[0], c[1], S)
     c[1] -= dwdx
-    c[2] = ifst(1j*K[1]*a[0], c[2], S)
+    c[2] = FST.ifst(1j*K[1]*a[0], c[2], S)
     c[2] *= -1.0
     c[2] += dvdx
     return c
@@ -71,12 +72,14 @@ def Curl(a, c, S):
 def Div(a_hat):
     F_tmp[:] = 0
     U_tmp[:] = 0
-    F_tmp[0] = Cm.matvec(a_hat[0])
+    F_tmp[0] = CDD.matvec(a_hat[0])
     F_tmp[0] = TDMASolverD(F_tmp[0])    
     dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST) 
-    dvdy_h = 1j*K[1]*a_hat[1]
+    F_tmp[1] = BDD.matvec(a_hat[1])
+    dvdy_h = 1j*K[1]*F_tmp[1]
     dvdy = U_tmp[1] = FST.ifst(dvdy_h, U_tmp[1], ST)
-    dwdz_h = 1j*K[2]*a_hat[2]
+    F_tmp[2] = BDD.matvec(a_hat[2])
+    dwdz_h = 1j*K[2]*F_tmp[2]
     dwdz = U_tmp[2] = FST.ifst(dwdz_h, U_tmp[2], ST)
     return dudx+dvdy+dwdz
 
@@ -87,7 +90,7 @@ def standardConvection(c):
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = Cm.matvec(U_hat0[0])
+    F_tmp[0] = CDD.matvec(U_hat0[0])
     F_tmp[0] = TDMASolverD(F_tmp[0])    
     dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)        
     
@@ -139,9 +142,9 @@ def divergenceConvection(c, add=False):
     F_tmp[1] = FST.fst(U0[0]*U0[1], F_tmp[1], ST)
     F_tmp[2] = FST.fst(U0[0]*U0[2], F_tmp[2], ST)
     
-    c[0] += Cm.matvec(F_tmp[0])
-    c[1] += Cm.matvec(F_tmp[1])
-    c[2] += Cm.matvec(F_tmp[2])
+    c[0] += CDD.matvec(F_tmp[0])
+    c[1] += CDD.matvec(F_tmp[1])
+    c[2] += CDD.matvec(F_tmp[2])
     
     F_tmp2[0] = FST.fss(U0[0]*U0[1], F_tmp2[0], ST)
     F_tmp2[1] = FST.fss(U0[0]*U0[2], F_tmp2[1], ST)    
@@ -193,7 +196,7 @@ def ComputeRHS(dU, jj):
         
     return dU
 
-def solvePressure(P_hat, U_hat):
+def solvePressure(P, P_hat, U_hat):
     global F_tmp, F_tmp2
     U_tmp[:] = 0
     F_tmp2[:] = 0
@@ -201,7 +204,7 @@ def solvePressure(P_hat, U_hat):
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = Cm.matvec(U_hat[0])
+    F_tmp[0] = CDD.matvec(U_hat[0])
     #F_tmp[0, u_slice] = SFTc.TDMA_3D(a0, b0, bc, c0, F_tmp[0, u_slice])    
     F_tmp[0] = TDMASolverD(F_tmp[0])
     dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)      
@@ -234,8 +237,8 @@ def solvePressure(P_hat, U_hat):
     F_tmp[0] = 0
     SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])    
     P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
+    P = FST.ifst(P_hat, P, SN)
 
-    return P_hat
     
 def Divu(U, U_hat, c):
     c[:] = 0

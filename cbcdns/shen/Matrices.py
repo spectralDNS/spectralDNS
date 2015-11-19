@@ -17,10 +17,10 @@ class BNDmat(object):
     def __init__(self, K, quad, **kwargs):
         assert len(K.shape) == 1
         self.shape = shape = (K.shape[0]-3, K.shape[0]-2)
-        ck = ones(K.shape, int)
+        ck = ones(K.shape[0], int)
         N = shape[1]
-        if quad == "GL": ck[N-1] = 2
-        self.dd = (pi/2.*(1+ck[1:N]*(K[1:N]/(K[1:N]+2))**2)).astype(float)
+        if quad == "GL": ck[-1] = 2
+        self.dd = (pi/2.*(1+ck[3:]*(K[1:N]/(K[1:N]+2))**2)).astype(float)
         self.ud = (-pi/2*(K[1:N-2]/(K[1:N-2]+2))**2).astype(float)
         self.ld = -pi/2
     
@@ -53,10 +53,10 @@ class BDNmat(object):
     def __init__(self, K, quad, **kwargs):
         assert len(K.shape) == 1
         self.shape = shape = (K.shape[0]-2, K.shape[0]-3)
-        ck = ones(K.shape, int)
+        ck = ones(K.shape[0], int)
         N = shape[0]
-        if quad == "GL": ck[N-1] = 2        
-        self.dd = (pi/2.*(1+ck[1:N]*(K[1:N]/(K[1:N]+2))**2)).astype(float)
+        if quad == "GL": ck[-1] = 2        
+        self.dd = (pi/2.*(1+ck[3:]*(K[1:N]/(K[1:N]+2))**2)).astype(float)
         self.ud = -pi/2
         self.ld = -pi/2*((K[3:N]-2)/(K[3:N]))**2
     
@@ -78,9 +78,8 @@ class BDNmat(object):
     def diags(self):
         return diags([self.ld, self.dd, self.ud*ones(self.shape[1]-1, float)], [-3, -1, 1], shape=self.shape)
     
-
-class BCCmat(object):
-    """Matrix for inner product (p, T)_w = BCCmat * p_hat
+class BTTmat(object):
+    """Matrix for inner product (p, T)_w = BTTmat * p_hat
     
     where p_hat is a vector of coefficients for a Chebyshev basis
     and T is a Chebyshev basis.
@@ -118,9 +117,9 @@ class BNNmat(object):
         assert len(K.shape) == 1
         self.shape = shape = (K.shape[0]-3, K.shape[0]-3)
         N = shape[0]+1        
-        ck = ones(N, int)
+        ck = ones(K.shape[0], int)
         if quad == "GL": ck[-1] = 2        
-        self.dd = pi/2*(1+ck[1:N]*(K[1:N]/(K[1:N]+2))**4)
+        self.dd = pi/2*(1+ck[3:]*(K[1:N]/(K[1:N]+2))**4)
         self.ud = -pi/2*(K[1:(N-2)]/(K[1:(N-2)]+2))**2
         self.ld = -pi/2*((K[3:N]-2)/(K[3:N]))**2
     
@@ -173,6 +172,100 @@ class BDDmat(object):
     
     def diags(self):
         return diags([self.ld, self.dd, self.ud], [-2, 0, 2], shape=self.shape)
+
+class BDTmat(object):
+    """Matrix for inner product (u, phi)_w = BDTmat * u_hat
+    
+    where u_hat is a vector of coefficients for a Chebyshev basis
+    and phi is a Shen Dirichlet basis.
+    """
+
+    def __init__(self, K, quad, **kwargs):
+        assert len(K.shape) == 1
+        self.shape = shape = (K.shape[0]-2, K.shape[0])
+        N = shape[0]
+        ck = ones(N+2, int)
+        ck[0] = 2
+        if quad == "GL": ck[-1] = 2        
+        self.dd = pi/2*ck[:N]
+        self.ud = -pi/2*ck[2:]
+    
+    def matvec(self, v):
+        N = self.shape[0]
+        c = zeros(v.shape, dtype=v.dtype)
+        if len(v.shape) > 1:
+            c[:N]  = self.dd.repeat(array(v.shape[1:]).prod()).reshape(v[:N].shape)*v[:N]
+            c[:N] += self.ud.repeat(array(v.shape[1:]).prod()).reshape(v[2:].shape)*v[2:]
+        else:
+            c[:N]  = self.dd*v[:N]
+            c[:N] += self.ud*v[2:]
+        return c
+    
+    def diags(self):
+        return diags([self.dd, self.ud], [0, 2], shape=self.shape)
+
+class BTDmat(object):
+    """Matrix for inner product (u, T)_w = BTDmat * u_hat
+    
+    where u_hat is a vector of coefficients for a Shen Dirichlet basis
+    and T is a Chebyshev basis.
+    """
+
+    def __init__(self, K, quad, **kwargs):
+        assert len(K.shape) == 1
+        self.shape = shape = (K.shape[0], K.shape[0]-2)
+        N = shape[1]
+        ck = ones(N+2, int)
+        ck[0] = 2
+        if quad == "GL": ck[-1] = 2        
+        self.dd = pi/2*ck[:N]
+        self.ld = -pi/2*ck[2:]
+    
+    def matvec(self, v):
+        N = self.shape[1]
+        c = zeros(v.shape, dtype=v.dtype)
+        if len(v.shape) > 1:
+            c[:N]  = self.dd.repeat(array(v.shape[1:]).prod()).reshape(v[:N].shape)*v[:N]
+            c[2:] += self.ld.repeat(array(v.shape[1:]).prod()).reshape(v[:N].shape)*v[:N]
+        else:
+            c[:N]  = self.dd*v[:N]
+            c[2:] += self.ld*v[:N]
+        return c
+    
+    def diags(self):
+        return diags([self.ld, self.dd], [-2, 0], shape=self.shape)
+
+class BTNmat(object):
+    """Matrix for inner product (u, T)_w = BTNmat * u_hat
+    
+    where u_hat is a vector of coefficients for a Shen Neumann basis
+    and T is a Chebyshev basis.
+    """
+
+    def __init__(self, K, quad, **kwargs):
+        assert len(K.shape) == 1
+        self.shape = shape = (K.shape[0], K.shape[0]-3)
+        N = shape[0]-2
+        ck = ones(shape[0], int)
+        if quad == "GL": ck[-1] = 2        
+        self.dd = pi/2
+        self.ld = -pi/2*ck[3:]*((K[3:]-2)/K[3:])**2
+    
+    def matvec(self, v):
+        N = self.shape[0]
+        c = zeros(v.shape, dtype=v.dtype)
+        if len(v.shape) > 1:
+            c[0] = 0
+            c[1:N-2]  = self.dd*v[1:N-2]
+            c[3:] += self.ld.repeat(array(v.shape[1:]).prod()).reshape(v[1:N-2].shape)*v[1:N-2]
+        else:
+            c[0] = 0
+            c[1:N-2]  = self.dd*v[1:N-2]
+            c[3:] += self.ld*v[1:N-2]
+        return c
+    
+    def diags(self):
+        return diags([self.ld, self.dd], [-3, -1], shape=self.shape)
 
 
 # Derivative matrices
@@ -251,7 +344,10 @@ class CNDmat(object):
         N = self.shape[1]
         c = zeros(v.shape, dtype=v.dtype)
         if len(v.shape) > 1:
-            raise NotImplementedError
+            C = self.diags().toarray()
+            for i in range(v.shape[1]):
+                for j in range(v.shape[2]):
+                    c[1:N,i,j] = np.dot(C, v[:N,i,j])
         else:
             c[1:N] = np.dot(self.diags().toarray(), v[:N])
         return c
@@ -279,7 +375,11 @@ class CTDmat(object):
         N = self.shape[1]
         c = zeros(v.shape, dtype=v.dtype)
         if len(v.shape) > 1:
-            raise NotImplementedError
+            C = self.diags().toarray()
+            for i in range(v.shape[1]):
+                for j in range(v.shape[2]):
+                    c[:,i,j] = np.dot(C, v[:N,i,j])
+
         else:
             c[:] = np.dot(self.diags().toarray(), v[:N])
         return c
@@ -300,14 +400,17 @@ class CDTmat(object):
     def __init__(self, K, **kwargs):
         assert len(K.shape) == 1
         self.shape  = (K.shape[0]-2, K.shape[0])
-        N = shape[0]
+        N = self.shape[0]
         self.ld = []
-        self.ud = pi*(K[1:N]+1)
+        self.ud = pi*(K[:N]+1)
 
     def matvec(self, v):
         N = self.shape[0]
         c = zeros(v.shape, dtype=v.dtype)
-        c[:N] = self.ud.repeat(array(v.shape[:]).prod()).reshape(v[1:(N+1)].shape)*v[1:(N+1)]
+        if len(v.shape) > 1:
+            c[:N] = self.ud.repeat(array(v.shape[1:]).prod()).reshape(v[1:-1].shape)*v[1:-1]
+        else:
+            c[:N] = self.ud*v[1:-1]
         return c        
 
     def diags(self):

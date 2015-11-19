@@ -50,9 +50,8 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, conv1, FST,
     e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
     conv1 = standardConvection(conv1)
     initOS(OS, U, U_hat, X, FST, ST, t=dt)
-    P_hat = solvePressure(P_hat, 0.5*(U_hat+U_hat0))
+    solvePressure(P, P_hat, 0.5*(U_hat+U_hat0))
 
-    P = FST.ifst(P_hat, P, SN)   
     U0[:] = U
     U_hat0[:] = U_hat
     config.t = dt

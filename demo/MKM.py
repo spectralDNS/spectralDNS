@@ -6,12 +6,25 @@ from cbcdns.fft.wrappyfftw import dct
 import matplotlib.pyplot as plt
 import warnings
 import matplotlib.cbook
+from OrrSommerfeld_eig import OrrSommerfeld
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
 # Use constant flux and adjust pressure gradient dynamically
 flux = array([1645.46])
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, ST, SN, X, comm, rank, num_processes, Curl, **kw):
+def initOS(OS, U, X, t=0.):
+    for i in range(U.shape[1]):
+        x = X[0, i, 0, 0]
+        OS.interp(x)
+        for j in range(U.shape[2]):
+            y = X[1, i, j, 0]
+            v =  dot(OS.f, real(OS.dphidy*exp(1j*(y-OS.eigval*t))))
+            u = -dot(OS.f, real(1j*OS.phi*exp(1j*(y-OS.eigval*t))))  
+            U[0, i, j, :] = u
+            U[1, i, j, :] = v
+    U[2] = 0
+
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_processes, Curl, **kw):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
     utau = config.nu * config.Re_tau
@@ -34,21 +47,26 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, ST, SN, X, comm, rank,
 
     U[:] = 0.001*random.randn(*U.shape)
     for i in range(3):
-        U_hat[i] = fst(U[i], U_hat[i], ST)    
+        U_hat[i] = FST.fst(U[i], U_hat[i], ST)    
     U = Curl(U_hat, U, ST)
     U[1] += Um*(Y-0.5*Y**2)
     U[1] += utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)
     
-    # project to Dirichlet space and back because U above is not in the Shen Dirichlet space
+    #OS = OrrSommerfeld(Re=6000, N=80)
+    #initOS(OS, U0, X)
+    #U[1] += 1e-3*U0[1]
+    #U[2] += 1e-3*U0[2]
+    
+    # project to Dirichlet space and back
     for i in range(3):
-        U_hat[i] = fst(U[i], U_hat[i], ST)
+        U_hat[i] = FST.fst(U[i], U_hat[i], ST)
         
     for i in range(3):
-        U[i] = ifst(U_hat[i], U[i], ST)
+        U[i] = FST.ifst(U_hat[i], U[i], ST)
 
     for i in range(3):
-        U_hat[i] = fst(U[i], U_hat[i], ST)
+        U_hat[i] = FST.fst(U[i], U_hat[i], ST)
 
 
     # Set the flux
@@ -58,7 +76,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, ST, SN, X, comm, rank,
     print "Flux", flux[0]
 
     P[:] = 0
-    P_hat = fst(P, P_hat, SN)
+    P_hat = FST.fst(P, P_hat, SN)
     U0[:] = U[:]
     U_hat0[:] = U_hat[:]
  
@@ -91,6 +109,7 @@ def initialize2(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, SN, ST, X, Curl, **kw
     P_hat = fst(P, P_hat, SN)
     U0[:] = U[:]
     U_hat0[:] = U_hat[:]
+    
  
 def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, conv1,
                    rank, standardConvection, fst, ST, SN, num_processes, **kw):
@@ -117,12 +136,12 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, conv1,
     P_hat = fst(P, P_hat, SN)
     f.close()
 
-def set_Source(Source, Sk, fss, ST, **kw):
+def set_Source(Source, Sk, ST, FST, **kw):
     utau = config.nu * config.Re_tau
     Source[:] = 0
     Source[1, :] = -utau**2
     Sk[:] = 0
-    Sk[1] = fss(Source[1], Sk[1], ST)
+    Sk[1] = FST.fss(Source[1], Sk[1], ST)
     
 def Q(u, rank, comm, N, **kw):
     L = config.L
@@ -140,18 +159,18 @@ def Q(u, rank, comm, N, **kw):
         return 0
 
 beta = zeros(1)    
-def update(U, U_hat, P, U0, P_hat, rank, X, stats, ifst, fst, fss, hdf5file, SN, Source, Sk, ST, U_tmp, F_tmp, comm, **kw):
+def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk, ST, U_tmp, F_tmp, comm, **kw):
     global im1, im2, im3, flux
     
-    q = Q(U[1], rank, comm, **kw)
-    beta[0] = (flux[0] - q)/(array(config.L).prod())
-    comm.Bcast(beta)
-    U_tmp[1] = beta[0]    
-    F_tmp[1] = fst(U_tmp[1], F_tmp[1], ST)
-    U_hat[1] += F_tmp[1]
-    U[1] = ifst(U_hat[1], U[1], ST)
-    Source[1] -= beta[0]
-    Sk[1] = fss(Source[1], Sk[1], ST)
+    #q = Q(U[1], rank, comm, **kw)
+    #beta[0] = (flux[0] - q)/(array(config.L).prod())
+    #comm.Bcast(beta)
+    #U_tmp[1] = beta[0]    
+    #F_tmp[1] = FST.fst(U_tmp[1], F_tmp[1], ST)
+    #U_hat[1] += F_tmp[1]
+    #U[1] = FST.ifst(U_hat[1], U[1], ST)
+    #Source[1] -= beta[0]
+    #Sk[1] = FST.fss(Source[1], Sk[1], ST)
     
     if config.tstep % config.write_result == 0 or config.tstep % config.write_yz_slice[1] == 0:
         hdf5file.write(config.tstep)
@@ -194,6 +213,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, ifst, fst, fss, hdf5file, SN,
         e0 = Q(U[0]*U[0], rank, comm, **kw)
         e1 = Q(U[1]*U[1], rank, comm, **kw)
         e2 = Q(U[2]*U[2], rank, comm, **kw)
+        q = Q(U[1], rank, comm, **kw)
         if rank == 0:
             print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.t, e0, e1, e2, q, beta, Source[1].mean())
 
@@ -320,7 +340,7 @@ if __name__ == "__main__":
         'Re_tau': 180., 
         'dt': 0.001,                  # Time step
         'T': 100.,                   # End time
-        'L': [2, 4*pi, 4*pi/3.],
+        'L': [2, 2*pi, 2*pi],
         'M': [6, 6, 5]
         },  "Shen"
     )

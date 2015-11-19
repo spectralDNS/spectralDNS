@@ -60,15 +60,19 @@ class ChebyshevTransform(object):
         SFTc.chebDerivativeCoefficients(fk, fj)  
         return fj
 
-    def chebDerivative_3D(self, fj, fd, fk, fkd):
+    def chebDerivative_3D(self, fj, fd):
+        fk = fj.copy()
         fk = self.fct(fj, fk)
+        fkd = fk.copy()
         fkd = SFTc.chebDerivativeCoefficients_3D(fk, fkd)
-        fd = self.ifct(fl, fd)
+        fd = self.ifct(fkd, fd)
         return fd
     
-    def fastChebDerivative(self, fj, fd, fk, fkd):
+    def fastChebDerivative(self, fj, fd):
         """Compute derivative of fj at the same points."""
+        fk = fj.copy()
         fk = self.fct(fj, fk)
+        fkd = fk.copy()
         fkd = self.chebDerivativeCoefficients(fk, fkd)
         fd  = self.ifct(fkd, fd)
         return fd
