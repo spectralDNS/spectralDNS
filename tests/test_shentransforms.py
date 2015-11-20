@@ -7,7 +7,6 @@ from cbcdns.shen import SFTc
 from cbcdns import config
 config.decomposition = "slab"
 config.solver = "IPCS"
-
 from cbcdns.mpi.slab import FastShenFourierTransform
 from mpi4py import MPI
 

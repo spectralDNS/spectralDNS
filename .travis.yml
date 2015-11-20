@@ -48,7 +48,8 @@ install:
     # Replace dep1 dep2 ... with your dependencies
     - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION Cython mpi4py scipy
     - source activate test-environment
-    - python setup.py install    
+    - python setup.py install --prefix=$HOME
+    - export PYTHONPATH="$HOME:$PYTHONPATH"
 
 before_script:
     - sudo hostname localhost
