@@ -54,7 +54,7 @@ if not "sdist" in sys.argv:
     for s in ("LUsolve", "TDMA", "PDMA", "UTDMA"):
         ext += cythonize(Extension("cbcdns.shenGeneralBCs.{}".format(s), sources = [os.path.join(sgdir, '{}.pyx'.format(s))], language="c++"))
         
-    for s in ("Cheb", "Matvec", "Matrices"):
+    for s in ("Matvec", "Matrices"):
         ext += cythonize(Extension("cbcdns.shenGeneralBCs.{}".format(s), sources = [os.path.join(sgdir, '{}.pyx'.format(s))]))    
 
     [e.extra_compile_args.extend(["-Ofast"]) for e in ext]
