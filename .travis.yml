@@ -25,6 +25,7 @@ before_install:
     - sh ./tests/install-mpi.sh $MPI
     - pip install -q Cython
     - pip install -q mpi4py
+    - pip install -q scipy
     - cython --version
 install:
     - pip install .
