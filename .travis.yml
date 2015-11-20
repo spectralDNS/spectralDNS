@@ -50,13 +50,14 @@ install:
     - source activate test-environment
     - python setup.py install
     
-before_script:
-    - sudo hostname localhost
-    - MPIEXEC='mpiexec';
-    - test $MPI == mpich1 && MPIEXEC='mpirun' || true
-    - test $MPI == mpich1 && PYTHON=$(command -v $PYTHON) || true
-    - test $MPI == mpich2 && MPIEXEC='mpiexec -launcher fork' || true
-    - test $MPI == mpich3 && MPIEXEC='mpiexec -launcher fork' || true
+#before_script:
+    #- sudo hostname localhost
+    #- which python
+    #- MPIEXEC='mpiexec';
+    #- test $MPI == mpich1 && MPIEXEC='mpirun' || true
+    #- test $MPI == mpich1 && PYTHON=$(command -v $PYTHON) || true
+    #- test $MPI == mpich2 && MPIEXEC='mpiexec -launcher fork' || true
+    #- test $MPI == mpich3 && MPIEXEC='mpiexec -launcher fork' || true
 
 script: cd $PWD/tests; py.test
 
