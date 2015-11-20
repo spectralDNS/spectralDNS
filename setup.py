@@ -23,7 +23,7 @@ ext = None
 cmdclass = {}
 if not "sdist" in sys.argv:
     if "build_ext" in sys.argv:
-        args += "build_ext --inplace"
+        args = "build_ext --inplace"
     subprocess.call([sys.executable, os.path.join(cdir, "setup.py"),
                     args], cwd=cdir)
                     
