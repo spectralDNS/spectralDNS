@@ -552,13 +552,14 @@ def test_ADDmat(ST2):
     
 def test_Helmholtz(ST2):
     M = 4*N
-    u = (1-x**2)*sin(np.pi*6*x)
     kx = 12
-    f = -u.diff(x, 2)+kx**2*u
     
     points, weights = ST2.points_and_weights(M)
-    uj = np.array([u.subs(x, h) for h in points], dtype=np.float)
-    fj = np.array([f.subs(x, h) for h in points], dtype=np.float)
+    
+    fj = np.random.randn(M)
+    f_hat = np.zeros(M)
+    f_hat = ST2.fst(fj, f_hat)
+    fj = ST2.ifst(f_hat, fj)
     
     if ST2.__class__.__name__ == "ShenDirichletBasis":
         A = ADDmat(np.arange(M).astype(np.float))
@@ -568,25 +569,22 @@ def test_Helmholtz(ST2):
         A = ANNmat(np.arange(M).astype(np.float))
         B = BNNmat(np.arange(M).astype(np.float), ST2.quad)
         s = slice(1, M-2)
-        fj -= np.dot(fj, weights)/weights.sum()
-        uj -= np.dot(uj, weights)/weights.sum()
         
     f_hat = np.zeros(M)
     f_hat = ST2.fastShenScalar(fj, f_hat)
     u_hat = np.zeros(M)
     u_hat[s] = la.spsolve(A.diags()+kx**2*B.diags(), f_hat[s])
     
-    u0 = np.zeros(M)
-    u0 = ST2.ifst(u_hat, u0)
-        
-    assert np.allclose(u0, uj)
-    
     u1 = np.zeros(M)
-    u1 = ST2.fst(uj, u1)
-    c = A.matvec(u1)+kx**2*B.matvec(u1)
+    u1 = ST2.ifst(u_hat, u1)
+        
+    c = A.matvec(u_hat)+kx**2*B.matvec(u_hat)        
+    c2 = np.dot(A.diags().toarray(), u_hat[s]) + kx**2*np.dot(B.diags().toarray(), u_hat[s])
     
+    #from IPython import embed; embed()
     assert np.allclose(c, f_hat)
-            
+    assert np.allclose(c[s], c2)
+    
     # Multidimensional
     f_hat = (f_hat.repeat(16).reshape((M, 4, 4))+1j*f_hat.repeat(16).reshape((M, 4, 4)))
     kx = np.zeros((4, 4))+12
@@ -596,9 +594,10 @@ def test_Helmholtz(ST2):
     u0 = np.zeros((M, 4, 4), dtype=np.complex)
     u0 = ST2.ifst(u0_hat, u0)
     
-    assert np.linalg.norm(u0[:, 2, 2].real - uj)/(M*16) < 1e-12
-    assert np.linalg.norm(u0[:, 2, 2].imag - uj)/(M*16) < 1e-12
+    assert np.linalg.norm(u0[:, 2, 2].real - u1)/(M*16) < 1e-12
+    assert np.linalg.norm(u0[:, 2, 2].imag - u1)/(M*16) < 1e-12
 
+#test_Helmholtz(ShenDirichletBasis("GL"))
 
 def test_Helmholtz2(SD):
     M = 2*N

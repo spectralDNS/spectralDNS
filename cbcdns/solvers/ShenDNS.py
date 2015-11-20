@@ -204,7 +204,6 @@ def solvePressure(P, P_hat, U_hat):
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
     F_tmp[0] = CDD.matvec(U_hat[0])
-    #F_tmp[0, u_slice] = SFTc.TDMA_3D(a0, b0, bc, c0, F_tmp[0, u_slice])    
     F_tmp[0] = TDMASolverD(F_tmp[0])
     dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)      
     

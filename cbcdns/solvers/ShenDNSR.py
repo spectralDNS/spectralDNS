@@ -83,7 +83,6 @@ def Divu(U, U_hat, c):
     c[:] = 0
     SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], 
                        U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], c[p_slice])
-    #c[p_slice] = SFTc.TDMA_3D(a0N, b0N, bcN, c0N, c[p_slice])
     c = TDMASolverN(c)
         
     return c
