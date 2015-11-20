@@ -48,11 +48,11 @@ install:
     # Replace dep1 dep2 ... with your dependencies
     - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION Cython mpi4py scipy
     - source activate test-environment
-    - conda install . --prefix=/home/travis/miniconda/lib/python2.7/site-packages/conda
-
+    - python setup.py install
+    
 before_script:
     - sudo hostname localhost
-    - MPIEXEC='mpiexec'; PYTHON='python';
+    - MPIEXEC='mpiexec';
     - test $MPI == mpich1 && MPIEXEC='mpirun' || true
     - test $MPI == mpich1 && PYTHON=$(command -v $PYTHON) || true
     - test $MPI == mpich2 && MPIEXEC='mpiexec -launcher fork' || true
