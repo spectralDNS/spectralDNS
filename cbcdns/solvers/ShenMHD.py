@@ -104,31 +104,31 @@ def standardConvection(c):
 
     F_tmp[0] = Cm.matvec(U_hat0[0])
     F_tmp[0] = TDMASolverD(F_tmp[0])    
-    dudx = U_tmp4[0] = ifst(F_tmp[0], U_tmp4[0], ST)        
+    dudx = U_tmp4[0] = FST.ifst(F_tmp[0], U_tmp4[0], ST)        
     
     SFTc.Mult_CTD_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
-    dvdx = U_tmp4[1] = ifct(F_tmp[1], U_tmp4[1],ST)
-    dwdx = U_tmp4[2] = ifct(F_tmp[2], U_tmp4[2],ST)
+    dvdx = U_tmp4[1] = FST.ifct(F_tmp[1], U_tmp4[1],ST)
+    dwdx = U_tmp4[2] = FST.ifct(F_tmp[2], U_tmp4[2],ST)
        
     dudy_h = 1j*K[1]*U_hat0[0]
-    dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], ST)
+    dudy = U_tmp3[0] = FST.ifst(dudy_h, U_tmp3[0], ST)
     dudz_h = 1j*K[2]*U_hat0[0]
-    dudz = U_tmp3[1] = ifst(dudz_h, U_tmp3[1], ST)
-    c[0] = fss(U0[0]*dudx + U0[1]*dudy + U0[2]*dudz, c[0], ST)
+    dudz = U_tmp3[1] = FST.ifst(dudz_h, U_tmp3[1], ST)
+    c[0] = FST.fss(U0[0]*dudx + U0[1]*dudy + U0[2]*dudz, c[0], ST)
     
     U_tmp3[:] = 0
     dvdy_h = 1j*K[1]*U_hat0[1]
-    dvdy = U_tmp3[0] = ifst(dvdy_h, U_tmp3[0], ST)
+    dvdy = U_tmp3[0] = FST.ifst(dvdy_h, U_tmp3[0], ST)
     dvdz_h = 1j*K[2]*U_hat0[1]
-    dvdz = U_tmp3[1] = ifst(dvdz_h, U_tmp3[1], ST)
-    c[1] = fss(U0[0]*dvdx + U0[1]*dvdy + U0[2]*dvdz, c[1], ST)
+    dvdz = U_tmp3[1] = FST.ifst(dvdz_h, U_tmp3[1], ST)
+    c[1] = FST.fss(U0[0]*dvdx + U0[1]*dvdy + U0[2]*dvdz, c[1], ST)
     
     U_tmp3[:] = 0
     dwdy_h = 1j*K[1]*U_hat0[2]
-    dwdy = U_tmp3[0] = ifst(dwdy_h, U_tmp3[0], ST)
+    dwdy = U_tmp3[0] = FST.ifst(dwdy_h, U_tmp3[0], ST)
     dwdz_h = 1j*K[2]*U_hat0[2]
-    dwdz = U_tmp3[1] = ifst(dwdz_h, U_tmp3[1], ST)
-    c[2] = fss(U0[0]*dwdx + U0[1]*dwdy + U0[2]*dwdz, c[2], ST)
+    dwdz = U_tmp3[1] = FST.ifst(dwdz_h, U_tmp3[1], ST)
+    c[2] = FST.fss(U0[0]*dwdx + U0[1]*dwdy + U0[2]*dwdz, c[2], ST)
 
     c *= -1
     return c
@@ -159,30 +159,30 @@ def magneticConvection(c):
     F_tmp2[1] = SFTc.TDMA(a0_hat, b0_hat, c0_hat, F_tmp[1])  
     F_tmp2[2] = SFTc.TDMA(a0_hat, b0_hat, c0_hat, F_tmp[2]) 
     
-    dudx = U_tmp4[0] = ifst(F_tmp2[0], U_tmp4[0], ST)        
-    dvdx = U_tmp4[1] = ifst(F_tmp2[1], U_tmp4[1], ST)
-    dwdx = U_tmp4[2] = ifst(F_tmp2[2], U_tmp4[2], ST)
+    dudx = U_tmp4[0] = FST.ifst(F_tmp2[0], U_tmp4[0], ST)        
+    dvdx = U_tmp4[1] = FST.ifst(F_tmp2[1], U_tmp4[1], ST)
+    dwdx = U_tmp4[2] = FST.ifst(F_tmp2[2], U_tmp4[2], ST)
     
     U_tmp3[:] = 0
     dudy_h = 1j*K[1]*U_hat0[3]
-    dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], SN)
+    dudy = U_tmp3[0] = FST.ifst(dudy_h, U_tmp3[0], SN)
     dudz_h = 1j*K[2]*U_hat0[3]
-    dudz = U_tmp3[1] = ifst(dudz_h, U_tmp3[1], SN)
-    c[0] = fss(U0[3]*dudx + U0[4]*dudy + U0[5]*dudz, c[0], ST)
+    dudz = U_tmp3[1] = FST.ifst(dudz_h, U_tmp3[1], SN)
+    c[0] = FST.fss(U0[3]*dudx + U0[4]*dudy + U0[5]*dudz, c[0], ST)
     
     U_tmp3[:] = 0
     dvdy_h = 1j*K[1]*U_hat0[4]
-    dvdy = U_tmp3[0] = ifst(dvdy_h, U_tmp3[0], SN)
+    dvdy = U_tmp3[0] = FST.ifst(dvdy_h, U_tmp3[0], SN)
     dvdz_h = 1j*K[2]*U_hat0[4]
-    dvdz = U_tmp3[1] = ifst(dvdz_h, U_tmp3[1], SN)
-    c[1] = fss(U0[3]*dvdx + U0[4]*dvdy + U0[5]*dvdz, c[1], ST)
+    dvdz = U_tmp3[1] = FST.ifst(dvdz_h, U_tmp3[1], SN)
+    c[1] = FST.fss(U0[3]*dvdx + U0[4]*dvdy + U0[5]*dvdz, c[1], ST)
     
     U_tmp3[:] = 0
     dwdy_h = 1j*K[1]*U_hat0[5]
-    dwdy = U_tmp3[0] = ifst(dwdy_h, U_tmp3[0], SN)
+    dwdy = U_tmp3[0] = FST.ifst(dwdy_h, U_tmp3[0], SN)
     dwdz_h = 1j*K[2]*U_hat0[5]
-    dwdz = U_tmp3[1] = ifst(dwdz_h, U_tmp3[1], SN)
-    c[2] = fss(U0[3]*dwdx + U0[4]*dwdy + U0[5]*dwdz, c[2], ST)
+    dwdz = U_tmp3[1] = FST.ifst(dwdz_h, U_tmp3[1], SN)
+    c[2] = FST.fss(U0[3]*dwdx + U0[4]*dwdy + U0[5]*dwdz, c[2], ST)
    
     return c
 
@@ -210,31 +210,31 @@ def magVelConvection(c):
     F_tmp[0] = Cm.matvec(U_hat[0])
     F_tmp[0] = TDMASolverD(F_tmp[0])    
     #F_tmp[0, u_slice] = SFTc.TDMA_3D_complex(a0, b0, bc, c0, F_tmp[0, u_slice])    
-    dudx = U_tmp4[0] = ifst(F_tmp[0], U_tmp4[0], ST)        
+    dudx = U_tmp4[0] = FST.ifst(F_tmp[0], U_tmp4[0], ST)        
     
     SFTc.Mult_CTD_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
-    dvdx = U_tmp4[1] = ifct(F_tmp[1], U_tmp4[1],ST)
-    dwdx = U_tmp4[2] = ifct(F_tmp[2], U_tmp4[2],ST)
+    dvdx = U_tmp4[1] = FST.ifct(F_tmp[1], U_tmp4[1],ST)
+    dwdx = U_tmp4[2] =FST. ifct(F_tmp[2], U_tmp4[2],ST)
        
     dudy_h = 1j*K[1]*U_hat[0]
-    dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], ST)
+    dudy = U_tmp3[0] = FST.ifst(dudy_h, U_tmp3[0], ST)
     dudz_h = 1j*K[2]*U_hat[0]
-    dudz = U_tmp3[1] = ifst(dudz_h, U_tmp3[1], ST)
-    c[0] = fss(U0[3]*dudx + U0[4]*dudy + U0[5]*dudz, c[0], SN)
+    dudz = U_tmp3[1] = FST.ifst(dudz_h, U_tmp3[1], ST)
+    c[0] = FST.fss(U0[3]*dudx + U0[4]*dudy + U0[5]*dudz, c[0], SN)
     
     U_tmp3[:] = 0
     dvdy_h = 1j*K[1]*U_hat[1]
-    dvdy = U_tmp3[0] = ifst(dvdy_h, U_tmp3[0], ST)
+    dvdy = U_tmp3[0] = FST.ifst(dvdy_h, U_tmp3[0], ST)
     dvdz_h = 1j*K[2]*U_hat[1]
-    dvdz = U_tmp3[1] = ifst(dvdz_h, U_tmp3[1], ST)
-    c[1] = fss(U0[3]*dvdx + U0[4]*dvdy + U0[5]*dvdz, c[1], SN)
+    dvdz = U_tmp3[1] = FST.ifst(dvdz_h, U_tmp3[1], ST)
+    c[1] = FST.fss(U0[3]*dvdx + U0[4]*dvdy + U0[5]*dvdz, c[1], SN)
     
     U_tmp3[:] = 0
     dwdy_h = 1j*K[1]*U_hat[2]
-    dwdy = U_tmp3[0] = ifst(dwdy_h, U_tmp3[0], ST)
+    dwdy = U_tmp3[0] = FST.ifst(dwdy_h, U_tmp3[0], ST)
     dwdz_h = 1j*K[2]*U_hat[2]
-    dwdz = U_tmp3[1] = ifst(dwdz_h, U_tmp3[1], ST)
-    c[2] = fss(U0[3]*dwdx + U0[4]*dwdy + U0[5]*dwdz, c[2], SN)
+    dwdz = U_tmp3[1] = FST.ifst(dwdz_h, U_tmp3[1], ST)
+    c[2] = FST.fss(U0[3]*dwdx + U0[4]*dwdy + U0[5]*dwdz, c[2], SN)
    
     return c
   
@@ -269,30 +269,30 @@ def velMagConvection(c):
     F_tmp2[1] = SFTc.TDMA(a0_hat, b0_hat, c0_hat, F_tmp[1])  
     F_tmp2[2] = SFTc.TDMA(a0_hat, b0_hat, c0_hat, F_tmp[2])  
     
-    dudx = U_tmp4[0] = ifst(F_tmp2[0], U_tmp4[0], ST)        
-    dvdx = U_tmp4[1] = ifst(F_tmp2[1], U_tmp4[1], ST)
-    dwdx = U_tmp4[2] = ifst(F_tmp2[2], U_tmp4[2], ST)
+    dudx = U_tmp4[0] = FST.ifst(F_tmp2[0], U_tmp4[0], ST)        
+    dvdx = U_tmp4[1] = FST.ifst(F_tmp2[1], U_tmp4[1], ST)
+    dwdx = U_tmp4[2] = FST.ifst(F_tmp2[2], U_tmp4[2], ST)
     
     U_tmp3[:] = 0
     dudy_h = 1j*K[1]*U_hat0[3]
-    dudy = U_tmp3[0] = ifst(dudy_h, U_tmp3[0], SN)
+    dudy = U_tmp3[0] = FST.ifst(dudy_h, U_tmp3[0], SN)
     dudz_h = 1j*K[2]*U_hat0[3]
-    dudz = U_tmp3[1] = ifst(dudz_h, U_tmp3[1], SN)
-    c[0] = fss(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], SN)
+    dudz = U_tmp3[1] = FST.ifst(dudz_h, U_tmp3[1], SN)
+    c[0] = FST.fss(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], SN)
     
     U_tmp3[:] = 0
     dvdy_h = 1j*K[1]*U_hat0[4]
-    dvdy = U_tmp3[0] = ifst(dvdy_h, U_tmp3[0], SN)
+    dvdy = U_tmp3[0] = FST.ifst(dvdy_h, U_tmp3[0], SN)
     dvdz_h = 1j*K[2]*U_hat0[4]
-    dvdz = U_tmp3[1] = ifst(dvdz_h, U_tmp3[1], SN)
-    c[1] = fss(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], SN)
+    dvdz = U_tmp3[1] = FST.ifst(dvdz_h, U_tmp3[1], SN)
+    c[1] = FST.fss(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], SN)
     
     U_tmp3[:] = 0
     dwdy_h = 1j*K[1]*U_hat0[5]
-    dwdy = U_tmp3[0] = ifst(dwdy_h, U_tmp3[0], SN)
+    dwdy = U_tmp3[0] = FST.ifst(dwdy_h, U_tmp3[0], SN)
     dwdz_h = 1j*K[2]*U_hat0[5]
-    dwdz = U_tmp3[1] = ifst(dwdz_h, U_tmp3[1], SN)
-    c[2] = fss(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], SN)
+    dwdz = U_tmp3[1] = FST.ifst(dwdz_h, U_tmp3[1], SN)
+    c[2] = FST.fss(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], SN)
    
     return c
   
@@ -363,63 +363,62 @@ def solve():
         config.t += dt
         config.tstep += 1
         # Tentative momentum solve
-        #**********************************************************************************************
-        #                           (I) Mechanincal phase 
-        #**********************************************************************************************
+        #****************************************************
+        #           (I) Mechanincal phase 
+        #****************************************************
         # Iterations for magnetic field
         for ii in range(1):
-	    # Iterations for pressure correction
-	    for jj in range(config.velocity_pressure_iters):
-		dU[:] = 0
-		dU = ComputeRHS_U(dU, jj)    
-		U_hat[0] = HelmholtzSolverU(U_hat[0],dU[0])
-		U_hat[1] = HelmholtzSolverU(U_hat[1],dU[1])
-		U_hat[2] = HelmholtzSolverU(U_hat[2],dU[2])
-		
-		# Pressure correction
-		dU = pressurerhs(U_hat, dU) 
-		Pcorr[:] = HelmholtzSolverP(Pcorr[:],dU[6])
+            # Iterations for pressure correction
+            for jj in range(config.velocity_pressure_iters):
+                dU[:] = 0
+                dU = ComputeRHS_U(dU, jj)    
+                U_hat[0] = HelmholtzSolverU(U_hat[0],dU[0])
+                U_hat[1] = HelmholtzSolverU(U_hat[1],dU[1])
+                U_hat[2] = HelmholtzSolverU(U_hat[2],dU[2])
+                
+                # Pressure correction
+                dU = pressurerhs(U_hat, dU) 
+                Pcorr[:] = HelmholtzSolverP(Pcorr[:],dU[6])
 
-		P_hat[p_slice] += Pcorr[p_slice]
+                P_hat[p_slice] += Pcorr[p_slice]
 
-		#if jj == 0:
-		    #print "   Divergence error"
-		#print "         Pressure correction norm %2.6e" %(linalg.norm(Pcorr))
-				
-	    # Update velocity
-	    dU[:] = 0
-	    pressuregrad(Pcorr, dU)
-	    
-	    dU[0] = TDMASolverD(dU[0])
-	    dU[1] = TDMASolverD(dU[1])
-	    dU[2] = TDMASolverD(dU[2])   
-	    U_hat[:3, u_slice] += dt*dU[:3, u_slice]
+                #if jj == 0:
+                    #print "   Divergence error"
+                #print "         Pressure correction norm %2.6e" %(linalg.norm(Pcorr))
+                        
+            # Update velocity
+            dU[:] = 0
+            pressuregrad(Pcorr, dU)
+            
+            dU[0] = TDMASolverD(dU[0])
+            dU[1] = TDMASolverD(dU[1])
+            dU[2] = TDMASolverD(dU[2])   
+            U_hat[:3, u_slice] += dt*dU[:3, u_slice]
 
-	    for i in range(3):
-		U[i] = ifst(U_hat[i], U[i], ST)
-	    
-	    # Rotate velocities
-	    U_hat1[:3] = U_hat0[:3]
-	    U_hat0[:3] = U_hat[:3]
-	    U0[:3] = U[:3]
-	    
-	    P = ifst(P_hat, P, SN)        
-	    conv1[:] = conv0 
-	    
-	    #**********************************************************************************************
-	    #                            (II) Magnetic phase 
-	    #**********************************************************************************************
-	    dU[:] = 0
-	    dU = ComputeRHS_B(dU, jj) 
-	    U_hat[3] = HelmholtzSolverB(U_hat[3],dU[3])
+            for i in range(3):
+                U[i] = FST.ifst(U_hat[i], U[i], ST)
+            
+            # Rotate velocities
+            U_hat1[:3] = U_hat0[:3]
+            U_hat0[:3] = U_hat[:3]
+            U0[:3] = U[:3]
+            
+            P = FST.ifst(P_hat, P, SN)        
+            conv1[:] = conv0 
+            #******************************************
+            #        (II) Magnetic phase 
+            #******************************************
+            dU[:] = 0
+            dU = ComputeRHS_B(dU, jj) 
+            U_hat[3] = HelmholtzSolverB(U_hat[3],dU[3])
             U_hat[4] = HelmholtzSolverB(U_hat[4],dU[4])
-	    U_hat[5] = HelmholtzSolverB(U_hat[5],dU[5])
+            U_hat[5] = HelmholtzSolverB(U_hat[5],dU[5])
 
-	    for i in range(3,6):
-		U[i] = ifst(U_hat[i], U[i], SN)
+            for i in range(3,6):
+                U[i] = FST.ifst(U_hat[i], U[i], SN)
 
-	    U_hat0[3:] = U_hat[3:]
-	    U0[3:] = U[3:]
+            U_hat0[3:] = U_hat[3:]
+            U0[3:] = U[3:]
 
         update(**globals())
         

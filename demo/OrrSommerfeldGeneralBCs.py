@@ -9,7 +9,7 @@ import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
 eps = 1e-6
-def initOS(OS, U, U_hat, X, fst, ifst, ST, t=0.):
+def initOS(OS, U, U_hat, X, FST, ST, t=0.):
     for i in range(U.shape[1]):
         x = X[0, i, 0, 0]
         OS.interp(x)
@@ -21,13 +21,13 @@ def initOS(OS, U, U_hat, X, fst, ifst, ST, t=0.):
             U[1, i, j, :] = v
     U[2] = 0
     for i in range(3):
-        U_hat[i] = fst(U[i], U_hat[i], ST)
+        U_hat[i] = FST.fst(U[i], U_hat[i], ST)
         
     for i in range(3):
-        U[i] = ifst(U_hat[i], U[i], ST)
+        U[i] = FST.ifst(U_hat[i], U[i], ST)
 
     for i in range(3):
-        U_hat[i] = fst(U[i], U_hat[i], ST)
+        U_hat[i] = FST.fst(U[i], U_hat[i], ST)
 
 def energy(u, N, comm, rank, L):
     uu = sum(u, axis=(1,2))
@@ -43,28 +43,27 @@ def energy(u, N, comm, rank, L):
     else:
         return 0    
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, conv1, fst, 
-               ifst, ST, SN, X, N, comm, rank, L, standardConvection, dt, **kw):        
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, conv1, FST, ST, SN, X, N, comm, rank, L, standardConvection, dt, **kw):        
     OS = OrrSommerfeld(Re=config.Re, N=80)
-    initOS(OS, U0, U_hat0, X, fst, ifst, ST)
+    initOS(OS, U0, U_hat0, X, FST, ST)
     e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
     conv1 = standardConvection(conv1)
-    initOS(OS, U, U_hat, X, fst, ifst, ST, t=dt)
+    initOS(OS, U, U_hat, X, FST, ST, t=dt)
     P_hat = solvePressure(P_hat, 0.5*(U_hat+U_hat0))
 
-    P = ifst(P_hat, P, SN)   
+    P = FST.ifst(P_hat, P, SN)   
     U0[:] = U
     U_hat0[:] = U_hat
     config.t = dt
     config.tstep = 1
     return dict(OS=OS, e0=e0)
 
-def set_Source(Source, Sk, fss, ST, **kw):
+def set_Source(Source, Sk, FST, ST, **kw):
     Source[:] = 0
     Source[1, :] = -2./config.Re
     Sk[:] = 0
     for i in range(3):
-        Sk[i] = fss(Source[i], Sk[i], ST)
+        Sk[i] = FST.fss(Source[i], Sk[i], ST)
 
 def update(rank, X, U, P, OS, N, comm, L, e0, **kw):
     global im1, im2, im3, im4
@@ -112,14 +111,14 @@ def update(rank, X, U, P, OS, N, comm, L, e0, **kw):
         if rank == 0:
             print "Time %2.5f Norms %2.12e %2.12e %2.12e" %(config.t, e1/e0, exact, e1/e0-exact)
 
-def regression_test(U, X, OS, N, comm, rank, L, e0, fst, ifst,ST, U0, U_hat0,**kw):
+def regression_test(U, X, OS, N, comm, rank, L, e0, FST, ST, U0, U_hat0,**kw):
     #pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
     #e1 = 0.5*energy(pert, N, comm, rank, L)
     #exact = exp(2*imag(OS.eigval)*config.t)
     #if rank == 0:
         #print "Computed error = %2.8e %2.8e " %(sqrt(abs(e1/e0-exact)), config.dt)
 
-    initOS(OS, U0, U_hat0, X, fst, ifst, ST, t=config.t)
+    initOS(OS, U0, U_hat0, X, FST, ST, t=config.t)
     pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
     e1 = 0.5*energy(pert, N, comm, rank, L)
     #exact = exp(2*imag(OS.eigval)*config.t)

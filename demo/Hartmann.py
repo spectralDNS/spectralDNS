@@ -1,4 +1,4 @@
-"""Orr-Sommerfeld"""
+"""Hartmann"""
 from cbcdns import config, get_solver
 from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, cosh, sinh, linalg, inf
 from cbcdns.fft.wrappyfftw import dct
@@ -8,7 +8,7 @@ import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
 
-def init(U, U_hat, X, fst, ifst, ST, SN, t=0.):
+def init(U, U_hat, X, FST, ST, SN, t=0.):
     Ha = config.Ha
     B_strength = config.B_strength
     for i in range(U.shape[1]):
@@ -26,22 +26,22 @@ def init(U, U_hat, X, fst, ifst, ST, SN, t=0.):
     U[2] = 0
     U[5] = 0
     for i in range(6):
-	if i<3:
-            U_hat[i] = fst(U[i], U_hat[i], ST)
+        if i<3:
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
         else:
-	    U_hat[i] = fst(U[i], U_hat[i], SN)
+            U_hat[i] = FST.fst(U[i], U_hat[i], SN)
         
     for i in range(6):
-	if i<3:
-	    U[i] = ifst(U_hat[i], U[i], ST)
-	else:
-	    U[i] = ifst(U_hat[i], U[i], SN)
-	    
-    for i in range(6):
-	if i<3:
-            U_hat[i] = fst(U[i], U_hat[i], ST)
+        if i<3:
+            U[i] = FST.ifst(U_hat[i], U[i], ST)
         else:
-	    U_hat[i] = fst(U[i], U_hat[i], SN)
+            U[i] = FST.ifst(U_hat[i], U[i], SN)
+            
+    for i in range(6):
+        if i<3:
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
+        else:
+            U_hat[i] = FST.fst(U[i], U_hat[i], SN)
 
 
 def energy(u, N, comm, rank, L):
@@ -58,37 +58,36 @@ def energy(u, N, comm, rank, L):
     else:
         return 0    
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, conv1, fst, 
-               ifst, ST, SN, X, N, comm, rank, L, standardConvection, dt, **kw):        
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, conv1, FST, ST, SN, X, N, comm, rank, L, standardConvection, dt, **kw):        
 
 
-    init(U0, U_hat0, X, fst, ifst, ST, SN)   
+    init(U0, U_hat0, X, FST, ST, SN)   
     conv1 = standardConvection(conv1)
-    init(U, U_hat, X, fst, ifst, ST, SN, t=dt) 
+    init(U, U_hat, X, FST, ST, SN, t=dt) 
     P[:] = 0
-    P_hat = fst(P, P_hat, SN)
+    P_hat = FST.fst(P, P_hat, SN)
     U0[:] = U
     U_hat0[:] = U_hat
     config.t = dt
     config.tstep = 1
     return dict()
 
-def set_Source(Source, Sk, fss, ST, **kw):
+def set_Source(Source, Sk, FST, ST, **kw):
     Source[:] = 0
     Source[1, :] = -2./config.Re
     Sk[:] = 0
     for i in range(3):
-        Sk[i] = fss(Source[i], Sk[i], ST)
+        Sk[i] = FST.fss(Source[i], Sk[i], ST)
 
 def update(rank, X, U, P, N, comm, L, **kw):
     
     Ha = config.Ha
     if config.tstep % config.compute_energy == 0: 
-	u_exact = ( cosh(Ha) - cosh(Ha*X[0,:,0,0]))/(cosh(Ha) - 1.0)
-	if rank == 0:
+        u_exact = ( cosh(Ha) - cosh(Ha*X[0,:,0,0]))/(cosh(Ha) - 1.0)
+        if rank == 0:
             print "Time %2.5f Error %2.12e" %(config.t, linalg.norm(u_exact-U[1,:,0,0],inf))
 
-def regression_test(U, X, N, comm, rank, L, fst, ifst,ST, U0, U_hat0,**kw):
+def regression_test(U, X, N, comm, rank, L, FST, ST, U0, U_hat0,**kw):
     Ha = config.Ha
     u_exact = ( cosh(Ha) - cosh(Ha*X[0,:,0,0]))/(cosh(Ha) - 1.0)
     if rank == 0:
