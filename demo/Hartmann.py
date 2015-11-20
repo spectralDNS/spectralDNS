@@ -115,7 +115,7 @@ if __name__ == "__main__":
 	
     config.ShenMHD.add_argument("--compute_energy", type=int, default=1)
     config.ShenMHD.add_argument("--plot_step", type=int, default=10)
-    solver = get_solver(update=update, regression_test=regression_test, family="Shen")
+    solver = get_solver(update=update, regression_test=regression_test, family="ShenMHD")
     vars(solver).update(initialize(**vars(solver)))
     set_Source(**vars(solver))
     solver.solve()
