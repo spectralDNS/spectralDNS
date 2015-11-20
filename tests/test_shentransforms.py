@@ -350,7 +350,7 @@ def test_CDDmat(SD):
     du = np.zeros(M)
     du = SD.ifst(cs, du)
 
-    assert np.linalg.norm(du-dudx_j)/M < 1e-12
+    assert np.linalg.norm(du-dudx_j)/M < 1e-10
     
     # Multidimensional version
     u3_hat = u_hat.repeat(4*4).reshape((M, 4, 4)) + 1j*u_hat.repeat(4*4).reshape((M, 4, 4))    
