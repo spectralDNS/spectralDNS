@@ -6,6 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from cbcdns import config
 from ..fft.wrappyfftw import *
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis
+from ..shenGeneralBCs.shentransform import ShenBasis
 from ..optimization import optimizer
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange
 
@@ -209,11 +210,187 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     
     del kwargs 
     return locals()
+
+def setupShenMHD(comm, float, complex, mpitype, N, L, mgrid,
+              num_processes, rank, MPI, **kwargs):
+    if not num_processes in [2**i for i in range(config.M[0]+1)]:
+        raise IOError("Number of cpus must be in ", [2**i for i in range(config.M[0]+1)])
     
+    Np = N / num_processes
+
+    # Get points and weights for Chebyshev weighted integrals
+    ST = ShenDirichletBasis(quad="GL")
+    SN = ShenNeumannBasis(quad="GC")
+    points, weights = ST.points_and_weights(N[0])
+    pointsp, weightsp = SN.points_and_weights(N[0])
+
+    x1 = arange(N[1], dtype=float)*L[1]/N[1]
+    x2 = arange(N[2], dtype=float)*L[2]/N[2]
+
+    # Get grid for velocity points
+    X = array(meshgrid(points[rank*Np[0]:(rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)
+
+    Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
+    Nu = N[0]-2   # Number of velocity modes in Shen basis
+    Nq = N[0]-3   # Number of pressure modes in Shen basis
+    u_slice = slice(0, Nu)
+    p_slice = slice(1, Nu)
+
+    U     = empty((6, Np[0], N[1], N[2]), dtype=float)
+    U_hat = empty((6, N[0], Np[1], Nf), dtype=complex)
+    P     = empty((Np[0], N[1], N[2]), dtype=float)
+    P_hat = empty((N[0], Np[1], Nf), dtype=complex)
+    Pcorr = empty((N[0], Np[1], Nf), dtype=complex)
+
+    U0      = empty((6, Np[0], N[1], N[2]), dtype=float)
+    U_hat0  = empty((6, N[0], Np[1], Nf), dtype=complex)
+    U_hat1  = empty((6, N[0], Np[1], Nf), dtype=complex)
+    UT      = empty((6, N[0], Np[1], N[2]), dtype=float)
+
+    U_tmp   = empty((6, Np[0], N[1], N[2]), dtype=float)
+    U_tmp2  = empty((6, Np[0], N[1], N[2]), dtype=float)
+    U_tmp3  = empty((6, Np[0], N[1], N[2]), dtype=float)
+    U_tmp4  = empty((6, Np[0], N[1], N[2]), dtype=float)
+    F_tmp   = empty((6, N[0], Np[1], Nf), dtype=complex)
+    F_tmp2  = empty((6, N[0], Np[1], Nf), dtype=complex)
+
+    dU      = empty((7, N[0], Np[1], Nf), dtype=complex)
+    Uc      = empty((Np[0], N[1], N[2]))
+    Uc2     = empty((Np[0], N[1], N[2]))
+    Uc_hat  = empty((N[0], Np[1], Nf), dtype="complex")
+    Uc_hat2 = empty((N[0], Np[1], Nf), dtype="complex")
+    Uc_hat3 = empty((N[0], Np[1], Nf), dtype="complex")
+    Uc_hatT = empty((Np[0], N[1], Nf), dtype="complex")
+    U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype="complex")
+    U_mpi2  = empty((num_processes, Np[0], Np[1], N[2])) 
+
+    conv0   = empty((3, N[0], Np[1], Nf), dtype=complex)
+    conv1   = empty((3, N[0], Np[1], Nf), dtype=complex)
+    magconv  = empty((3, N[0], Np[1], Nf), dtype="complex")
+    magconvU = empty((3, N[0], Np[1], Nf), dtype="complex")
+    diff0   = empty((3, N[0], Np[1], Nf), dtype=complex)
+    Source  = empty((6, Np[0], N[1], N[2]), dtype=float) 
+    Sk      = empty((6, N[0], Np[1], Nf), dtype=complex) 
+
+    kx = arange(N[0]).astype(float)
+    ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
+    kz = fftfreq(N[2], 1./N[2])[:Nf]
+    kz[-1] *= -1.0
+
+    mpidouble = MPI.DOUBLE
+    init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble)
+    
+    # scale with physical mesh size. 
+    # This takes care of mapping the physical domain to a computational cube of size (2, 2pi, 2pi)
+    # Note that first direction cannot be different from 2 (yet)
+    Lp = array([2, 2*pi, 2*pi])/L
+    K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
+    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
+    K2 = sum(K*K, 0, dtype=float)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
+    # Filter for dealiasing nonlinear convection
+    kmax = 2./3.*(N/2+1)
+    kmax[0] = N[0]
+    dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
+                    (abs(K[2]) < kmax[2]), dtype=uint8)
+    
+    del kwargs 
+    return locals()
+
+def setupShenGeneralBCs(comm, float, complex, mpitype, N, L, mgrid,
+              num_processes, rank, MPI, **kwargs):
+    if not num_processes in [2**i for i in range(config.M[0]+1)]:
+        raise IOError("Number of cpus must be in ", [2**i for i in range(config.M[0]+1)])
+    
+    Np = N / num_processes
+
+    # Get points and weights for Chebyshev weighted integrals
+    BC1 = array([1,0,0, 1,0,0])
+    BC2 = array([0,1,0, 0,1,0])
+    ST = ShenBasis(BC1, quad="GL")
+    SN = ShenBasis(BC2, quad="GC")
+    points, weights = ST.points_and_weights(N[0])
+    pointsp, weightsp = SN.points_and_weights(N[0])
+
+    x1 = arange(N[1], dtype=float)*L[1]/N[1]
+    x2 = arange(N[2], dtype=float)*L[2]/N[2]
+
+    # Get grid for velocity points
+    X = array(meshgrid(points[rank*Np[0]:(rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)
+
+    Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
+    Nu = N[0]-2   # Number of velocity modes in Shen basis
+    Nq = N[0]-3   # Number of pressure modes in Shen basis
+    u_slice = slice(0, Nu)
+    p_slice = slice(1, Nu)
+
+    U     = empty((3, Np[0], N[1], N[2]), dtype=float)
+    U_hat = empty((3, N[0], Np[1], Nf), dtype=complex)
+    P     = empty((Np[0], N[1], N[2]), dtype=float)
+    P_hat = empty((N[0], Np[1], Nf), dtype=complex)
+    Pcorr = empty((N[0], Np[1], Nf), dtype=complex)
+
+    U0      = empty((3, Np[0], N[1], N[2]), dtype=float)
+    U_hat0  = empty((3, N[0], Np[1], Nf), dtype=complex)
+    U_hat1  = empty((3, N[0], Np[1], Nf), dtype=complex)
+    UT      = empty((3, N[0], Np[1], N[2]), dtype=float)
+
+    U_tmp   = empty((3, Np[0], N[1], N[2]), dtype=float)
+    U_tmp2  = empty((3, Np[0], N[1], N[2]), dtype=float)
+    U_tmp3  = empty((3, Np[0], N[1], N[2]), dtype=float)
+    U_tmp4  = empty((3, Np[0], N[1], N[2]), dtype=float)
+    F_tmp   = empty((3, N[0], Np[1], Nf), dtype=complex)
+    F_tmp2  = empty((3, N[0], Np[1], Nf), dtype=complex)
+
+    dU      = empty((4, N[0], Np[1], Nf), dtype=complex)
+    Uc      = empty((Np[0], N[1], N[2]))
+    Uc2     = empty((Np[0], N[1], N[2]))
+    Uc_hat  = empty((N[0], Np[1], Nf), dtype="complex")
+    Uc_hat2 = empty((N[0], Np[1], Nf), dtype="complex")
+    Uc_hat3 = empty((N[0], Np[1], Nf), dtype="complex")
+    Uc_hatT = empty((Np[0], N[1], Nf), dtype="complex")
+    U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype="complex")
+    U_mpi2  = empty((num_processes, Np[0], Np[1], N[2]))
+
+    conv0   = empty((3, N[0], Np[1], Nf), dtype=complex)
+    conv1   = empty((3, N[0], Np[1], Nf), dtype=complex)
+    diff0   = empty((3, N[0], Np[1], Nf), dtype=complex)
+    Source  = empty((3, Np[0], N[1], N[2]), dtype=float) 
+    Sk      = empty((3, N[0], Np[1], Nf), dtype=complex) 
+
+    kx = arange(N[0]).astype(float)
+    ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
+    kz = fftfreq(N[2], 1./N[2])[:Nf]
+    kz[-1] *= -1.0
+
+    mpidouble = MPI.DOUBLE
+    init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble)
+    
+    # scale with physical mesh size. 
+    # This takes care of mapping the physical domain to a computational cube of size (2, 2pi, 2pi)
+    # Note that first direction cannot be different from 2 (yet)
+    Lp = array([2, 2*pi, 2*pi])/L
+    K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
+    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
+    K2 = sum(K*K, 0, dtype=float)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
+    # Filter for dealiasing nonlinear convection
+    kmax = 2./3.*(N/2+1)
+    kmax[0] = N[0]
+    dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
+                    (abs(K[2]) < kmax[2]), dtype=uint8)
+    
+    del kwargs 
+    return locals()
+        
 setup = {"MHD": setupMHD,
          "NS":  setupDNS,
          "VV":  setupDNS,
-         "IPCS": setupShen}[config.solver]        
+         "IPCS": setupShen,
+         "IPCS_MHD": setupShenMHD,
+         "IPCS_GeneralBCs": setupShenGeneralBCs}[config.solver]        
 
 def init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble):
     # Initialize MPI work arrays globally

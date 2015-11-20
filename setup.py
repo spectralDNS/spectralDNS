@@ -34,6 +34,7 @@ maintenance = 0
 cwd = os.path.abspath(os.path.dirname(__file__))
 cdir = os.path.join(cwd, "cbcdns", "optimization")
 sdir = os.path.join(cwd, "cbcdns", "shen")
+sgdir = os.path.join(cwd, "cbcdns", "shenGeneralBCs")
 
 ext = None
 cmdclass = {}
@@ -47,9 +48,15 @@ if not "sdist" in sys.argv:
     for s in ("LUsolve", "TDMA"):
         ext += cythonize(Extension("cbcdns.shen.{}".format(s), sources = [os.path.join(sdir, '{}.pyx'.format(s))], language="c++"))
         
-    for s in ("Cheb", "Matvec"):
+    for s in ("Cheb", "Matvec", "HelmholtzMHD"):
         ext += cythonize(Extension("cbcdns.shen.{}".format(s), sources = [os.path.join(sdir, '{}.pyx'.format(s))]))    
     
+    for s in ("LUsolve", "TDMA", "PDMA", "UTDMA"):
+        ext += cythonize(Extension("cbcdns.shenGeneralBCs.{}".format(s), sources = [os.path.join(sgdir, '{}.pyx'.format(s))], language="c++"))
+        
+    for s in ("Cheb", "Matvec", "Matrices"):
+        ext += cythonize(Extension("cbcdns.shenGeneralBCs.{}".format(s), sources = [os.path.join(sgdir, '{}.pyx'.format(s))]))    
+
     [e.extra_compile_args.extend(["-Ofast"]) for e in ext]
     [e.include_dirs.extend([get_include()]) for e in ext]
     if use_cython:

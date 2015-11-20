@@ -27,6 +27,7 @@ float, complex, mpitype = {"single": (float32, complex64, MPI.F_FLOAT_COMPLEX),
 # Apply correct precision and set mesh size
 dt = config.dt = float(config.dt)
 nu = config.nu = float(config.nu)
+eta = config.eta = float(config.eta)
 M = config.M = array([eval(str(f)) for f in config.M], dtype=int)  # Convert from possible commandline, which is parsed as strings
 L = config.L = array([eval(str(f)) for f in config.L], dtype=float)
 N = 2**M
@@ -34,7 +35,7 @@ dx = (L/N).astype(float)
 
 if config.make_profile: profiler = cProfile.Profile()
 
-# Set up solver using wither slab or decomposition
+# Set up solver using either slab or decomposition
 vars().update(setup(**vars()))
 
 def update(t, tstep, **kwargs):

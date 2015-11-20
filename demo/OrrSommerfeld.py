@@ -142,5 +142,5 @@ if __name__ == "__main__":
     config.Shen.add_argument("--plot_step", type=int, default=10)
     solver = get_solver(update=update, regression_test=regression_test, family="Shen")    
     vars(solver).update(initialize(**vars(solver)))
-    set_Source(**vars(solver))
+    set_Source(**vars(solver))	
     solver.solve()
