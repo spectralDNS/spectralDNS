@@ -366,7 +366,7 @@ def test_CDDmat(SD):
     d3 = SD.ifst(cs, d3)
 
     #from IPython import embed; embed()
-    assert np.linalg.norm(du3-d3)/(M*16) < 1e-12
+    assert np.linalg.norm(du3-d3)/(M*16) < 1e-10
         
 def test_CXXmat(SXSX):
     S1, S2 = SXSX
