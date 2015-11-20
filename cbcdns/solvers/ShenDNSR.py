@@ -78,6 +78,7 @@ def solvePressure(P, P_hat, U_hat):
     P[:] = FST.ifst(P_hat, P, SN)
     P_hat  = FST.fct(P, P_hat, SN)
     P[:] = FST.ifct(P_hat, P, SN)
+    P_hat  = FST.fct(P, P_hat, SN)
 
 def Divu(U, U_hat, c):
     c[:] = 0
