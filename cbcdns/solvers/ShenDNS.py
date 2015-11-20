@@ -4,7 +4,7 @@ __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
-from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat
+from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat
 from ..shen.Helmholtz import Helmholtz, TDMA
 from ..shen import SFTc
 
@@ -22,11 +22,16 @@ CDN = CDNmat(K[0, :, 0, 0])
 BDN = BDNmat(K[0, :, 0, 0], ST.quad)
 CDD = CDDmat(K[0, :, 0, 0])
 BDD = BDDmat(K[0, :, 0, 0], ST.quad)
+BDT = BDTmat(K[0, :, 0, 0], SN.quad)
 
+dpdx = P.copy()
 #@profile
 def pressuregrad(P_hat, dU):
     # Pressure gradient x-direction
     dU[0] -= CDN.matvec(P_hat)
+    #dpdx[:] = FST.chebDerivative_3D0(P, dpdx, SN)
+    #F_tmp[0] = FST.fct(dpdx, F_tmp[0], SN)
+    #dU[0] -= BDT.matvec(F_tmp[0])
     
     # pressure gradient y-direction
     F_tmp[0] = BDN.matvec(P_hat)
@@ -48,12 +53,6 @@ def body_force(Sk, dU):
     dU[1, :Nu] -= Sk[1, :Nu]
     dU[2, :Nu] -= Sk[2, :Nu]
     return dU
-
-def chebDerivative_3D0(fj, u0):
-    UT[0] = FST.fct0(fj, UT[0], ST)
-    UT[1] = SFTc.chebDerivativeCoefficients_3D(UT[0], UT[1]) 
-    u0[:] = FST.ifct0(UT[1], u0, ST)
-    return u0
 
 def Curl(a, c, S):
     F_tmp[:] = 0
@@ -259,6 +258,8 @@ def solve():
     while config.t < config.T-1e-8:
         config.t += dt
         config.tstep += 1
+        #print "I", U[0].mean(), U[1].mean(), U[2].mean()
+
         # Tentative momentum solve
         for jj in range(config.velocity_pressure_iters):
             dU[:] = 0
@@ -278,19 +279,23 @@ def solve():
                 print "   Divergence error"
             if config.print_divergence_progress:
                 print "         Pressure correction norm %2.6e" %(linalg.norm(Pcorr))
+
+        #for i in range(3):
+            #U[i] = FST.ifst(U_hat[i], U[i], ST)
+        #print "A", U[0].mean(), U[1].mean(), U[2].mean()
                  
-        # Update velocity
-        dU[:] = 0
-        pressuregrad(Pcorr, dU)        
-        dU[0] = TDMASolverD(dU[0])
-        dU[1] = TDMASolverD(dU[1])
-        dU[2] = TDMASolverD(dU[2])
-        
-        U_hat[:3, u_slice] += dt*dU[:3, u_slice]  # + since pressuregrad computes negative pressure gradient
+        ## Update velocity
+        #dU[:] = 0
+        #pressuregrad(Pcorr, dU)        
+        #dU[0] = TDMASolverD(dU[0])
+        #dU[1] = TDMASolverD(dU[1])
+        #dU[2] = TDMASolverD(dU[2])
+        #U_hat[:3, u_slice] += dt*dU[:3, u_slice]  # + since pressuregrad computes negative pressure gradient
 
         for i in range(3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)
-         
+        print "A", U[0].mean(), U[1].mean(), U[2].mean()
+
         update(**globals())
  
         # Rotate velocities

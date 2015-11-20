@@ -41,8 +41,7 @@ def solvePressure(P, P_hat, U_hat):
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = Cm.matvec(U_hat[0])
-    #F_tmp[0, u_slice] = SFTc.TDMA_3D(a0, b0, bc, c0, F_tmp[0, u_slice])    
+    F_tmp[0] = CDD.matvec(U_hat[0])
     F_tmp[0] = TDMASolverD(F_tmp[0])
     dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)      
     
@@ -91,9 +90,9 @@ def Divu(U, U_hat, c):
 
 def updatepressure(P_hat, Pcorr, U_hat):
     P_hat += BTN.matvec(Pcorr)/dd
-    #P_hat -= nu*CTD.matvec(U_hat[0])/dd
-    #P_hat -= nu*1j*K[1]*BTD.matvec(U_hat[1])/dd
-    #P_hat -= nu*1j*K[2]*BTD.matvec(U_hat[2])/dd
+    P_hat -= nu*CTD.matvec(U_hat[0])/dd
+    P_hat -= nu*1j*K[1]*BTD.matvec(U_hat[1])/dd
+    P_hat -= nu*1j*K[2]*BTD.matvec(U_hat[2])/dd
 
 #@profile
 def solve():

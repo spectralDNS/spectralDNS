@@ -15,7 +15,7 @@ from sympy import chebyshevt, Symbol, sin, cos, pi
 import numpy as np
 import scipy.sparse.linalg as la
 
-N = 16
+N = 10
 x = Symbol("x")
 
 @pytest.fixture(params=("NGC", "NGL", "DGC", "DGL", "CGC", "CGL"))
@@ -111,11 +111,19 @@ def test_TDMA(T):
     u0 = f.copy()
     u0 = T(u0)
     assert np.allclose(u0[s], u)
+    # Again
+    u0 = f.copy()
+    u0 = T(u0)
+    assert np.allclose(u0[s], u)
+    
     
     # Multidimensional version
-    f = f.repeat(16).reshape((N, 4, 4))
-    f = T(f)
-    assert np.allclose(f[s, 2, 2], u)
+    fc = f.repeat(16).reshape((N, 4, 4))
+    fc = T(fc)    
+    assert np.allclose(fc[s, 2, 2], u)
+    fc = f.repeat(16).reshape((N, 4, 4))
+    fc = T(fc)    
+    assert np.allclose(fc[s, 2, 2], u)
     
 def test_BNNmat(ST):
     points, weights = ST.points_and_weights(N)
@@ -359,7 +367,7 @@ def test_CDDmat(SD):
     #from IPython import embed; embed()
     assert np.linalg.norm(du3-d3)/(M*16) < 1e-12
         
-def test_CDNmat(SXSX):
+def test_CXXmat(SXSX):
     S1, S2 = SXSX
     
     if S1.__class__.__name__ == "ShenDirichletBasis" and S2.__class__.__name__ == "ShenDirichletBasis":

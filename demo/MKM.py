@@ -52,11 +52,12 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     U[1] += Um*(Y-0.5*Y**2)
     U[1] += utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)
+    U[0] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)
     
     #OS = OrrSommerfeld(Re=6000, N=80)
     #initOS(OS, U0, X)
-    #U[1] += 1e-3*U0[1]
-    #U[2] += 1e-3*U0[2]
+    #U[1] += 5e-2*U0[1]
+    #U[2] += 5e-2*U0[2]
     
     # project to Dirichlet space and back
     for i in range(3):
@@ -161,7 +162,7 @@ def Q(u, rank, comm, N, **kw):
 beta = zeros(1)    
 def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk, ST, U_tmp, F_tmp, comm, **kw):
     global im1, im2, im3, flux
-    
+
     #q = Q(U[1], rank, comm, **kw)
     #beta[0] = (flux[0] - q)/(array(config.L).prod())
     #comm.Bcast(beta)

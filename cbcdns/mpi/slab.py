@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from cbcdns import config
 from ..fft.wrappyfftw import *
-from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis
+from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, SFTc
 from ..optimization import optimizer
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange
 
@@ -358,16 +358,22 @@ class FastShenFourierTransform(object):
     def fct0(self, u, fu, S):
         """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do fct."""
         self.U_mpi2[:] = rollaxis(u.reshape(self.Np[0], self.num_processes, self.Np[1], self.N[2]), 1)
-        self.comm.Alltoall([self.U_mpi2, self.mpidouble], [self.UT[0], self.mpidouble])
+        self.comm.Alltoall([self.U_mpi2, self.mpitype], [self.UT[0], self.mpitype])
         fu = S.fct(self.UT[0], fu)
         return fu
 
     def ifct0(self, fu, u, S):
         """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do ifct"""
         self.UT[0] = S.ifct(fu, self.UT[0])
-        self.comm.Alltoall([self.UT[0], self.mpidouble], [self.U_mpi2, self.mpidouble])
+        self.comm.Alltoall([self.UT[0], self.mpitype], [self.U_mpi2, self.mpitype])
         u[:] = rollaxis(self.U_mpi2, 1).reshape(u.shape)
         return u
+    
+    def chebDerivative_3D0(self, fj, u0, S):
+        self.UT[0] = self.fct0(fj, self.UT[0], S)
+        self.UT[1] = SFTc.chebDerivativeCoefficients_3D(self.UT[0], self.UT[1]) 
+        u0[:] = self.ifct0(self.UT[1], u0, S)
+        return u0
 
 
 #class FFT(object):
