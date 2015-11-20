@@ -49,6 +49,7 @@ install:
     - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION Cython mpi4py scipy
     - source activate test-environment
     - python setup.py install
+    - which python
     
 #before_script:
     #- sudo hostname localhost
