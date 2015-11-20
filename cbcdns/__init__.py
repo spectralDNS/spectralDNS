@@ -48,6 +48,10 @@ def get_solver(update=None, regression_test=None, family="Isotropic"):
         
         if config.solver == 'IPCS':
             import cbcdns.solvers.ShenDNS as solver           
+
+            
+        elif config.solver == 'IPCSR':
+            import cbcdns.solvers.ShenDNSR as solver
         
         else:
             raise AttributeError("Wrong solver!")
@@ -59,9 +63,10 @@ def get_solver(update=None, regression_test=None, family="Isotropic"):
         if config.solver == 'IPCS_MHD':
             import cbcdns.solvers.ShenMHD as solver            
         
+            
         else:
             raise AttributeError("Wrong solver!")
-	
+
     elif family is "ShenGeneralBCs":
         args = config.ShenGeneralBCs.parse_args()
         vars(config).update(vars(args))

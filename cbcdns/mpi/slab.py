@@ -5,12 +5,16 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from cbcdns import config
 from ..fft.wrappyfftw import *
+<<<<<<< HEAD
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis
 from ..shenGeneralBCs.shentransform import ShenBasis
+=======
+from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, SFTc
+>>>>>>> mikael/channelShen
 from ..optimization import optimizer
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange
 
-__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi', 'fss', 'fst', 'ifst', 'fct', 'ifct', 'fct0', 'ifct0']
+__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi', 'FastShenFourierTransform']
 
 @optimizer
 def transpose_Uc(Uc_hatT, U_mpi, num_processes):
@@ -160,39 +164,37 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     Nq = N[0]-3   # Number of pressure modes in Shen basis
     u_slice = slice(0, Nu)
     p_slice = slice(1, Nu)
+    
+    FST = FastShenFourierTransform(N, MPI)
 
-    U     = empty((3, Np[0], N[1], N[2]), dtype=float)
-    U_hat = empty((3, N[0], Np[1], Nf), dtype=complex)
-    P     = empty((Np[0], N[1], N[2]), dtype=float)
-    P_hat = empty((N[0], Np[1], Nf), dtype=complex)
-    Pcorr = empty((N[0], Np[1], Nf), dtype=complex)
+    U     = empty((3,)+FST.real_shape(), dtype=float)
+    U_hat = empty((3,)+FST.complex_shape(), dtype=complex)
+    P     = empty(FST.real_shape(), dtype=float)
+    P_hat = empty(FST.complex_shape(), dtype=complex)
+    Pcorr = empty(FST.complex_shape(), dtype=complex)
 
-    U0      = empty((3, Np[0], N[1], N[2]), dtype=float)
-    U_hat0  = empty((3, N[0], Np[1], Nf), dtype=complex)
-    U_hat1  = empty((3, N[0], Np[1], Nf), dtype=complex)
-    UT      = empty((3, N[0], Np[1], N[2]), dtype=float)
+    U0      = empty((3,)+FST.real_shape(), dtype=float)
+    U_hat0  = empty((3,)+FST.complex_shape(), dtype=complex)
+    U_hat1  = empty((3,)+FST.complex_shape(), dtype=complex)
 
-    U_tmp   = empty((3, Np[0], N[1], N[2]), dtype=float)
-    U_tmp2  = empty((3, Np[0], N[1], N[2]), dtype=float)
-    F_tmp   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    F_tmp2  = empty((3, N[0], Np[1], Nf), dtype=complex)
+    U_tmp   = empty((3,)+FST.real_shape(), dtype=float)
+    U_tmp2  = empty((3,)+FST.real_shape(), dtype=float)
+    F_tmp   = empty((3,)+FST.complex_shape(), dtype=complex)
+    F_tmp2  = empty((3,)+FST.complex_shape(), dtype=complex)
 
-    dU      = empty((4, N[0], Np[1], Nf), dtype=complex)
+    dU      = empty((4,)+FST.complex_shape(), dtype=complex)
 
-    conv0   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    conv1   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    diff0   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    Source  = empty((3, Np[0], N[1], N[2]), dtype=float) 
-    Sk      = empty((3, N[0], Np[1], Nf), dtype=complex) 
+    conv0   = empty((3,)+FST.complex_shape(), dtype=complex)
+    conv1   = empty((3,)+FST.complex_shape(), dtype=complex)
+    diff0   = empty((3,)+FST.complex_shape(), dtype=complex)
+    Source  = empty((3,)+FST.real_shape(), dtype=float) 
+    Sk      = empty((3,)+FST.complex_shape(), dtype=complex) 
 
     kx = arange(N[0]).astype(float)
     ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
     kz = fftfreq(N[2], 1./N[2])[:Nf]
     kz[-1] *= -1.0
 
-    mpidouble = MPI.DOUBLE
-    init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble)
-    
     # scale with physical mesh size. 
     # This takes care of mapping the physical domain to a computational cube of size (2, 2pi, 2pi)
     # Note that first direction cannot be different from 2 (yet)
@@ -204,7 +206,7 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
-    kmax[0] = N[0]
+    kmax[0] = N[0]*2./3.
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
     
@@ -389,6 +391,7 @@ setup = {"MHD": setupMHD,
          "NS":  setupDNS,
          "VV":  setupDNS,
          "IPCS": setupShen,
+<<<<<<< HEAD
          "IPCS_MHD": setupShenMHD,
          "IPCS_GeneralBCs": setupShenGeneralBCs}[config.solver]        
 
@@ -400,6 +403,9 @@ def init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble):
     Uc_hat  = empty((N[0], Np[1], Nf), dtype=complex)
     Uc_hatT = empty((Np[0], N[1], Nf), dtype=complex)
     globals().update(locals())
+=======
+         "IPCSR": setupShen}[config.solver]        
+>>>>>>> mikael/channelShen
 
 def init_fft(N, Nf, Np, complex, num_processes, comm, rank, mpitype):
     # Initialize MPI work arrays globally
@@ -468,56 +474,170 @@ def fftn_mpi(u, fu):
     fu[:] = fft(fu, axis=0)
     return fu
      
-def fss(u, fu, S):
-    """Fast Shen scalar product of x-direction, Fourier transform of y and z"""
-    Uc_hatT[:] = rfft2(u, axes=(1,2))
-    U_mpi[:] = rollaxis(Uc_hatT.reshape(Np[0], num_processes, Np[1], Nf), 1)
-    comm.Alltoall([U_mpi, mpitype], [Uc_hat, mpitype])
-    fu = S.fastShenScalar(Uc_hat, fu)
-    return fu
+     
+class FastShenFourierTransform(object):
+    def __init__(self, N, MPI):
+        self.N = N         # The global size of the problem
+        self.Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
+        self.comm = MPI.COMM_WORLD
+        self.num_processes = self.comm.Get_size()
+        self.rank = self.comm.Get_rank()
+        self.Np = N / self.num_processes     
+        self.mpitype = MPI.F_DOUBLE_COMPLEX
+        
+        # Initialize intermediate MPI work arrays
+        self.U_mpi   = empty((self.num_processes, self.Np[0], self.Np[1], self.Nf), dtype=complex)
+        self.U_mpi2  = empty((self.num_processes, self.Np[0], self.Np[1], self.N[2]))
+        self.UT      = empty((3, self.N[0], self.Np[1], self.N[2]))
+        self.Uc_hat  = empty(self.complex_shape(), dtype=complex)
+        self.Uc_hatT = empty(self.complex_shape_T(), dtype=complex)
+        
+    def real_shape(self):
+        """The local shape of the real data"""
+        return (self.Np[0], self.N[1], self.N[2])
 
-def ifst(fu, u, S):
-    """Inverse Shen transform of x-direction, Fourier in y and z"""
-    Uc_hat[:] = S.ifst(fu, Uc_hat)
-    comm.Alltoall([Uc_hat, mpitype], [U_mpi, mpitype])
-    Uc_hatT[:] = rollaxis(U_mpi, 1).reshape(Uc_hatT.shape)
-    u[:] = irfft2(Uc_hatT, axes=(1,2))
-    return u
+    def complex_shape(self):
+        """The local shape of the complex data"""
+        return (self.N[0], self.Np[1], self.Nf)
+    
+    def complex_shape_T(self):
+        """The local transposed shape of the complex data"""
+        return (self.Np[0], self.N[1], self.Nf)
+        
+    def complex_shape_I(self):
+        """A local intermediate shape of the complex data"""
+        return (self.Np[0], self.num_processes, self.Np[1], self.Nf)
+    
+    def fss(self, u, fu, S):
+        """Fast Shen scalar product of x-direction, Fourier transform of y and z"""
+        self.Uc_hatT[:] = rfft2(u, axes=(1,2))
+        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+        fu = S.fastShenScalar(self.Uc_hat, fu)
+        return fu
 
-def fst(u, fu, S):
-    """Fast Shen transform of x-direction, Fourier transform of y and z"""
-    Uc_hatT[:] = rfft2(u, axes=(1,2))
-    U_mpi[:] = rollaxis(Uc_hatT.reshape(Np[0], num_processes, Np[1], Nf), 1)
-    comm.Alltoall([U_mpi, mpitype], [Uc_hat, mpitype])
-    fu = S.fst(Uc_hat, fu)
-    return fu
+    def ifst(self, fu, u, S):
+        """Inverse Shen transform of x-direction, Fourier in y and z"""
+        self.Uc_hat[:] = S.ifst(fu, self.Uc_hat)
+        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.U_mpi, self.mpitype])
+        self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())
+        u[:] = irfft2(self.Uc_hatT, axes=(1,2))
+        return u
 
-def fct(u, fu, S):
-    """Fast Cheb transform of x-direction, Fourier transform of y and z"""
-    Uc_hatT[:] = rfft2(u, axes=(1,2))
-    U_mpi[:] = rollaxis(Uc_hatT.reshape(Np[0], num_processes, Np[1], Nf), 1)
-    comm.Alltoall([U_mpi, mpitype], [Uc_hat, mpitype])
-    fu = S.fct(Uc_hat, fu)
-    return fu
+    def fst(self, u, fu, S):
+        """Fast Shen transform of x-direction, Fourier transform of y and z"""
+        self.Uc_hatT[:] = rfft2(u, axes=(1,2))
+        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+        fu = S.fst(self.Uc_hat, fu)
+        return fu
 
-def ifct(fu, u, S):
-    """Inverse Cheb transform of x-direction, Fourier in y and z"""
-    Uc_hat[:] = S.ifct(fu, Uc_hat)
-    comm.Alltoall([Uc_hat, mpitype], [U_mpi, mpitype])
-    Uc_hatT[:] = rollaxis(U_mpi, 1).reshape(Uc_hatT.shape)
-    u[:] = irfft2(Uc_hatT, axes=(1,2))
-    return u
+    def fct(self, u, fu, S):
+        """Fast Cheb transform of x-direction, Fourier transform of y and z"""
+        self.Uc_hatT[:] = rfft2(u, axes=(1,2))
+        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+        fu = S.fct(self.Uc_hat, fu)
+        return fu
 
-def fct0(u, fu, S):
-    """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do fct."""
-    U_mpi2[:] = rollaxis(u.reshape(Np[0], num_processes, Np[1], N[2]), 1)
-    comm.Alltoall([U_mpi2, mpidouble], [UT[0], mpidouble])
-    fu = S.fct(UT[0], fu)
-    return fu
+    def ifct(self, fu, u, S):
+        """Inverse Cheb transform of x-direction, Fourier in y and z"""
+        self.Uc_hat[:] = S.ifct(fu, self.Uc_hat)
+        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.U_mpi, self.mpitype])
+        self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())
+        u[:] = irfft2(self.Uc_hatT, axes=(1,2))
+        return u
 
-def ifct0(fu, u, S):
-    """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do ifct"""
-    UT[0] = S.ifct(fu, UT[0])
-    comm.Alltoall([UT[0], mpidouble], [U_mpi2, mpidouble])
-    u[:] = rollaxis(U_mpi2, 1).reshape(u.shape)
-    return u
+    def fct0(self, u, fu, S):
+        """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do fct."""
+        self.U_mpi2[:] = rollaxis(u.reshape(self.Np[0], self.num_processes, self.Np[1], self.N[2]), 1)
+        self.comm.Alltoall([self.U_mpi2, self.mpitype], [self.UT[0], self.mpitype])
+        fu = S.fct(self.UT[0], fu)
+        return fu
+
+    def ifct0(self, fu, u, S):
+        """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do ifct"""
+        self.UT[0] = S.ifct(fu, self.UT[0])
+        self.comm.Alltoall([self.UT[0], self.mpitype], [self.U_mpi2, self.mpitype])
+        u[:] = rollaxis(self.U_mpi2, 1).reshape(u.shape)
+        return u
+    
+    def chebDerivative_3D0(self, fj, u0, S):
+        self.UT[0] = self.fct0(fj, self.UT[0], S)
+        self.UT[1] = SFTc.chebDerivativeCoefficients_3D(self.UT[0], self.UT[1]) 
+        u0[:] = self.ifct0(self.UT[1], u0, S)
+        return u0
+
+
+#class FFT(object):
+    
+    #def __init__(self, N, comm, mpitype):
+        #self.N = N
+        #self.Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
+        #self.num_processes = comm.Get_size()
+        #self.rank = comm.Get_rank()
+        #self.Np = N / num_processes     
+        
+        ## Initialize MPI work arrays globally
+        #self.Uc_hat  = empty((N[0], self.Np[1], self.Nf), dtype=complex)
+        #self.Uc_hatT = empty((self.Np[0], N[1], self.Nf), dtype=complex)
+        #self.Uc_send = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
+        #self.U_mpi   = empty((self.num_processes, self.Np[0], self.Np[1], self.Nf), dtype=complex)
+    
+    #def ifftn(self, fu, u):
+        #"""ifft in three directions using mpi.
+        #Need to do ifft in reversed order of fft
+        #"""
+        #if self.num_processes == 1:
+            #u[:] = irfftn(fu, axes=(0,1,2))
+            #return u
+        
+        ## Do first owned direction
+        #self.Uc_hat[:] = ifft(fu, axis=0)
+            
+        #if config.communication == 'alltoall':
+            ## Communicate all values
+            #self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.U_mpi, self.mpitype])
+            #self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.Uc_hatT.shape)
+        
+        #else:
+            #for i in xrange(self.num_processes):
+                #if not i == self.rank:
+                    #self.comm.Sendrecv_replace([self.Uc_send[i], self.mpitype], i, 0, i, 0)   
+                #self.Uc_hatT[:, i*self.Np[1]:(i+1)*self.Np[1]] = self.Uc_send[i]
+            
+        ## Do last two directions
+        #u = irfft2(self.Uc_hatT, axes=(1,2))
+        #return u
+
+    ##@profile
+    #def fftn(self, u, fu):
+        #"""fft in three directions using mpi
+        #"""
+        #if self.num_processes == 1:
+            #fu[:] = rfftn(u, axes=(0,1,2))
+            #return fu
+        
+        #if config.communication == 'alltoall':
+            ## Do 2 ffts in y-z directions on owned data
+            #self.Uc_hatT[:] = rfft2(u, axes=(1,2))
+            
+            ## Transform data to align with x-direction  
+            #self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
+                
+            ## Communicate all values
+            #self.comm.Alltoall([self.U_mpi, self.mpitype], [fu, self.mpitype])  
+        
+        #else:
+            ## Communicating intermediate result 
+            #ft = fu.transpose(1,0,2)
+            #ft[:] = rfft2(u, axes=(1,2))
+            #fu_send = fu.reshape((self.num_processes, self.Np[1], self.Np[1], self.Nf))
+            #for i in xrange(self.num_processes):
+                #if not i == self.rank:
+                    #self.comm.Sendrecv_replace([fu_send[i], self.mpitype], i, 0, i, 0)   
+            #fu_send[:] = fu_send.transpose(0,2,1,3)
+                        
+        ## Do fft for last direction 
+        #fu[:] = fft(fu, axis=0)
+        #return fu
