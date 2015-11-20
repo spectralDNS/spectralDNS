@@ -17,7 +17,7 @@ Time discretization is done by a semi-implicit Crank-Nicolson scheme.
 from spectralinit import *
 from ..shenGeneralBCs import SFTc
 from ..shenGeneralBCs.ShenMatrices import B_matrix
-from ..shenGeneralBCs.Helmholtz import *
+from ..shenGeneralBCs.linalg import *
 from ..shenGeneralBCs.shentransform import ShenBasis
 
 assert config.precision == "double"
