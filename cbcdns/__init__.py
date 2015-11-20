@@ -43,7 +43,7 @@ def get_solver(update=None, regression_test=None, family="Isotropic"):
             raise AttributeError("Wrong solver!")
 
     elif family is "Shen":
-	args = config.Shen.parse_args()
+        args = config.Shen.parse_args()
         vars(config).update(vars(args))
         
         if config.solver == 'IPCS':
