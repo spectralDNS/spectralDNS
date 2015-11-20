@@ -223,6 +223,8 @@ def test_BDTmat(SDST):
     u2 = B.matvec(f_hat)
     assert np.linalg.norm(u2-u0)/(N*16) < 1e-12    
 
+#test_BDTmat((ShenDirichletBasis("GL"), ShenNeumannBasis("GL")))
+
 def test_BTXmat(SXST):
     SX, ST = SXST
     

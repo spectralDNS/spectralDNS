@@ -5,12 +5,8 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from cbcdns import config
 from ..fft.wrappyfftw import *
-<<<<<<< HEAD
-from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis
-from ..shenGeneralBCs.shentransform import ShenBasis
-=======
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, SFTc
->>>>>>> mikael/channelShen
+from ..shenGeneralBCs.shentransform import ShenBasis
 from ..optimization import optimizer
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange
 
@@ -391,21 +387,9 @@ setup = {"MHD": setupMHD,
          "NS":  setupDNS,
          "VV":  setupDNS,
          "IPCS": setupShen,
-<<<<<<< HEAD
+         "IPCSR": setupShen,
          "IPCS_MHD": setupShenMHD,
          "IPCS_GeneralBCs": setupShenGeneralBCs}[config.solver]        
-
-def init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble):
-    # Initialize MPI work arrays globally
-    U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype=complex)
-    U_mpi2  = empty((num_processes, Np[0], Np[1], N[2]))
-    UT      = empty((3, N[0], Np[1], N[2]))
-    Uc_hat  = empty((N[0], Np[1], Nf), dtype=complex)
-    Uc_hatT = empty((Np[0], N[1], Nf), dtype=complex)
-    globals().update(locals())
-=======
-         "IPCSR": setupShen}[config.solver]        
->>>>>>> mikael/channelShen
 
 def init_fft(N, Nf, Np, complex, num_processes, comm, rank, mpitype):
     # Initialize MPI work arrays globally

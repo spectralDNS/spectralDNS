@@ -38,11 +38,7 @@ def optimizer(func):
         
         @wraps(func)
         def wrapped_function(*args, **kwargs): 
-            if config.optimization == 'weave':
-                fun(*args, **kwargs)
-                u0 = args[0]
-            else:
-                u0 = fun(*args, **kwargs)
+            u0 = fun(*args, **kwargs)
             return u0
         
     except: # Otherwise revert to default numpy implementation
@@ -60,29 +56,6 @@ try:
 except:
     pass
 
-try:
-    import weave_single, weave_double
-    from numpy import int64
-    
-    def crossi(c, a, b):
-        if a.dtype == int64:
-            c = weave_single.cross2a(c, a, b)
-        else:
-            c = weave_single.cross2b(c, a, b)
-        return c
-    weave_single.cross2 = crossi
-    
-    def crossd(c, a, b):
-        if a.dtype == int64:
-            c = weave_double.cross2a(c, a, b)
-        else:
-            c = weave_double.cross2b(c, a, b)
-        return c
-    weave_double.cross2 = crossd
-    
-except:
-    pass
-
 try:   
     import numba_single, numba_double
     
@@ -94,5 +67,3 @@ try:
 
 except:
     pass
-
-    
