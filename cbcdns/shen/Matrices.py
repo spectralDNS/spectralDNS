@@ -16,12 +16,12 @@ class BNDmat(object):
 
     def __init__(self, K, quad, **kwargs):
         assert len(K.shape) == 1
-        self.shape = shape = (K.shape[0]-3, K.shape[0]-2)
+        self.shape = shape = (K.shape[0]-5, K.shape[0]-2)
         ck = ones(K.shape[0], int)
-        N = shape[1]
-        if quad == "GL": ck[-1] = 2
-        self.dd = (pi/2.*(1+ck[3:]*(K[1:N]/(K[1:N]+2))**2)).astype(float)
-        self.ud = (-pi/2*(K[1:N-2]/(K[1:N-2]+2))**2).astype(float)
+        N = shape[0]+1
+        if quad == "GL": ck[N-1] = 2
+        self.dd = (pi/2.*(1+ck[1:N+1]*(K[1:N+1]/(K[1:N+1]+2))**2)).astype(float)
+        self.ud = (-pi/2*ck[1:N]*(K[1:N]/(K[1:N]+2))**2).astype(float)
         self.ld = -pi/2
     
     def matvec(self, v):
@@ -29,13 +29,13 @@ class BNDmat(object):
         c = zeros(v.shape, dtype=v.dtype)
         if len(v.shape) > 1:
             c[1:(N-2)] = self.ud.repeat(array(v.shape[1:]).prod()).reshape(v[3:N].shape)*v[3:N]
-            c[1:N] += self.dd.repeat(array(v.shape[1:]).prod()).reshape(v[1:N].shape)*v[1:N]
-            c[2:N] += self.ld*v[:(N-2)]
+            c[1:(N-2)] += self.dd[:-1].repeat(array(v.shape[1:]).prod()).reshape(v[1:N-2].shape)*v[1:N-2]
+            c[2:(N-2)] += self.ld*v[:(N-4)]
 
         else:
-            c[1:(N-2)]= self.ud*v[3:N]
-            c[1:N]   += self.dd*v[1:N]
-            c[2:N]   += self.ld*v[:(N-2)]
+            c[1:(N-2)] = self.ud*v[3:N]
+            c[1:(N-2)]+= self.dd[:-1]*v[1:N-2]
+            c[2:(N-2)]+= self.ld*v[:(N-4)]
 
         return c
 
@@ -333,12 +333,13 @@ class CNDmat(object):
 
     def __init__(self, K, **kwargs):
         assert len(K.shape) == 1
-        self.shape = shape = (K.shape[0]-3, K.shape[0]-2)
+        self.shape = shape = (K.shape[0]-5, K.shape[0]-2)
         N = shape[1]
-        self.ld = -(K[1:N]+1)*pi
-        self.ud = [-(2-K[1:(N-1)]**2/(K[1:(N-1)]+2)**2*(K[1:(N-1)]+3))*pi]
+        Np = N-2
+        self.ld = -(K[1:Np]+1)*pi
+        self.ud = [-(2-K[1:Np+1]**2/(K[1:Np+1]+2)**2*(K[1:Np+1]+3))*pi]
         for i in range(3, N-1, 2):
-            self.ud.append(-(1-K[1:(N-i)]**2/(K[1:(N-i)]+2)**2)*2*pi)    
+            self.ud.append(-(1-K[1:(Np-i+2)]**2/(K[1:(Np-i+2)]+2)**2)*2*pi)    
 
     def matvec(self, v):
         N = self.shape[1]
@@ -347,9 +348,9 @@ class CNDmat(object):
             C = self.diags().toarray()
             for i in range(v.shape[1]):
                 for j in range(v.shape[2]):
-                    c[1:N,i,j] = np.dot(C, v[:N,i,j])
+                    c[1:N-2,i,j] = np.dot(C, v[:N,i,j])
         else:
-            c[1:N] = np.dot(self.diags().toarray(), v[:N])
+            c[1:N-2] = np.dot(self.diags().toarray(), v[:N])
         return c
 
     def diags(self):

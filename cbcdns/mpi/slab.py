@@ -147,19 +147,22 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     ST = ShenDirichletBasis(quad="GL")
     SN = ShenNeumannBasis(quad="GC")
     points, weights = ST.points_and_weights(N[0])
-    pointsp, weightsp = SN.points_and_weights(N[0])
-
+    pointsp = zeros(N[0])
+    weightsp = zeros(N[0])
+    pointsp[:-2], weightsp[:-2] = SN.points_and_weights(N[0]-2)
+    
     x1 = arange(N[1], dtype=float)*L[1]/N[1]
     x2 = arange(N[2], dtype=float)*L[2]/N[2]
 
     # Get grid for velocity points
     X = array(meshgrid(points[rank*Np[0]:(rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)
+    Xp = array(meshgrid(pointsp[rank*Np[0]:(rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)
 
     Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
     Nu = N[0]-2   # Number of velocity modes in Shen basis
-    Nq = N[0]-3   # Number of pressure modes in Shen basis
+    Nq = N[0]-5   # Number of pressure modes in Shen basis
     u_slice = slice(0, Nu)
-    p_slice = slice(1, Nu)
+    p_slice = slice(1, Nu-2)
     
     FST = FastShenFourierTransform(N, MPI)
 

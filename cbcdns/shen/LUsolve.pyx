@@ -579,15 +579,16 @@ def Mult_Div_1D(np.int_t N,
     for i in xrange(M-3):    
         cp3[i] = -2.0*pi*(1.0 - (((i+1)*1.0)/((i+1)+2.0))**2)
                 
-    # k = M-1
-    b[M-1] = ((m*bm2[M-1]*v_hat[M-2] + n*bm2[M-1]*w_hat[M-2]
-              + m*bii[M-1]*v_hat[M] + n*bii[M-1]*w_hat[M])*1j
-              + cm1[M-1]*u_hat[M-1])
-    
-    b[M-2] = ((m*bm2[M-2]*v_hat[M-3] + n*bm2[M-2]*w_hat[M-3]
-              + m*bii[M-2]*v_hat[M-1] + n*bii[M-2]*w_hat[M-1])*1j
-              + cm1[M-2]*u_hat[M-2]
-              + cp1[M-2]*u_hat[M])
+    # M-1 and M-2 are zero for PN-PN-2
+    #if b.shape[0] == u_hat.shape[0] - 1:
+        #b[M-1] = ((m*bm2[M-1]*v_hat[M-2] + n*bm2[M-1]*w_hat[M-2]
+                #+ m*bii[M-1]*v_hat[M] + n*bii[M-1]*w_hat[M])*1j
+                #+ cm1[M-1]*u_hat[M-1])
+        
+        #b[M-2] = ((m*bm2[M-2]*v_hat[M-3] + n*bm2[M-2]*w_hat[M-3]
+                #+ m*bii[M-2]*v_hat[M-1] + n*bii[M-2]*w_hat[M-1])*1j
+                #+ cm1[M-2]*u_hat[M-2]
+                #+ cp1[M-2]*u_hat[M])
     
     b[M-3] = ((m*bm2[M-3]*v_hat[M-4] + n*bm2[M-3]*w_hat[M-4]
               + m*bii[M-3]*v_hat[M-2] + n*bii[M-3]*w_hat[M-2] 
