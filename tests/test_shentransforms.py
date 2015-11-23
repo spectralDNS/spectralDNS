@@ -80,9 +80,11 @@ def SXST(request):
 
 def test_scalarproduct(ST):
     """Test fast scalar product against Vandermonde computed version"""
-    points, weights = ST.points_and_weights(N)
+    ST.zeropadding = 2
+    points, weights = ST.points_and_weights(N-ST.zeropadding)
     f = x*x+cos(pi*x)
-    fj = np.array([f.subs(x, j) for j in points], dtype=float)
+    fj = np.zeros(N)
+    fj[:(N-ST.zeropadding)] = np.array([f.subs(x, j) for j in points], dtype=float)
     u0 = np.zeros(N)
     u1 = np.zeros(N)
     if ST.__class__.__name__ == "ChebyshevTransform":
@@ -95,6 +97,8 @@ def test_scalarproduct(ST):
     else:
         u1 = ST.fastShenScalar(fj, u1)
     assert np.allclose(u1, u0)
+    
+#test_scalarproduct(ShenNeumannBasis("GC"))    
 
 def test_TDMA(T):
     from scipy.linalg import solve
@@ -276,6 +280,8 @@ def test_transforms(ST):
 
     # Project function to space first
     if ST.__class__.__name__ in ("ShenNeumannBasis", "ShenDirichletBasis"):
+        ST.zeropadding = 0
+        fj[(N-ST.zeropadding):] = 0
         f_hat = np.zeros(N)
         f_hat = ST.fst(fj, f_hat)
         fj = ST.ifst(f_hat, fj)
@@ -305,18 +311,26 @@ def test_transforms(ST):
         u1 = ST.ifst(u0, u1)
     assert np.allclose(fj, u1)
 
-#test_transforms(ShenDirichletBasis("GC"))
+#test_transforms(ShenNeumannBasis("GL"))
 
 def test_FST(ST):
     FST = FastShenFourierTransform(np.array([N, 4, 4]), MPI)
-    points, weights = ST.points_and_weights(N)
     fj = np.random.random((N,4,4))    
-    f_hat = fj.copy()
+    f_hat = np.zeros((N,4,4))
+    if ST.__class__.__name__ == "ShenNeumannBasis":
+        points, weights = ST.points_and_weights(N-4)
+        fj[-2:] = 0
+    elif ST.__class__.__name__ == "ShenDirichletBasis":
+        points, weights = ST.points_and_weights(N-2)
+        fj[-2:] = 0
+    else:
+        points, weights = ST.points_and_weights(N)
     
     if ST.__class__.__name__ in ("ShenNeumannBasis", "ShenDirichletBasis"):
         f_hat = ST.fst(fj, f_hat)
         fj = ST.ifst(f_hat, fj)
 
+    #from IPython import embed; embed()
     # Then check if transformations work as they should
     u_hat = np.zeros((N,4,3), dtype=np.complex)
     u0 = np.zeros((N,4,4))
@@ -327,9 +341,10 @@ def test_FST(ST):
         u_hat = FST.fst(fj, u_hat, ST)
         u0 = FST.ifst(u_hat, u0, ST)
 
-    #from IPython import embed; embed()
     assert np.allclose(fj, u0)
-    
+ 
+#test_FST(ShenNeumannBasis("GC"))
+
 def test_CDDmat(SD):
     M = 256
     u = (1-x**2)*sin(np.pi*6*x)

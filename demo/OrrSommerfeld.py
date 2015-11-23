@@ -65,7 +65,7 @@ def set_Source(Source, Sk, FST, ST, **kw):
     for i in range(3):
         Sk[i] = FST.fss(Source[i], Sk[i], ST)
 
-def update(rank, X, U, P, OS, N, comm, L, e0, **kw):
+def update(rank, X, Xp, U, P, OS, N, comm, L, e0, **kw):
     global im1, im2, im3, im4
     if config.tstep == 2 and rank == 0 and config.plot_step > 0:
         plt.figure()
@@ -79,7 +79,7 @@ def update(rank, X, U, P, OS, N, comm, L, e0, **kw):
         plt.draw()
 
         plt.figure()
-        im3 = plt.contourf(X[1,:,:,0], X[0,:,:,0], P[:,:,0], 100)
+        im3 = plt.contourf(Xp[1,:-2,:,0], Xp[0,:-2,:,0], P[:-2,:,0], 100)
         plt.colorbar(im3)
         plt.draw()
         
@@ -98,7 +98,7 @@ def update(rank, X, U, P, OS, N, comm, L, e0, **kw):
         im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0]-(1-X[0,:,:,0]**2), 100)         
         im2.autoscale()
         im3.ax.clear()
-        im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100) 
+        im3.ax.contourf(Xp[1,:-2,:,0], Xp[0,:-2,:,0], P[:-2,:,0], 100) 
         im3.autoscale()
         im4.set_UVC(U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
         plt.pause(1e-6)
