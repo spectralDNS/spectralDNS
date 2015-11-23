@@ -257,7 +257,6 @@ def solve():
     while config.t < config.T-1e-8:
         config.t += dt
         config.tstep += 1
-        #print "I", U[0].mean(), U[1].mean(), U[2].mean()
 
         # Tentative momentum solve
         for jj in range(config.velocity_pressure_iters):
@@ -279,21 +278,19 @@ def solve():
             if config.print_divergence_progress:
                 print "         Pressure correction norm %2.6e" %(linalg.norm(Pcorr))
 
-        #for i in range(3):
-            #U[i] = FST.ifst(U_hat[i], U[i], ST)
-        #print "A", U[0].mean(), U[1].mean(), U[2].mean()
+        for i in range(3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)
                  
-        ## Update velocity
-        #dU[:] = 0
-        #pressuregrad(Pcorr, dU)        
-        #dU[0] = TDMASolverD(dU[0])
-        #dU[1] = TDMASolverD(dU[1])
-        #dU[2] = TDMASolverD(dU[2])
-        #U_hat[:3, u_slice] += dt*dU[:3, u_slice]  # + since pressuregrad computes negative pressure gradient
+        # Update velocity
+        dU[:] = 0
+        pressuregrad(Pcorr, dU)        
+        dU[0] = TDMASolverD(dU[0])
+        dU[1] = TDMASolverD(dU[1])
+        dU[2] = TDMASolverD(dU[2])
+        U_hat[:3, u_slice] += dt*dU[:3, u_slice]  # + since pressuregrad computes negative pressure gradient
 
         for i in range(3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)
-        print "A", U[0].mean(), U[1].mean(), U[2].mean()
 
         update(**globals())
  
