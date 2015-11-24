@@ -330,7 +330,6 @@ def test_FST(ST):
         f_hat = ST.fst(fj, f_hat)
         fj = ST.ifst(f_hat, fj)
 
-    #from IPython import embed; embed()
     # Then check if transformations work as they should
     u_hat = np.zeros((N,4,3), dtype=np.complex)
     u0 = np.zeros((N,4,4))
@@ -342,8 +341,19 @@ def test_FST(ST):
         u0 = FST.ifst(u_hat, u0, ST)
 
     assert np.allclose(fj, u0)
+    
+    fj = np.ones(N)
+    f_hat = np.zeros((N))    
+    f_hat = ST.fastShenScalar(fj, f_hat)
+    ST.fast_transform = False
+    u_hat = np.zeros(N)
+    u_hat = ST.fastShenScalar(fj, u_hat)
+    from IPython import embed; embed()
+    assert np.allclose(f_hat, u_hat)
+    
  
 #test_FST(ShenNeumannBasis("GC"))
+test_FST(ShenDirichletBasis("GL"))
 
 def test_CDDmat(SD):
     M = 256
