@@ -144,7 +144,7 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     Np = N / num_processes
 
     # Get points and weights for Chebyshev weighted integrals
-    ST = ShenDirichletBasis(quad="GL")
+    ST = ShenDirichletBasis(quad="GC")
     SN = ShenNeumannBasis(quad="GC", zeropadding=2)
     points, weights = ST.points_and_weights(N[0])
     pointsp = zeros(N[0])
