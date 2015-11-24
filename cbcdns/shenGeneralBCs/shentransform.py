@@ -63,12 +63,12 @@ class ChebyshevTransform(object):
         
     def points_and_weights(self, N):
         self.N = N
-        if self.quad == "GC":
+        if self.quad == "GL":
             points = n_cheb.chebpts2(N)[::-1]
             weights = np.zeros((N))+np.pi/(N-1)
             weights[0] /= 2
             weights[-1] /= 2
-        elif self.quad == "GL":
+        elif self.quad == "GC":
             points, weights = n_cheb.chebgauss(N)
         return points, weights
         
@@ -92,11 +92,11 @@ class ChebyshevTransform(object):
     def fct(self, fj, cj):
         """Fast Chebyshev transform."""
         N = fj.shape[0]
-        if self.quad == "GL":
+        if self.quad == "GC":
             cj = dct(fj, 2, axis=0)
             cj /= N
             cj[0] /= 2        
-        elif self.quad == "GC":
+        elif self.quad == "GL":
             cj = dct(fj, 1, axis=0)/(N-1)
             cj[0] /= 2
             cj[-1] /= 2
@@ -104,10 +104,10 @@ class ChebyshevTransform(object):
 
     def ifct(self, fk, cj):
         """Inverse fast Chebyshev transform."""
-        if self.quad == "GL":
+        if self.quad == "GC":
             cj = 0.5*dct(fk, 3, axis=0)
             cj += 0.5*fk[0]
-        elif self.quad == "GC":
+        elif self.quad == "GL":
             cj = 0.5*dct(fk, 1, axis=0)
             cj += 0.5*fk[0]
             cj[::2] += 0.5*fk[-1]
@@ -117,9 +117,9 @@ class ChebyshevTransform(object):
     def fastChebScalar(self, fj, fk):
         """Fast Chebyshev scalar product."""
         N = fj.shape[0]
-        if self.quad == "GL":
+        if self.quad == "GC":
             fk = dct(fj, 2, axis=0)*np.pi/(2*N)
-        elif self.quad == "GC":
+        elif self.quad == "GL":
             fk = dct(fj, 1, axis=0)*np.pi/(2*(N-1))
         return fk
 
@@ -146,9 +146,9 @@ class ShenBasis(ChebyshevTransform):
             return kk[0]
 
     def chebNormalizationFactor(self, N, quad):
-	if self.quad == "GL":
+	if self.quad == "GC":
             ck = ones(N[0]-2); ck[0] = 2
-        elif self.quad == "GC":
+        elif self.quad == "GL":
             ck = ones(N[0]-2); ck[0] = 2; ck[-1] = 2
         return ck
     
@@ -217,9 +217,9 @@ class ShenBasis(ChebyshevTransform):
         ak, bk = self.shenCoefficients(k, self.BC)
         ak1, bk1 = self.shenCoefficients(k1, self.BC)
         
-        if self.quad == "GL":
+        if self.quad == "GC":
             ck = ones(N-2); ck[0] = 2
-        elif self.quad == "GC":
+        elif self.quad == "GL":
             ck = ones(N-2); ck[0] = 2; ck[-1] = 2  
         
         a = (pi/2)*(ck + ak**2 + bk**2)

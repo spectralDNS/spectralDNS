@@ -22,9 +22,9 @@ class Shen(object):
 		return kk[0]
 
     def chebNormalizationFactor(self, N, quad):
-	if self.quad == "GL":
+	if self.quad == "GC":
 	    ck = ones(N[0]-2); ck[0] = 2
-	elif self.quad == "GC":
+	elif self.quad == "GL":
 	    ck = ones(N[0]-2); ck[0] = 2; ck[-1] = 2
 	return ck
 

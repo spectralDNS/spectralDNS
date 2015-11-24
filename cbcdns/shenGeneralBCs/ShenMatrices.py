@@ -18,9 +18,9 @@ class B_matrix(object):
         self.shape = shape = (K.shape[0]-2, K.shape[0]-2)
         ck = ones(K.shape)
         N = self.shape[0]
-        if quad == "GL":
+        if quad == "GC":
             ck[0] = 2
-        elif quad == "GC":
+        elif quad == "GL":
             ck[0] = 2; ck[-3] = 2  
         self.dd = pi/2*(ck[:-2] + a_j*a_k + b_j*b_k)
         self.ud = pi/2*(a_k[:N-1] + a_j[1:]*b_k[:N-1])
@@ -60,9 +60,9 @@ class C_matrix(object):
         assert len(K.shape) == 1
         self.shape = shape = (K.shape[0]-2, K.shape[0]-2)
         ck = ones(K.shape)
-        if quad == "GL":
+        if quad == "GC":
             ck[0] = 2
-        elif quad == "GC":
+        elif quad == "GL":
             ck[0] = 2; ck[-1] = 2   
 
     def mat(self, c):
@@ -91,9 +91,9 @@ class A_matrix(object):
         assert len(K.shape) == 1
         self.shape = shape = (K.shape[0]-2, K.shape[0]-2)
         ck = ones(K.shape)
-        if quad == "GL":
+        if quad == "GC":
             ck[0] = 2
-        elif quad == "GC":
+        elif quad == "GL":
             ck[0] = 2; ck[-1] = 2   
 
     def mat(self, c):
@@ -122,9 +122,9 @@ class D_matrix(object):
         self.shape = shape = (K.shape[0]-2, K.shape[0]-2)
         ck = ones(K.shape)
         N = self.shape[0]
-        if quad == "GL":
+        if quad == "GC":
             ck[0] = 2
-        elif quad == "GC":
+        elif quad == "GL":
             ck[0] = 2; ck[-1] = 2   
         self.dd = (pi/2)*ck[:N]
         self.ud = (pi/2)*a_k[:(N-1)]
