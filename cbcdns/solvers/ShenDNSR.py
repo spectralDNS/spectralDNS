@@ -25,7 +25,9 @@ def pressuregrad(P_hat, dU):
     dU[0] -= CDT.matvec(P_hat)
     
     # pressure gradient y-direction
-    F_tmp[0] = BDT.matvec(P_hat)
+    F_tmp[0] = FST.fss(P, F_tmp[0], ST)
+    #F_tmp[0] = BDT.matvec(P_hat)
+    
     dU[1, :Nu] -= 1j*K[1, :Nu]*F_tmp[0, :Nu]
     
     # pressure gradient z-direction

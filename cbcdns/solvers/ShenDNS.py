@@ -26,12 +26,9 @@ BDT = BDTmat(K[0, :, 0, 0], SN.quad)
 
 dpdx = P.copy()
 #@profile
-def pressuregrad(P_hat, dU):
+def pressuregrad(P, P_hat, dU):
     # Pressure gradient x-direction
     dU[0] -= CDN.matvec(P_hat)
-    #dpdx[:] = FST.chebDerivative_3D0(P, dpdx, SN)
-    #F_tmp[0] = FST.fct(dpdx, F_tmp[0], SN)
-    #dU[0] -= BDT.matvec(F_tmp[0])
     
     # pressure gradient y-direction
     F_tmp[0] = BDN.matvec(P_hat)
@@ -40,11 +37,25 @@ def pressuregrad(P_hat, dU):
     # pressure gradient z-direction
     dU[2, :Nu] -= 1j*K[2, :Nu]*F_tmp[0, :Nu]    
     
+    ## Alternatively
+    #dpdx[:] = FST.chebDerivative_3D0(P, dpdx, SN)
+    #F_tmp[0] = FST.fss(dpdx, F_tmp[0], ST)
+    #dU[0] -= F_tmp[0]
+    #F_tmp[0] = FST.fss(P, F_tmp[0], ST)
+    #dU[1, :Nu] -= 1j*K[1, :Nu]*F_tmp[0, :Nu]
+    #dU[2, :Nu] -= 1j*K[2, :Nu]*F_tmp[0, :Nu]    
+        
     return dU
 
 def pressurerhs(U_hat, dU):
     dU[:] = 0.
     SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], dU[p_slice])    
+    
+    #U_tmp2[0] = Div(U_hat)
+    #F_tmp2[0] = FST.fst(U_tmp2[0], F_tmp2[0], ST)
+    #U_tmp2[0] = FST.ifst(F_tmp2[0], U_tmp2[0], ST)
+    #dU = FST.fss(U_tmp2[0], dU, SN)
+    
     dU[p_slice] *= -1./dt    
     return dU
 
@@ -124,6 +135,52 @@ def standardConvection(c):
     c *= -1
     return c
 
+
+def standardConvection2(c):
+    c[:] = 0
+    U_tmp[:] = 0
+    
+    # dudx = 0 from continuity equation. Use Shen Dirichlet basis
+    # Use regular Chebyshev basis for dvdx and dwdx
+    #F_tmp[0] = CDD.matvec(U_hat0[0])
+    #F_tmp[0] = TDMASolverD(F_tmp[0])    
+    #dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)        
+    
+    SFTc.Mult_CTD_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
+    dvdx = U_tmp[1] = FST.ifct(F_tmp[1], U_tmp[1], ST)
+    dwdx = U_tmp[2] = FST.ifct(F_tmp[2], U_tmp[2], ST)
+    
+    #dudx = U_tmp[0] = chebDerivative_3D0(U0[0], U_tmp[0])
+    #dvdx = U_tmp[1] = chebDerivative_3D0(U0[1], U_tmp[1])
+    #dwdx = U_tmp[2] = chebDerivative_3D0(U0[2], U_tmp[2])    
+    
+    U_tmp2[:] = 0
+    dvdy_h = 1j*K[1]*U_hat0[1]
+    dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], ST)
+    dvdz_h = 1j*K[2]*U_hat0[1]
+    dvdz = U_tmp2[1] = FST.ifst(dvdz_h, U_tmp2[1], ST)
+    c[1] = FST.fss(U0[0]*dvdx + U0[1]*dvdy + U0[2]*dvdz, c[1], ST)
+    dudx = -dvdy.copy()
+    
+    U_tmp2[:] = 0
+    dwdy_h = 1j*K[1]*U_hat0[2]
+    dwdy = U_tmp2[0] = FST.ifst(dwdy_h, U_tmp2[0], ST)
+    dwdz_h = 1j*K[2]*U_hat0[2]
+    dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
+    c[2] = FST.fss(U0[0]*dwdx + U0[1]*dwdy + U0[2]*dwdz, c[2], ST)
+    dudx -= dwdz
+    
+    U_tmp2[:] = 0
+    dudy_h = 1j*K[1]*U_hat0[0]
+    dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], ST)
+    dudz_h = 1j*K[2]*U_hat0[0]
+    dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], ST)
+    c[0] = FST.fss(U0[0]*dudx + U0[1]*dudy + U0[2]*dudz, c[0], ST)
+    
+    c *= -1
+    return c
+
+
 def divergenceConvection(c, add=False):
     """c_i = div(u_i u_j)"""
     if not add: 
@@ -167,6 +224,8 @@ def ComputeRHS(dU, jj):
     if jj == 0:
         if config.convection == "Standard":
             conv0[:] = standardConvection(conv0) 
+        elif config.convection == "Standard2":
+            conv0[:] = standardConvection2(conv0) 
         elif config.convection == "Divergence":
             conv0[:] = divergenceConvection(conv0)
         elif config.convection == "Skew":
@@ -184,7 +243,7 @@ def ComputeRHS(dU, jj):
     dU[:3] *= dealias    
     
     # Add pressure gradient and body force
-    dU = pressuregrad(P_hat, dU)
+    dU = pressuregrad(P, P_hat, dU)
     dU = body_force(Sk, dU)
     
     # Scale by 2/nu factor
@@ -283,7 +342,8 @@ def solve():
                  
         # Update velocity
         dU[:] = 0
-        pressuregrad(Pcorr, dU)        
+        U_tmp[0] = FST.ifst(Pcorr, U_tmp[0], SN)
+        pressuregrad(U_tmp[0], Pcorr, dU)        
         dU[0] = TDMASolverD(dU[0])
         dU[1] = TDMASolverD(dU[1])
         dU[2] = TDMASolverD(dU[2])
