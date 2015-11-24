@@ -30,7 +30,7 @@ BC1 = array([1,0,0, 1,0,0])
 BC2 = array([0,1,0, 0,1,0])
 BC3 = array([0,1,0, 1,0,0])
 ST = ShenBasis(BC1, quad="GL")
-SN = ShenBasis(BC2, quad="GL")
+SN = ShenBasis(BC2, quad="GC")
 SR = ShenBasis(BC3, quad="GC")
 
 points, weights = ST.points_and_weights(N[0])
@@ -70,9 +70,9 @@ def wavenumbers(N):
             return kk[0]
 
 def chebNormalizationFactor(N, quad):
-    if quad == "GL":
+    if quad == "GC":
 	ck = ones(N[0]-2); ck[0] = 2
-    elif quad == "GC":
+    elif quad == "GL":
 	ck = ones(N[0]-2); ck[0] = 2; ck[-1] = 2
     return ck
 
