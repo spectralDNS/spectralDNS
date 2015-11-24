@@ -45,6 +45,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     #U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
     #U[0] = 0.00001*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
 
+    U[:] = 0
     U[:] = 0.001*random.randn(*U.shape)
     for i in range(3):
         U_hat[i] = FST.fst(U[i], U_hat[i], ST)    
@@ -355,4 +356,3 @@ if __name__ == "__main__":
     solver.stats = Stats(solver.U, solver.comm, filename="MKMstats")
     solver.solve()
     s = solver.stats.get_stats()
-    

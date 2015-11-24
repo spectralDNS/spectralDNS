@@ -162,6 +162,24 @@ def Cross(a, b, c):
     c[2] = FST.fss(a[0]*b[1]-a[1]*b[0], c[2], ST)
     return c
 
+def Curl(a, c, S):
+    F_tmp[:] = 0
+    U_tmp[:] = 0
+    F_tmp[1] = SFTc.C_matvec(K[0,:,0,0],Cmat,U_hat0[1], F_tmp[1])
+    F_tmp[2] = SFTc.C_matvec(K[0,:,0,0],Cmat,U_hat0[2], F_tmp[2])
+    F_tmp2[1] = SFTc.UTDMA(a_k, b_k, F_tmp[1],F_tmp2[1])  
+    F_tmp2[2] = SFTc.UTDMA(a_k, b_k, F_tmp[2], F_tmp2[2])  
+    dvdx = U_tmp4[1] = FST.ifct(F_tmp2[1], U_tmp4[1], ST)
+    dwdx = U_tmp4[2] = FST.ifct(F_tmp2[2], U_tmp4[2], ST)  
+    
+    c[0] = FST.ifst(1j*K[1]*a[2] - 1j*K[2]*a[1], c[0], S)
+    c[1] = FST.ifst(1j*K[2]*a[0], c[1], S)
+    c[1] -= dwdx
+    c[2] = FST.ifst(1j*K[1]*a[0], c[2], S)
+    c[2] *= -1.0
+    c[2] += dvdx
+    return c
+
 def standardConvection(c):
     c[:] = 0
     U_tmp4[:] = 0

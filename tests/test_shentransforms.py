@@ -14,7 +14,7 @@ from sympy import chebyshevt, Symbol, sin, cos, pi
 import numpy as np
 import scipy.sparse.linalg as la
 
-N = 10
+N = 12
 x = Symbol("x")
 
 @pytest.fixture(params=("NGC", "NGL", "DGC", "DGL", "CGC", "CGL"))
@@ -471,7 +471,7 @@ def test_CTDmat(SDST):
 
 def test_Mult_Div():
     
-    SD = ShenDirichletBasis("GL")
+    SD = ShenDirichletBasis("GC")
     SN = ShenDirichletBasis("GC")
     
     Cm = CNDmat(np.arange(N).astype(np.float))
@@ -488,33 +488,36 @@ def test_Mult_Div():
     
     uk0 = SD.fst(uk, uk0)
     uk  = SD.ifst(uk0, uk)
+    uk0 = SD.fst(uk, uk0)
     vk0 = SD.fst(vk, vk0)
     vk  = SD.ifst(vk0, vk)
+    vk0 = SD.fst(vk, vk0)
     wk0 = SD.fst(wk, wk0)
     wk  = SD.ifst(wk0, wk)
+    wk0 = SD.fst(wk, wk0)
 
-    SFTc.Mult_Div_1D(N, 7, 7, uk[:N-2], vk[:N-2], wk[:N-2], b[1:N-2])
+    SFTc.Mult_Div_1D(N, 7, 7, uk0[:N-2], vk0[:N-2], wk0[:N-2], b[1:N-2])
         
-    uu = Cm.matvec(uk)
-    uu += 1j*7*Bm.matvec(vk) + 1j*7*Bm.matvec(wk)
-    
-    assert np.allclose(uu, b)
-    
-    uk = uk.repeat(4*4).reshape((N,4,4)) + 1j*uk.repeat(4*4).reshape((N,4,4))
-    vk = vk.repeat(4*4).reshape((N,4,4)) + 1j*vk.repeat(4*4).reshape((N,4,4))
-    wk = wk.repeat(4*4).reshape((N,4,4)) + 1j*wk.repeat(4*4).reshape((N,4,4))
-    b = np.zeros((N,4,4), dtype=np.complex)
-    m = np.zeros((4,4))+7
-    n = np.zeros((4,4))+7
-    SFTc.Mult_Div_3D(N, m, n, uk[:N-2], vk[:N-2], wk[:N-2], b[1:N-2])
-    
-    uu = Cm.matvec(uk)
-    uu += 1j*7*Bm.matvec(vk) + 1j*7*Bm.matvec(wk)
+    uu = Cm.matvec(uk0)
+    uu += 1j*7*Bm.matvec(vk0) + 1j*7*Bm.matvec(wk0)
     
     #from IPython import embed; embed()
     assert np.allclose(uu, b)
+    
+    uk0 = uk0.repeat(4*4).reshape((N,4,4)) + 1j*uk0.repeat(4*4).reshape((N,4,4))
+    vk0 = vk0.repeat(4*4).reshape((N,4,4)) + 1j*vk0.repeat(4*4).reshape((N,4,4))
+    wk0 = wk0.repeat(4*4).reshape((N,4,4)) + 1j*wk0.repeat(4*4).reshape((N,4,4))
+    b = np.zeros((N,4,4), dtype=np.complex)
+    m = np.zeros((4,4))+7
+    n = np.zeros((4,4))+7
+    SFTc.Mult_Div_3D(N, m, n, uk0[:N-2], vk0[:N-2], wk0[:N-2], b[1:N-2])
+    
+    uu = Cm.matvec(uk0)
+    uu += 1j*7*Bm.matvec(vk0) + 1j*7*Bm.matvec(wk0)
+    
+    assert np.allclose(uu, b)
 
-#test_Mult_Div()
+test_Mult_Div()
 
 def test_ADDmat(ST2):
     M = 2*N

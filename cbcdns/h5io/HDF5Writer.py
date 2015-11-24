@@ -14,7 +14,7 @@ try:
     import h5py
     class HDF5Writer(object):
     
-        def __init__(self, comm, dtype, comps, filename="U.h5", mesh={}):
+        def __init__(self, comm, dtype, comps, filename="U.h5", mesh={}, fromfile=None):
             self.comm = comm
             self.components = comps
             self.fname = filename
