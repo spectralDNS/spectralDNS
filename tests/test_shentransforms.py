@@ -509,7 +509,7 @@ def test_Mult_Div():
     wk0 = wk0.repeat(4*4).reshape((N,4,4)) + 1j*wk0.repeat(4*4).reshape((N,4,4))
     b = np.zeros((N,4,4), dtype=np.complex)
     m = np.zeros((4,4))+7
-    n = np.zeros((4,4))+7
+    n = np.zeros((4,4))+7 
     SFTc.Mult_Div_3D(N, m, n, uk0[:N-2], vk0[:N-2], wk0[:N-2], b[1:N-2])
     
     uu = Cm.matvec(uk0)

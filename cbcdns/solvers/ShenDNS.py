@@ -65,12 +65,18 @@ def body_force(Sk, dU):
     dU[2, :Nu] -= Sk[2, :Nu]
     return dU
 
+def Cross(a, b, c):
+    c[0] = FST.fss(a[1]*b[2]-a[2]*b[1], c[0], ST)
+    c[1] = FST.fss(a[2]*b[0]-a[0]*b[2], c[1], ST)
+    c[2] = FST.fss(a[0]*b[1]-a[1]*b[0], c[2], ST)
+    return c
+
 def Curl(a, c, S):
     F_tmp[:] = 0
-    U_tmp[:] = 0
+    U_tmp2[:] = 0
     SFTc.Mult_CTD_3D(N[0], a[1], a[2], F_tmp[1], F_tmp[2])
-    dvdx = U_tmp[1] = FST.ifct(F_tmp[1], U_tmp[1], ST)
-    dwdx = U_tmp[2] = FST.ifct(F_tmp[2], U_tmp[2], ST)
+    dvdx = U_tmp2[1] = FST.ifct(F_tmp[1], U_tmp2[1], S)
+    dwdx = U_tmp2[2] = FST.ifct(F_tmp[2], U_tmp2[2], S)
     c[0] = FST.ifst(1j*K[1]*a[2] - 1j*K[2]*a[1], c[0], S)
     c[1] = FST.ifst(1j*K[2]*a[0], c[1], S)
     c[1] -= dwdx
@@ -94,99 +100,93 @@ def Div(a_hat):
     return dudx+dvdy+dwdz
 
 #@profile
-def standardConvection(c):
+def standardConvection(c, U, U_hat):
     c[:] = 0
     U_tmp[:] = 0
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = CDD.matvec(U_hat0[0])
+    F_tmp[0] = CDD.matvec(U_hat[0])
     F_tmp[0] = TDMASolverD(F_tmp[0])    
     dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)        
     
-    SFTc.Mult_CTD_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
+    SFTc.Mult_CTD_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
     dvdx = U_tmp[1] = FST.ifct(F_tmp[1], U_tmp[1], ST)
     dwdx = U_tmp[2] = FST.ifct(F_tmp[2], U_tmp[2], ST)
     
-    #dudx = U_tmp[0] = chebDerivative_3D0(U0[0], U_tmp[0])
-    #dvdx = U_tmp[1] = chebDerivative_3D0(U0[1], U_tmp[1])
-    #dwdx = U_tmp[2] = chebDerivative_3D0(U0[2], U_tmp[2])    
+    #dudx = U_tmp[0] = chebDerivative_3D0(U[0], U_tmp[0])
+    #dvdx = U_tmp[1] = chebDerivative_3D0(U[1], U_tmp[1])
+    #dwdx = U_tmp[2] = chebDerivative_3D0(U[2], U_tmp[2])    
     
     U_tmp2[:] = 0
-    dudy_h = 1j*K[1]*U_hat0[0]
+    dudy_h = 1j*K[1]*U_hat[0]
     dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], ST)
-    dudz_h = 1j*K[2]*U_hat0[0]
+    dudz_h = 1j*K[2]*U_hat[0]
     dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], ST)
-    c[0] = FST.fss(U0[0]*dudx + U0[1]*dudy + U0[2]*dudz, c[0], ST)
+    c[0] = FST.fss(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST)
     
     U_tmp2[:] = 0
-    dvdy_h = 1j*K[1]*U_hat0[1]
+    dvdy_h = 1j*K[1]*U_hat[1]
     dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], ST)
-    dvdz_h = 1j*K[2]*U_hat0[1]
+    dvdz_h = 1j*K[2]*U_hat[1]
     dvdz = U_tmp2[1] = FST.ifst(dvdz_h, U_tmp2[1], ST)
-    c[1] = FST.fss(U0[0]*dvdx + U0[1]*dvdy + U0[2]*dvdz, c[1], ST)
+    c[1] = FST.fss(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST)
     
     U_tmp2[:] = 0
-    dwdy_h = 1j*K[1]*U_hat0[2]
+    dwdy_h = 1j*K[1]*U_hat[2]
     dwdy = U_tmp2[0] = FST.ifst(dwdy_h, U_tmp2[0], ST)
-    dwdz_h = 1j*K[2]*U_hat0[2]
+    dwdz_h = 1j*K[2]*U_hat[2]
     dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
-    c[2] = FST.fss(U0[0]*dwdx + U0[1]*dwdy + U0[2]*dwdz, c[2], ST)
-    c *= -1
+    c[2] = FST.fss(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST)
     return c
 
-
-def standardConvection2(c):
+def standardConvection2(c, U, U_hat):
     c[:] = 0
     U_tmp[:] = 0
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    #F_tmp[0] = CDD.matvec(U_hat0[0])
+    #F_tmp[0] = CDD.matvec(U_hat[0])
     #F_tmp[0] = TDMASolverD(F_tmp[0])    
     #dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)        
     
-    SFTc.Mult_CTD_3D(N[0], U_hat0[1], U_hat0[2], F_tmp[1], F_tmp[2])
+    SFTc.Mult_CTD_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
     dvdx = U_tmp[1] = FST.ifct(F_tmp[1], U_tmp[1], ST)
     dwdx = U_tmp[2] = FST.ifct(F_tmp[2], U_tmp[2], ST)
     
-    #dudx = U_tmp[0] = chebDerivative_3D0(U0[0], U_tmp[0])
-    #dvdx = U_tmp[1] = chebDerivative_3D0(U0[1], U_tmp[1])
-    #dwdx = U_tmp[2] = chebDerivative_3D0(U0[2], U_tmp[2])    
+    #dudx = U_tmp[0] = chebDerivative_3D0(U[0], U_tmp[0])
+    #dvdx = U_tmp[1] = chebDerivative_3D0(U[1], U_tmp[1])
+    #dwdx = U_tmp[2] = chebDerivative_3D0(U[2], U_tmp[2])    
     
     U_tmp2[:] = 0
-    dvdy_h = 1j*K[1]*U_hat0[1]
+    dvdy_h = 1j*K[1]*U_hat[1]
     dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], ST)
-    dvdz_h = 1j*K[2]*U_hat0[1]
+    dvdz_h = 1j*K[2]*U_hat[1]
     dvdz = U_tmp2[1] = FST.ifst(dvdz_h, U_tmp2[1], ST)
-    c[1] = FST.fss(U0[0]*dvdx + U0[1]*dvdy + U0[2]*dvdz, c[1], ST)
+    c[1] = FST.fss(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST)
     dudx = -dvdy.copy()
     
     U_tmp2[:] = 0
-    dwdy_h = 1j*K[1]*U_hat0[2]
+    dwdy_h = 1j*K[1]*U_hat[2]
     dwdy = U_tmp2[0] = FST.ifst(dwdy_h, U_tmp2[0], ST)
-    dwdz_h = 1j*K[2]*U_hat0[2]
+    dwdz_h = 1j*K[2]*U_hat[2]
     dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
-    c[2] = FST.fss(U0[0]*dwdx + U0[1]*dwdy + U0[2]*dwdz, c[2], ST)
+    c[2] = FST.fss(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST)
     dudx -= dwdz
     
     U_tmp2[:] = 0
-    dudy_h = 1j*K[1]*U_hat0[0]
+    dudy_h = 1j*K[1]*U_hat[0]
     dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], ST)
-    dudz_h = 1j*K[2]*U_hat0[0]
+    dudz_h = 1j*K[2]*U_hat[0]
     dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], ST)
-    c[0] = FST.fss(U0[0]*dudx + U0[1]*dudy + U0[2]*dudz, c[0], ST)
+    c[0] = FST.fss(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST)
     
-    c *= -1
     return c
 
 
-def divergenceConvection(c, add=False):
+def divergenceConvection(c, U, U_hat, add=False):
     """c_i = div(u_i u_j)"""
-    if not add: 
-        c.fill(0)
-    else:
-        c *= -1
+    if not add: c.fill(0)
     #U_tmp[0] = chebDerivative_3D0(U[0]*U[0], U_tmp[0])
     #U_tmp[1] = chebDerivative_3D0(U[0]*U[1], U_tmp[1])
     #U_tmp[2] = chebDerivative_3D0(U[0]*U[2], U_tmp[2])
@@ -194,44 +194,75 @@ def divergenceConvection(c, add=False):
     #c[1] = fss(U_tmp[1], c[1], ST)
     #c[2] = fss(U_tmp[2], c[2], ST)
     
-    F_tmp[0] = FST.fst(U0[0]*U0[0], F_tmp[0], ST)
-    F_tmp[1] = FST.fst(U0[0]*U0[1], F_tmp[1], ST)
-    F_tmp[2] = FST.fst(U0[0]*U0[2], F_tmp[2], ST)
+    F_tmp[0] = FST.fst(U[0]*U[0], F_tmp[0], ST)
+    F_tmp[1] = FST.fst(U[0]*U[1], F_tmp[1], ST)
+    F_tmp[2] = FST.fst(U[0]*U[2], F_tmp[2], ST)
     
     c[0] += CDD.matvec(F_tmp[0])
     c[1] += CDD.matvec(F_tmp[1])
     c[2] += CDD.matvec(F_tmp[2])
     
-    F_tmp2[0] = FST.fss(U0[0]*U0[1], F_tmp2[0], ST)
-    F_tmp2[1] = FST.fss(U0[0]*U0[2], F_tmp2[1], ST)    
+    F_tmp2[0] = FST.fss(U[0]*U[1], F_tmp2[0], ST)
+    F_tmp2[1] = FST.fss(U[0]*U[2], F_tmp2[1], ST)    
     c[0] += 1j*K[1]*F_tmp2[0] # duvdy
     c[0] += 1j*K[2]*F_tmp2[1] # duwdz
     
-    F_tmp[0] = FST.fss(U0[1]*U0[1], F_tmp[0], ST)
-    F_tmp[1] = FST.fss(U0[1]*U0[2], F_tmp[1], ST)
-    F_tmp[2] = FST.fss(U0[2]*U0[2], F_tmp[2], ST)
+    F_tmp[0] = FST.fss(U[1]*U[1], F_tmp[0], ST)
+    F_tmp[1] = FST.fss(U[1]*U[2], F_tmp[1], ST)
+    F_tmp[2] = FST.fss(U[2]*U[2], F_tmp[2], ST)
     c[1] += 1j*K[1]*F_tmp[0]  # dvvdy
     c[1] += 1j*K[2]*F_tmp[1]  # dvwdz  
     c[2] += 1j*K[1]*F_tmp[1]  # dvwdy
     c[2] += 1j*K[2]*F_tmp[2]  # dwwdz
-    c *= -1
     return c    
 
+def getConvection(convection):
+    if convection == "Standard":
+        
+        def Conv(dU, U, U_hat):
+            dU = standardConvection(dU, U, U_hat)
+            dU[:] *= -1 
+            return dU
+
+    elif convection == "Standard2":
+        
+        def Conv(dU, U, U_hat):
+            dU = standardConvection(dU, U, U_hat)
+            dU[:] *= -1 
+            return dU
+        
+    elif convection == "Divergence":
+        
+        def Conv(dU, U, U_hat):
+            dU = divergenceConvection(dU, U, U_hat, False)
+            dU[:] *= -1
+            return dU
+        
+    elif convection == "Skewed":
+        
+        def Conv(dU, U, U_hat):
+            dU = standardConvection(dU, U, U_hat)
+            dU = divergenceConvection(dU, U, U_hat, True)        
+            dU *= -0.5
+            return dU
+        
+    elif convection == "Vortex":
+        
+        def Conv(dU, U, U_hat):
+            U_tmp[:] = Curl(U_hat, U_tmp, ST)
+            dU = Cross(U, U_tmp, dU)
+            return dU
+        
+    return Conv           
+
+conv = getConvection(config.convection)
+    
 #@profile
 def ComputeRHS(dU, jj):
     global conv0
     # Add convection to rhs
     if jj == 0:
-        if config.convection == "Standard":
-            conv0[:] = standardConvection(conv0) 
-        elif config.convection == "Standard2":
-            conv0[:] = standardConvection2(conv0) 
-        elif config.convection == "Divergence":
-            conv0[:] = divergenceConvection(conv0)
-        elif config.convection == "Skew":
-            conv0[:] = standardConvection2(conv0) 
-            conv0[:] = divergenceConvection(conv0, True)
-            conv0 *= 0.5
+        conv0 = conv(conv0, U0, U_hat0)
         
         # Compute diffusion
         diff0[:] = 0
@@ -254,49 +285,13 @@ def ComputeRHS(dU, jj):
         
     return dU
 
-def solvePressure(P, P_hat, U_hat):
-    global F_tmp, F_tmp2
-    U_tmp[:] = 0
-    F_tmp2[:] = 0
-    Ni = F_tmp2
-    
-    # dudx = 0 from continuity equation. Use Shen Dirichlet basis
-    # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = CDD.matvec(U_hat[0])
-    F_tmp[0] = TDMASolverD(F_tmp[0])
-    dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)      
-    
-    SFTc.Mult_CTD_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = U_tmp[1] = FST.ifct(F_tmp[1], U_tmp[1], ST)
-    dwdx = U_tmp[2] = FST.ifct(F_tmp[2], U_tmp[2], ST)
-
-    U_tmp2[:] = 0
-    dudy_h = 1j*K[1]*U_hat[0]
-    dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], ST)
-    dudz_h = 1j*K[2]*U_hat[0]
-    dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], ST)
-    Ni[0] = FST.fst(U0[0]*dudx + U0[1]*dudy + U0[2]*dudz, Ni[0], ST)
-    
-    U_tmp2[:] = 0
-    dvdy_h = 1j*K[1]*U_hat[1]
-    dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], ST)
-    dvdz_h = 1j*K[2]*U_hat[1]
-    dvdz = U_tmp2[1] = FST.ifst(dvdz_h, U_tmp2[1], ST)
-    Ni[1] = FST.fst(U0[0]*dvdx + U0[1]*dvdy + U0[2]*dvdz, Ni[1], ST)
-    
-    U_tmp2[:] = 0
-    dwdy_h = 1j*K[1]*U_hat[2]
-    dwdy = U_tmp2[0] = FST.ifst(dwdy_h, U_tmp2[0], ST)
-    dwdz_h = 1j*K[2]*U_hat[2]
-    dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
-    Ni[2] = FST.fst(U0[0]*dwdx + U0[1]*dwdy + U0[2]*dwdz, Ni[2], ST)
-    
+def solvePressure(P_hat, Ni):
+    """Solve for pressure if Ni is fst of convection"""
     F_tmp[0] = 0
     SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])    
     P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
-    P = FST.ifst(P_hat, P, SN)
+    return P_hat
 
-    
 def Divu(U, U_hat, c):
     c[:] = 0
     SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], 

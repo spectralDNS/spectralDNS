@@ -223,54 +223,12 @@ def standardConvection(c):
     c *= -1
     return c
 
-
-def solvePressure(P, P_hat, U_hat):
-  
-    U_tmp4[:] = 0
-    U_tmp3[:] = 0
-    F_tmp[:] = 0
-    F_tmp2[:] = 0
-    c = F_tmp
-
-    # dudx = 0 from continuity equation. Use Shen Dirichlet basis
-    # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = SFTc.C_matvec(K[0,:,0,0], Cmat,U_hat0[0], F_tmp[0])
-    F_tmp2[0] = SFTc.PDMA(a0, b0, c0, d0, uud, F_tmp[0], F_tmp2[0])    
-    dudx = U_tmp4[0] = FST.ifst(F_tmp2[0], U_tmp4[0], ST)        
-    
-    F_tmp[1] = SFTc.C_matvec(K[0,:,0,0],Cmat,U_hat0[1], F_tmp[1])
-    F_tmp[2] = SFTc.C_matvec(K[0,:,0,0],Cmat,U_hat0[2], F_tmp[2])
-    F_tmp2[1] = SFTc.UTDMA(a_k, b_k, F_tmp[1],F_tmp2[1])  
-    F_tmp2[2] = SFTc.UTDMA(a_k, b_k, F_tmp[2], F_tmp2[2])  
-    
-    dvdx = U_tmp4[1] = FST.ifct(F_tmp2[1], U_tmp4[1], ST)
-    dwdx = U_tmp4[2] = FST.ifct(F_tmp2[2], U_tmp4[2], ST)  
-    
-    dudy_h = 1j*K[1]*U_hat0[0]
-    dudy = U_tmp3[0] = FST.ifst(dudy_h, U_tmp3[0], ST)
-    dudz_h = 1j*K[2]*U_hat0[0]
-    dudz = U_tmp3[1] = FST.ifst(dudz_h, U_tmp3[1], ST)
-    c[0] = FST.fss(U0[0]*dudx + U0[1]*dudy + U0[2]*dudz, c[0], ST)
-    
-    U_tmp3[:] = 0
-    dvdy_h = 1j*K[1]*U_hat0[1]
-    dvdy = U_tmp3[0] = FST.ifst(dvdy_h, U_tmp3[0], ST)
-    dvdz_h = 1j*K[2]*U_hat0[1]
-    dvdz = U_tmp3[1] = FST.ifst(dvdz_h, U_tmp3[1], ST)
-    c[1] = FST.fss(U0[0]*dvdx + U0[1]*dvdy + U0[2]*dvdz, c[1], ST)
-    
-    U_tmp3[:] = 0
-    dwdy_h = 1j*K[1]*U_hat0[2]
-    dwdy = U_tmp3[0] = FST.ifst(dwdy_h, U_tmp3[0], ST)
-    dwdz_h = 1j*K[2]*U_hat0[2]
-    dwdz = U_tmp3[1] = FST.ifst(dwdz_h, U_tmp3[1], ST)
-    c[2] = FST.fss(U0[0]*dwdx + U0[1]*dwdy + U0[2]*dwdz, c[2], ST)
-    
-    F_tmp[:] = 0
-    F_tmp[0] = SFTc.Helmholtz_CB_matvec(K[0,:,0,0],C_hat, B_hat, K[1,0], K[2,0], c[0], c[1], c[2], F_tmp[0])
-    P_hat[:] = SFTc.Helmholtz_AB_Solver(K[0,:,0,0], alpha3, 1, F_tmp[0], A_breve, B_breve, P_hat)
-    P = FST.ifst(P_hat, P, SN)
-
+def solvePressure(P_hat, Ni):
+    """Solve for pressure if Ni is fst of convection"""
+    F_tmp[0] = 0
+    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])    
+    P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
+    return P_hat
 
 def ComputeRHS(dU, jj):
     # Add convection to rhs
@@ -309,6 +267,7 @@ def solve():
     while config.t < config.T-1e-8:
         config.t += dt
         config.tstep += 1
+
         # Tentative momentum solve
         for jj in range(config.velocity_pressure_iters):
             dU[:] = 0

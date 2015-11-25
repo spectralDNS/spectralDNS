@@ -1,14 +1,14 @@
 """Orr-Sommerfeld"""
 from cbcdns import config, get_solver
 from OrrSommerfeld_eig import OrrSommerfeld
-from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array
+from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array, zeros_like
 from cbcdns.fft.wrappyfftw import dct
 import matplotlib.pyplot as plt
 import warnings
 import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
-eps = 1e-4
+eps = 1e-6
 def initOS(OS, U, U_hat, X, FST, ST, t=0.):
     for i in range(U.shape[1]):
         x = X[0, i, 0, 0]
@@ -44,14 +44,20 @@ def energy(u, N, comm, rank, L):
         return 0    
 
 def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, conv1, FST,
-               ST, SN, X, N, comm, rank, L, standardConvection, dt, **kw):        
+               ST, SN, X, N, comm, rank, L, conv, dt, TDMASolverD, **kw):        
     OS = OrrSommerfeld(Re=config.Re, N=80)
     initOS(OS, U0, U_hat0, X, FST, ST)
     e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
-    conv1 = standardConvection(conv1)
+    conv1 = conv(conv1, U0, U_hat0)
     initOS(OS, U, U_hat, X, FST, ST, t=dt)
-    solvePressure(P, P_hat, 0.5*(U_hat+U_hat0))
-
+    conv2 = zeros_like(conv1)
+    conv2 = conv(conv2, U0, 0.5*(U_hat0+U_hat))  
+    for j in range(3):
+        conv2[j] = TDMASolverD(conv2[j])
+    conv2 *= -1
+    P_hat = solvePressure(P_hat, conv2)
+    
+    P = FST.ifst(P_hat, P, SN)
     U0[:] = U
     U_hat0[:] = U_hat
     config.t = dt
