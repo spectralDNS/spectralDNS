@@ -65,10 +65,10 @@ def body_force(Sk, dU):
     dU[2, :Nu] -= Sk[2, :Nu]
     return dU
 
-def Cross(a, b, c):
-    c[0] = FST.fss(a[1]*b[2]-a[2]*b[1], c[0], ST)
-    c[1] = FST.fss(a[2]*b[0]-a[0]*b[2], c[1], ST)
-    c[2] = FST.fss(a[0]*b[1]-a[1]*b[0], c[2], ST)
+def Cross(a, b, c, S):
+    c[0] = FST.fss(a[1]*b[2]-a[2]*b[1], c[0], S)
+    c[1] = FST.fss(a[2]*b[0]-a[0]*b[2], c[1], S)
+    c[2] = FST.fss(a[0]*b[1]-a[1]*b[0], c[2], S)
     return c
 
 def Curl(a, c, S):
@@ -250,7 +250,7 @@ def getConvection(convection):
         
         def Conv(dU, U, U_hat):
             U_tmp[:] = Curl(U_hat, U_tmp, ST)
-            dU = Cross(U, U_tmp, dU)
+            dU = Cross(U, U_tmp, dU, ST)
             return dU
         
     return Conv           
