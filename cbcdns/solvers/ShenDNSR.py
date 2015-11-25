@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
 from ShenDNS import *
-from ..shen.Matrices import CDTmat, CTDmat, BDTmat, BTDmat, BTTmat, BTNmat
+from ..shen.Matrices import CDTmat, CTDmat, BDTmat, BTDmat, BTTmat, BTNmat, CNDmat, BNDmat
 
 hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5", 
                       mesh={"x": points, "xp": pointsp, "y": x1, "z": x2})  
@@ -16,6 +16,8 @@ BDT = BDTmat(K[0, :, 0, 0], ST.quad)
 BTD = BTDmat(K[0, :, 0, 0], SN.quad)
 BTT = BTTmat(K[0, :, 0, 0], SN.quad)
 BTN = BTNmat(K[0, :, 0, 0], SN.quad)
+CND = CNDmat(K[0, :, 0, 0])
+BND = BNDmat(K[0, :, 0, 0], SN.quad)
 
 dd = BTT.dd.repeat(array(P_hat.shape[1:]).prod()).reshape(P_hat.shape)
 
@@ -25,8 +27,8 @@ def pressuregrad(P_hat, dU):
     dU[0] -= CDT.matvec(P_hat)
     
     # pressure gradient y-direction
-    F_tmp[0] = FST.fss(P, F_tmp[0], ST)
-    #F_tmp[0] = BDT.matvec(P_hat)
+    #F_tmp[0] = FST.fss(P, F_tmp[0], ST)
+    F_tmp[0] = BDT.matvec(P_hat)
     
     dU[1, :Nu] -= 1j*K[1, :Nu]*F_tmp[0, :Nu]
     
@@ -91,6 +93,15 @@ def Divu(U, U_hat, c):
     return c
 
 def updatepressure(P_hat, Pcorr, U_hat):
+    #F_tmp[2] = 0
+    #F_tmp[2] = CND.matvec(U_hat[0])
+    #F_tmp[2] += 1j*K[1]*BND.matvec(U_hat[1])
+    #F_tmp[2] += 1j*K[2]*BND.matvec(U_hat[2])
+    #F_tmp[2] = TDMASolverN(F_tmp[2])
+    ##U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], SN)
+    #P_hat += BTN.matvec(Pcorr)/dd
+    #P_hat -= nu*BTN.matvec(F_tmp[2])/dd
+    
     P_hat += BTN.matvec(Pcorr)/dd
     P_hat -= nu*CTD.matvec(U_hat[0])/dd
     P_hat -= nu*1j*K[1]*BTD.matvec(U_hat[1])/dd
@@ -130,7 +141,7 @@ def solve():
         dU[1] = TDMASolverD(dU[1])
         dU[2] = TDMASolverD(dU[2])
         
-        U_hat[:3, u_slice] += dt*dU[:3, u_slice]  # + since pressuregrad computes negative pressure gradient
+        #U_hat[:3, u_slice] += dt*dU[:3, u_slice]  # + since pressuregrad computes negative pressure gradient
 
         for i in range(3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)

@@ -224,7 +224,7 @@ def standardConvection(c):
     return c
 
 
-def solvePressure(P_hat, U_hat):
+def solvePressure(P, P_hat, U_hat):
   
     U_tmp4[:] = 0
     U_tmp3[:] = 0
@@ -269,8 +269,7 @@ def solvePressure(P_hat, U_hat):
     F_tmp[:] = 0
     F_tmp[0] = SFTc.Helmholtz_CB_matvec(K[0,:,0,0],C_hat, B_hat, K[1,0], K[2,0], c[0], c[1], c[2], F_tmp[0])
     P_hat[:] = SFTc.Helmholtz_AB_Solver(K[0,:,0,0], alpha3, 1, F_tmp[0], A_breve, B_breve, P_hat)
-    
-    return P_hat
+    P = FST.ifst(P_hat, P, SN)
 
 
 def ComputeRHS(dU, jj):

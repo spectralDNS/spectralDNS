@@ -229,7 +229,7 @@ def ComputeRHS(dU, jj):
         elif config.convection == "Divergence":
             conv0[:] = divergenceConvection(conv0)
         elif config.convection == "Skew":
-            conv0[:] = standardConvection(conv0) 
+            conv0[:] = standardConvection2(conv0) 
             conv0[:] = divergenceConvection(conv0, True)
             conv0 *= 0.5
         

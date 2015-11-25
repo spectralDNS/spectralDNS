@@ -144,7 +144,7 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     Np = N / num_processes
 
     # Get points and weights for Chebyshev weighted integrals
-    ST = ShenDirichletBasis(quad="GC")
+    ST = ShenDirichletBasis(quad="GL")
     SN = ShenNeumannBasis(quad="GC")
     points, weights = ST.points_and_weights(N[0])
     pointsp, weightsp = SN.points_and_weights(N[0])
@@ -202,7 +202,7 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
-    kmax[0] = N[0]*2./3.
+    kmax[0] = N[0]
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
     
@@ -311,8 +311,8 @@ def setupShenGeneralBCs(comm, float, complex, mpitype, N, L, mgrid,
     # Get points and weights for Chebyshev weighted integrals
     BC1 = array([1,0,0, 1,0,0])
     BC2 = array([0,1,0, 0,1,0])
-    ST = ShenBasis(BC1, quad="GC")
-    SN = ShenBasis(BC2, quad="GL")
+    ST = ShenBasis(BC1, quad="GL")
+    SN = ShenBasis(BC2, quad="GC")
     points, weights = ST.points_and_weights(N[0])
     pointsp, weightsp = SN.points_and_weights(N[0])
 
