@@ -12,7 +12,7 @@ assert config.precision == "double"
 hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5", 
                       mesh={"x": points, "xp": pointsp, "y": x1, "z": x2})  
 
-HelmholtzSolverU = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), "GL", False)
+HelmholtzSolverU = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), ST.quad, False)
 HelmholtzSolverP = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2), SN.quad, True)
 TDMASolverD = TDMA(ST.quad, False)
 TDMASolverN = TDMA(SN.quad, True)
@@ -321,8 +321,8 @@ def solve():
             U_hat[2] = HelmholtzSolverU(U_hat[2], dU[2])
         
             # Pressure correction
-            dU[3] = pressurerhs(U_hat, dU[3]) 
-            Pcorr[:] = HelmholtzSolverP(Pcorr, dU[3])
+            F_tmp[0] = pressurerhs(U_hat, F_tmp[0]) 
+            Pcorr[:] = HelmholtzSolverP(Pcorr, F_tmp[0])
 
             # Update pressure
             P_hat[p_slice] += Pcorr[p_slice]
@@ -342,7 +342,7 @@ def solve():
         dU[0] = TDMASolverD(dU[0])
         dU[1] = TDMASolverD(dU[1])
         dU[2] = TDMASolverD(dU[2])
-        U_hat[:3, u_slice] += dt*dU[:3, u_slice]  # + since pressuregrad computes negative pressure gradient
+        U_hat[:, u_slice] += dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
 
         for i in range(3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)

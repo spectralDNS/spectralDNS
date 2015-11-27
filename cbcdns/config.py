@@ -37,9 +37,10 @@ Isotropic.add_argument('--L', default=[2*pi, 2*pi, 2*pi], nargs='+', help='Physi
 
 # Arguments for Shen based solver with one inhomogeneous direction
 Shen = argparse.ArgumentParser(parents=[parser])
-Shen.add_argument('--solver', default='IPCS', choices=('IPCS','IPCSR'), help="""Choose solver.""")
+Shen.add_argument('--solver', default='IPCS', choices=('IPCS','IPCSR', 'ChannelRK4'), help="""Choose solver.""")
 Shen.add_argument('--convection', default='Standard', choices=('Standard', 'Standard2', 'Divergence', 'Skew', 'Vortex'))
 Shen.add_argument('--L', default=[2, 2*pi, 2*pi], nargs='+', help='Physical mesh size')
+Shen.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2'))
 Shen.add_argument('--velocity_pressure_iters', default=1, type=int, help="Number of inner velocity pressure iterations")
 Shen.add_argument('--print_divergence_progress', default=False, help="Print the norm of the pressure correction on inner iterations")
 

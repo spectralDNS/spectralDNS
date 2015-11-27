@@ -48,20 +48,25 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, conv1, FST,
     OS = OrrSommerfeld(Re=config.Re, N=80)
     initOS(OS, U0, U_hat0, X, FST, ST)
     e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
-    conv1 = conv(conv1, U0, U_hat0)
-    initOS(OS, U, U_hat, X, FST, ST, t=dt)
-    conv2 = zeros_like(conv1)
-    conv2 = conv(conv2, U0, 0.5*(U_hat0+U_hat))  
-    for j in range(3):
-        conv2[j] = TDMASolverD(conv2[j])
-    conv2 *= -1
-    P_hat = solvePressure(P_hat, conv2)
+    if not config.solver == "ChannelRK4":
+        conv1 = conv(conv1, U0, U_hat0)
+        initOS(OS, U, U_hat, X, FST, ST, t=dt)
+        conv2 = zeros_like(conv1)
+        conv2 = conv(conv2, U0, 0.5*(U_hat0+U_hat))  
+        for j in range(3):
+            conv2[j] = TDMASolverD(conv2[j])
+        conv2 *= -1
+        P_hat = solvePressure(P_hat, conv2)
+
+        P = FST.ifst(P_hat, P, SN)
+        U0[:] = U
+        U_hat0[:] = U_hat
+        config.t = dt
+        config.tstep = 1
+    else:
+        U[:] = U0[:]
+        U_hat[:] = U_hat0[:]
     
-    P = FST.ifst(P_hat, P, SN)
-    U0[:] = U
-    U_hat0[:] = U_hat
-    config.t = dt
-    config.tstep = 1
     return dict(OS=OS, e0=e0)
 
 def set_Source(Source, Sk, FST, ST, **kw):
@@ -71,9 +76,9 @@ def set_Source(Source, Sk, FST, ST, **kw):
     for i in range(3):
         Sk[i] = FST.fss(Source[i], Sk[i], ST)
 
-def update(rank, X, U, P, OS, N, comm, L, e0, **kw):
+def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, **kw):
     global im1, im2, im3, im4
-    if config.tstep == 2 and rank == 0 and config.plot_step > 0:
+    if config.tstep <= 2 and rank == 0 and config.plot_step > 0:
         plt.figure()
         im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
         plt.colorbar(im1)
@@ -114,8 +119,11 @@ def update(rank, X, U, P, OS, N, comm, L, e0, **kw):
         pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
         e1 = 0.5*energy(pert, N, comm, rank, L)
         exact = exp(2*imag(OS.eigval)*(config.t))
+        initOS(OS, U_tmp, F_tmp, X, FST, ST, t=config.t)
+        pert = (U[0] - U_tmp[0])**2 + (U[1]-U_tmp[1])**2
+        e2 = 0.5*energy(pert, N, comm, rank, L)
         if rank == 0:
-            print "Time %2.5f Norms %2.12e %2.12e %2.12e" %(config.t, e1/e0, exact, e1/e0-exact)
+            print "Time %2.5f Norms %2.12e %2.12e %2.12e %2.12e" %(config.t, e1/e0, exact, e1/e0-exact, sqrt(e2))
 
 def regression_test(U, X, OS, N, comm, rank, L, e0, FST, ST, U0, U_hat0,**kw):
     #pert = (U[1] - (1-X[0]**2))**2 + U[0]**2

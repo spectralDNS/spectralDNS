@@ -144,7 +144,7 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     Np = N / num_processes
 
     # Get points and weights for Chebyshev weighted integrals
-    ST = ShenDirichletBasis(quad="GL")
+    ST = ShenDirichletBasis(quad="GC")
     SN = ShenNeumannBasis(quad="GC")
     points, weights = ST.points_and_weights(N[0])
     pointsp, weightsp = SN.points_and_weights(N[0])
@@ -178,7 +178,7 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     F_tmp   = empty((3,)+FST.complex_shape(), dtype=complex)
     F_tmp2  = empty((3,)+FST.complex_shape(), dtype=complex)
 
-    dU      = empty((4,)+FST.complex_shape(), dtype=complex)
+    dU      = empty((3,)+FST.complex_shape(), dtype=complex)
 
     conv0   = empty((3,)+FST.complex_shape(), dtype=complex)
     conv1   = empty((3,)+FST.complex_shape(), dtype=complex)
@@ -397,6 +397,7 @@ setup = {"MHD": setupMHD,
          "VV":  setupDNS,
          "IPCS": setupShen,
          "IPCSR": setupShen,
+         "ChannelRK4": setupShen,
          "IPCS_MHD": setupShenMHD,
          "IPCS_GeneralBCs": setupShenGeneralBCs}[config.solver]        
 
