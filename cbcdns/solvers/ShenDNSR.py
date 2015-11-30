@@ -63,28 +63,20 @@ def solvePressure(P_hat, Ni):
     P_hat  = FST.fct(P, P_hat, SN)
     return P_hat
 
-def Divu(U, U_hat, c):
-    c[:] = 0
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], 
-                       U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], c[p_slice])
-    c = TDMASolverN(c)
-        
-    return c
-
 def updatepressure(P_hat, Pcorr, U_hat):
-    #F_tmp[2] = 0
-    #F_tmp[2] = CND.matvec(U_hat[0])
-    #F_tmp[2] += 1j*K[1]*BND.matvec(U_hat[1])
-    #F_tmp[2] += 1j*K[2]*BND.matvec(U_hat[2])
-    #F_tmp[2] = TDMASolverN(F_tmp[2])
-    ##U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], SN)
-    #P_hat += BTN.matvec(Pcorr)/dd
-    #P_hat -= nu*BTN.matvec(F_tmp[2])/dd
-    
+    F_tmp[2] = 0
+    F_tmp[2] = CND.matvec(U_hat[0])
+    F_tmp[2] += 1j*K[1]*BND.matvec(U_hat[1])
+    F_tmp[2] += 1j*K[2]*BND.matvec(U_hat[2])
+    F_tmp[2] = TDMASolverN(F_tmp[2])
+    #U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], SN)
     P_hat += BTN.matvec(Pcorr)/dd
-    P_hat -= nu*CTD.matvec(U_hat[0])/dd
-    P_hat -= nu*1j*K[1]*BTD.matvec(U_hat[1])/dd
-    P_hat -= nu*1j*K[2]*BTD.matvec(U_hat[2])/dd
+    P_hat -= nu*BTN.matvec(F_tmp[2])/dd
+    
+    #P_hat += BTN.matvec(Pcorr)/dd
+    #P_hat -= nu*CTD.matvec(U_hat[0])/dd
+    #P_hat -= nu*1j*K[1]*BTD.matvec(U_hat[1])/dd
+    #P_hat -= nu*1j*K[2]*BTD.matvec(U_hat[2])/dd
 
 #@profile
 def solve():
@@ -119,7 +111,7 @@ def solve():
         dU[0] = TDMASolverD(dU[0])
         dU[1] = TDMASolverD(dU[1])
         dU[2] = TDMASolverD(dU[2])        
-        U_hat[:3, u_slice] += dt*dU[:3, u_slice]  # + since pressuregrad computes negative pressure gradient
+        U_hat[:, u_slice] += dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
 
         for i in range(3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)

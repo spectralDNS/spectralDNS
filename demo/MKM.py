@@ -142,7 +142,10 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, conv1,
     for i in range(3):
         U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
     
-    P_hat = FST.fst(P, P_hat, SN)
+    if config.solver == "IPCSR":
+        P_hat = FST.fct(P, P_hat, SN)
+    else:
+        P_hat = FST.fst(P, P_hat, SN)
     f.close()
 
 def set_Source(Source, Sk, ST, FST, **kw):
@@ -358,8 +361,9 @@ if __name__ == "__main__":
     config.Shen.add_argument("--sample_stats", type=int, default=100)
     solver = get_solver(update=update, family="Shen")    
     #initialize(**vars(solver))    
-    init_from_file("IPCS.h5", **vars(solver))
+    init_from_file("IPCS2.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="MKMstats")
+    solver.hdf5file.fname = "IPCSRR.h5"
     solver.solve()
     s = solver.stats.get_stats()

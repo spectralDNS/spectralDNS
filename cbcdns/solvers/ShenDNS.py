@@ -91,13 +91,19 @@ def Div(a_hat):
     F_tmp[0] = CDD.matvec(a_hat[0])
     F_tmp[0] = TDMASolverD(F_tmp[0])    
     dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST) 
-    F_tmp[1] = BDD.matvec(a_hat[1])
-    dvdy_h = 1j*K[1]*F_tmp[1]
+    dvdy_h = 1j*K[1]*a_hat[1]
     dvdy = U_tmp[1] = FST.ifst(dvdy_h, U_tmp[1], ST)
-    F_tmp[2] = BDD.matvec(a_hat[2])
-    dwdz_h = 1j*K[2]*F_tmp[2]
+    dwdz_h = 1j*K[2]*a_hat[2]
     dwdz = U_tmp[2] = FST.ifst(dwdz_h, U_tmp[2], ST)
     return dudx+dvdy+dwdz
+
+def Divu(U_hat, c):
+    c[:] = 0
+    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], 
+                       U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], c[p_slice])
+    c = TDMASolverN(c)
+        
+    return c
 
 #@profile
 def standardConvection(c, U, U_hat):
@@ -118,6 +124,8 @@ def standardConvection(c, U, U_hat):
     #dvdx = U_tmp[1] = chebDerivative_3D0(U[1], U_tmp[1])
     #dwdx = U_tmp[2] = chebDerivative_3D0(U[2], U_tmp[2])    
     
+    U_tmp3[0] = dudx[:]
+    
     U_tmp2[:] = 0
     dudy_h = 1j*K[1]*U_hat[0]
     dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], ST)
@@ -131,6 +139,7 @@ def standardConvection(c, U, U_hat):
     dvdz_h = 1j*K[2]*U_hat[1]
     dvdz = U_tmp2[1] = FST.ifst(dvdz_h, U_tmp2[1], ST)
     c[1] = FST.fss(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST)
+    U_tmp3[1] = dvdy[:]
     
     U_tmp2[:] = 0
     dwdy_h = 1j*K[1]*U_hat[2]
@@ -138,6 +147,7 @@ def standardConvection(c, U, U_hat):
     dwdz_h = 1j*K[2]*U_hat[2]
     dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
     c[2] = FST.fss(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST)
+    U_tmp3[2] = dwdz[:]
     return c
 
 def standardConvection2(c, U, U_hat):
@@ -292,15 +302,6 @@ def solvePressure(P_hat, Ni):
     P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
     return P_hat
 
-def Divu(U, U_hat, c):
-    c[:] = 0
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], 
-                       U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], c[p_slice])
-    #c[p_slice] = SFTc.TDMA_3D(a0N, b0N, bcN, c0N, c[p_slice])
-    c = TDMASolverN(c)
-        
-    return c
-
 def regression_test(**kw):
     pass
 
@@ -326,11 +327,15 @@ def solve():
 
             # Update pressure
             P_hat[p_slice] += Pcorr[p_slice]
+            
 
-            if jj == 0 and config.print_divergence_progress:
+            if jj == 0 and config.print_divergence_progress and rank == 0:
                 print "   Divergence error"
             if config.print_divergence_progress:
-                print "         Pressure correction norm %2.6e" %(linalg.norm(Pcorr))
+                dp = zeros(1)
+                comm.Reduce(linalg.norm(Pcorr), dp)
+                if rank == 0:                
+                    print "         Pressure correction norm %2.6e" %(dp[0])
 
         for i in range(3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)
