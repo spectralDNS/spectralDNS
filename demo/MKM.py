@@ -36,10 +36,10 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     alfaplus = 2*pi/500.
     betaplus = 2*pi/200.
     sigma = 0.00055
-    epsilon = Um/2000. #Um/200.
+    epsilon = Um/200. #Um/200.
     U[:] = 0
     U[1] = Um*(Y-0.5*Y**2)
-    dev = 1+0.00000*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dev = 1+0.0001*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
     dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
     U[1] += dd
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
@@ -120,6 +120,31 @@ def initialize2(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, SN, ST, X, Curl, **kw
     P_hat = fst(P, P_hat, SN)
     U0[:] = U[:]
     U_hat0[:] = U_hat[:]
+
+def initialize3(U, U_hat, U0, U_hat0, P, P_hat, FST, SN, ST, X, Curl, F_tmp, CDD, K, 
+                TDMASolverD, U_tmp, **kw):
+    Y = where(X[0]<0, 1+X[0], 1-X[0])
+    utau = config.nu * config.Re_tau
+    Um = 46.9091*utau
+    U_tmp[0] = exp(-((X[0]-0.1)**2+(X[1]-2*pi+pi/4)**2)/(0.2)) \
+       +    exp(-((X[0]-0.1)**2+(X[1]-2*pi-pi/4)**2)/(0.2)) \
+       -0.5*exp(-((X[0]-0.1-0.2)**2+(X[1]-2*pi-pi/4)**2)/(0.4))
+    
+    w_hat = U_hat[0].copy()
+    w_hat = FST.fst(U_tmp[0], w_hat, ST)
+    F_tmp[0] = CDD.matvec(w_hat)
+    F_tmp[0] = TDMASolverD(F_tmp[0])  
+    U[:] = 0
+    U[1] = FST.ifst(F_tmp[0], U[0], ST) 
+    U[1] *= 0.1
+    U[1] += Um*(1-X[0]**2)
+    dvdy_h = -1j*K[1]*w_hat
+    U[0] = FST.ifst(dvdy_h, U[0], ST)
+    U[0] *= 0.1
+    U_hat[0] = FST.fst(U[0], U_hat[0], ST)
+    U_hat[1] = FST.fst(U[1], U_hat[1], ST)
+    U_hat0[:] = U_hat[:]
+    U0[:] = U[:]
     
  
 def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, conv1,
@@ -185,12 +210,12 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk
     #U[1] = FST.ifst(U_hat[1], U[1], ST)
     #Source[1] -= beta[0]
     #Sk[1] = FST.fss(Source[1], Sk[1], ST)
-    utau = config.Re_tau * config.nu
-    Source[:] = 0
-    Source[1] = -utau**2
-    Source[:] += 0.05*random.randn(*U.shape)
-    for i in range(3):
-        Sk[i] = FST.fss(Source[i], Sk[i], ST)
+    #utau = config.Re_tau * config.nu
+    #Source[:] = 0
+    #Source[1] = -utau**2
+    #Source[:] += 0.02*random.randn(*U.shape)
+    #for i in range(3):
+        #Sk[i] = FST.fss(Source[i], Sk[i], ST)
     
     if config.tstep % config.write_result == 0 or config.tstep % config.write_yz_slice[1] == 0:
         hdf5file.write(config.tstep)
@@ -368,8 +393,8 @@ if __name__ == "__main__":
     config.Shen.add_argument("--plot_result", type=int, default=100)
     config.Shen.add_argument("--sample_stats", type=int, default=100)
     solver = get_solver(update=update, family="Shen")    
-    #initialize(**vars(solver))    
-    init_from_file("IPCSRR.h5", **vars(solver))
+    initialize(**vars(solver))    
+    #init_from_file("IPCSRR.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="MKMstats")
     solver.hdf5file.fname = "IPCSRR.h5"

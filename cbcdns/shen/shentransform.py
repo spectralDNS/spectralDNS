@@ -40,14 +40,15 @@ class ChebyshevTransform(object):
         self.N = N
         M = N - self.zeropadding
         if self.quad == "GL":
-            points = (n_cheb.chebpts2(M)).astype(float)
+            #points = (n_cheb.chebpts2(M)).astype(float)
+            points = (n_cheb.chebpts2(N)[::-1]).astype(float)
             weights = zeros(M)+pi/(M-1)
             weights[0] /= 2
             weights[-1] /= 2
 
         elif self.quad == "GC":
             points, weights = n_cheb.chebgauss(M)
-            points = points[::-1]
+            #points = points[::-1]
             points = points.astype(float)
             weights = weights.astype(float)
             
