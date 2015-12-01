@@ -12,7 +12,7 @@ assert config.precision == "double"
 hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5", 
                       mesh={"x": points, "xp": pointsp, "y": x1, "z": x2})  
 
-HelmholtzSolverU = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), "GL", False)
+HelmholtzSolverU = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), ST.quad, False)
 HelmholtzSolverP = Helmholtz(N[0]-2, sqrt(K[1, 0]**2+K[2, 0]**2), SN.quad, True)
 TDMASolverD = TDMA(ST.quad, False)
 TDMASolverN = TDMA(SN.quad, True)
