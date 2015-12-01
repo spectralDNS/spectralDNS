@@ -7,7 +7,6 @@ from cbcdns.shen import SFTc
 from cbcdns import config
 config.decomposition = "slab"
 config.solver = "IPCS"
-
 from cbcdns.mpi.slab import FastShenFourierTransform
 from mpi4py import MPI
 
@@ -389,7 +388,7 @@ def test_CDDmat(SD):
     du = np.zeros(M)
     du = SD.ifst(cs, du)
 
-    assert np.linalg.norm(du-dudx_j)/M < 1e-12
+    assert np.linalg.norm(du-dudx_j)/M < 1e-10
     
     # Multidimensional version
     u3_hat = u_hat.repeat(4*4).reshape((M, 4, 4)) + 1j*u_hat.repeat(4*4).reshape((M, 4, 4))    
@@ -405,7 +404,7 @@ def test_CDDmat(SD):
     d3 = SD.ifst(cs, d3)
 
     #from IPython import embed; embed()
-    assert np.linalg.norm(du3-d3)/(M*16) < 1e-12
+    assert np.linalg.norm(du3-d3)/(M*16) < 1e-10
         
 def test_CXXmat(SXSX):
     S1, S2 = SXSX
@@ -531,6 +530,8 @@ def test_CTDmat(SDST):
 def test_Mult_Div():
     
     SD = ShenDirichletBasis("GL")    
+    SN = ShenDirichletBasis("GC")
+    
     Cm = CNDmat(np.arange(N).astype(np.float))
     Bm = BNDmat(np.arange(N).astype(np.float), "GC")
     
@@ -567,9 +568,9 @@ def test_Mult_Div():
     #from IPython import embed; embed()
     assert np.allclose(uu, b)
     
-    uk = uk.repeat(4*4).reshape((N,4,4)) + 1j*uk.repeat(4*4).reshape((N,4,4))
-    vk = vk.repeat(4*4).reshape((N,4,4)) + 1j*vk.repeat(4*4).reshape((N,4,4))
-    wk = wk.repeat(4*4).reshape((N,4,4)) + 1j*wk.repeat(4*4).reshape((N,4,4))
+    uk0 = uk0.repeat(4*4).reshape((N,4,4)) + 1j*uk0.repeat(4*4).reshape((N,4,4))
+    vk0 = vk0.repeat(4*4).reshape((N,4,4)) + 1j*vk0.repeat(4*4).reshape((N,4,4))
+    wk0 = wk0.repeat(4*4).reshape((N,4,4)) + 1j*wk0.repeat(4*4).reshape((N,4,4))
     b = np.zeros((N,4,4), dtype=np.complex)
     m = np.zeros((4,4))+7
     n = np.zeros((4,4))+7

@@ -178,10 +178,11 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
 
     U_tmp   = empty((3,)+FST.real_shape(), dtype=float)
     U_tmp2  = empty((3,)+FST.real_shape(), dtype=float)
+    U_tmp3  = empty((3,)+FST.real_shape(), dtype=float)
     F_tmp   = empty((3,)+FST.complex_shape(), dtype=complex)
     F_tmp2  = empty((3,)+FST.complex_shape(), dtype=complex)
 
-    dU      = empty((4,)+FST.complex_shape(), dtype=complex)
+    dU      = empty((3,)+FST.complex_shape(), dtype=complex)
 
     conv0   = empty((3,)+FST.complex_shape(), dtype=complex)
     conv1   = empty((3,)+FST.complex_shape(), dtype=complex)
@@ -205,7 +206,7 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
-    kmax[0] = N[0]*2./3.
+    kmax[0] = N[0]
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
     
@@ -237,49 +238,54 @@ def setupShenMHD(comm, float, complex, mpitype, N, L, mgrid,
     u_slice = slice(0, Nu)
     p_slice = slice(1, Nu)
 
-    U     = empty((6, Np[0], N[1], N[2]), dtype=float)
-    U_hat = empty((6, N[0], Np[1], Nf), dtype=complex)
-    P     = empty((Np[0], N[1], N[2]), dtype=float)
-    P_hat = empty((N[0], Np[1], Nf), dtype=complex)
-    Pcorr = empty((N[0], Np[1], Nf), dtype=complex)
 
-    U0      = empty((6, Np[0], N[1], N[2]), dtype=float)
-    U_hat0  = empty((6, N[0], Np[1], Nf), dtype=complex)
-    U_hat1  = empty((6, N[0], Np[1], Nf), dtype=complex)
-    UT      = empty((6, N[0], Np[1], N[2]), dtype=float)
+    FST = FastShenFourierTransform(N, MPI)
 
-    U_tmp   = empty((6, Np[0], N[1], N[2]), dtype=float)
-    U_tmp2  = empty((6, Np[0], N[1], N[2]), dtype=float)
-    U_tmp3  = empty((6, Np[0], N[1], N[2]), dtype=float)
-    U_tmp4  = empty((6, Np[0], N[1], N[2]), dtype=float)
-    F_tmp   = empty((6, N[0], Np[1], Nf), dtype=complex)
-    F_tmp2  = empty((6, N[0], Np[1], Nf), dtype=complex)
+    U     = empty((6,)+FST.real_shape(), dtype=float)
+    U_hat = empty((6,)+FST.complex_shape(), dtype=complex)
+    P     = empty(FST.real_shape(), dtype=float)
+    P_hat = empty(FST.complex_shape(), dtype=complex)
+    Pcorr = empty(FST.complex_shape(), dtype=complex)
 
-    dU      = empty((7, N[0], Np[1], Nf), dtype=complex)
-    Uc      = empty((Np[0], N[1], N[2]))
-    Uc2     = empty((Np[0], N[1], N[2]))
-    Uc_hat  = empty((N[0], Np[1], Nf), dtype="complex")
-    Uc_hat2 = empty((N[0], Np[1], Nf), dtype="complex")
-    Uc_hat3 = empty((N[0], Np[1], Nf), dtype="complex")
-    Uc_hatT = empty((Np[0], N[1], Nf), dtype="complex")
-    U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype="complex")
-    U_mpi2  = empty((num_processes, Np[0], Np[1], N[2])) 
+    U0      = empty((6,)+FST.real_shape(), dtype=float)
+    U_hat0  = empty((6,)+FST.complex_shape(), dtype=complex)
+    U_hat1  = empty((6,)+FST.complex_shape(), dtype=complex)
+    UT      = empty((6,)+FST.complex_shape(), dtype=float)
+    
+    
+    U_tmp   = empty((6,)+FST.real_shape(), dtype=float)
+    U_tmp2  = empty((6,)+FST.real_shape(), dtype=float)
+    U_tmp3  = empty((6,)+FST.real_shape(), dtype=float)
+    U_tmp4  = empty((6,)+FST.real_shape(), dtype=float)
+    F_tmp   = empty((6,)+FST.complex_shape(), dtype=complex)
+    F_tmp2  = empty((6,)+FST.complex_shape(), dtype=complex)
 
-    conv0   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    conv1   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    magconv  = empty((3, N[0], Np[1], Nf), dtype="complex")
-    magconvU = empty((3, N[0], Np[1], Nf), dtype="complex")
-    diff0   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    Source  = empty((6, Np[0], N[1], N[2]), dtype=float) 
-    Sk      = empty((6, N[0], Np[1], Nf), dtype=complex) 
+    dU      = empty((7,)+FST.complex_shape(), dtype=complex)
+
+    conv0    = empty((3,)+FST.complex_shape(), dtype=complex)
+    conv1    = empty((3,)+FST.complex_shape(), dtype=complex)
+    magconv  = empty((3,)+FST.complex_shape(), dtype=complex)
+    magconvU = empty((3,)+FST.complex_shape(), dtype=complex)
+    diff0    = empty((3,)+FST.complex_shape(), dtype=complex)
+    Source   = empty((3,)+FST.real_shape(), dtype=float) 
+    Sk       = empty((3,)+FST.complex_shape(), dtype=complex) 
+    
+    #Uc      = empty((Np[0], N[1], N[2]))
+    #Uc2     = empty((Np[0], N[1], N[2]))
+    #Uc_hat  = empty((N[0], Np[1], Nf), dtype="complex")
+    #Uc_hat2 = empty((N[0], Np[1], Nf), dtype="complex")
+    #Uc_hat3 = empty((N[0], Np[1], Nf), dtype="complex")
+    #Uc_hatT = empty((Np[0], N[1], Nf), dtype="complex")
+    #U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype="complex")
+    #U_mpi2  = empty((num_processes, Np[0], Np[1], N[2])) 
 
     kx = arange(N[0]).astype(float)
     ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
     kz = fftfreq(N[2], 1./N[2])[:Nf]
     kz[-1] *= -1.0
 
-    mpidouble = MPI.DOUBLE
-    init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble)
+    #mpidouble = MPI.DOUBLE
+    #init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble)
     
     # scale with physical mesh size. 
     # This takes care of mapping the physical domain to a computational cube of size (2, 2pi, 2pi)
@@ -326,47 +332,51 @@ def setupShenGeneralBCs(comm, float, complex, mpitype, N, L, mgrid,
     u_slice = slice(0, Nu)
     p_slice = slice(1, Nu)
 
-    U     = empty((3, Np[0], N[1], N[2]), dtype=float)
-    U_hat = empty((3, N[0], Np[1], Nf), dtype=complex)
-    P     = empty((Np[0], N[1], N[2]), dtype=float)
-    P_hat = empty((N[0], Np[1], Nf), dtype=complex)
-    Pcorr = empty((N[0], Np[1], Nf), dtype=complex)
+    FST = FastShenFourierTransform(N, MPI)
 
-    U0      = empty((3, Np[0], N[1], N[2]), dtype=float)
-    U_hat0  = empty((3, N[0], Np[1], Nf), dtype=complex)
-    U_hat1  = empty((3, N[0], Np[1], Nf), dtype=complex)
-    UT      = empty((3, N[0], Np[1], N[2]), dtype=float)
+    U     = empty((3,)+FST.real_shape(), dtype=float)
+    U_hat = empty((3,)+FST.complex_shape(), dtype=complex)
+    P     = empty(FST.real_shape(), dtype=float)
+    P_hat = empty(FST.complex_shape(), dtype=complex)
+    Pcorr = empty(FST.complex_shape(), dtype=complex)
 
-    U_tmp   = empty((3, Np[0], N[1], N[2]), dtype=float)
-    U_tmp2  = empty((3, Np[0], N[1], N[2]), dtype=float)
-    U_tmp3  = empty((3, Np[0], N[1], N[2]), dtype=float)
-    U_tmp4  = empty((3, Np[0], N[1], N[2]), dtype=float)
-    F_tmp   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    F_tmp2  = empty((3, N[0], Np[1], Nf), dtype=complex)
+    U0      = empty((3,)+FST.real_shape(), dtype=float)
+    U_hat0  = empty((3,)+FST.complex_shape(), dtype=complex)
+    U_hat1  = empty((3,)+FST.complex_shape(), dtype=complex)
 
-    dU      = empty((4, N[0], Np[1], Nf), dtype=complex)
-    Uc      = empty((Np[0], N[1], N[2]))
-    Uc2     = empty((Np[0], N[1], N[2]))
-    Uc_hat  = empty((N[0], Np[1], Nf), dtype="complex")
-    Uc_hat2 = empty((N[0], Np[1], Nf), dtype="complex")
-    Uc_hat3 = empty((N[0], Np[1], Nf), dtype="complex")
-    Uc_hatT = empty((Np[0], N[1], Nf), dtype="complex")
-    U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype="complex")
-    U_mpi2  = empty((num_processes, Np[0], Np[1], N[2]))
+    U_tmp   = empty((3,)+FST.real_shape(), dtype=float)
+    U_tmp2  = empty((3,)+FST.real_shape(), dtype=float)
+    U_tmp3  = empty((3,)+FST.real_shape(), dtype=float)
+    U_tmp4  = empty((3,)+FST.real_shape(), dtype=float)        
+    F_tmp   = empty((3,)+FST.complex_shape(), dtype=complex)
+    F_tmp2  = empty((3,)+FST.complex_shape(), dtype=complex)
 
-    conv0   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    conv1   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    diff0   = empty((3, N[0], Np[1], Nf), dtype=complex)
-    Source  = empty((3, Np[0], N[1], N[2]), dtype=float) 
-    Sk      = empty((3, N[0], Np[1], Nf), dtype=complex) 
+    dU      = empty((4,)+FST.complex_shape(), dtype=complex)
+
+    conv0   = empty((3,)+FST.complex_shape(), dtype=complex)
+    conv1   = empty((3,)+FST.complex_shape(), dtype=complex)
+    diff0   = empty((3,)+FST.complex_shape(), dtype=complex)
+    Source  = empty((3,)+FST.real_shape(), dtype=float) 
+    Sk      = empty((3,)+FST.complex_shape(), dtype=complex) 
+    
+    
+    #Uc      = empty((Np[0], N[1], N[2]))
+    #Uc2     = empty((Np[0], N[1], N[2]))
+    #Uc_hat  = empty((N[0], Np[1], Nf), dtype="complex")
+    #Uc_hat2 = empty((N[0], Np[1], Nf), dtype="complex")
+    #Uc_hat3 = empty((N[0], Np[1], Nf), dtype="complex")
+    #Uc_hatT = empty((Np[0], N[1], Nf), dtype="complex")
+    #U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype="complex")
+    #U_mpi2  = empty((num_processes, Np[0], Np[1], N[2]))
+
 
     kx = arange(N[0]).astype(float)
     ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
     kz = fftfreq(N[2], 1./N[2])[:Nf]
     kz[-1] *= -1.0
 
-    mpidouble = MPI.DOUBLE
-    init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble)
+    #mpidouble = MPI.DOUBLE
+    #init_fst(N, Nf, Np, complex, num_processes, comm, rank, mpitype, mpidouble)
     
     # scale with physical mesh size. 
     # This takes care of mapping the physical domain to a computational cube of size (2, 2pi, 2pi)
@@ -391,6 +401,7 @@ setup = {"MHD": setupMHD,
          "VV":  setupDNS,
          "IPCS": setupShen,
          "IPCSR": setupShen,
+         "ChannelRK4": setupShen,
          "IPCS_MHD": setupShenMHD,
          "IPCS_GeneralBCs": setupShenGeneralBCs}[config.solver]        
 

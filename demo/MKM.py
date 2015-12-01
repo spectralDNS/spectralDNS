@@ -1,6 +1,6 @@
 """Turbulent channel"""
 from cbcdns import config, get_solver
-from numpy import dot, real, pi, exp, sum, complex, float, zeros, arange, imag, cos, where, pi, random, exp, sin, log, array
+from numpy import dot, real, pi, exp, sum, complex, float, zeros, arange, imag, cos, where, pi, random, exp, sin, log, array, zeros_like
 import h5py
 from cbcdns.fft.wrappyfftw import dct
 import matplotlib.pyplot as plt
@@ -24,7 +24,7 @@ def initOS(OS, U, X, t=0.):
             U[1, i, j, :] = v
     U[2] = 0
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_processes, Curl, **kw):
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_processes, Curl, conv, TDMASolverD, solvePressure, **kw):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
     utau = config.nu * config.Re_tau
@@ -32,27 +32,30 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     Xplus = Y*config.Re_tau
     Yplus = X[1]*config.Re_tau
     Zplus = X[2]*config.Re_tau
-    duplus = Um*0.2/utau  #Um*0.25/utau 
+    duplus = Um*0.01/utau  #Um*0.25/utau 
     alfaplus = 2*pi/500.
     betaplus = 2*pi/200.
     sigma = 0.00055
-    epsilon = Um/200. #Um/200.
-    #U[:] = 0
-    #U[1] = Um*(Y-0.5*Y**2)
-    #dev = 1+0.000001*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
-    #dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
-    #U[1] += dd
-    #U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
+    epsilon = Um/2000. #Um/200.
+    U[:] = 0
+    U[1] = Um*(Y-0.5*Y**2)
+    dev = 1+0.00000*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
+    U[1] += dd
+    U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
     #U[0] = 0.00001*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
 
-    U[:] = 0.001*random.randn(*U.shape)
-    for i in range(3):
-        U_hat[i] = FST.fst(U[i], U_hat[i], ST)    
-    U = Curl(U_hat, U, ST)
-    U[1] += Um*(Y-0.5*Y**2)
-    U[1] += utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)
-    U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)
-    U[0] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)
+    #U[:] = 0
+    #U[:] = 0.001*random.randn(*U.shape)
+    #for i in range(3):
+        #U_hat[i] = FST.fst(U[i], U_hat[i], ST)    
+    #U = Curl(U_hat, U, ST)
+    #U[1] += Um*(Y-0.5*Y**2)
+    #U[1] += utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)
+    #U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)
+        
+    #U[0] += 0.1*(1-X[0]**2)*sin(4*pi*X[0])*cos(2*pi*X[1])
+    #U[1] += 0.1*((1-X[0]**2)*sin(2*pi*X[1])+2*X[0]*sin(4*pi*X[0])*sin(2*pi*X[1])/2./pi)
     
     #OS = OrrSommerfeld(Re=6000, N=80)
     #initOS(OS, U0, X)
@@ -76,10 +79,17 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     
     print "Flux", flux[0]
 
-    P[:] = 0
-    P_hat = FST.fst(P, P_hat, SN)
+    conv2 = zeros_like(U_hat)
+    conv2 = conv(conv2, U, U_hat)  
+    for j in range(3):
+        conv2[j] = TDMASolverD(conv2[j])
+    conv2 *= -1
+    P_hat = solvePressure(P_hat, conv2)
+
+    P = FST.ifst(P_hat, P, SN)
     U0[:] = U[:]
     U_hat0[:] = U_hat[:]
+    
  
 def initialize2(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, SN, ST, X, Curl, **kw):
     """"""
@@ -113,15 +123,15 @@ def initialize2(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, SN, ST, X, Curl, **kw
     
  
 def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, conv1,
-                   rank, standardConvection, fst, ST, SN, num_processes, **kw):
+                   rank, conv, FST, ST, SN, num_processes, **kw):
     f = h5py.File(filename, driver="mpio", comm=comm)
     assert "0" in f["3D/checkpoint/U"]
     N = U0.shape[1]
     s = slice(rank*N, (rank+1)*N, 1)
     U0[:] = f["3D/checkpoint/U/0"][:, s]
     for i in range(3):
-        U_hat0[i] = fst(U0[i], U_hat0[i], ST)
-    conv1[:] = standardConvection(conv1)
+        U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
+    conv1[:] = conv(conv1, U0, U_hat0)
     
     U0[:] = f["3D/checkpoint/U/1"][:, s]
     P [:] = f["3D/checkpoint/P/1"][s]
@@ -132,9 +142,12 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, conv1,
         #U0[:, -1] = 0
 
     for i in range(3):
-        U_hat0[i] = fst(U0[i], U_hat0[i], ST)
+        U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
     
-    P_hat = fst(P, P_hat, SN)
+    if config.solver == "IPCSR":
+        P_hat = FST.fct(P, P_hat, SN)
+    else:
+        P_hat = FST.fst(P, P_hat, SN)
     f.close()
 
 def set_Source(Source, Sk, ST, FST, **kw):
@@ -172,6 +185,12 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk
     #U[1] = FST.ifst(U_hat[1], U[1], ST)
     #Source[1] -= beta[0]
     #Sk[1] = FST.fss(Source[1], Sk[1], ST)
+    utau = config.Re_tau * config.nu
+    Source[:] = 0
+    Source[1] = -utau**2
+    Source[:] += 0.05*random.randn(*U.shape)
+    for i in range(3):
+        Sk[i] = FST.fss(Source[i], Sk[i], ST)
     
     if config.tstep % config.write_result == 0 or config.tstep % config.write_yz_slice[1] == 0:
         hdf5file.write(config.tstep)
@@ -341,7 +360,7 @@ if __name__ == "__main__":
         'Re_tau': 180., 
         'dt': 0.001,                  # Time step
         'T': 100.,                   # End time
-        'L': [2, 2*pi, 2*pi],
+        'L': [2, 4*pi, 4.*pi/3.],
         'M': [6, 6, 5]
         },  "Shen"
     )
@@ -349,10 +368,10 @@ if __name__ == "__main__":
     config.Shen.add_argument("--plot_result", type=int, default=100)
     config.Shen.add_argument("--sample_stats", type=int, default=100)
     solver = get_solver(update=update, family="Shen")    
-    initialize(**vars(solver))    
-    #init_from_file("IPCS.h5", **vars(solver))
+    #initialize(**vars(solver))    
+    init_from_file("IPCSRR.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="MKMstats")
+    solver.hdf5file.fname = "IPCSRR.h5"
     solver.solve()
     s = solver.stats.get_stats()
-    

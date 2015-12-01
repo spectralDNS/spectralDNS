@@ -21,6 +21,7 @@ sgdir = os.path.join(cwd, "cbcdns", "shenGeneralBCs")
 
 ext = None
 cmdclass = {}
+args = ""
 if not "sdist" in sys.argv:
     if "build_ext" in sys.argv:
         args = "build_ext --inplace"
