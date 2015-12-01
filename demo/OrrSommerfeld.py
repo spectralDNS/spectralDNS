@@ -76,7 +76,7 @@ def set_Source(Source, Sk, FST, ST, **kw):
     for i in range(3):
         Sk[i] = FST.fss(Source[i], Sk[i], ST)
 
-def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, **kw):
+def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, Xp, **kw):
     global im1, im2, im3, im4
     if config.tstep <= 2 and rank == 0 and config.plot_step > 0:
         plt.figure()

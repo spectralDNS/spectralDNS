@@ -24,9 +24,10 @@ CDD = CDDmat(K[0, :, 0, 0])
 BDD = BDDmat(K[0, :, 0, 0], ST.quad)
 BDT = BDTmat(K[0, :, 0, 0], SN.quad)
 
-#dpdx = P.copy()
+dpdx = P.copy()
 #@profile
 def pressuregrad(P_hat, dU):
+    global dpdx
     # Pressure gradient x-direction
     dU[0] -= CDN.matvec(P_hat)
     
@@ -38,7 +39,7 @@ def pressuregrad(P_hat, dU):
     dU[2, :Nu] -= 1j*K[2, :Nu]*F_tmp[0, :Nu]    
     
     ## Alternatively
-    #dpdx[:] = FST.chebDerivative_3D0(P, dpdx, SN)
+    #dpdx = FST.chebDerivative_3D0(P, dpdx, SN)
     #F_tmp[0] = FST.fss(dpdx, F_tmp[0], ST)
     #dU[0] -= F_tmp[0]
     #F_tmp[0] = FST.fss(P, F_tmp[0], ST)
@@ -150,49 +151,6 @@ def standardConvection(c, U, U_hat):
     U_tmp3[2] = dwdz[:]
     return c
 
-def standardConvection2(c, U, U_hat):
-    c[:] = 0
-    U_tmp[:] = 0
-    
-    # dudx = 0 from continuity equation. Use Shen Dirichlet basis
-    # Use regular Chebyshev basis for dvdx and dwdx
-    #F_tmp[0] = CDD.matvec(U_hat[0])
-    #F_tmp[0] = TDMASolverD(F_tmp[0])    
-    #dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)        
-    
-    SFTc.Mult_CTD_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = U_tmp[1] = FST.ifct(F_tmp[1], U_tmp[1], ST)
-    dwdx = U_tmp[2] = FST.ifct(F_tmp[2], U_tmp[2], ST)
-    
-    #dudx = U_tmp[0] = chebDerivative_3D0(U[0], U_tmp[0])
-    #dvdx = U_tmp[1] = chebDerivative_3D0(U[1], U_tmp[1])
-    #dwdx = U_tmp[2] = chebDerivative_3D0(U[2], U_tmp[2])    
-    
-    U_tmp2[:] = 0
-    dvdy_h = 1j*K[1]*U_hat[1]
-    dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], ST)
-    dvdz_h = 1j*K[2]*U_hat[1]
-    dvdz = U_tmp2[1] = FST.ifst(dvdz_h, U_tmp2[1], ST)
-    c[1] = FST.fss(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST)
-    dudx = -dvdy.copy()
-    
-    U_tmp2[:] = 0
-    dwdy_h = 1j*K[1]*U_hat[2]
-    dwdy = U_tmp2[0] = FST.ifst(dwdy_h, U_tmp2[0], ST)
-    dwdz_h = 1j*K[2]*U_hat[2]
-    dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
-    c[2] = FST.fss(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST)
-    dudx -= dwdz
-    
-    U_tmp2[:] = 0
-    dudy_h = 1j*K[1]*U_hat[0]
-    dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], ST)
-    dudz_h = 1j*K[2]*U_hat[0]
-    dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], ST)
-    c[0] = FST.fss(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST)
-    
-    return c
-
 
 def divergenceConvection(c, U, U_hat, add=False):
     """c_i = div(u_i u_j)"""
@@ -280,18 +238,18 @@ def ComputeRHS(dU, jj):
         SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, U_hat0[1], diff0[1])
         SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, U_hat0[2], diff0[2])    
     
-    dU[:3] = 1.5*conv0 - 0.5*conv1
-    dU[:3] *= dealias    
+    dU[:] = 1.5*conv0 - 0.5*conv1
+    dU[:] *= dealias    
     
     # Add pressure gradient and body force
     dU = pressuregrad(P_hat, dU)
     dU = body_force(Sk, dU)
     
     # Scale by 2/nu factor
-    dU[:3] *= 2./nu
+    dU[:] *= 2./nu
     
     # Add diffusion
-    dU[:3] += diff0
+    dU[:] += diff0
         
     return dU
 
@@ -329,7 +287,7 @@ def solve():
             # Update pressure
             P_hat[p_slice] += Pcorr[p_slice]
             
-            comm.AllReduce(linalg.norm(Pcorr), pressure_error)
+            comm.Allreduce(linalg.norm(Pcorr), pressure_error)
             if jj == 0 and config.print_divergence_progress and rank == 0:
                 print "   Divergence error"
             if config.print_divergence_progress:

@@ -83,45 +83,53 @@ class ChebyshevTransform(object):
     def fct(self, fj, cj):
         """Fast Chebyshev transform."""
         N = fj.shape[0]
+        M = N-self.zeropadding
+        fc = fj[:(N-self.zeropadding)]
+        cc = cj[:(N-self.zeropadding)]
         if self.quad == "GC":
-            cj[:] = dct(fj, type=2, axis=0)            
-            cj /= N
-            cj[0] /= 2
+            cc[:] = dct(fc, type=2, axis=0)            
+            cc /= M
+            cc[0] /= 2
                 
         elif self.quad == "GL":
-            cj[:] = dct(fj, type=1, axis=0)/(N-1)
-            cj[0] /= 2
-            cj[-1] /= 2
+            cc[:] = dct(fc, type=1, axis=0)/(M-1)
+            cc[0] /= 2
+            cc[-1] /= 2
             
         return cj
 
     #@profile
     def ifct(self, fk, cj):
         """Inverse fast Chebyshev transform."""
+        N = fk.shape[0]
+        fc = fk[:(N-self.zeropadding)]
+        cc = cj[:(N-self.zeropadding)]
         if self.quad == "GC":
-            cj[:] = 0.5*dct(fk, type=3, axis=0)
-            cj += 0.5*fk[0]
+            cc[:] = 0.5*dct(fc, type=3, axis=0)
+            cc += 0.5*fc[0]
         
         elif self.quad == "GL":
-            cj[:] = 0.5*dct(fk, type=1, axis=0)
-            cj += 0.5*fk[0]
-            cj[::2] += 0.5*fk[-1]
-            cj[1::2] -= 0.5*fk[-1]
+            cc[:] = 0.5*dct(fc, type=1, axis=0)
+            cc += 0.5*fc[0]
+            cc[::2] += 0.5*fc[-1]
+            cc[1::2] -= 0.5*fc[-1]
 
         return cj
     
     def fastChebScalar(self, fj, fk):
         """Fast Chebyshev scalar product."""
+        N = fj.shape[0]
+        M = N - self.zeropadding
+        fc = fj[:(N-self.zeropadding)]
+        cc = fk[:(N-self.zeropadding)]
         if self.fast_transform:
-            N = fj.shape[0]
             if self.quad == "GC":
-                fk[:] = dct(fj, type=2, axis=0)*pi/(2*N)
-            
+                cc[:] = dct(fc, type=2, axis=0)*pi/(2*M)            
             elif self.quad == "GL":
-                fk[:] = dct(fj, type=1, axis=0)*pi/(2*(N-1))
+                cc[:] = dct(fc, type=1, axis=0)*pi/(2*(M-1))
         else:
             if self.points is None: self.init(fj.shape[0])
-            fk[:] = np.dot(self.V, fj*self.weights)
+            cc[:] = np.dot(self.V, fc*self.weights)
 
         return fk
 
@@ -239,13 +247,12 @@ class ShenNeumannBasis(ShenDirichletBasis):
         if self.fast_transform:
             k  = self.wavenumbers(fj.shape)
             factor = self.getwavenumberarray(fk)
-            fk[:(N-z0)] = self.fastChebScalar(fj[:(N-z0)], fk[:(N-z0)])
+            fk = self.fastChebScalar(fj, fk)
             fk[:-(2+z0)] -= self.factor[:(N-2-z0)] * fk[2:(N-z0)]
             fk[0] = 0
 
         else:
             if self.points is None: self.init(fj.shape[0])
-            #from IPython import embed; embed()
             fk[1:-(2+z0)] = np.dot(self.V, fj[:(N-z0)]*self.weights)
             
         fk[(N-2-z0):] = 0
@@ -265,7 +272,7 @@ class ShenNeumannBasis(ShenDirichletBasis):
         self.w_hat[:] = 0
         self.w_hat[1:-(2+z0)] = fk[1:-(2+z0)]
         self.w_hat[3:(N-z0)] -= self.factor[1:(N-2-z0)]*fk[1:-(2+z0)]
-        fj[:(N-z0)] = self.ifct(self.w_hat[:(N-z0)], fj[:(N-z0)])
+        fj = self.ifct(self.w_hat, fj)
         return fj
         
     def fst(self, fj, fk):

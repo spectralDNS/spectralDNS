@@ -149,7 +149,7 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     points, weights = ST.points_and_weights(N[0])
     pointsp = zeros(N[0])
     weightsp = zeros(N[0])
-    pointsp[:-2], weightsp[:-2] = SN.points_and_weights(N[0]-2)
+    pointsp[:-2], weightsp[:-2] = SN.points_and_weights(N[0])
     
     x1 = arange(N[1], dtype=float)*L[1]/N[1]
     x2 = arange(N[2], dtype=float)*L[2]/N[2]
