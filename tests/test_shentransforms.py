@@ -17,7 +17,7 @@ import scipy.sparse.linalg as la
 N = 12
 x = Symbol("x")
 
-@pytest.fixture(params=("NGC", "NGL", "DGC", "DGL", "CGC", "CGL"))
+@pytest.fixture(params=("NGC", "NGL", "DGC", "DGL", "CGC", "CGL", "KGC", "KGL"))
 def ST(request):
     if request.param[0] == 'N':
         return ShenNeumannBasis(request.param[1:])
@@ -25,6 +25,8 @@ def ST(request):
         return ShenDirichletBasis(request.param[1:])
     elif request.param[0] == 'C':
         return ChebyshevTransform(request.param[1:])
+    elif request.param[0] == 'K':
+        return ShenNeumannBasis(request.param[1:], zeropadding=2)
 
 @pytest.fixture(params=("NGC", "NGL", "DGC", "DGL"))
 def ST2(request):
@@ -79,17 +81,18 @@ def SXST(request):
 
 def test_scalarproduct(ST):
     """Test fast scalar product against Vandermonde computed version"""
-    ST.zeropadding = 2
-    points, weights = ST.points_and_weights(N-ST.zeropadding)
+    points, weights = ST.points_and_weights(N)
     f = x*x+cos(pi*x)
     fj = np.zeros(N)
-    fj[:(N-ST.zeropadding)] = np.array([f.subs(x, j) for j in points], dtype=float)
+    fj[:len(points)] = np.array([f.subs(x, j) for j in points], dtype=float)
     u0 = np.zeros(N)
     u1 = np.zeros(N)
     if ST.__class__.__name__ == "ChebyshevTransform":
         u0 = ST.fastChebScalar(fj, u0)
     else:
         u0 = ST.fastShenScalar(fj, u0)
+        
+    #from IPython import embed; embed()
     ST.fast_transform = False
     if ST.__class__.__name__ == "ChebyshevTransform":
         u1 = ST.fastChebScalar(fj, u1)
@@ -97,7 +100,7 @@ def test_scalarproduct(ST):
         u1 = ST.fastShenScalar(fj, u1)
     assert np.allclose(u1, u0)
     
-#test_scalarproduct(ShenNeumannBasis("GC"))    
+#test_scalarproduct(ShenNeumannBasis("GC", zeropadding=2))    
 
 def test_TDMA(T):
     from scipy.linalg import solve
@@ -132,9 +135,10 @@ def test_BNNmat(ST):
     points, weights = ST.points_and_weights(N)
     f_hat = np.zeros(N)
     fj = np.random.random(N)    
+    fj[(N-ST.zeropadding):] = 0
     u0 = np.zeros(N)
     if ST.__class__.__name__ == "ShenNeumannBasis":
-        B = BNNmat(np.arange(N).astype(np.float), ST.quad)
+        B = BNNmat(np.arange(N-ST.zeropadding).astype(np.float), ST.quad)
         f_hat = ST.fst(fj, f_hat)
         fj = ST.ifst(f_hat, fj)
         u0 = ST.fastShenScalar(fj, u0)
@@ -154,6 +158,7 @@ def test_BNNmat(ST):
 
     u2 = B.matvec(f_hat)
     
+    #from IPython import embed; embed()
     assert np.allclose(u2, u0)
     
     # Multidimensional version
@@ -168,6 +173,8 @@ def test_BNNmat(ST):
         f_hat = ST.fct(fj, f_hat)
     u2 = B.matvec(f_hat)
     assert np.allclose(u2, u0)
+
+#test_BNNmat(ShenNeumannBasis("GC", zeropadding=2))
 
 def test_BDNmat(S1S2):
     S1, S2 = S1S2    
@@ -347,12 +354,13 @@ def test_FST(ST):
     ST.fast_transform = False
     u_hat = np.zeros(N)
     u_hat = ST.fastShenScalar(fj, u_hat)
-    from IPython import embed; embed()
+    #from IPython import embed; embed()
     assert np.allclose(f_hat, u_hat)
     
  
 #test_FST(ShenNeumannBasis("GC"))
-test_FST(ShenDirichletBasis("GL"))
+#test_FST(ShenDirichletBasis("GL"))
+test_FST(ChebyshevTransform("GC"))
 
 def test_CDDmat(SD):
     M = 256
@@ -580,7 +588,7 @@ def test_Mult_Div():
     
     assert np.allclose(uu, b)
 
-test_Mult_Div()
+#test_Mult_Div()
 
 def test_ADDmat(ST2):
     M = 2*N

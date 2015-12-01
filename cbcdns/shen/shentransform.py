@@ -34,17 +34,19 @@ class ChebyshevTransform(object):
         self.fast_transform = fast_transform
         self.points = None
         self.weights = None
+        self.zeropadding = 0
         
     def points_and_weights(self, N):
         self.N = N
+        M = N - self.zeropadding
         if self.quad == "GL":
-            points = (n_cheb.chebpts2(N)).astype(float)
-            weights = zeros(N)+pi/(N-1)
+            points = (n_cheb.chebpts2(M)).astype(float)
+            weights = zeros(M)+pi/(M-1)
             weights[0] /= 2
             weights[-1] /= 2
 
         elif self.quad == "GC":
-            points, weights = n_cheb.chebgauss(N)
+            points, weights = n_cheb.chebgauss(M)
             points = points[::-1]
             points = points.astype(float)
             weights = weights.astype(float)
@@ -133,6 +135,7 @@ class ShenDirichletBasis(ChebyshevTransform):
         self.N = -1
         self.ck = None
         self.w_hat = None
+        self.zeropadding = 0
         self.TDMASolver = TDMA(quad, False)
         
     def init(self, N):
@@ -203,7 +206,7 @@ class ShenNeumannBasis(ShenDirichletBasis):
         self.zeropadding = zeropadding
             
     def init(self, N):
-        self.points, self.weights = self.points_and_weights(N-self.zeropadding)
+        self.points, self.weights = self.points_and_weights(N)
         k = self.wavenumbers(N-self.zeropadding)
         # Build Vandermonde matrix. Note! N points in real space gives N-3 bases in spectral space
         self.V = n_cheb.chebvander(self.points, N-3-self.zeropadding).T - ((k/(k+2))**2)[:, np.newaxis]*n_cheb.chebvander(self.points, N-1-self.zeropadding)[:, 2:].T
