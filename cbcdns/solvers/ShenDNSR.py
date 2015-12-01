@@ -69,7 +69,6 @@ def updatepressure(P_hat, Pcorr, U_hat):
     F_tmp[2] += 1j*K[1]*BND.matvec(U_hat[1])
     F_tmp[2] += 1j*K[2]*BND.matvec(U_hat[2])
     F_tmp[2] = TDMASolverN(F_tmp[2])
-    #U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], SN)
     P_hat += BTN.matvec(Pcorr)/dd
     P_hat -= nu*BTN.matvec(F_tmp[2])/dd
     
