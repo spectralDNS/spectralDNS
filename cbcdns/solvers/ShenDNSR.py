@@ -79,6 +79,7 @@ def updatepressure(P_hat, Pcorr, U_hat):
     #P_hat -= nu*1j*K[2]*BTD.matvec(U_hat[2])/dd
 
 #@profile
+pressure_error = zeros(1)
 def solve():
     timer = Timer()
     
@@ -100,11 +101,15 @@ def solve():
             # Update pressure
             updatepressure(P_hat, Pcorr, U_hat)
 
-            if jj == 0 and config.print_divergence_progress:
+            comm.Reduce(linalg.norm(Pcorr), pressure_error)
+            if jj == 0 and config.print_divergence_progress and rank == 0:
                 print "   Divergence error"
             if config.print_divergence_progress:
-                print "         Pressure correction norm %2.6e" %(linalg.norm(Pcorr))
-                 
+                if rank == 0:                
+                    print "         Pressure correction norm %6d  %2.6e" %(jj, pressure_error[0])
+            if pressure_error[0] < config.divergence_tol:
+                break
+     
         # Update velocity
         dU[:] = 0
         pressuregrad2(Pcorr, dU)        

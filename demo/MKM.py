@@ -32,28 +32,30 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     Xplus = Y*config.Re_tau
     Yplus = X[1]*config.Re_tau
     Zplus = X[2]*config.Re_tau
-    duplus = Um*0.2/utau  #Um*0.25/utau 
+    duplus = Um*0.01/utau  #Um*0.25/utau 
     alfaplus = 2*pi/500.
     betaplus = 2*pi/200.
     sigma = 0.00055
-    epsilon = Um/200. #Um/200.
-    #U[:] = 0
-    #U[1] = Um*(Y-0.5*Y**2)
-    #dev = 1+0.000001*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
-    #dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
-    #U[1] += dd
-    #U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
+    epsilon = Um/2000. #Um/200.
+    U[:] = 0
+    U[1] = Um*(Y-0.5*Y**2)
+    dev = 1+0.00000*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
+    U[1] += dd
+    U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
     #U[0] = 0.00001*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
 
-    U[:] = 0
-    U[:] = 0.001*random.randn(*U.shape)
-    for i in range(3):
-        U_hat[i] = FST.fst(U[i], U_hat[i], ST)    
-    U = Curl(U_hat, U, ST)
-    U[1] += Um*(Y-0.5*Y**2)
-    U[1] += utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)
-    U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)
-    U[0] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)
+    #U[:] = 0
+    #U[:] = 0.001*random.randn(*U.shape)
+    #for i in range(3):
+        #U_hat[i] = FST.fst(U[i], U_hat[i], ST)    
+    #U = Curl(U_hat, U, ST)
+    #U[1] += Um*(Y-0.5*Y**2)
+    #U[1] += utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)
+    #U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)
+        
+    #U[0] += 0.1*(1-X[0]**2)*sin(4*pi*X[0])*cos(2*pi*X[1])
+    #U[1] += 0.1*((1-X[0]**2)*sin(2*pi*X[1])+2*X[0]*sin(4*pi*X[0])*sin(2*pi*X[1])/2./pi)
     
     #OS = OrrSommerfeld(Re=6000, N=80)
     #initOS(OS, U0, X)
@@ -183,6 +185,12 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk
     #U[1] = FST.ifst(U_hat[1], U[1], ST)
     #Source[1] -= beta[0]
     #Sk[1] = FST.fss(Source[1], Sk[1], ST)
+    utau = config.Re_tau * config.nu
+    Source[:] = 0
+    Source[1] = -utau**2
+    Source[:] += 0.05*random.randn(*U.shape)
+    for i in range(3):
+        Sk[i] = FST.fss(Source[i], Sk[i], ST)
     
     if config.tstep % config.write_result == 0 or config.tstep % config.write_yz_slice[1] == 0:
         hdf5file.write(config.tstep)
@@ -361,7 +369,7 @@ if __name__ == "__main__":
     config.Shen.add_argument("--sample_stats", type=int, default=100)
     solver = get_solver(update=update, family="Shen")    
     #initialize(**vars(solver))    
-    init_from_file("IPCS2.h5", **vars(solver))
+    init_from_file("IPCSRR.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="MKMstats")
     solver.hdf5file.fname = "IPCSRR.h5"

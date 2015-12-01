@@ -41,27 +41,28 @@ Shen.add_argument('--solver', default='IPCS', choices=('IPCS','IPCSR', 'ChannelR
 Shen.add_argument('--convection', default='Standard', choices=('Standard', 'Standard2', 'Divergence', 'Skew', 'Vortex'))
 Shen.add_argument('--L', default=[2, 2*pi, 2*pi], nargs='+', help='Physical mesh size')
 Shen.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2'))
-Shen.add_argument('--velocity_pressure_iters', default=1, type=int, help="Number of inner velocity pressure iterations")
-Shen.add_argument('--print_divergence_progress', default=False, help="Print the norm of the pressure correction on inner iterations")
+Shen.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations')
+Shen.add_argument('--print_divergence_progress', default=False, help='Print the norm of the pressure correction on inner iterations')
+Shen.add_argument('--divergence_tol', default=1e-7, type=float, help='Tolerance on divergence error for pressure velocity coupling')
 
 # Arguments for Shen based solver for general bounday conditions
 ShenGeneralBCs = argparse.ArgumentParser(parents=[parser])
 ShenGeneralBCs.add_argument('--solver', default='IPCS_GeneralBCs', choices=('IPCS_GeneralBCs',), help="""Choose solver.""")
 ShenGeneralBCs.add_argument('--convection', default='Standard', choices=('Standard', 'Divergence'))
 ShenGeneralBCs.add_argument('--L', default=[2, 2*pi, 2*pi], nargs='+', help='Physical mesh size')
-ShenGeneralBCs.add_argument('--velocity_pressure_iters', default=1, type=int, help="Number of inner velocity pressure iterations")
-ShenGeneralBCs.add_argument('--print_divergence_progress', default=False, help="Print the norm of the pressure correction on inner iterations")
+ShenGeneralBCs.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations')
+ShenGeneralBCs.add_argument('--print_divergence_progress', default=False, help='Print the norm of the pressure correction on inner iterations')
 
 # Arguments for Shen based solver for MHD
 ShenMHD = argparse.ArgumentParser(parents=[parser])
-ShenMHD.add_argument('--solver', default='IPCS_MHD', choices=('IPCS_MHD',), help="""Choose solver.""")
+ShenMHD.add_argument('--solver', default='IPCS_MHD', choices=('IPCS_MHD',), help='Choose solver')
 ShenMHD.add_argument('--convection', default='Standard', choices=('Standard', 'Divergence'))
 ShenMHD.add_argument('--L', default=[2, 2*pi, 2*pi], nargs='+', help='Physical mesh size')
 ShenMHD.add_argument('--eta', default=0.0016666, type=float, help='Resistivity')
 ShenMHD.add_argument('--Ha', default=0.0043817804600413289, type=float, help='Hartmann number')
 ShenMHD.add_argument('--B_strength', default=0.000001, type=float, help='Magnetic strength')
-ShenMHD.add_argument('--velocity_pressure_iters', default=1, type=int, help="Number of inner velocity pressure iterations")
-ShenMHD.add_argument('--print_divergence_progress', default=False, help="Print the norm of the pressure correction on inner iterations")
+ShenMHD.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations')
+ShenMHD.add_argument('--print_divergence_progress', default=False, help='Print the norm of the pressure correction on inner iterations')
 
 def update(new, par="Isotropic"):
     assert isinstance(new, dict)

@@ -306,6 +306,7 @@ def regression_test(**kw):
     pass
 
 #@profile
+pressure_error = zeros(1)
 def solve():
     timer = Timer()
     
@@ -329,14 +330,15 @@ def solve():
             P_hat[p_slice] += Pcorr[p_slice]
             
 
+            comm.Reduce(linalg.norm(Pcorr), pressure_error)
             if jj == 0 and config.print_divergence_progress and rank == 0:
                 print "   Divergence error"
             if config.print_divergence_progress:
-                dp = zeros(1)
-                comm.Reduce(linalg.norm(Pcorr), dp)
                 if rank == 0:                
-                    print "         Pressure correction norm %2.6e" %(dp[0])
-
+                    print "         Pressure correction norm %6d  %2.6e" %(jj, pressure_error[0])
+            if pressure_error[0] < config.divergence_tol:
+                break
+            
         for i in range(3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)
                  
