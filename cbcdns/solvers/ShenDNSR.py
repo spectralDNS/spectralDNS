@@ -101,7 +101,7 @@ def solve():
             # Update pressure
             updatepressure(P_hat, Pcorr, U_hat)
 
-            comm.Reduce(linalg.norm(Pcorr), pressure_error)
+            comm.Allreduce(linalg.norm(Pcorr), pressure_error)
             if jj == 0 and config.print_divergence_progress and rank == 0:
                 print "   Divergence error"
             if config.print_divergence_progress:
