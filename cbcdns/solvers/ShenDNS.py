@@ -4,7 +4,7 @@ __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
-from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat
+from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, CNDmat
 from ..shen.Helmholtz import Helmholtz, TDMA
 from ..shen import SFTc
 
@@ -19,6 +19,7 @@ TDMASolverN = TDMA(SN.quad, True)
 
 alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
 CDN = CDNmat(K[0, :, 0, 0])
+CND = CNDmat(K[0, :, 0, 0])
 BDN = BDNmat(K[0, :, 0, 0], ST.quad)
 CDD = CDDmat(K[0, :, 0, 0])
 BDD = BDDmat(K[0, :, 0, 0], ST.quad)
@@ -112,9 +113,15 @@ def standardConvection(c, U, U_hat):
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = CDD.matvec(U_hat[0])
-    F_tmp[0] = TDMASolverD(F_tmp[0])    
-    dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)        
+    #F_tmp[0] = CDD.matvec(U_hat[0])
+    #F_tmp[0] = TDMASolverD(F_tmp[0])    
+    #dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)   
+    
+    F_tmp[0] = CND.matvec(U_hat[0])
+    F_tmp[0] = TDMASolverN(F_tmp[0])    
+    quad = SN.quad
+    SN.quad = ST.quad
+    dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], SN)       
     
     SFTc.Mult_CTD_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
     dvdx = U_tmp[1] = FST.ifct(F_tmp[1], U_tmp[1], ST)
@@ -124,30 +131,43 @@ def standardConvection(c, U, U_hat):
     #dvdx = U_tmp[1] = chebDerivative_3D0(U[1], U_tmp[1])
     #dwdx = U_tmp[2] = chebDerivative_3D0(U[2], U_tmp[2])    
     
-    U_tmp3[0] = dudx[:]
-    
     U_tmp2[:] = 0
     dudy_h = 1j*K[1]*U_hat[0]
-    dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], ST)
+    dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], ST)    
     dudz_h = 1j*K[2]*U_hat[0]
     dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], ST)
     c[0] = FST.fss(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST)
     
     U_tmp2[:] = 0
-    dvdy_h = 1j*K[1]*U_hat[1]
-    dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], ST)
+    
+    #dvdy_h = 1j*K[1]*U_hat[1]    
+    #dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], ST)
+    F_tmp[0] = FST.fst(U[1], F_tmp[0], SN)
+    dvdy_h = 1j*K[1]*F_tmp[0]    
+    dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], SN)
+    ##########
+    
     dvdz_h = 1j*K[2]*U_hat[1]
     dvdz = U_tmp2[1] = FST.ifst(dvdz_h, U_tmp2[1], ST)
     c[1] = FST.fss(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST)
-    U_tmp3[1] = dvdy[:]
     
     U_tmp2[:] = 0
     dwdy_h = 1j*K[1]*U_hat[2]
     dwdy = U_tmp2[0] = FST.ifst(dwdy_h, U_tmp2[0], ST)
-    dwdz_h = 1j*K[2]*U_hat[2]
-    dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
+    
+    #dwdz_h = 1j*K[2]*U_hat[2]
+    #dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
+    
+    F_tmp[0] = FST.fst(U[2], F_tmp[0], SN)
+    dwdz_h = 1j*K[2]*F_tmp[0]    
+    dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], SN)    
+    #########
+    
     c[2] = FST.fss(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST)
-    U_tmp3[2] = dwdz[:]
+    
+    # Reset
+    SN.quad = quad
+
     return c
 
 def standardConvection2(c, U, U_hat):
