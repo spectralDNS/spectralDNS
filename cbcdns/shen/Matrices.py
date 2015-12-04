@@ -267,7 +267,41 @@ class BTNmat(object):
     def diags(self):
         return diags([self.ld, self.dd], [-3, -1], shape=self.shape)
 
-
+class BLLmat(object):
+    
+    def __init__(self, K, quad):
+        N = K.shape[0]-4
+        self.shape = (N, N)
+        ck = ones(N)
+        ck[0] = 2
+        k = K[:N].astype(float)
+        self.dd = (ck + 4*((k+2)/(k+3))**2 + ((k+1)/(k+3))**2)*pi/2.
+        self.ud = -((k[:-2]+2)/(k[:-2]+3) + (k[:-2]+4)*(k[:-2]+1)/((k[:-2]+5)*(k[:-2]+3)))*pi
+        self.uud = (k[:-4]+1)/(k[:-4]+3)*pi/2
+        self.ld = -((k[2:]+2)/(k[2:]+3) + (k[2:]+4)*(k[2:]+1)/((k[2:]+5)*(k[2:]+3)))*pi
+        self.lld = (k[4:]+1)/(k[4:]+3)*pi/2
+        
+    def matvec(self, v):
+        c = zeros(v.shape, dtype=v.dtype)
+        if len(v.shape) > 1:
+            vv = v[:-4]
+            c[:] = self.dd.repeat(array(v.shape[1:]).prod()).reshape(vv.shape) * vv[:]
+            c[:-2] += self.ud.repeat(array(v.shape[1:]).prod()).reshape(vv[:-2].shape) * vv[:-2]
+            c[:-4] += self.uud.repeat(array(v.shape[1:]).prod()).reshape(vv[:-4].shape) * vv[:-4]
+            c[2:]  += self.ld.repeat(array(v.shape[1:]).prod()).reshape(vv[2:].shape) * vv[2:]
+            c[4:]  += self.lld.repeat(array(v.shape[1:]).prod()).reshape(vv[4:].shape) * vv[4:]
+            
+        else:
+            vv = v[:-4]
+            c[:] = self.dd * vv[:]
+            c[:-2] += self.ud * vv[:-2]
+            c[:-4] += self.uud * vv[:-4]
+            c[2:]  += self.ld * vv[2:]
+            c[4:]  += self.lld * vv[4:]
+            
+    def diags(self):
+        return diags([self.lld, self.ld, self.dd, self.ud, self.uud], range(-4, 6, 2), shape=self.shape)
+    
 # Derivative matrices
 class CDNmat(object):
     """Matrix for inner product (p', phi)_w = CDNmat * p_hat
@@ -416,6 +450,31 @@ class CDTmat(object):
     def diags(self):
         return diags(self.ud, [1], shape=self.shape)
     
+class CLLmat(object):
+
+    def __init__(self, K):
+        N = K.shape[0]-4
+        self.shape = (N, N)
+        k = K[:N].astype(float)
+        self.dd = -4*(k+1)/(k+3)*(k+2)**2*pi
+        self.ud = 2*(k[:-2]+1)*(k[:-2]+2)*pi
+        self.ld = 2*(k[2:]-1)*(k[2:]+2)*pi
+        
+    def matvec(self, v):
+        N = self.shape[0]
+        c = zeros(v.shape, dtype=v.dtype)
+        if len(v.shape) > 1:
+            c[:N] = self.dd.repeat(array(v.shape[1:]).prod()).reshape(v[:N].shape) * v[:N]
+            c[:N-2] += self.ud.repeat(array(v.shape[1:]).prod()).reshape(v[:N-2].shape) * v[:N-2]
+            c[2:N] += self.ld.repeat(array(v.shape[1:]).prod()).reshape(v[2:N].shape) * v[2:N]
+            
+        else:
+            c[:N] = self.dd * v[:N]
+            c[:N-2] += self.ud * v[:N-2]
+            c[2:N] += self.ld * v[2:N]
+        
+    def diags(self):
+        return diags([self.ld, self.dd, self.ud], [-2, 0, 2], shape=self.shape)
     
 class ADDmat(object):
     """Matrix for inner product -(u'', phi) = -(phi'', phi) u_hat = ADDmat * u_hat
@@ -480,3 +539,31 @@ class ANNmat(object):
         N = self.shape[0]
         return diags([self.dd] + self.ud, range(0, N, 2))
 
+class ALLmat(object):
+    
+    def __init__(self, K, quad):
+        N = K.shape[0]-4
+        self.shape = (N, N)
+        ck = ones(N)
+        ck[0] = 2
+        k = K[:N].astype(float)
+        self.dd = 8*(k+1)**2*(k+2)*(k+4)*pi
+        self.ud = []
+        for j in range(2, N, 2):
+            self.ud.append(np.array(8./(j+3)*pi*(k[:-j]+1)*(k[:-j]+2)*(k[:-j]*(k[:-j]+4)+3*(j+2)**2)))    
+
+        self.ld = None
+        
+    def matvec(self, v):
+        N = self.shape[0]
+        c = np.zeros(v.shape, dtype=v.dtype)
+        if len(v.shape) > 1:
+            m = self.diags().toarray()
+            for i in range(v.shape[1]):
+                for j in range(v.shape[2]):
+                    c[:N, i, j] = np.dot(m, vv[:N, i ,j])
+        else:
+            c[:N] = np.dot(self.diags().toarray(), vv[:N])
+            
+    def diags(self):
+        return diags([self.dd]+self.ud, range(0, self.shape[0], 2), shape=self.shape)
