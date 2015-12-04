@@ -64,18 +64,18 @@ def solvePressure(P_hat, Ni):
     return P_hat
 
 def updatepressure(P_hat, Pcorr, U_hat):
-    F_tmp[2] = 0
-    F_tmp[2] = CND.matvec(U_hat[0])
-    F_tmp[2] += 1j*K[1]*BND.matvec(U_hat[1])
-    F_tmp[2] += 1j*K[2]*BND.matvec(U_hat[2])
-    F_tmp[2] = TDMASolverN(F_tmp[2])
-    P_hat += BTN.matvec(Pcorr)/dd
-    P_hat -= nu*BTN.matvec(F_tmp[2])/dd
-    
+    #F_tmp[2] = 0
+    #F_tmp[2] = CND.matvec(U_hat[0])
+    #F_tmp[2] += 1j*K[1]*BND.matvec(U_hat[1])
+    #F_tmp[2] += 1j*K[2]*BND.matvec(U_hat[2])
+    #F_tmp[2] = TDMASolverN(F_tmp[2])
     #P_hat += BTN.matvec(Pcorr)/dd
-    #P_hat -= nu*CTD.matvec(U_hat[0])/dd
-    #P_hat -= nu*1j*K[1]*BTD.matvec(U_hat[1])/dd
-    #P_hat -= nu*1j*K[2]*BTD.matvec(U_hat[2])/dd
+    #P_hat -= nu*BTN.matvec(F_tmp[2])/dd
+    
+    P_hat += BTN.matvec(Pcorr)/dd
+    P_hat -= nu*CTD.matvec(U_hat[0])/dd
+    P_hat -= nu*1j*K[1]*BTD.matvec(U_hat[1])/dd
+    P_hat -= nu*1j*K[2]*BTD.matvec(U_hat[2])/dd
 
 #@profile
 pressure_error = zeros(1)
@@ -98,7 +98,9 @@ def solve():
             Pcorr[:] = HelmholtzSolverP(Pcorr, F_tmp[0])
 
             # Update pressure
+            F_tmp[1] = P_hat[:]
             updatepressure(P_hat, Pcorr, U_hat)
+            F_tmp[1] -= P_hat
 
             comm.Allreduce(linalg.norm(Pcorr), pressure_error)
             if jj == 0 and config.print_divergence_progress and rank == 0:

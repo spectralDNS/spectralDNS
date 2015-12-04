@@ -140,11 +140,11 @@ def standardConvection(c, U, U_hat):
     
     U_tmp2[:] = 0
     
-    #dvdy_h = 1j*K[1]*U_hat[1]    
-    #dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], ST)
-    F_tmp[0] = FST.fst(U[1], F_tmp[0], SN)
-    dvdy_h = 1j*K[1]*F_tmp[0]    
-    dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], SN)
+    dvdy_h = 1j*K[1]*U_hat[1]    
+    dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], ST)
+    #F_tmp[0] = FST.fst(U[1], F_tmp[0], SN)
+    #dvdy_h = 1j*K[1]*F_tmp[0]    
+    #dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], SN)
     ##########
     
     dvdz_h = 1j*K[2]*U_hat[1]
@@ -155,12 +155,12 @@ def standardConvection(c, U, U_hat):
     dwdy_h = 1j*K[1]*U_hat[2]
     dwdy = U_tmp2[0] = FST.ifst(dwdy_h, U_tmp2[0], ST)
     
-    #dwdz_h = 1j*K[2]*U_hat[2]
-    #dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
+    dwdz_h = 1j*K[2]*U_hat[2]
+    dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
     
-    F_tmp[0] = FST.fst(U[2], F_tmp[0], SN)
-    dwdz_h = 1j*K[2]*F_tmp[0]    
-    dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], SN)    
+    #F_tmp[0] = FST.fst(U[2], F_tmp[0], SN)
+    #dwdz_h = 1j*K[2]*F_tmp[0]    
+    #dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], SN)    
     #########
     
     c[2] = FST.fss(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST)
