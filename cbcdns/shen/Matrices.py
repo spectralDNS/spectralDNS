@@ -273,32 +273,36 @@ class BLLmat(object):
         N = K.shape[0]-4
         self.shape = (N, N)
         ck = ones(N)
+        ckp = ones(N)
         ck[0] = 2
+        if quad == "GL": ckp[-1] = 2
         k = K[:N].astype(float)
-        self.dd = (ck + 4*((k+2)/(k+3))**2 + ((k+1)/(k+3))**2)*pi/2.
+        self.dd = (ck + 4*((k+2)/(k+3))**2 + ckp*((k+1)/(k+3))**2)*pi/2.
         self.ud = -((k[:-2]+2)/(k[:-2]+3) + (k[:-2]+4)*(k[:-2]+1)/((k[:-2]+5)*(k[:-2]+3)))*pi
         self.uud = (k[:-4]+1)/(k[:-4]+3)*pi/2
-        self.ld = -((k[2:]+2)/(k[2:]+3) + (k[2:]+4)*(k[2:]+1)/((k[2:]+5)*(k[2:]+3)))*pi
-        self.lld = (k[4:]+1)/(k[4:]+3)*pi/2
+        self.ld = self.ud
+        self.lld = self.uud
         
     def matvec(self, v):
         c = zeros(v.shape, dtype=v.dtype)
+        N = self.shape[0]
         if len(v.shape) > 1:
             vv = v[:-4]
-            c[:] = self.dd.repeat(array(v.shape[1:]).prod()).reshape(vv.shape) * vv[:]
-            c[:-2] += self.ud.repeat(array(v.shape[1:]).prod()).reshape(vv[:-2].shape) * vv[:-2]
-            c[:-4] += self.uud.repeat(array(v.shape[1:]).prod()).reshape(vv[:-4].shape) * vv[:-4]
-            c[2:]  += self.ld.repeat(array(v.shape[1:]).prod()).reshape(vv[2:].shape) * vv[2:]
-            c[4:]  += self.lld.repeat(array(v.shape[1:]).prod()).reshape(vv[4:].shape) * vv[4:]
+            c[:N] = self.dd.repeat(array(v.shape[1:]).prod()).reshape(vv.shape) * vv[:]
+            c[:N-2] += self.ud.repeat(array(v.shape[1:]).prod()).reshape(vv[:-2].shape) * vv[:-2]
+            c[:N-4] += self.uud.repeat(array(v.shape[1:]).prod()).reshape(vv[:-4].shape) * vv[:-4]
+            c[2:N]  += self.ld.repeat(array(v.shape[1:]).prod()).reshape(vv[2:].shape) * vv[2:]
+            c[4:N]  += self.lld.repeat(array(v.shape[1:]).prod()).reshape(vv[4:].shape) * vv[4:]
             
         else:
             vv = v[:-4]
-            c[:] = self.dd * vv[:]
-            c[:-2] += self.ud * vv[:-2]
-            c[:-4] += self.uud * vv[:-4]
-            c[2:]  += self.ld * vv[2:]
-            c[4:]  += self.lld * vv[4:]
-            
+            c[:N] = self.dd * vv[:]
+            c[:N-2] += self.ud * vv[:-2]
+            c[:N-4] += self.uud * vv[:-4]
+            c[2:N]  += self.ld * vv[2:]
+            c[4:N]  += self.lld * vv[4:]
+        return c
+    
     def diags(self):
         return diags([self.lld, self.ld, self.dd, self.ud, self.uud], range(-4, 6, 2), shape=self.shape)
     
@@ -544,13 +548,11 @@ class ALLmat(object):
     def __init__(self, K, quad):
         N = K.shape[0]-4
         self.shape = (N, N)
-        ck = ones(N)
-        ck[0] = 2
         k = K[:N].astype(float)
-        self.dd = 8*(k+1)**2*(k+2)*(k+4)*pi
+        self.dd = 8.*(k+1.)**2*(k+2.)*(k+4.)*pi
         self.ud = []
         for j in range(2, N, 2):
-            self.ud.append(np.array(8./(j+3)*pi*(k[:-j]+1)*(k[:-j]+2)*(k[:-j]*(k[:-j]+4)+3*(j+2)**2)))    
+            self.ud.append(np.array(8./(j+3.)*pi*(k[:-j]+1.)*(k[:-j]+2.)*(k[:-j]*(k[:-j]+4.)+3.*(j+2.)**2)))    
 
         self.ld = None
         

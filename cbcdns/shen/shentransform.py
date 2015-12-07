@@ -3,8 +3,10 @@ from numpy.polynomial import chebyshev as n_cheb
 from cbcdns.fft.wrappyfftw import dct
 from cbcdns import config
 import SFTc
+import scipy.sparse.linalg as la
 from cbcdns.shen.Helmholtz import TDMA
-
+from cbcdns.shenGeneralBCs import SFTc as SF
+from cbcdns.shen.Matrices import BLLmat
 """
 Fast transforms for pure Chebyshev basis or 
 Shen's Chebyshev basis: 
@@ -134,7 +136,7 @@ class ShenDirichletBasis(ChebyshevTransform):
         self.N = -1
         self.ck = None
         self.w_hat = None
-        self.TDMASolver = TDMA(quad, False)
+        self.Solver = TDMA(quad, False)
         
     def init(self, N):
         """Vandermonde matrix is used just for verification"""
@@ -192,7 +194,7 @@ class ShenDirichletBasis(ChebyshevTransform):
         """Fast Shen transform
         """
         fk = self.fastShenScalar(fj, fk)
-        fk = self.TDMASolver(fk)
+        fk = self.Solver(fk)
         return fk
 
 class ShenNeumannBasis(ShenDirichletBasis):
@@ -200,7 +202,7 @@ class ShenNeumannBasis(ShenDirichletBasis):
     def __init__(self, quad="GC", fast_transform=True): 
         ShenDirichletBasis.__init__(self, quad, fast_transform)
         self.factor = None        
-        self.TDMASolver = TDMA(quad, True)
+        self.Solver = TDMA(quad, True)
             
     def init(self, N):
         self.points, self.weights = self.points_and_weights(N)
@@ -255,17 +257,112 @@ class ShenNeumannBasis(ShenDirichletBasis):
         self.w_hat[3:] -= self.factor*fk[1:-2]
         fj = self.ifct(self.w_hat, fj)
         return fj
+
+class PDMA(object):
+    
+    def __init__(self, quad="GL"):
+        self.quad = quad
+        self.B = None
+        self.bc = None
+        self.s = None
         
-    def fst(self, fj, fk):
-        """Fast Shen transform.
-        """
-        fk = self.fastShenScalar(fj, fk)
-        fk = self.TDMASolver(fk)
+    def init(self, N):
+        self.B = BLLmat(np.arange(N).astype(np.float), "GL")
+        self.s = slice(0, N-4)
+        
+    def __call__(self, u):
+        N = u.shape[0]
+        if self.B is None:
+            self.init(N)
+        if len(u.shape) == 3:
+            pass
+            #SF.PDMA_3D(self.B.dd, self.B.ud, self.B.uud, self.B.ld, self.B.lld, u[self.s])
+        elif len(u.shape) == 1:            
+            b = u[:-4].copy()
+            #lld = np.zeros(len(self.B.dd))
+            #ld = np.zeros(len(self.B.dd))
+            #lld[2:] = self.B.lld
+            #ld[1:] = self.B.ld
+            #SF.PDMA_1D(self.B.lld, self.B.ld, self.B.dd, self.B.ud, self.B.uud, b, u[self.s])
+            u[:-4] = la.spsolve(self.B.diags(), b)
+        else:
+            raise NotImplementedError
+        return u
+
+class ShenBiharmonicBasis(ShenDirichletBasis):
+    
+    def __init__(self, quad="GC", fast_transform=False):
+        ShenDirichletBasis.__init__(self, quad, fast_transform)
+        self.factor1 = None
+        self.factor2 = None
+        self.Solver = PDMA(self)
+        
+    def init(self, N):
+        self.points, self.weights = self.points_and_weights(N)
+        k = self.wavenumbers(N)
+        #from IPython import embed; embed()
+        # Build Vandermonde matrix.
+        self.V = n_cheb.chebvander(self.points, N-5).T - (2*(k+2)/(k+3))[:, np.newaxis]*n_cheb.chebvander(self.points, N-3)[:, 2:].T + ((k+1)/(k+3))[:, np.newaxis]*n_cheb.chebvander(self.points, N-1)[:, 4:].T
+        
+    def wavenumbers(self, N):
+        if isinstance(N, tuple):
+            if len(N) == 1:
+                N = N[0]
+        if isinstance(N, int): 
+            return np.arange(N-4).astype(float)
+        
+        else:
+            kk = np.mgrid[:N[0]-4, :N[1], :N[2]].astype(float)
+            return kk[0]
+
+    def fastShenScalar(self, fj, fk):
+        """Fast Shen scalar product.
+        """        
+        if self.fast_transform:
+            raise NotImplementedError
+
+        else:
+            if self.points is None: self.init(fj.shape[0])
+            fk[:-4] = np.dot(self.V, fj*self.weights)
+            
+        fk[-4:] = 0
         return fk
+
+    def ifst(self, fk, fj):
+        """Fast inverse Shen scalar transform
+        """
+        if self.w_hat is None:
+            self.w_hat = fk.copy()
+        elif not self.w_hat.shape == fk.shape:
+            self.w_hat = fk.copy()
+
+        recreate = False
+        if isinstance(self.factor1, np.ndarray):
+            if not self.factor1.shape == fk.shape:
+                recreate = True
+            
+        if self.factor1 is None:
+            recreate = True
+            
+        if recreate:
+            if len(fk.shape)==3:
+                k = self.wavenumbers(fk.shape)                
+            elif len(fk.shape)==1:
+                k = self.wavenumbers(fk.shape[0])
+            self.factor1 = -2*(k+2)/(k+3)
+            self.factor2 = (k+1)/(k+3)
+            
+        self.w_hat[:] = 0
+        self.w_hat[:-4] = fk[:-4]
+        self.w_hat[2:-2] += self.factor1*fk[:-4]
+        self.w_hat[4:]   += self.factor2*fk[:-4]
+        fj = self.ifct(self.w_hat, fj)
+        return fj
+        
     
 if __name__ == "__main__":
-    from sympy import Symbol, sin, cos, pi
-    N = 10
+    from sympy import Symbol, sin, cos
+    N = 16
     #a = np.random.random((N, N, N/2+1))+1j*np.random.random((N, N, N/2+1))
     #af = zeros((N, N, N/2+1), dtype=a.dtype)
     #a[0,:,:] = 0
@@ -303,6 +400,17 @@ if __name__ == "__main__":
     u0 = SN.fst(fj, u0)
     u1 = u0.copy()
     u1 = SN.ifst(u0, u1)
+    assert np.allclose(u1, fj)
+
+    N = 30
+    SB = ShenBiharmonicBasis(quad="GL", fast_transform=False)
+    points, weights = SB.points_and_weights(N)
+    f = (1-x**2)*sin(2*pi*x)    
+    fj = np.array([f.subs(x, j) for j in points], dtype=float)    
+    u0 = zeros(N, dtype=float)
+    u0 = SB.fst(fj, u0)
+    u1 = u0.copy()
+    u1 = SB.ifst(u0, u1)
     assert np.allclose(u1, fj)
     
 
