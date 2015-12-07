@@ -267,7 +267,7 @@ class PDMA(object):
         self.s = None
         
     def init(self, N):
-        self.B = BLLmat(np.arange(N).astype(np.float), "GL")
+        self.B = BLLmat(np.arange(N).astype(np.float), self.quad)
         self.s = slice(0, N-4)
         
     def __call__(self, u):
@@ -295,7 +295,7 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
         ShenDirichletBasis.__init__(self, quad, fast_transform)
         self.factor1 = None
         self.factor2 = None
-        self.Solver = PDMA(self)
+        self.Solver = PDMA(quad)
         
     def init(self, N):
         self.points, self.weights = self.points_and_weights(N)
@@ -319,7 +319,12 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
         """Fast Shen scalar product.
         """        
         if self.fast_transform:
-            raise NotImplementedError
+            k  = self.wavenumbers(fj.shape)
+            Tk = fk.copy()
+            Tk = self.fastChebScalar(fj, Tk)
+            fk[:] = Tk[:]
+            fk[:-4] -= 2*(k+2)/(k+3) * Tk[2:-2]
+            fk[:-4] += ((k+1)/(k+3)) * Tk[4:]
 
         else:
             if self.points is None: self.init(fj.shape[0])

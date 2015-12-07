@@ -30,7 +30,7 @@ a = 0.0
 b = 0.0
 f = u.diff(x, 4) - a*u.diff(x, 2) + b*u
 
-SD = ShenBiharmonicBasis("GC")
+SD = ShenBiharmonicBasis("GL", True)
 N = 120
 points, weights = SD.points_and_weights(N) 
 
@@ -52,4 +52,21 @@ u_hat[:-4] = solve(AA, f_hat[:-4])
 u1 = np.zeros(N)
 u1 = SD.ifst(u_hat, u1)
 
+
+fr = np.random.randn(N)
+fr[-4:] = 0
+fr_hat = np.zeros(N)
+fr2 = np.zeros(N)
+
+fr_hat = SD.fst(fr, fr_hat)
+fr = SD.ifst(fr_hat, fr)
+fr_hat = SD.fst(fr, fr_hat)
+fr2 = SD.ifst(fr_hat, fr2)
+
+
+assert np.allclose(fr2, fr)
+
+
 assert np.allclose(u1, uj)
+
+
