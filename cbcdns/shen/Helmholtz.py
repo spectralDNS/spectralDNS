@@ -1,5 +1,6 @@
 from cbcdns import config
 from numpy import zeros, ones, arange, pi, float, complex, int
+from Matrices import BBBmat
 import SFTc
 
 class Helmholtz(object):
@@ -63,6 +64,29 @@ class TDMA(object):
             SFTc.TDMA_3D(self.a0, self.b0, self.bc, self.c0, u[self.s])
         elif len(u.shape) == 1:
             SFTc.TDMA_1D(self.a0, self.b0, self.bc, self.c0, u[self.s])
+        else:
+            raise NotImplementedError
+        return u
+
+class PDMA(object):
+    
+    def __init__(self, quad="GL"):
+        self.quad = quad
+        self.B = None
+        
+    def init(self, N):
+        self.B = BBBmat(arange(N).astype(float), self.quad)
+        self.d0, self.d1, self.d2 = self.B.dd.copy(), self.B.ud.copy(), self.B.uud.copy()
+        SFTc.PDMA_SymLU(self.d0, self.d1, self.d2)
+        
+    def __call__(self, u):
+        N = u.shape[0]
+        if self.B is None:
+            self.init(N)
+        if len(u.shape) == 3:
+            SFTc.PDMA_Symsolve3D(self.d0, self.d1, self.d2, u[:-4])
+        elif len(u.shape) == 1:
+            SFTc.PDMA_Symsolve(self.d0, self.d1, self.d2, u[:-4])
         else:
             raise NotImplementedError
         return u

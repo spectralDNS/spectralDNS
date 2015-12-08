@@ -267,7 +267,7 @@ class BTNmat(object):
     def diags(self):
         return diags([self.ld, self.dd], [-3, -1], shape=self.shape)
 
-class BLLmat(object):
+class BBBmat(object):
     
     def __init__(self, K, quad):
         N = K.shape[0]-4
@@ -289,18 +289,18 @@ class BLLmat(object):
         if len(v.shape) > 1:
             vv = v[:-4]
             c[:N] = self.dd.repeat(array(v.shape[1:]).prod()).reshape(vv.shape) * vv[:]
-            c[:N-2] += self.ud.repeat(array(v.shape[1:]).prod()).reshape(vv[:-2].shape) * vv[:-2]
-            c[:N-4] += self.uud.repeat(array(v.shape[1:]).prod()).reshape(vv[:-4].shape) * vv[:-4]
-            c[2:N]  += self.ld.repeat(array(v.shape[1:]).prod()).reshape(vv[2:].shape) * vv[2:]
-            c[4:N]  += self.lld.repeat(array(v.shape[1:]).prod()).reshape(vv[4:].shape) * vv[4:]
+            c[:N-2] += self.ud.repeat(array(v.shape[1:]).prod()).reshape(vv[2:].shape) * vv[2:]
+            c[:N-4] += self.uud.repeat(array(v.shape[1:]).prod()).reshape(vv[4:].shape) * vv[4:]
+            c[2:N]  += self.ld.repeat(array(v.shape[1:]).prod()).reshape(vv[:-2].shape) * vv[:-2]
+            c[4:N]  += self.lld.repeat(array(v.shape[1:]).prod()).reshape(vv[:-4].shape) * vv[:-4]
             
         else:
             vv = v[:-4]
             c[:N] = self.dd * vv[:]
-            c[:N-2] += self.ud * vv[:-2]
-            c[:N-4] += self.uud * vv[:-4]
-            c[2:N]  += self.ld * vv[2:]
-            c[4:N]  += self.lld * vv[4:]
+            c[:N-2] += self.ud * vv[2:]
+            c[:N-4] += self.uud * vv[4:]
+            c[2:N]  += self.ld * vv[:-2]
+            c[4:N]  += self.lld * vv[:-4]
         return c
     
     def diags(self):
@@ -454,7 +454,77 @@ class CDTmat(object):
     def diags(self):
         return diags(self.ud, [1], shape=self.shape)
     
-class CLLmat(object):
+class CBDmat(object):
+    """Matrix for inner product (u', phi) = (phi', phi) u_hat =  CBDmat * u_hat
+    
+    where u_hat is a vector of coefficients for a Shen Biharmonic basis
+    and phi is a Shen Dirichlet basis.
+    """
+
+    def __init__(self, K, **kwargs):
+        assert len(K.shape) == 1
+        self.shape = shape = (K.shape[0]-4, K.shape[0]-2)
+        N = shape[0]
+        self.ld = -(K[1:N]+1)*pi
+        self.ud = 2*(K[:N+1]+1)*pi     #  N+1 because of diags.
+        self.uud = -(K[:N-1]+1)*pi
+
+    def matvec(self, v):
+        N = self.shape[1]
+        c = zeros(v.shape, dtype=v.dtype)
+        if len(v.shape) > 1:
+            c[1:N] = self.ld.repeat(array(v.shape[1:]).prod()).reshape(v[:N-1].shape)*v[:N-1]
+            c[:N] += self.ud.repeat(array(v.shape[1:]).prod()).reshape(v[1:N+1].shape)*v[1:N+1]
+            c[:N-1]+= self.uud.repeat(array(v.shape[1:]).prod()).reshape(v[3:N+2].shape)*v[3:N+2]
+        else:
+            c[1:N] = self.ld * v[:N-1]
+            c[:N] += self.ud * v[1:N+1]
+            c[:N-1] += self.uud * v[3:N+2]
+        return c
+
+    def diags(self):
+        return diags([self.ld, self.ud, self.uud], [-1, 1, 3], shape=self.shape)
+    
+
+class CDBmat(object):
+    """Matrix for inner product (u', phi) = (phi', phi) u_hat =  CDBmat * u_hat
+    
+    where u_hat is a vector of coefficients for a Shen Dirichlet basis
+    and phi is a Shen Biharmonic basis.
+    """
+
+    def __init__(self, K, **kwargs):
+        assert len(K.shape) == 1
+        self.shape = shape = (K.shape[0]-2, K.shape[0]-4)
+        N = shape[0]
+        self.lld = (K[3:N]+1)**2/(K[3:N]+3)*pi
+        self.ld = -2*(K[1:N]+1)*(K[1:N]+2)/(K[1:N]+3)*pi
+        self.ud = (K[:N-3]+1)*pi
+
+    def matvec(self, v):
+        N, M = self.shape
+        c = zeros(v.shape, dtype=v.dtype)
+        if len(v.shape) > 1:
+            c[3:N] = self.lld.repeat(array(v.shape[1:]).prod()).reshape(v[:M-1].shape) * v[:M-1]
+            c[1:N-1] += self.ld.repeat(array(v.shape[1:]).prod()).reshape(v[:M].shape) * v[:M]
+            c[:N-3] += self.ud.repeat(array(v.shape[1:]).prod()).reshape(v[1:M].shape) * v[1:M]
+            
+        else:
+            c[3:N] = self.lld * v[:M-1]
+            c[1:N-1] += self.ld * v[:M]
+            c[:N-3] += self.ud * v[1:M]
+        return c
+
+    def diags(self):
+        return diags([self.lld, self.ld, self.ud], [-3, -1, 1], shape=self.shape)
+
+    
+class ABBmat(object):
+    """Matrix for inner product (u'', phi) = (phi'', phi) u_hat =  ABBmat * u_hat
+    
+    where u_hat is a vector of coefficients for a Shen Biharmonic basis
+    and phi is a Shen Biharmonic basis.
+    """
 
     def __init__(self, K):
         N = K.shape[0]-4
@@ -543,7 +613,12 @@ class ANNmat(object):
         N = self.shape[0]
         return diags([self.dd] + self.ud, range(0, N, 2))
 
-class ALLmat(object):
+class SBBmat(object):
+    """Matrix for inner product (u'''', phi) = (phi'''', phi) u_hat =  SBBmat * u_hat
+    
+    where u_hat is a vector of coefficients for a Shen Biharmonic basis
+    and phi is a Shen Biharmonic basis.
+    """
     
     def __init__(self, K, quad):
         N = K.shape[0]-4
@@ -552,7 +627,7 @@ class ALLmat(object):
         self.dd = 8.*(k+1.)**2*(k+2.)*(k+4.)*pi
         self.ud = []
         for j in range(2, N, 2):
-            self.ud.append(np.array(8./(j+3.)*pi*(k[:-j]+1.)*(k[:-j]+2.)*(k[:-j]*(k[:-j]+4.)+3.*(j+2.)**2)))    
+            self.ud.append(np.array(8./(k[j:]+3.)*pi*(k[:-j]+1.)*(k[:-j]+2.)*(k[:-j]*(k[:-j]+4.)+3.*(k[j:]+2.)**2)))    
 
         self.ld = None
         

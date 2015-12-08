@@ -1,7 +1,7 @@
 import pytest
-from cbcdns.shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ChebyshevTransform
+from cbcdns.shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ChebyshevTransform, ShenBiharmonicBasis
 from cbcdns.shen.Helmholtz import TDMA, Helmholtz
-from cbcdns.shen.Matrices import BNNmat, BTTmat, BDDmat, CDDmat, CDNmat, BNDmat, CNDmat, BDNmat, ADDmat, ANNmat, CTDmat, BDTmat, CDTmat, BTDmat, BTNmat
+from cbcdns.shen.Matrices import BNNmat, BTTmat, BDDmat, CDDmat, CDNmat, BNDmat, CNDmat, BDNmat, ADDmat, ANNmat, CTDmat, BDTmat, CDTmat, BTDmat, BTNmat, BBBmat, ABBmat, SBBmat, CDBmat, CBDmat
 from cbcdns.shen import SFTc
 
 from cbcdns import config
@@ -17,7 +17,7 @@ import scipy.sparse.linalg as la
 N = 12
 x = Symbol("x")
 
-@pytest.fixture(params=("NGC", "NGL", "DGC", "DGL", "CGC", "CGL"))
+@pytest.fixture(params=("NGC", "NGL", "DGC", "DGL", "CGC", "CGL", "BGL", "BGC"))
 def ST(request):
     if request.param[0] == 'N':
         return ShenNeumannBasis(request.param[1:])
@@ -25,6 +25,8 @@ def ST(request):
         return ShenDirichletBasis(request.param[1:])
     elif request.param[0] == 'C':
         return ChebyshevTransform(request.param[1:])
+    elif request.param[0] == 'B':
+        return ShenBiharmonicBasis(request.param[1:])
 
 @pytest.fixture(params=("NGC", "NGL", "DGC", "DGL"))
 def ST2(request):
@@ -141,6 +143,12 @@ def test_BNNmat(ST):
         fj = ST.ifst(f_hat, fj)
         u0 = ST.fastShenScalar(fj, u0)
         f_hat = ST.fst(fj, f_hat)
+    elif ST.__class__.__name__ == "ShenBiharmonicBasis":
+        B = BBBmat(np.arange(N).astype(np.float), ST.quad)
+        f_hat = ST.fst(fj, f_hat)
+        fj = ST.ifst(f_hat, fj)
+        u0 = ST.fastShenScalar(fj, u0)
+        f_hat = ST.fst(fj, f_hat)        
     else:
         B = BTTmat(np.arange(N).astype(np.float), ST.quad)
         f_hat = ST.fct(fj, f_hat)
@@ -149,21 +157,23 @@ def test_BNNmat(ST):
         f_hat = ST.fct(fj, f_hat)
 
     u2 = B.matvec(f_hat)
-    
+    #from IPython import embed; embed()
     assert np.allclose(u2, u0)
     
     # Multidimensional version
     fj = fj.repeat(16).reshape((N, 4, 4)) + 1j*fj.repeat(16).reshape((N, 4, 4))
     u0 = np.zeros((N, 4, 4), dtype=np.complex)
     f_hat = np.zeros((N, 4, 4), dtype=np.complex)
-    if ST.__class__.__name__ in ("ShenNeumannBasis", "ShenDirichletBasis"):
-        u0 = ST.fastShenScalar(fj, u0)
-        f_hat = ST.fst(fj, f_hat)
-    else:
+    if ST.__class__.__name__ in ("ChebyshevTransform"):
         u0 = ST.fastChebScalar(fj, u0)
         f_hat = ST.fct(fj, f_hat)
+    else:
+        u0 = ST.fastShenScalar(fj, u0)
+        f_hat = ST.fst(fj, f_hat)
     u2 = B.matvec(f_hat)
     assert np.allclose(u2, u0)
+
+#test_BNNmat(ShenBiharmonicBasis("GL"))
 
 def test_BDNmat(S1S2):
     S1, S2 = S1S2
@@ -261,7 +271,7 @@ def test_transforms(ST):
     fj = np.random.random(N)    
 
     # Project function to space first
-    if ST.__class__.__name__ in ("ShenNeumannBasis", "ShenDirichletBasis"):
+    if not ST.__class__.__name__ == "ChebyshevTransform":
         f_hat = np.zeros(N)
         f_hat = ST.fst(fj, f_hat)
         fj = ST.ifst(f_hat, fj)
@@ -289,9 +299,10 @@ def test_transforms(ST):
     else:
         u0 = ST.fst(fj, u0)
         u1 = ST.ifst(u0, u1)
+    
     assert np.allclose(fj, u1)
 
-#test_transforms(ShenDirichletBasis("GC"))
+#test_transforms(ShenBiharmonicBasis("GC"))
 
 def test_FST(ST):
     FST = FastShenFourierTransform(np.array([N, 4, 4]), MPI)
@@ -299,7 +310,7 @@ def test_FST(ST):
     fj = np.random.random((N,4,4))    
     f_hat = fj.copy()
     
-    if ST.__class__.__name__ in ("ShenNeumannBasis", "ShenDirichletBasis"):
+    if not ST.__class__.__name__ == "ChebyshevTransform":
         f_hat = ST.fst(fj, f_hat)
         fj = ST.ifst(f_hat, fj)
 
@@ -315,6 +326,8 @@ def test_FST(ST):
 
     #from IPython import embed; embed()
     assert np.allclose(fj, u0)
+
+#test_FST(ShenBiharmonicBasis("GC"))    
     
 def test_CDDmat(SD):
     M = 256
@@ -517,7 +530,7 @@ def test_Mult_Div():
     
     assert np.allclose(uu, b)
 
-test_Mult_Div()
+#test_Mult_Div()
 
 def test_ADDmat(ST2):
     M = 2*N

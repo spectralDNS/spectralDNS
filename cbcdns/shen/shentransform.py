@@ -4,9 +4,8 @@ from cbcdns.fft.wrappyfftw import dct
 from cbcdns import config
 import SFTc
 import scipy.sparse.linalg as la
-from cbcdns.shen.Helmholtz import TDMA
-from cbcdns.shenGeneralBCs import SFTc as SF
-from cbcdns.shen.Matrices import BLLmat
+from cbcdns.shen.Helmholtz import TDMA, PDMA
+from cbcdns.shen.Matrices import BBBmat
 """
 Fast transforms for pure Chebyshev basis or 
 Shen's Chebyshev basis: 
@@ -258,40 +257,9 @@ class ShenNeumannBasis(ShenDirichletBasis):
         fj = self.ifct(self.w_hat, fj)
         return fj
 
-class PDMA(object):
-    
-    def __init__(self, quad="GL"):
-        self.quad = quad
-        self.B = None
-        self.bc = None
-        self.s = None
-        
-    def init(self, N):
-        self.B = BLLmat(np.arange(N).astype(np.float), self.quad)
-        self.s = slice(0, N-4)
-        
-    def __call__(self, u):
-        N = u.shape[0]
-        if self.B is None:
-            self.init(N)
-        if len(u.shape) == 3:
-            pass
-            #SF.PDMA_3D(self.B.dd, self.B.ud, self.B.uud, self.B.ld, self.B.lld, u[self.s])
-        elif len(u.shape) == 1:            
-            b = u[:-4].copy()
-            #lld = np.zeros(len(self.B.dd))
-            #ld = np.zeros(len(self.B.dd))
-            #lld[2:] = self.B.lld
-            #ld[1:] = self.B.ld
-            #SF.PDMA_1D(self.B.lld, self.B.ld, self.B.dd, self.B.ud, self.B.uud, b, u[self.s])
-            u[:-4] = la.spsolve(self.B.diags(), b)
-        else:
-            raise NotImplementedError
-        return u
-
 class ShenBiharmonicBasis(ShenDirichletBasis):
     
-    def __init__(self, quad="GC", fast_transform=False):
+    def __init__(self, quad="GC", fast_transform=True):
         ShenDirichletBasis.__init__(self, quad, fast_transform)
         self.factor1 = None
         self.factor2 = None
@@ -300,7 +268,6 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
     def init(self, N):
         self.points, self.weights = self.points_and_weights(N)
         k = self.wavenumbers(N)
-        #from IPython import embed; embed()
         # Build Vandermonde matrix.
         self.V = n_cheb.chebvander(self.points, N-5).T - (2*(k+2)/(k+3))[:, np.newaxis]*n_cheb.chebvander(self.points, N-3)[:, 2:].T + ((k+1)/(k+3))[:, np.newaxis]*n_cheb.chebvander(self.points, N-1)[:, 4:].T
         

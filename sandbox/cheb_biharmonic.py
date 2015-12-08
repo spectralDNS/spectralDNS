@@ -19,39 +19,37 @@ The equation to be solved for is
 
     (\nabla^4 u, \phi_k)_w - a(\nabla^2 u, \phi_k)_w + b(u, \phi_k)_w = (f, \phi_k)_w 
     
-    (A + aC + bB) u = f
+    (A - aC + bB) u = f
 """
-
 
 # Use sympy to compute a rhs, given an analytical solution
 x = Symbol("x")
 u = sin(2*pi*x)**2
-a = 0.0
-b = 0.0
+a = 1.0
+b = 1.0
 f = u.diff(x, 4) - a*u.diff(x, 2) + b*u
 
-SD = ShenBiharmonicBasis("GL", True)
-N = 120
+SD = ShenBiharmonicBasis("GC", True)
+N = 30
 points, weights = SD.points_and_weights(N) 
 
 uj = np.array([u.subs(x, j) for j in points], dtype=float)
 fj = np.array([f.subs(x, j) for j in points], dtype=float)     # Get f on quad points
 
 k = np.arange(N).astype(np.float)
-A = ALLmat(k, SD.quad)
-B = BLLmat(k, SD.quad)
-C = CLLmat(k)
+A = SBBmat(k, SD.quad)
+B = BBBmat(k, SD.quad)
+C = ABBmat(k)
 
-#AA = A.diags() + B.diags() + C.diags()
-AA = A.diags().toarray()
+AA = A.diags() + B.diags() - C.diags()
+#AA = A.diags().toarray()
 f_hat = np.zeros(N)
 f_hat = SD.fastShenScalar(fj, f_hat)
 u_hat = np.zeros(N)
-#u_hat[:-4] = la.spsolve(AA, f_hat[:-4])
-u_hat[:-4] = solve(AA, f_hat[:-4])
+u_hat[:-4] = la.spsolve(AA, f_hat[:-4])
+#u_hat[:-4] = solve(AA, f_hat[:-4])
 u1 = np.zeros(N)
 u1 = SD.ifst(u_hat, u1)
-
 
 fr = np.random.randn(N)
 fr[-4:] = 0
