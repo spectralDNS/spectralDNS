@@ -1,7 +1,8 @@
 from cbcdns import config
-from numpy import zeros, ones, arange, pi, float, complex, int
-from Matrices import BBBmat
+from numpy import zeros, ones, arange, pi, float, complex, int, complex128
+from Matrices import BBBmat, SBBmat, ABBmat
 import SFTc
+from scipy.linalg import lu_factor, lu_solve, solve
 
 class Helmholtz(object):
 
@@ -11,16 +12,31 @@ class Helmholtz(object):
         self.alfa = alfa
         self.neumann = neumann
         M = (N-4)/2 if neumann else (N-3)/2
-        Ny, Nz = alfa.shape
-        self.u0 = zeros((2, M+1, Ny, Nz), float)   # Diagonal entries of U
-        self.u1 = zeros((2, M, Ny, Nz), float)     # Diagonal+1 entries of U
-        self.u2 = zeros((2, M-1, Ny, Nz), float)   # Diagonal+2 entries of U
-        self.L  = zeros((2, M, Ny, Nz), float)     # The single nonzero row of L 
-        self.s = slice(1, N-2) if neumann else slice(0, N-2) 
-        SFTc.LU_Helmholtz_3D(N, neumann, quad=="GL", self.alfa, self.u0, self.u1, self.u2, self.L)  
+        if hasattr(alfa, "__len__"):
+            Ny, Nz = alfa.shape
+            self.u0 = zeros((2, M+1, Ny, Nz), float)   # Diagonal entries of U
+            self.u1 = zeros((2, M, Ny, Nz), float)     # Diagonal+1 entries of U
+            self.u2 = zeros((2, M-1, Ny, Nz), float)   # Diagonal+2 entries of U
+            self.L  = zeros((2, M, Ny, Nz), float)     # The single nonzero row of L 
+            self.s = slice(1, N-2) if neumann else slice(0, N-2) 
+            SFTc.LU_Helmholtz_3D(N, neumann, quad=="GL", self.alfa, self.u0, self.u1, self.u2, self.L)  
+        else:
+            self.u0 = zeros((2, M+1), float)   # Diagonal entries of U
+            self.u1 = zeros((2, M), float)     # Diagonal+1 entries of U
+            self.u2 = zeros((2, M-1), float)   # Diagonal+2 entries of U
+            self.L  = zeros((2, M), float)     # The single nonzero row of L 
+            self.s = slice(1, N-2) if neumann else slice(0, N-2) 
+            SFTc.LU_Helmholtz_1D(N, neumann, quad=="GL", self.alfa, self.u0, self.u1, self.u2, self.L)  
 
     def __call__(self, u, b):
-        SFTc.Solve_Helmholtz_3D_complex(self.N, self.neumann, b[self.s], u[self.s], self.u0, self.u1, self.u2, self.L)
+        if len(u.shape) > 1:
+            SFTc.Solve_Helmholtz_3D_complex(self.N, self.neumann, b[self.s], u[self.s], self.u0, self.u1, self.u2, self.L)
+        else:
+            if u.dtype == complex128:
+                SFTc.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s].real, u[self.s].real, self.u0, self.u1, self.u2, self.L)
+                SFTc.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s].imag, u[self.s].imag, self.u0, self.u1, self.u2, self.L)
+            else:
+                SFTc.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s], u[self.s], self.u0, self.u1, self.u2, self.L)
         return u
 
 class TDMA(object):
@@ -90,3 +106,57 @@ class PDMA(object):
         else:
             raise NotImplementedError
         return u
+
+class Biharmonic(object):
+    
+    def __init__(self, N, a0, alfa, beta, quad="GL"):
+        self.quad = quad
+        k = arange(N).astype(float)
+        self.S = S = SBBmat(k)
+        self.B = B = BBBmat(k, self.quad)
+        self.A = A = ABBmat(k)
+        self.a0 = a0
+        self.alfa = alfa
+        self.beta = beta
+        if hasattr(beta, "__len__"):
+            Ny, Nz = beta.shape
+            self.Le = Le = []
+            self.Lo = Lo = []
+            for i in range(Ny):
+                Lej = []
+                Loj = []
+                for j in range(Nz):
+                    AA = a0*S.diags().toarray() + alfa[i, j]*A.diags().toarray() + beta[i, j]*B.diags().toarray()
+                    Ae = AA[::2, ::2]
+                    Ao = AA[1::2, 1::2]
+                    Lej.append(lu_factor(Ae))
+                    Loj.append(lu_factor(Ao))
+                Le.append(Lej)
+                Lo.append(Loj)
+        else:
+            AA = a0*S.diags().toarray() + alfa*A.diags().toarray() + beta*B.diags().toarray()
+            Ae = AA[::2, ::2]
+            Ao = AA[1::2, 1::2]
+            self.Le = lu_factor(Ae)
+            self.Lo = lu_factor(Ao)
+            
+        
+    def __call__(self, u, b):
+        #uu = u[:-4]
+        #bb = b[:-4]
+        if len(u.shape) == 3:
+            Ny, Nz = u.shape[1:]
+            for i in range(Ny):
+                for j in range(Nz):
+                    u[:-4:2, i, j] = lu_solve(self.Le[i][j], b[:-4:2, i, j])
+                    u[1:-4:2, i, j] = lu_solve(self.Lo[i][j], b[1:-4:2, i, j])
+                    #AA = self.a0*self.S.diags().toarray() + self.alfa[i, j]*self.A.diags().toarray() + self.beta[i, j]*self.B.diags().toarray()
+                    #u[:-4:2, i, j] = solve(AA[::2, ::2], b[:-4:2, i, j])
+                    #u[1:-4:2, i, j] = solve(AA[1::2, 1::2], b[1:-4:2, i, j])
+                    #u[:-4, i, j] = solve(AA, b[:-4, i, j])
+                    
+        else:
+            u[:-4:2] = lu_solve(self.Le, b[:-4:2])
+            u[1:-4:2] = lu_solve(self.Lo, b[1:-4:2])
+        return u
+        
