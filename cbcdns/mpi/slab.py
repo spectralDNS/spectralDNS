@@ -263,6 +263,8 @@ def setupShenKMM(comm, float, complex, mpitype, N, L, mgrid,
     diff0   = empty((3,)+FST.complex_shape(), dtype=complex)
     Source  = empty((3,)+FST.real_shape(), dtype=float) 
     Sk      = empty((3,)+FST.complex_shape(), dtype=complex) 
+    P     = empty(FST.real_shape(), dtype=float)
+    P_hat = empty(FST.complex_shape(), dtype=complex)
 
     kx = arange(N[0]).astype(float)
     ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
