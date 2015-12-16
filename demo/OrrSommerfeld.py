@@ -40,14 +40,14 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, conv1, FST, U_tmp,
     OS = OrrSommerfeld(Re=config.Re, N=80)
     initOS(OS, U0, U_hat0, X, FST)
     e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
-    conv1 = conv(conv1, U0, U_hat0)
-    if not config.solver in ("ChannelRK4", "KMM"):
+    if not config.solver in ("ChannelRK4", "KMM", "KMMRK3"):
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
         for i in range(3):
             U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
+        conv1 = conv(conv1, U0, U_hat0)
 
         initOS(OS, U, U_hat, X, FST, t=dt)
         for i in range(3):
@@ -69,6 +69,29 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, conv1, FST, U_tmp,
         U_hat0[:] = U_hat
         config.t = dt
         config.tstep = 1
+
+    elif config.solver == "ChannelRK4":        
+        for i in range(3):
+            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
+        for i in range(3):
+            U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
+        for i in range(3):
+            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
+        conv1 = conv(conv1, U0, U_hat0)
+
+        initOS(OS, U, U_hat, X, FST, t=dt)
+        for i in range(3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
+        for i in range(3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)
+        for i in range(3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
+
+        U0[:] = U
+        U_hat0[:] = U_hat
+        config.t = dt
+        config.tstep = 1
+        
     else:
         U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB']) 
         for i in range(1, 3):
@@ -76,7 +99,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, conv1, FST, U_tmp,
         U0[0] = FST.ifst(U_hat0[0], U0[0], kw['SB'])
         for i in range(1, 3):
             U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
-        
+        conv1 = conv(conv1, U0, U_hat0)
         
         initOS(OS, U, U_hat, X, FST, t=dt)
         U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB']) 
@@ -98,10 +121,7 @@ def set_Source(Source, Sk, FST, ST, **kw):
     Source[:] = 0
     Source[1] = -2./config.Re
     Sk[:] = 0
-    if not config.solver == "KMM":
-        Sk[1] = FST.fss(Source[1], Sk[1], ST)
-    else:
-        Sk[1] = FST.fst(Source[1], Sk[1], ST)
+    Sk[1] = FST.fss(Source[1], Sk[1], ST)
         
 im1, im2, im3, im4 = (None, )*4        
 def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, **kw):

@@ -57,6 +57,9 @@ def get_solver(update=None, regression_test=None, family="Isotropic"):
             
         elif config.solver == 'KMM':
             import cbcdns.solvers.ShenKMM as solver
+
+        elif config.solver == 'KMMRK3':
+            import cbcdns.solvers.ShenKMMRK3 as solver
         
         else:
             raise AttributeError("Wrong solver!")
