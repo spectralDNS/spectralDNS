@@ -49,20 +49,26 @@ def Cross(a, b, c, S):
     c[2] = FST.fst(a[0]*b[1]-a[1]*b[0], c[2], S)
     return c
 
-def Curl(a, c, S):
+def CrossR(a, b, c):
+    c[0] = a[1]*b[2]-a[2]*b[1]
+    c[1] = a[2]*b[0]-a[0]*b[2]
+    c[2] = a[0]*b[1]-a[1]*b[0]
+    return c
+
+def Curl(a_hat, c, S):
     F_tmp[:] = 0
     U_tmp2[:] = 0
-    SFTc.Mult_CTD_3D(N[0], a[1], a[2], F_tmp[1], F_tmp[2])
+    SFTc.Mult_CTD_3D(N[0], a_hat[1], a_hat[2], F_tmp[1], F_tmp[2])
     dvdx = U_tmp2[1] = FST.ifct(F_tmp[1], U_tmp2[1], S)
     dwdx = U_tmp2[2] = FST.ifct(F_tmp[2], U_tmp2[2], S)
-    c[0] = FST.ifst(1j*K[1]*a[2] - 1j*K[2]*a[1], c[0], S)
-    c[1] = FST.ifst(1j*K[2]*a[0], c[1], SB)
+    #c[0] = FST.ifst(1j*K[1]*a_hat[2] - 1j*K[2]*a_hat[1], c[0], S)
+    c[0] = FST.ifst(g, c[0], ST)
+    c[1] = FST.ifst(1j*K[2]*a_hat[0], c[1], SB)
     c[1] -= dwdx
-    c[2] = FST.ifst(1j*K[1]*a[0], c[2], SB)
+    c[2] = FST.ifst(1j*K[1]*a_hat[0], c[2], SB)
     c[2] *= -1.0
     c[2] += dvdx
     return c
-
 
 #@profile
 def standardConvection(c, U, U_hat):
@@ -71,7 +77,7 @@ def standardConvection(c, U, U_hat):
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = CDD.matvec(U_hat[0])
+    F_tmp[0] = CDB.matvec(U_hat[0])
     F_tmp[0] = TDMASolverD(F_tmp[0])    
     dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)   
         
@@ -88,7 +94,8 @@ def standardConvection(c, U, U_hat):
     dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], SB)    
     dudz_h = 1j*K[2]*U_hat[0]
     dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], SB)
-    c[0] = FST.fst(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST)
+    H[0] = U[0]*dudx + U[1]*dudy + U[2]*dudz
+    c[0] = FST.fst(H[0], c[0], ST)
     
     U_tmp2[:] = 0
     
@@ -101,7 +108,8 @@ def standardConvection(c, U, U_hat):
     
     dvdz_h = 1j*K[2]*U_hat[1]
     dvdz = U_tmp2[1] = FST.ifst(dvdz_h, U_tmp2[1], ST)
-    c[1] = FST.fst(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST)
+    H[1] = U[0]*dvdx + U[1]*dvdy + U[2]*dvdz
+    c[1] = FST.fst(H[1], c[1], ST)
     
     U_tmp2[:] = 0
     dwdy_h = 1j*K[1]*U_hat[2]
@@ -115,7 +123,8 @@ def standardConvection(c, U, U_hat):
     #dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], SN)    
     #########
     
-    c[2] = FST.fst(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST)
+    H[2] = U[0]*dwdx + U[1]*dwdy + U[2]*dwdz
+    c[2] = FST.fst(H[2], c[2], ST)
     
     return c
 
@@ -123,17 +132,19 @@ def standardConvection(c, U, U_hat):
 def getConvection(convection):
     if convection == "Standard":
         
-        def Conv(dU, U, U_hat):
-            dU = standardConvection(dU, U, U_hat)
-            dU[:] *= -1 
-            return dU
+        def Conv(H_hat, U, U_hat):
+            H_hat = standardConvection(H_hat, U, U_hat)
+            H_hat[:] *= -1 
+            return H_hat
 
     elif convection == "Vortex":
         
-        def Conv(dU, U, U_hat):
+        def Conv(H_hat, U, U_hat):
             U_tmp[:] = Curl(U_hat, U_tmp, ST)
-            dU = Cross(U, U_tmp, dU, ST)
-            return dU
+            H[:] = CrossR(U, U_tmp, H)
+            for i in range(3):
+                H_hat[i] = FST.fst(H[i], H_hat[i], ST)
+            return H_hat
         
     return Conv           
 
@@ -141,9 +152,9 @@ conv = getConvection(config.convection)
     
 #@profile
 def ComputeRHS(dU):
-    global conv0, hv
+    global hv
     
-    conv0 = conv(conv0, U0, U_hat0)    
+    H_hat[:] = conv(H_hat, U0, U_hat0)    
     diff0[:] = 0
     
     # Compute diffusion for g-equation
@@ -155,14 +166,22 @@ def ComputeRHS(dU):
     diff0[0] -= (K2 - nu*dt/2.*K2**2)*BBB.matvec(u)
     
     # Compute convection
-    H_hat = F_tmp
-    H_hat[:] = 1.5*conv0 - 0.5*conv1
-    H_hat[:] *= dealias    
+    H0[:] = 1.5*H - 0.5*H1
+    H_hat0[:] = 1.5*H_hat - 0.5*H_hat1
+    H_hat0[:] *= dealias    
     
-    hv[:] = -K2*BBD.matvec(H_hat[0])
+    #hv[:] = -K2*BBD.matvec(H_hat0[0])
+    #hv -= 1j*K[1]*CBD.matvec(H_hat0[1])
+    #hv -= 1j*K[2]*CBD.matvec(H_hat0[2])    
+    hv[:] = FST.fss(H0[0], hv, SB)
+    hv *= -K2
     hv -= 1j*K[1]*CBD.matvec(H_hat[1])
     hv -= 1j*K[2]*CBD.matvec(H_hat[2])    
-    hg[:] = 1j*K[1]*BDD.matvec(H_hat[2]) - 1j*K[2]*BDD.matvec(H_hat[1])
+    
+    #hg[:] = 1j*K[1]*BDD.matvec(H_hat[2]) - 1j*K[2]*BDD.matvec(H_hat[1])
+    F_tmp[1] = FST.fss(H[1], F_tmp[1], ST)
+    F_tmp[2] = FST.fss(H[2], F_tmp[2], ST)
+    hg[:] = 1j*K[1]*F_tmp[2] - 1j*K[2]*F_tmp[1]
     
     dU[0] = hv*dt + diff0[0]
     dU[1] = hg*2./nu + diff0[1]
@@ -176,7 +195,7 @@ def regression_test(**kw):
 def solve():
     timer = Timer()
     
-    while config.t < config.T-1e-10:
+    while config.t < config.T-1e-14:
         config.t += dt
         config.tstep += 1
 
@@ -194,18 +213,15 @@ def solve():
         U_hat[2] = -1j*(K_over_K2[2]*f_hat + K_over_K2[1]*g) 
         
         # Remains to fix wavenumber 0
-        H_hat = F_tmp
-        H_hat[:] = 1.5*conv0 - 0.5*conv1
-        H_hat[:] *= dealias    
         
         u0_hat = zeros((3, N[0]), dtype=complex)
         h0_hat = zeros((3, N[0]), dtype=complex)
-        h0_hat[1] = H_hat[1, :, 0, 0]
-        h0_hat[2] = H_hat[2, :, 0, 0]
+        h0_hat[1] = H_hat0[1, :, 0, 0]
+        h0_hat[2] = H_hat0[2, :, 0, 0]
         u0_hat[1] = U_hat0[1, :, 0, 0]
         u0_hat[2] = U_hat0[2, :, 0, 0]
         
-        w = 2./nu * BDD.matvec(h0_hat[1])
+        w = 2./nu * BDD.matvec(h0_hat[1])        
         w -= 2./nu * Sk[1, :, 0, 0]        
         w -= ADD.matvec(u0_hat[1])
         w += 2./nu/dt * BDD.matvec(u0_hat[1])        
@@ -228,7 +244,8 @@ def solve():
         # Rotate velocities
         U_hat0[:] = U_hat
         U0[:] = U
-        conv1[:] = conv0
+        H1[:] = H
+        H_hat1[:] = H_hat
                 
         timer()
         

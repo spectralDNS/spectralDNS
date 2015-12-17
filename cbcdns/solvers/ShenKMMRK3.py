@@ -62,7 +62,8 @@ def Curl(a, c, S):
     SFTc.Mult_CTD_3D(N[0], a[1], a[2], F_tmp[1], F_tmp[2])
     dvdx = U_tmp2[1] = FST.ifct(F_tmp[1], U_tmp2[1], S)
     dwdx = U_tmp2[2] = FST.ifct(F_tmp[2], U_tmp2[2], S)
-    c[0] = FST.ifst(1j*K[1]*a[2] - 1j*K[2]*a[1], c[0], S)
+    #c[0] = FST.ifst(1j*K[1]*a[2] - 1j*K[2]*a[1], c[0], S)
+    c[0] = FST.ifst(g, c[0], S)
     c[1] = FST.ifst(1j*K[2]*a[0], c[1], SB)
     c[1] -= dwdx
     c[2] = FST.ifst(1j*K[1]*a[0], c[2], SB)
@@ -77,7 +78,7 @@ def standardConvection(c, U, U_hat):
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = CDD.matvec(U_hat[0])
+    F_tmp[0] = CDB.matvec(U_hat[0])
     F_tmp[0] = TDMASolverD(F_tmp[0])    
     dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)   
         
@@ -91,9 +92,9 @@ def standardConvection(c, U, U_hat):
     
     U_tmp2[:] = 0
     dudy_h = 1j*K[1]*U_hat[0]
-    dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], ST)    
+    dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], SB)    
     dudz_h = 1j*K[2]*U_hat[0]
-    dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], ST)
+    dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], SB)
     c[0] = FST.fst(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST)
     
     U_tmp2[:] = 0

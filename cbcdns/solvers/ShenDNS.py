@@ -67,9 +67,12 @@ def body_force(Sk, dU):
     return dU
 
 def Cross(a, b, c, S):
-    c[0] = FST.fss(a[1]*b[2]-a[2]*b[1], c[0], S)
-    c[1] = FST.fss(a[2]*b[0]-a[0]*b[2], c[1], S)
-    c[2] = FST.fss(a[0]*b[1]-a[1]*b[0], c[2], S)
+    H[0] = a[1]*b[2]-a[2]*b[1]
+    H[1] = a[2]*b[0]-a[0]*b[2]
+    H[2] = a[0]*b[1]-a[1]*b[0]
+    c[0] = FST.fss(H[0], c[0], S)
+    c[1] = FST.fss(H[1], c[1], S)
+    c[2] = FST.fss(H[2], c[2], S)
     return c
 
 def Curl(a, c, S):
@@ -136,7 +139,8 @@ def standardConvection(c, U, U_hat):
     dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], ST)    
     dudz_h = 1j*K[2]*U_hat[0]
     dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], ST)
-    c[0] = FST.fss(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST)
+    H[0] = U[0]*dudx + U[1]*dudy + U[2]*dudz
+    c[0] = FST.fss(H[0], c[0], ST)
     
     U_tmp2[:] = 0
     
@@ -149,7 +153,8 @@ def standardConvection(c, U, U_hat):
     
     dvdz_h = 1j*K[2]*U_hat[1]
     dvdz = U_tmp2[1] = FST.ifst(dvdz_h, U_tmp2[1], ST)
-    c[1] = FST.fss(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST)
+    H[1] = U[0]*dvdx + U[1]*dvdy + U[2]*dvdz
+    c[1] = FST.fss(H[1], c[1], ST)
     
     U_tmp2[:] = 0
     dwdy_h = 1j*K[1]*U_hat[2]
@@ -162,55 +167,12 @@ def standardConvection(c, U, U_hat):
     #dwdz_h = 1j*K[2]*F_tmp[0]    
     #dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], SN)    
     #########
-    
-    c[2] = FST.fss(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST)
+    H[2] = U[0]*dwdx + U[1]*dwdy + U[2]*dwdz
+    c[2] = FST.fss(H[2], c[2], ST)
     
     # Reset
     SN.quad = quad
 
-    return c
-
-def standardConvection2(c, U, U_hat):
-    c[:] = 0
-    U_tmp[:] = 0
-    
-    # dudx = 0 from continuity equation. Use Shen Dirichlet basis
-    # Use regular Chebyshev basis for dvdx and dwdx
-    #F_tmp[0] = CDD.matvec(U_hat[0])
-    #F_tmp[0] = TDMASolverD(F_tmp[0])    
-    #dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)        
-    
-    SFTc.Mult_CTD_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = U_tmp[1] = FST.ifct(F_tmp[1], U_tmp[1], ST)
-    dwdx = U_tmp[2] = FST.ifct(F_tmp[2], U_tmp[2], ST)
-    
-    #dudx = U_tmp[0] = chebDerivative_3D0(U[0], U_tmp[0])
-    #dvdx = U_tmp[1] = chebDerivative_3D0(U[1], U_tmp[1])
-    #dwdx = U_tmp[2] = chebDerivative_3D0(U[2], U_tmp[2])    
-    
-    U_tmp2[:] = 0
-    dvdy_h = 1j*K[1]*U_hat[1]
-    dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], ST)
-    dvdz_h = 1j*K[2]*U_hat[1]
-    dvdz = U_tmp2[1] = FST.ifst(dvdz_h, U_tmp2[1], ST)
-    c[1] = FST.fss(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST)
-    dudx = -dvdy.copy()
-    
-    U_tmp2[:] = 0
-    dwdy_h = 1j*K[1]*U_hat[2]
-    dwdy = U_tmp2[0] = FST.ifst(dwdy_h, U_tmp2[0], ST)
-    dwdz_h = 1j*K[2]*U_hat[2]
-    dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
-    c[2] = FST.fss(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST)
-    dudx -= dwdz
-    
-    U_tmp2[:] = 0
-    dudy_h = 1j*K[1]*U_hat[0]
-    dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], ST)
-    dudz_h = 1j*K[2]*U_hat[0]
-    dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], ST)
-    c[0] = FST.fss(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST)
-    
     return c
 
 
@@ -249,39 +211,32 @@ def divergenceConvection(c, U, U_hat, add=False):
 def getConvection(convection):
     if convection == "Standard":
         
-        def Conv(dU, U, U_hat):
-            dU = standardConvection(dU, U, U_hat)
-            dU[:] *= -1 
-            return dU
+        def Conv(H_hat, U, U_hat):
+            H_hat = standardConvection(H_hat, U, U_hat)
+            H_hat[:] *= -1 
+            return H_hat
 
-    elif convection == "Standard2":
-        
-        def Conv(dU, U, U_hat):
-            dU = standardConvection(dU, U, U_hat)
-            dU[:] *= -1 
-            return dU
-        
     elif convection == "Divergence":
         
-        def Conv(dU, U, U_hat):
-            dU = divergenceConvection(dU, U, U_hat, False)
-            dU[:] *= -1
-            return dU
+        def Conv(H_hat, U, U_hat):
+            H_hat = divergenceConvection(H_hat, U, U_hat, False)
+            H_hat[:] *= -1
+            return H_hat
         
     elif convection == "Skewed":
         
-        def Conv(dU, U, U_hat):
-            dU = standardConvection(dU, U, U_hat)
-            dU = divergenceConvection(dU, U, U_hat, True)        
+        def Conv(H_hat, U, U_hat):
+            H_hat = standardConvection(H_hat, U, U_hat)
+            H_hat = divergenceConvection(H_hat, U, U_hat, True)        
             dU *= -0.5
             return dU
-        
+
     elif convection == "Vortex":
         
-        def Conv(dU, U, U_hat):
+        def Conv(H_hat, U, U_hat):
             U_tmp[:] = Curl(U_hat, U_tmp, ST)
-            dU = Cross(U, U_tmp, dU, ST)
-            return dU
+            H_hat[:] = Cross(U, U_tmp, H_hat, ST)
+            return H_hat
         
     return Conv           
 
@@ -289,10 +244,10 @@ conv = getConvection(config.convection)
     
 #@profile
 def ComputeRHS(dU, jj):
-    global conv0
+    global H_hat
     # Add convection to rhs
     if jj == 0:
-        conv0 = conv(conv0, U0, U_hat0)
+        H_hat = conv(H_hat, U0, U_hat0)
         
         # Compute diffusion
         diff0[:] = 0
@@ -300,18 +255,21 @@ def ComputeRHS(dU, jj):
         SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, U_hat0[1], diff0[1])
         SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, U_hat0[2], diff0[2])    
     
-    dU[:3] = 1.5*conv0 - 0.5*conv1
-    dU[:3] *= dealias    
+    H0[:] = 1.5*H - 0.5*H1
+    H_hat0[:] = 1.5*H_hat - 0.5*H_hat1
+    H_hat0[:] *= dealias    
+
+    dU[:] = H_hat0
     
     # Add pressure gradient and body force
     dU = pressuregrad(P, P_hat, dU)
     dU = body_force(Sk, dU)
     
     # Scale by 2/nu factor
-    dU[:3] *= 2./nu
+    dU[:] *= 2./nu
     
     # Add diffusion
-    dU[:3] += diff0
+    dU[:] += diff0
         
     return dU
 
@@ -381,7 +339,8 @@ def solve():
         U0[:] = U
         
         P[:] = FST.ifst(P_hat, P, SN)        
-        conv1[:] = conv0
+        H_hat1[:] = H_hat
+        H1[:] = H
                 
         timer()
         

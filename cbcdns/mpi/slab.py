@@ -181,8 +181,13 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
 
     dU      = empty((3,)+FST.complex_shape(), dtype=complex)
 
-    conv0   = empty((3,)+FST.complex_shape(), dtype=complex)
-    conv1   = empty((3,)+FST.complex_shape(), dtype=complex)
+    H        = empty((3,)+FST.real_shape(), dtype=float)
+    H0       = empty((3,)+FST.real_shape(), dtype=float)
+    H1       = empty((3,)+FST.real_shape(), dtype=float)
+    H_hat    = empty((3,)+FST.complex_shape(), dtype=complex)
+    H_hat0   = empty((3,)+FST.complex_shape(), dtype=complex)
+    H_hat1   = empty((3,)+FST.complex_shape(), dtype=complex)
+
     diff0   = empty((3,)+FST.complex_shape(), dtype=complex)
     Source  = empty((3,)+FST.real_shape(), dtype=float) 
     Sk      = empty((3,)+FST.complex_shape(), dtype=complex) 
@@ -250,14 +255,19 @@ def setupShenKMM(comm, float, complex, mpitype, N, L, mgrid,
     u = U_hat0[0]
     g = empty(FST.complex_shape(), dtype=complex)
 
+    H        = empty((3,)+FST.real_shape(), dtype=float)
+    H0       = empty((3,)+FST.real_shape(), dtype=float)
+    H1       = empty((3,)+FST.real_shape(), dtype=float)
+    H_hat    = empty((3,)+FST.complex_shape(), dtype=complex)
+    H_hat0   = empty((3,)+FST.complex_shape(), dtype=complex)
+    H_hat1   = empty((3,)+FST.complex_shape(), dtype=complex)
+    
     U_tmp   = empty((3,)+FST.real_shape(), dtype=float)
     U_tmp2  = empty((3,)+FST.real_shape(), dtype=float)
     F_tmp   = empty((3,)+FST.complex_shape(), dtype=complex)
     F_tmp2  = empty((3,)+FST.complex_shape(), dtype=complex)
 
     dU      = empty((3,)+FST.complex_shape(), dtype=complex)
-    conv0   = empty((3,)+FST.complex_shape(), dtype=complex)
-    conv1   = empty((3,)+FST.complex_shape(), dtype=complex)
     hv      = empty(FST.complex_shape(), dtype=complex)
     hg      = empty(FST.complex_shape(), dtype=complex)
     diff0   = empty((3,)+FST.complex_shape(), dtype=complex)
@@ -282,7 +292,7 @@ def setupShenKMM(comm, float, complex, mpitype, N, L, mgrid,
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
-    kmax[0] = N[0]
+    kmax[0] = N[0]*2./3.
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
     
@@ -608,6 +618,20 @@ class FastShenFourierTransform(object):
         fu = S.fst(self.Uc_hat, fu)
         return fu
 
+    def fft(self, u, fu):
+        """Fast Fourier transform of y and z"""
+        self.Uc_hatT[:] = rfft2(u, axes=(1,2))
+        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.U_mpi, self.mpitype], [fu, self.mpitype])
+        return fu
+    
+    def ifft(self, fu, u):
+        """Inverse Fourier transforms in y and z"""
+        self.comm.Alltoall([fu, self.mpitype], [self.U_mpi, self.mpitype])
+        self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())
+        u[:] = irfft2(self.Uc_hatT, axes=(1,2))
+        return u
+    
     def fct(self, u, fu, S):
         """Fast Cheb transform of x-direction, Fourier transform of y and z"""
         self.Uc_hatT[:] = rfft2(u, axes=(1,2))
