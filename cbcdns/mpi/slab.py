@@ -218,9 +218,9 @@ def setupShenKMM(comm, float, complex, mpitype, N, L, mgrid,
     Np = N / num_processes
 
     # Get points and weights for Chebyshev weighted integrals
-    ST = ShenDirichletBasis(quad="GL")
-    SB = ShenBiharmonicBasis(quad="GL")
-    SN = ShenNeumannBasis(quad="GL")   # For pressure calculation
+    ST = ShenDirichletBasis(quad="GC")
+    SB = ShenBiharmonicBasis(quad="GC")
+    SN = ShenNeumannBasis(quad="GC")   # For pressure calculation
     points, weights = ST.points_and_weights(N[0])
     pointsp, weightsp = SB.points_and_weights(N[0])
 

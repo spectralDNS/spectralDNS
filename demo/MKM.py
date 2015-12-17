@@ -24,7 +24,7 @@ def initOS(OS, U, X, t=0.):
             U[1, i, j, :] = v
     U[2] = 0
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_processes, Curl, conv, TDMASolverD, solvePressure, **kw):
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_processes, Curl, conv, TDMASolverD, solvePressure, N, **kw):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
     utau = config.nu * config.Re_tau
@@ -74,19 +74,21 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
 
 
     # Set the flux
-    flux[0] = Q(U[1], rank, comm, **kw)
+    flux[0] = Q(U[1], rank, comm, N)
     comm.Bcast(flux)
     
-    print "Flux", flux[0]
-
-    conv2 = zeros_like(U_hat)
-    conv2 = conv(conv2, U, U_hat)  
-    for j in range(3):
-        conv2[j] = TDMASolverD(conv2[j])
-    conv2 *= -1
-    P_hat = solvePressure(P_hat, conv2)
-
-    P = FST.ifst(P_hat, P, SN)
+    if rank == 0:
+        print "Flux", flux[0]
+    
+    if not config.solver in ("KMM", "KMMRK3"):
+        conv2 = zeros_like(U_hat)
+        conv2 = conv(conv2, U, U_hat)  
+        for j in range(3):
+            conv2[j] = TDMASolverD(conv2[j])
+        conv2 *= -1
+        P_hat = solvePressure(P_hat, conv2)
+        P = FST.ifst(P_hat, P, SN)
+        
     U0[:] = U[:]
     U_hat0[:] = U_hat[:]
     
@@ -157,7 +159,7 @@ def set_Source(Source, Sk, ST, FST, **kw):
     Sk[:] = 0
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
     
-def Q(u, rank, comm, N, **kw):
+def Q(u, rank, comm, N):
     L = config.L
     uu = sum(u, axis=(1,2))
     c = zeros(N[0])
@@ -173,10 +175,10 @@ def Q(u, rank, comm, N, **kw):
         return 0
 
 beta = zeros(1)    
-def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk, ST, U_tmp, F_tmp, comm, **kw):
+def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk, ST, U_tmp, F_tmp, comm, N, **kw):
     global im1, im2, im3, flux
 
-    #q = Q(U[1], rank, comm, **kw)
+    #q = Q(U[1], rank, comm, N)
     #beta[0] = (flux[0] - q)/(array(config.L).prod())
     #comm.Bcast(beta)
     #U_tmp[1] = beta[0]    
@@ -185,12 +187,12 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk
     #U[1] = FST.ifst(U_hat[1], U[1], ST)
     #Source[1] -= beta[0]
     #Sk[1] = FST.fss(Source[1], Sk[1], ST)
-    utau = config.Re_tau * config.nu
-    Source[:] = 0
-    Source[1] = -utau**2
-    Source[:] += 0.05*random.randn(*U.shape)
-    for i in range(3):
-        Sk[i] = FST.fss(Source[i], Sk[i], ST)
+    #utau = config.Re_tau * config.nu
+    #Source[:] = 0
+    #Source[1] = -utau**2
+    #Source[:] += 0.05*random.randn(*U.shape)
+    #for i in range(3):
+        #Sk[i] = FST.fss(Source[i], Sk[i], ST)
     
     if config.tstep % config.write_result == 0 or config.tstep % config.write_yz_slice[1] == 0:
         hdf5file.write(config.tstep)
@@ -230,10 +232,10 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk
         plt.pause(1e-6)
     
     if config.tstep % config.compute_energy == 0: 
-        e0 = Q(U[0]*U[0], rank, comm, **kw)
-        e1 = Q(U[1]*U[1], rank, comm, **kw)
-        e2 = Q(U[2]*U[2], rank, comm, **kw)
-        q = Q(U[1], rank, comm, **kw)
+        e0 = Q(U[0]*U[0], rank, comm, N)
+        e1 = Q(U[1]*U[1], rank, comm, N)
+        e2 = Q(U[2]*U[2], rank, comm, N)
+        q = Q(U[1], rank, comm, N)
         if rank == 0:
             print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.t, e0, e1, e2, q, beta, Source[1].mean())
 
