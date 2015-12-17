@@ -72,6 +72,9 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     for i in range(3):
         U_hat[i] = FST.fst(U[i], U_hat[i], ST)
 
+    if "KMM" in config.solver:
+        g = kw['g']
+        g[:] = 1j*kw['K'][1]*U_hat[2] - 1j*kw['K'][2]*U_hat[1]
 
     # Set the flux
     flux[0] = Q(U[1], rank, comm, N)
@@ -93,8 +96,6 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     U_hat0[:] = U_hat[:]
     H_hat1 = conv(H_hat1, U0, U_hat0)
     H1[:] = H[:]
-
-    
  
 def initialize2(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, SN, ST, X, Curl, **kw):
     """"""
@@ -181,15 +182,15 @@ beta = zeros(1)
 def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk, ST, U_tmp, F_tmp, comm, N, **kw):
     global im1, im2, im3, flux
 
-    #q = Q(U[1], rank, comm, N)
-    #beta[0] = (flux[0] - q)/(array(config.L).prod())
-    #comm.Bcast(beta)
-    #U_tmp[1] = beta[0]    
-    #F_tmp[1] = FST.fst(U_tmp[1], F_tmp[1], ST)
-    #U_hat[1] += F_tmp[1]
-    #U[1] = FST.ifst(U_hat[1], U[1], ST)
-    #Source[1] -= beta[0]
-    #Sk[1] = FST.fss(Source[1], Sk[1], ST)
+    q = Q(U[1], rank, comm, N)
+    beta[0] = (flux[0] - q)/(array(config.L).prod())
+    comm.Bcast(beta)
+    U_tmp[1] = beta[0]    
+    F_tmp[1] = FST.fst(U_tmp[1], F_tmp[1], ST)
+    U_hat[1] += F_tmp[1]
+    U[1] = FST.ifst(U_hat[1], U[1], ST)
+    Source[1] -= beta[0]
+    Sk[1] = FST.fss(Source[1], Sk[1], ST)
     #utau = config.Re_tau * config.nu
     #Source[:] = 0
     #Source[1] = -utau**2

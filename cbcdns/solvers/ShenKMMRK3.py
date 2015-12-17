@@ -51,9 +51,12 @@ def solvePressure(P_hat, Ni):
     return P_hat
 
 def Cross(a, b, c, S):
-    c[0] = FST.fst(a[1]*b[2]-a[2]*b[1], c[0], S)
-    c[1] = FST.fst(a[2]*b[0]-a[0]*b[2], c[1], S)
-    c[2] = FST.fst(a[0]*b[1]-a[1]*b[0], c[2], S)
+    H[0] = a[1]*b[2]-a[2]*b[1]
+    H[1] = a[2]*b[0]-a[0]*b[2]
+    H[2] = a[0]*b[1]-a[1]*b[0]
+    c[0] = FST.fst(H[0], c[0], S)
+    c[1] = FST.fst(H[1], c[1], S)
+    c[2] = FST.fst(H[2], c[2], S)    
     return c
 
 def Curl(a, c, S):
@@ -95,7 +98,8 @@ def standardConvection(c, U, U_hat):
     dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], SB)    
     dudz_h = 1j*K[2]*U_hat[0]
     dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], SB)
-    c[0] = FST.fst(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST)
+    H[0] = U[0]*dudx + U[1]*dudy + U[2]*dudz
+    c[0] = FST.fst(H[0], c[0], ST)
     
     U_tmp2[:] = 0
     
@@ -108,7 +112,8 @@ def standardConvection(c, U, U_hat):
     
     dvdz_h = 1j*K[2]*U_hat[1]
     dvdz = U_tmp2[1] = FST.ifst(dvdz_h, U_tmp2[1], ST)
-    c[1] = FST.fst(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST)
+    H[1] = U[0]*dvdx + U[1]*dvdy + U[2]*dvdz
+    c[1] = FST.fst(H[1], c[1], ST)
     
     U_tmp2[:] = 0
     dwdy_h = 1j*K[1]*U_hat[2]
@@ -122,7 +127,8 @@ def standardConvection(c, U, U_hat):
     #dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], SN)    
     #########
     
-    c[2] = FST.fst(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST)
+    H[2] = U[0]*dwdx + U[1]*dwdy + U[2]*dwdz
+    c[2] = FST.fst(H[2], c[2], ST)
     
     return c
 
@@ -130,23 +136,22 @@ def standardConvection(c, U, U_hat):
 def getConvection(convection):
     if convection == "Standard":
         
-        def Conv(dU, U, U_hat):
-            dU = standardConvection(dU, U, U_hat)
-            dU[:] *= -1 
-            return dU
+        def Conv(H_hat, U, U_hat):
+            H_hat = standardConvection(H_hat, U, U_hat)
+            H_hat[:] *= -1 
+            return H_hat
 
     elif convection == "Vortex":
         
-        def Conv(dU, U, U_hat):
+        def Conv(H_hat, U, U_hat):
             U_tmp[:] = Curl(U_hat, U_tmp, ST)
-            dU = Cross(U, U_tmp, dU, ST)
-            return dU
+            H_hat[:] = Cross(U, U_tmp, H_hat, ST)
+            return H_hat
         
     return Conv           
 
 conv = getConvection(config.convection)
     
-conv2 = conv0.copy()
 U_hat1 = U_hat0.copy()
 U_hat2 = U_hat0.copy()
 hg0 = hg.copy()
@@ -165,7 +170,10 @@ def RKstep(U_hat, g, dU, rk):
         for i in range(1, 3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)
     
-    conv1 = conv(conv1, U, U_hat)
+    # Compute convection
+    H_hat[:] = conv(H_hat, U0, U_hat0)    
+    H_hat[:] *= dealias    
+
     diff0[:] = 0
     
     # Compute diffusion for g-equation
@@ -176,15 +184,16 @@ def RKstep(U_hat, g, dU, rk):
     diff0[0] += (1. - nu*(a[rk]+b[rk])*dt*K2) * ABB.matvec(U_hat[0])
     diff0[0] -= (K2 - nu*(a[rk]+b[rk])*dt/2.*K2**2)*BBB.matvec(U_hat[0])
     
-    # Compute convection
-    H_hat = F_tmp
-    H_hat[:] = conv1
-    H_hat[:] *= dealias    
     
-    hv[:] = -K2*BBD.matvec(H_hat[0])
+    #hv[:] = -K2*BBD.matvec(H_hat[0])
+    hv[:] = FST.fss(H[0], hv, SB)
+    hv *= -K2
     hv -= 1j*K[1]*CBD.matvec(H_hat[1])
     hv -= 1j*K[2]*CBD.matvec(H_hat[2])    
-    hg[:] = 1j*K[1]*BDD.matvec(H_hat[2]) - 1j*K[2]*BDD.matvec(H_hat[1])
+    #hg[:] = 1j*K[1]*BDD.matvec(H_hat[2]) - 1j*K[2]*BDD.matvec(H_hat[1])
+    F_tmp[1] = FST.fss(H[1], F_tmp[1], ST)
+    F_tmp[2] = FST.fss(H[2], F_tmp[2], ST)
+    hg[:] = 1j*K[1]*F_tmp[2] - 1j*K[2]*F_tmp[1]
     
     dU[0] = (hv*a[rk] + hv0*b[rk])*dt + diff0[0]
     dU[1] = (hg*a[rk] + hg0*b[rk])*2./nu + diff0[1]

@@ -44,15 +44,12 @@ def solvePressure(P_hat, Ni):
     return P_hat
 
 def Cross(a, b, c, S):
-    c[0] = FST.fst(a[1]*b[2]-a[2]*b[1], c[0], S)
-    c[1] = FST.fst(a[2]*b[0]-a[0]*b[2], c[1], S)
-    c[2] = FST.fst(a[0]*b[1]-a[1]*b[0], c[2], S)
-    return c
-
-def CrossR(a, b, c):
-    c[0] = a[1]*b[2]-a[2]*b[1]
-    c[1] = a[2]*b[0]-a[0]*b[2]
-    c[2] = a[0]*b[1]-a[1]*b[0]
+    H[0] = a[1]*b[2]-a[2]*b[1]
+    H[1] = a[2]*b[0]-a[0]*b[2]
+    H[2] = a[0]*b[1]-a[1]*b[0]
+    c[0] = FST.fst(H[0], c[0], S)
+    c[1] = FST.fst(H[1], c[1], S)
+    c[2] = FST.fst(H[2], c[2], S)    
     return c
 
 def Curl(a_hat, c, S):
@@ -141,9 +138,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             U_tmp[:] = Curl(U_hat, U_tmp, ST)
-            H[:] = CrossR(U, U_tmp, H)
-            for i in range(3):
-                H_hat[i] = FST.fst(H[i], H_hat[i], ST)
+            H_hat[:] = Cross(U, U_tmp, H_hat, ST)
             return H_hat
         
     return Conv           
