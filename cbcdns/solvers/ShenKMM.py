@@ -116,7 +116,6 @@ def standardConvection(c, U, U_hat):
     
     H[2] = U[0]*dwdx + U[1]*dwdy + U[2]*dwdz
     c[2] = FST.fst(H[2], c[2], ST)
-    from IPython import embed; embed()
     
     return c
 
@@ -212,27 +211,27 @@ def solve():
         U_hat[2] = -1j*(K_over_K2[2]*f_hat + K_over_K2[1]*g) 
         
         # Remains to fix wavenumber 0
-        
-        u0_hat = zeros((3, N[0]), dtype=complex)
-        h0_hat = zeros((3, N[0]), dtype=complex)
-        h0_hat[1] = H_hat0[1, :, 0, 0]
-        h0_hat[2] = H_hat0[2, :, 0, 0]
-        u0_hat[1] = U_hat0[1, :, 0, 0]
-        u0_hat[2] = U_hat0[2, :, 0, 0]
-        
-        w = 2./nu * BDD.matvec(h0_hat[1])        
-        w -= 2./nu * Sk[1, :, 0, 0]        
-        w -= ADD.matvec(u0_hat[1])
-        w += 2./nu/dt * BDD.matvec(u0_hat[1])        
-        u0_hat[1] = HelmholtzSolverU0(u0_hat[1], w)
-        
-        w = 2./nu * BDD.matvec(h0_hat[2])
-        w -= ADD.matvec(u0_hat[2])
-        w += 2./nu/dt * BDD.matvec(u0_hat[2])
-        u0_hat[2] = HelmholtzSolverU0(u0_hat[2], w)
-        
-        U_hat[1, :, 0, 0] = u0_hat[1]
-        U_hat[2, :, 0, 0] = u0_hat[2]
+        if rank == 0:
+            u0_hat = zeros((3, N[0]), dtype=complex)
+            h0_hat = zeros((3, N[0]), dtype=complex)
+            h0_hat[1] = H_hat0[1, :, 0, 0]
+            h0_hat[2] = H_hat0[2, :, 0, 0]
+            u0_hat[1] = U_hat0[1, :, 0, 0]
+            u0_hat[2] = U_hat0[2, :, 0, 0]
+            
+            w = 2./nu * BDD.matvec(h0_hat[1])        
+            w -= 2./nu * Sk[1, :, 0, 0]        
+            w -= ADD.matvec(u0_hat[1])
+            w += 2./nu/dt * BDD.matvec(u0_hat[1])        
+            u0_hat[1] = HelmholtzSolverU0(u0_hat[1], w)
+            
+            w = 2./nu * BDD.matvec(h0_hat[2])
+            w -= ADD.matvec(u0_hat[2])
+            w += 2./nu/dt * BDD.matvec(u0_hat[2])
+            u0_hat[2] = HelmholtzSolverU0(u0_hat[2], w)
+            
+            U_hat[1, :, 0, 0] = u0_hat[1]
+            U_hat[2, :, 0, 0] = u0_hat[2]
         
         U[0] = FST.ifst(U_hat[0], U[0], SB)
         for i in range(1, 3):

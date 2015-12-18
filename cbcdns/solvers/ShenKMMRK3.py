@@ -212,26 +212,27 @@ def RKstep(U_hat, g, dU, rk):
     U_hat[2] = -1j*(K_over_K2[2]*f_hat + K_over_K2[1]*g) 
     
     # Remains to fix wavenumber 0    
-    h0_hat[1, :] = H_hat[1, :, 0, 0]
-    h0_hat[2, :] = H_hat[2, :, 0, 0]
-    
-    h1[0] = BDD.matvec(h0_hat[1])
-    h1[1] = BDD.matvec(h0_hat[2])
-    h1[0] -= Sk[1, :, 0, 0]  # Subtract constant pressure gradient
-    
-    beta = 2./nu/(a[rk]+b[rk])/dt
-    w = beta*(a[rk]*h1[0] + b[rk]*h0[0])*dt
-    w -= ADD.matvec(u0_hat[1])
-    w += beta*BDD.matvec(u0_hat[1])    
-    u0_hat[1] = HelmholtzSolverU0[rk](u0_hat[1], w)
-    
-    w = beta*(a[rk]*h1[1] + b[rk]*h0[1])*dt
-    w -= ADD.matvec(u0_hat[2])
-    w += beta*BDD.matvec(u0_hat[2])    
-    u0_hat[2] = HelmholtzSolverU0[rk](u0_hat[2], w)
+    if rank == 0:
+        h0_hat[1, :] = H_hat[1, :, 0, 0]
+        h0_hat[2, :] = H_hat[2, :, 0, 0]
         
-    U_hat[1, :, 0, 0] = u0_hat[1]
-    U_hat[2, :, 0, 0] = u0_hat[2]
+        h1[0] = BDD.matvec(h0_hat[1])
+        h1[1] = BDD.matvec(h0_hat[2])
+        h1[0] -= Sk[1, :, 0, 0]  # Subtract constant pressure gradient
+        
+        beta = 2./nu/(a[rk]+b[rk])/dt
+        w = beta*(a[rk]*h1[0] + b[rk]*h0[0])*dt
+        w -= ADD.matvec(u0_hat[1])
+        w += beta*BDD.matvec(u0_hat[1])    
+        u0_hat[1] = HelmholtzSolverU0[rk](u0_hat[1], w)
+        
+        w = beta*(a[rk]*h1[1] + b[rk]*h0[1])*dt
+        w -= ADD.matvec(u0_hat[2])
+        w += beta*BDD.matvec(u0_hat[2])    
+        u0_hat[2] = HelmholtzSolverU0[rk](u0_hat[2], w)
+            
+        U_hat[1, :, 0, 0] = u0_hat[1]
+        U_hat[2, :, 0, 0] = u0_hat[2]
     
     return U_hat
 
