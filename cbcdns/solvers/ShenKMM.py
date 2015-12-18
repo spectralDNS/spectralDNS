@@ -165,17 +165,24 @@ def ComputeRHS(dU):
     H_hat0[:] = 1.5*H_hat - 0.5*H_hat1
     H_hat0[:] *= dealias    
     
+    # Following modification is critical for accuracy with vortex convection, but it makes standard perform worse
     #hv[:] = -K2*BBD.matvec(H_hat0[0])
-    #hv -= 1j*K[1]*CBD.matvec(H_hat0[1])
-    #hv -= 1j*K[2]*CBD.matvec(H_hat0[2])    
     hv[:] = FST.fss(H0[0], hv, SB)
     hv *= -K2
-    hv -= 1j*K[1]*CBD.matvec(H_hat[1])
-    hv -= 1j*K[2]*CBD.matvec(H_hat[2])    
     
-    #hg[:] = 1j*K[1]*BDD.matvec(H_hat[2]) - 1j*K[2]*BDD.matvec(H_hat[1])
-    F_tmp[1] = FST.fss(H[1], F_tmp[1], ST)
-    F_tmp[2] = FST.fss(H[2], F_tmp[2], ST)
+    # Following does not seem to be critical
+    hv -= 1j*K[1]*CBD.matvec(H_hat0[1])
+    hv -= 1j*K[2]*CBD.matvec(H_hat0[2])    
+    #dH1dx = U_tmp[1] = FST.chebDerivative_3D0(H0[1], U_tmp[1], SB)
+    #dH2dx = U_tmp[2] = FST.chebDerivative_3D0(H0[2], U_tmp[2], SB)
+    #F_tmp[1] = FST.fss(dH1dx, F_tmp[1], SB)
+    #F_tmp[2] = FST.fss(dH2dx, F_tmp[2], SB)
+    #hv -= 1j*K[1]*F_tmp[1]
+    #hv -= 1j*K[2]*F_tmp[2]
+    
+    #hg[:] = 1j*K[1]*BDD.matvec(H_hat0[2]) - 1j*K[2]*BDD.matvec(H_hat0[1])
+    F_tmp[1] = FST.fss(H0[1], F_tmp[1], ST)
+    F_tmp[2] = FST.fss(H0[2], F_tmp[2], ST)
     hg[:] = 1j*K[1]*F_tmp[2] - 1j*K[2]*F_tmp[1]
     
     dU[0] = hv*dt + diff0[0]

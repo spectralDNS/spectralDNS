@@ -32,11 +32,11 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     Xplus = Y*config.Re_tau
     Yplus = X[1]*config.Re_tau
     Zplus = X[2]*config.Re_tau
-    duplus = Um*0.2/utau  #Um*0.25/utau 
+    duplus = Um*0.1/utau  #Um*0.25/utau 
     alfaplus = 2*pi/500.
     betaplus = 2*pi/200.
     sigma = 0.00055
-    epsilon = Um/200.   #Um/200.
+    epsilon = Um/400.   #Um/200.
     U[:] = 0
     U[1] = Um*(Y-0.5*Y**2)
     dev = 1+0.00001*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
