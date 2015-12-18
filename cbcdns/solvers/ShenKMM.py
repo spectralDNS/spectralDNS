@@ -98,9 +98,6 @@ def standardConvection(c, U, U_hat):
     
     dvdy_h = 1j*K[1]*U_hat[1]    
     dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], ST)
-    #F_tmp[0] = FST.fst(U[1], F_tmp[0], SN)
-    #dvdy_h = 1j*K[1]*F_tmp[0]    
-    #dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], SN)
     ##########
     
     dvdz_h = 1j*K[2]*U_hat[1]
@@ -115,13 +112,11 @@ def standardConvection(c, U, U_hat):
     dwdz_h = 1j*K[2]*U_hat[2]
     dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
     
-    #F_tmp[0] = FST.fst(U[2], F_tmp[0], SN)
-    #dwdz_h = 1j*K[2]*F_tmp[0]    
-    #dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], SN)    
     #########
     
     H[2] = U[0]*dwdx + U[1]*dwdy + U[2]*dwdz
     c[2] = FST.fst(H[2], c[2], ST)
+    from IPython import embed; embed()
     
     return c
 
@@ -169,6 +164,7 @@ def ComputeRHS(dU):
     #hv[:] = -K2*BBD.matvec(H_hat0[0])
     hv[:] = FST.fss(H0[0], hv, SB)
     hv *= -K2
+    hv *= dealias
     
     # Following does not seem to be critical
     hv -= 1j*K[1]*CBD.matvec(H_hat0[1])
@@ -184,6 +180,7 @@ def ComputeRHS(dU):
     F_tmp[1] = FST.fss(H0[1], F_tmp[1], ST)
     F_tmp[2] = FST.fss(H0[2], F_tmp[2], ST)
     hg[:] = 1j*K[1]*F_tmp[2] - 1j*K[2]*F_tmp[1]
+    hg[:] *= dealias
     
     dU[0] = hv*dt + diff0[0]
     dU[1] = hg*2./nu + diff0[1]

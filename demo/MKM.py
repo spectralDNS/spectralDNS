@@ -74,7 +74,10 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
 
     if "KMM" in config.solver:
         g = kw['g']
-        g[:] = 1j*kw['K'][1]*U_hat[2] - 1j*kw['K'][2]*U_hat[1]
+        dwdy = epsilon*alfaplus*config.Re_tau*cos(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev
+        dvdz = -utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*betaplus*config.Re_tau*sin(betaplus*Zplus)*dev
+        g[:] = FST.fst(dwdy-dvdz, g, ST)
+
 
     # Set the flux
     flux[0] = Q(U[1], rank, comm, N)
