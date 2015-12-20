@@ -24,7 +24,7 @@ def initOS(OS, U, X, t=0.):
             U[1, i, j, :] = v
     U[2] = 0
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_processes, Curl, conv, TDMASolverD, solvePressure, N, H, H1, H_hat, H_hat1, **kw):
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_processes, Curl, conv, TDMASolverD, solvePressure, N, H, H1, H_hat, H_hat1, U_tmp, K, **kw):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
     utau = config.nu * config.Re_tau
@@ -39,7 +39,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     epsilon = Um/400.   #Um/200.
     U[:] = 0
     U[1] = Um*(Y-0.5*Y**2)
-    dev = 1+0.01*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dev = 1+0.0*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
     dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
     U[1] += dd
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
@@ -74,9 +74,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
 
     if "KMM" in config.solver:
         g = kw['g']
-        dwdy = epsilon*alfaplus*config.Re_tau*cos(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev
-        dvdz = -utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*betaplus*config.Re_tau*sin(betaplus*Zplus)*dev
-        g[:] = FST.fst(dwdy-dvdz, g, ST)
+        g[:] = 1j*K[1]*U_hat[2] - 1j*K[2]*U_hat[1]
 
 
     # Set the flux
@@ -100,12 +98,17 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     H_hat1 = conv(H_hat1, U0, U_hat0)
     H1[:] = H[:]
  
-def initialize2(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, SN, ST, X, Curl, **kw):
+def initialize2(U, U_hat, U0, U_hat0, P, P_hat, FST, SN, ST, X, Curl, **kw):
     """"""
     # Random streamfunction
     U[:] = 0.0001*random.randn(*U.shape)
-    for i in range(3):
-        U_hat[i] = fst(U[i], U_hat[i], ST)
+    if config.solver in ("KMM", "KMMRK3"):
+        U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB'])
+        for i in range(1, 3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
+    else:
+        for i in range(3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
     
     U = Curl(U_hat, U, ST)
 
@@ -113,23 +116,53 @@ def initialize2(U, U_hat, U0, U_hat0, P, P_hat, fst, ifst, SN, ST, X, Curl, **kw
     utau = config.nu * config.Re_tau
     Y0 = where(Y < 1e-12, 1e-12, Y)
     #U[1] += 1.25*(utau/0.41*log(Y0*utau/config.nu)+5*utau)
-    U[1] += 40*utau*(Y-0.5*Y**2)
+    U[1] += 46.9091*utau*(Y-0.5*Y**2)
     
     # project to Dirichlet space and back because U above is not in the Shen Dirichlet space
-    for i in range(3):
-        U_hat[i] = fst(U[i], U_hat[i], ST)
+    if config.solver in ("KMM", "KMMRK3"):
+        U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB'])
+        for i in range(1, 3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
+        U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
+        for i in range(1, 3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)
+
+        U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB'])
+        for i in range(1, 3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
+    else:
         
-    for i in range(3):
-        U[i] = ifst(U_hat[i], U[i], ST)
+        for i in range(3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
+            
+        for i in range(3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)
 
-    for i in range(3):
-        U_hat[i] = fst(U[i], U_hat[i], ST)
+        for i in range(3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
 
-    P[:] = 0
-    P_hat = fst(P, P_hat, SN)
+        P[:] = 0
+        P_hat = FST.fst(P, P_hat, SN)
     U0[:] = U[:]
     U_hat0[:] = U_hat[:]
     
+
+def initialize3(U, U_hat, U0, U_hat0, P, P_hat, FST, SN, ST, X, Curl, sin, cos, pi, g, **kw):
+    # Random streamfunction
+    #U[0, ::4, ::4, ::4] = 0.1*random.randn(*U[0,::4,::4,::4].shape)
+    U[0, :, 20, 20] = 100
+    g = FST.fst(U[0], g, ST)
+    U[:] = 0
+    
+    Y = where(X[0]<0, 1+X[0], 1-X[0])
+    utau = config.nu * config.Re_tau
+    Y0 = where(Y < 1e-12, 1e-12, Y)
+    #U[1] += 1.25*(utau/0.41*log(Y0*utau/config.nu)+5*utau)
+    U[1] += 46.9091*utau*(Y-0.5*Y**2)
+    U_hat[1] = FST.fst(U[1], U_hat[1], ST)
+    U0[:] = U[:]
+    U_hat0[:] = U_hat[:]
+
  
 def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, conv1,
                    rank, conv, FST, ST, SN, num_processes, **kw):
@@ -185,15 +218,15 @@ beta = zeros(1)
 def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk, ST, U_tmp, F_tmp, comm, N, **kw):
     global im1, im2, im3, flux
 
-    q = Q(U[1], rank, comm, N)
-    beta[0] = (flux[0] - q)/(array(config.L).prod())
-    comm.Bcast(beta)
-    U_tmp[1] = beta[0]    
-    F_tmp[1] = FST.fst(U_tmp[1], F_tmp[1], ST)
-    U_hat[1] += F_tmp[1]
-    U[1] = FST.ifst(U_hat[1], U[1], ST)
-    Source[1] -= beta[0]
-    Sk[1] = FST.fss(Source[1], Sk[1], ST)
+    #q = Q(U[1], rank, comm, N)
+    #beta[0] = (flux[0] - q)/(array(config.L).prod())
+    #comm.Bcast(beta)
+    #U_tmp[1] = beta[0]    
+    #F_tmp[1] = FST.fst(U_tmp[1], F_tmp[1], ST)
+    #U_hat[1] += F_tmp[1]
+    #U[1] = FST.ifst(U_hat[1], U[1], ST)
+    #Source[1] -= beta[0]
+    #Sk[1] = FST.fss(Source[1], Sk[1], ST)
     #utau = config.Re_tau * config.nu
     #Source[:] = 0
     #Source[1] = -utau**2

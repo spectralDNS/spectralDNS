@@ -82,7 +82,7 @@ def standardConvection(c, U, U_hat):
     dvdx = U_tmp[1] = FST.ifct(F_tmp[1], U_tmp[1], ST)
     dwdx = U_tmp[2] = FST.ifct(F_tmp[2], U_tmp[2], ST)
     
-    #dudx = U_tmp[0] = chebDerivative_3D0(U[0], U_tmp[0])
+    #dudx = U_tmp[0] = FST.chebDerivative_3D0(U[0], U_tmp[0], ST)
     #dvdx = U_tmp[1] = chebDerivative_3D0(U[1], U_tmp[1])
     #dwdx = U_tmp[2] = chebDerivative_3D0(U[2], U_tmp[2])    
     
@@ -174,12 +174,14 @@ def ComputeRHS(dU):
     #F_tmp[2] = FST.fss(dH2dx, F_tmp[2], SB)
     #hv -= 1j*K[1]*F_tmp[1]
     #hv -= 1j*K[2]*F_tmp[2]
+
+    #hv *= dealias
     
-    #hg[:] = 1j*K[1]*BDD.matvec(H_hat0[2]) - 1j*K[2]*BDD.matvec(H_hat0[1])
-    F_tmp[1] = FST.fss(H0[1], F_tmp[1], ST)
-    F_tmp[2] = FST.fss(H0[2], F_tmp[2], ST)
-    hg[:] = 1j*K[1]*F_tmp[2] - 1j*K[2]*F_tmp[1]
-    hg[:] *= dealias
+    hg[:] = 1j*K[1]*BDD.matvec(H_hat0[2]) - 1j*K[2]*BDD.matvec(H_hat0[1])
+    #F_tmp[1] = FST.fss(H0[1], F_tmp[1], ST)
+    #F_tmp[2] = FST.fss(H0[2], F_tmp[2], ST)
+    #hg[:] = 1j*K[1]*F_tmp[2] - 1j*K[2]*F_tmp[1]    
+    #hg[:] *= dealias
     
     dU[0] = hv*dt + diff0[0]
     dU[1] = hg*2./nu + diff0[1]

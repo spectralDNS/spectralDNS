@@ -171,7 +171,7 @@ def RKstep(U_hat, g, dU, rk):
             U[i] = FST.ifst(U_hat[i], U[i], ST)
     
     # Compute convection
-    H_hat[:] = conv(H_hat, U0, U_hat0)    
+    H_hat[:] = conv(H_hat, U, U_hat)    
     H_hat[:] *= dealias    
 
     diff0[:] = 0
@@ -188,12 +188,14 @@ def RKstep(U_hat, g, dU, rk):
     #hv[:] = -K2*BBD.matvec(H_hat[0])
     hv[:] = FST.fss(H[0], hv, SB)
     hv *= -K2
+    hv *= dealias
+    
     hv -= 1j*K[1]*CBD.matvec(H_hat[1])
     hv -= 1j*K[2]*CBD.matvec(H_hat[2])    
-    #hg[:] = 1j*K[1]*BDD.matvec(H_hat[2]) - 1j*K[2]*BDD.matvec(H_hat[1])
-    F_tmp[1] = FST.fss(H[1], F_tmp[1], ST)
-    F_tmp[2] = FST.fss(H[2], F_tmp[2], ST)
-    hg[:] = 1j*K[1]*F_tmp[2] - 1j*K[2]*F_tmp[1]
+    hg[:] = 1j*K[1]*BDD.matvec(H_hat[2]) - 1j*K[2]*BDD.matvec(H_hat[1])
+    #F_tmp[1] = FST.fss(H[1], F_tmp[1], ST)
+    #F_tmp[2] = FST.fss(H[2], F_tmp[2], ST)
+    #hg[:] = 1j*K[1]*F_tmp[2] - 1j*K[2]*F_tmp[1]
     
     dU[0] = (hv*a[rk] + hv0*b[rk])*dt + diff0[0]
     dU[1] = (hg*a[rk] + hg0*b[rk])*2./nu + diff0[1]
