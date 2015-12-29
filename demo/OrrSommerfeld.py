@@ -1,7 +1,7 @@
 """Orr-Sommerfeld"""
 from cbcdns import config, get_solver
 from OrrSommerfeld_eig import OrrSommerfeld
-from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array, zeros_like
+from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose
 from cbcdns.fft.wrappyfftw import dct
 import matplotlib.pyplot as plt
 import warnings
@@ -224,19 +224,43 @@ if __name__ == "__main__":
     vars(solver).update(initialize(**vars(solver)))
     set_Source(**vars(solver))	
     solver.solve()
-    #from cbcdns.mpi.slab import FastShenFourierTransfers
+    s = solver
+    #from cbcdns.mpi.slab import FastShenFourierTransform
     #FST = solver.FST
-    #FST2 = FastShenFourierTransfers(array([2*solver.N[0], 2*solver.N[1], 2]), solver.MPI)
-    #um_hat = solver.zeros(FST2.complex_shape(), dtype=solver.complex)
-    #um = solver.zeros(FST2.real_shape())
-    #um_hat[:solver.N[0], :solver.N[1]/2, :] = solver.U_hat[0, :, :solver.N[1]/2, :]
-    #um_hat[:solver.N[0], (2*solver.N[1]-solver.N[1]/2):(2*solver.N[1]), :] = solver.U_hat[0, :, (solver.N[1]/2):, :]
-    #um = FST2.ifst(um_hat, um, solver.ST)
-    #plt.figure();plt.contourf(um[:, :, 0], 100);plt.colorbar()
-    #plt.show()
+    #FST2 = FastShenFourierTransform(array([s.N[0], 2*s.N[1], 2]), s.MPI)
+    #um_hat = s.zeros(FST2.complex_shape(), dtype=s.complex)
+    #um = s.zeros(FST2.real_shape())
+    ## Copy to padded
+    ##um_hat[:s.N[0], :s.N[1]/2, :s.Nf] = s.U_hat[0, :, :s.N[1]/2, :s.Nf]
+    ##um_hat[:s.N[0], -(s.N[1]/2):, :s.Nf] = s.U_hat[0, :, -(s.N[1]/2):, :s.Nf] 
+
+    #um_hat[:s.N[0], :s.N[1]/2, :] = s.U_hat[0, :, :s.N[1]/2, :]
+    #um_hat[:s.N[0], -(s.N[1]/2):, :] = s.U_hat[0, :, -(s.N[1]/2):, :]     
+    #um = FST2.ifst(um_hat*2, um, s.SB)
+    #um_hat = FST2.fst(um, um_hat, s.SB)
+    #um_hat2 = s.zeros(FST.complex_shape(), dtype=s.complex)
+    #um_hat2[:, :s.N[1]/2, :s.Nf] = um_hat[:s.N[0], :s.N[1]/2, :s.Nf]
+    #um_hat2[:, s.N[1]/2:, :s.Nf] = um_hat[:s.N[0], -(s.N[1]/2):, :s.Nf]
+    #um2 = s.zeros(FST.real_shape())
+    #um2 = FST.ifst(um_hat2, um2, s.SB)
+    #um2 /= 2
     
-    initOS_and_project(**vars(solver))
+    #from numpy import meshgrid, float
+    
+    #points, weights = s.ST.points_and_weights(um.shape[0])
+    #X = array(meshgrid(points, arange(um.shape[1]), arange(um.shape[2]), indexing="ij"), dtype=float)
+    #plt.figure();plt.contourf(X[1,:,:,0], X[0,:,:,0], um[:, :, 0], 100);plt.title("um");plt.colorbar()
+    #plt.figure();plt.contourf(s.X[1,:,:,0], s.X[0,:,:,0], um2[:, :, 0], 100);plt.title("um2");plt.colorbar()
+    
+    ###initOS_and_project(**vars(s))
+    #uu = s.zeros((3*s.N[0]/2, 3*s.N[1]/2, 3*s.N[2]/2))
+    #uu = s.FST.ifst_padded(s.U_hat[0], uu, s.SB)
+    #s.F_tmp[0] = s.FST.fst_padded(uu, s.F_tmp[0], s.SB)
+    #s.U_tmp[0] = s.FST.ifst(s.F_tmp[0], s.U_tmp[0], s.SB)
+    #plt.figure();plt.contourf(s.X[1, :, :, 0], s.X[0, :, :, 0], s.U_tmp[0, :, :, 0], 100);plt.colorbar()
+    #assert allclose(s.U_tmp[0], s.U[0])
     
 
+    #plt.show()
     
 

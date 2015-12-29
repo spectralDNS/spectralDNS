@@ -32,14 +32,14 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     Xplus = Y*config.Re_tau
     Yplus = X[1]*config.Re_tau
     Zplus = X[2]*config.Re_tau
-    duplus = Um*0.1/utau  #Um*0.25/utau 
-    alfaplus = 2*pi/500.
-    betaplus = 2*pi/200.
+    duplus = Um*0.15/utau  #Um*0.25/utau 
+    alfaplus = config.L[1]/500.
+    betaplus = config.L[2]/200.
     sigma = 0.00055
-    epsilon = Um/400.   #Um/200.
+    epsilon = Um/300.   #Um/200.
     U[:] = 0
     U[1] = Um*(Y-0.5*Y**2)
-    dev = 1+0.0*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dev = 1+0.01*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
     dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
     U[1] += dd
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
@@ -164,7 +164,7 @@ def initialize3(U, U_hat, U0, U_hat0, P, P_hat, FST, SN, ST, X, Curl, sin, cos, 
     U_hat0[:] = U_hat[:]
 
  
-def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, conv1,
+def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1,
                    rank, conv, FST, ST, SN, num_processes, **kw):
     f = h5py.File(filename, driver="mpio", comm=comm)
     assert "0" in f["3D/checkpoint/U"]
@@ -173,7 +173,7 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, conv1,
     U0[:] = f["3D/checkpoint/U/0"][:, s]
     for i in range(3):
         U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
-    conv1[:] = conv(conv1, U0, U_hat0)
+    H_hat1[:] = conv(H_hat1, U0, U_hat0)
     
     U0[:] = f["3D/checkpoint/U/1"][:, s]
     P [:] = f["3D/checkpoint/P/1"][s]
@@ -277,7 +277,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk
         e2 = Q(U[2]*U[2], rank, comm, N)
         q = Q(U[1], rank, comm, N)
         if rank == 0:
-            print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.t, e0, e1, e2, q, beta, Source[1].mean())
+            print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.t, e0, e1, e2, q, e0+e1+e2, Source[1].mean())
 
     if config.tstep % config.sample_stats == 0:
         stats(U, P)
@@ -414,6 +414,6 @@ if __name__ == "__main__":
     #init_from_file("IPCSRR.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="MKMstats")
-    solver.hdf5file.fname = "IPCSRR.h5"
+    solver.hdf5file.fname = "KMM5.h5"
     solver.solve()
     s = solver.stats.get_stats()

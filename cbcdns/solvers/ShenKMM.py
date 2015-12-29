@@ -17,6 +17,11 @@ BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0], -(K2[0] + nu*dt/
 HelmholtzSolverP = Helmholtz(N[0], sqrt(K2[0]), SN.quad, True)
 HelmholtzSolverU0 = Helmholtz(N[0], sqrt(2./nu/dt), ST.quad, False)
 
+U_pad = empty((3,)+FST.real_shape_padded())
+U_pad2 = empty((3,)+FST.real_shape_padded())
+curl_pad = empty((3,)+FST.real_shape_padded())
+U_dealiased = empty((3,)+FST.real_shape())
+
 TDMASolverD = TDMA(ST.quad, False)
 
 alfa = K2[0] - 2.0/nu/dt
@@ -56,16 +61,44 @@ def Curl(a_hat, c, S):
     F_tmp[:] = 0
     U_tmp2[:] = 0
     SFTc.Mult_CTD_3D(N[0], a_hat[1], a_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = U_tmp2[1] = FST.ifct(F_tmp[1], U_tmp2[1], S)
-    dwdx = U_tmp2[2] = FST.ifct(F_tmp[2], U_tmp2[2], S)
+    dvdx = U_tmp2[1] = FST.ifct(F_tmp[1]*dealias, U_tmp2[1], S)
+    dwdx = U_tmp2[2] = FST.ifct(F_tmp[2]*dealias, U_tmp2[2], S)
     #c[0] = FST.ifst(1j*K[1]*a_hat[2] - 1j*K[2]*a_hat[1], c[0], S)
-    c[0] = FST.ifst(g, c[0], ST)
-    c[1] = FST.ifst(1j*K[2]*a_hat[0], c[1], SB)
+    c[0] = FST.ifst(g * dealias, c[0], ST)
+    c[1] = FST.ifst(1j*K[2]*a_hat[0]*dealias, c[1], SB)
     c[1] -= dwdx
-    c[2] = FST.ifst(1j*K[1]*a_hat[0], c[2], SB)
+    c[2] = FST.ifst(1j*K[1]*a_hat[0]*dealias, c[2], SB)
     c[2] *= -1.0
     c[2] += dvdx
     return c
+
+def Curl2(u_hat, c, S):
+    U_pad2[:] = 0
+    F_tmp[:] = 0
+    SFTc.Mult_CTD_3D(N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
+    dvdx = U_pad2[1] = FST.ifct_padded(F_tmp[1], U_pad2[1], S)
+    dwdx = U_pad2[2] = FST.ifct_padded(F_tmp[2], U_pad2[2], S)
+    #c[0] = FST.ifst(1j*K[1]*a_hat[2] - 1j*K[2]*a_hat[1], c[0], S)
+    c[0] = FST.ifst_padded(g, c[0], ST)
+    c[1] = FST.ifst_padded(1j*K[2]*u_hat[0], c[1], SB)
+    c[1] -= dwdx
+    c[2] = FST.ifst_padded(1j*K[1]*u_hat[0], c[2], SB)
+    c[2] *= -1.0
+    c[2] += dvdx
+    return c
+
+def Cross2(a, b, c, S):
+    U_pad2[0] = a[1]*b[2]-a[2]*b[1]
+    U_pad2[1] = a[2]*b[0]-a[0]*b[2]
+    U_pad2[2] = a[0]*b[1]-a[1]*b[0]
+    c[0] = FST.fst_padded(U_pad2[0], c[0], S)
+    c[1] = FST.fst_padded(U_pad2[1], c[1], S)
+    c[2] = FST.fst_padded(U_pad2[2], c[2], S)    
+    H[0] = FST.ifst(c[0], H[0], S)
+    H[1] = FST.ifst(c[1], H[1], S)
+    H[2] = FST.ifst(c[2], H[2], S)
+    return c
+
 
 #@profile
 def standardConvection(c, U, U_hat):
@@ -131,9 +164,21 @@ def getConvection(convection):
     elif convection == "Vortex":
         
         def Conv(H_hat, U, U_hat):
+            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB)
+            for i in range(1,3):
+                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST)
+                
             U_tmp[:] = Curl(U_hat, U_tmp, ST)
-            H_hat[:] = Cross(U, U_tmp, H_hat, ST)
+            H_hat[:] = Cross(U_dealiased, U_tmp, H_hat, ST)
             return H_hat
+
+        #def Conv(H_hat, U, U_hat):
+            #curl_pad[:] = Curl2(U_hat, curl_pad, ST)
+            #U_pad[0] = FST.ifst_padded(U_hat[0], U_pad[0], SB)
+            #for i in range(1,3):
+                #U_pad[i] = FST.ifst_padded(U_hat[i], U_pad[i], ST)
+            #H_hat[:] = Cross2(U_pad, curl_pad, H_hat, ST)
+            #return H_hat
         
     return Conv           
 
@@ -157,13 +202,13 @@ def ComputeRHS(dU):
     # Compute convection
     H0[:] = 1.5*H - 0.5*H1
     H_hat0[:] = 1.5*H_hat - 0.5*H_hat1
-    H_hat0[:] *= dealias    
+    #H_hat0[:] *= dealias    
     
     # Following modification is critical for accuracy with vortex convection, but it makes standard perform worse
     #hv[:] = -K2*BBD.matvec(H_hat0[0])
     hv[:] = FST.fss(H0[0], hv, SB)
     hv *= -K2
-    hv *= dealias
+    #hv *= dealias
     
     # Following does not seem to be critical
     hv -= 1j*K[1]*CBD.matvec(H_hat0[1])

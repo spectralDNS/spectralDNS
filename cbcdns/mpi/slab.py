@@ -207,7 +207,7 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
     # Filter for dealiasing nonlinear convection
-    kmax = 2./3.*(N/2+1)
+    kmax = 2./3.*(N/2)
     kmax[0] = N[0]
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
@@ -291,8 +291,8 @@ def setupShenKMM(comm, float, complex, mpitype, N, L, mgrid,
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
     # Filter for dealiasing nonlinear convection
-    kmax = 2./3.*(N/2+1)
-    kmax[0] = N[0]*2./3.
+    kmax = 2./3.*(N/2)
+    kmax[0] = N[0]
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
     
@@ -577,6 +577,11 @@ class FastShenFourierTransform(object):
         self.UT      = empty((3, self.N[0], self.Np[1], self.N[2]))
         self.Uc_hat  = empty(self.complex_shape(), dtype=complex)
         self.Uc_hatT = empty(self.complex_shape_T(), dtype=complex)
+        self.Upad_hat  = empty(self.complex_shape_padded_x(), dtype=complex)
+        self.Upad_hat1 = empty(self.complex_shape_padded_x(), dtype=complex)
+        self.Upad_mpi  = empty((self.num_processes, 3*self.Np[0]/2, self.Np[1], self.Nf), dtype=complex)
+        self.Upad_hatT0 = empty(self.complex_shape_padded_T0(), dtype=complex)        
+        self.Upad_hatT = empty(self.complex_shape_padded_T(), dtype=complex)
         
     def real_shape(self):
         """The local shape of the real data"""
@@ -593,6 +598,140 @@ class FastShenFourierTransform(object):
     def complex_shape_I(self):
         """A local intermediate shape of the complex data"""
         return (self.Np[0], self.num_processes, self.Np[1], self.Nf)
+
+    def complex_shape_padded_x(self):
+        """The local shape of the complex data padded in x direction"""
+        return (3*self.N[0]/2, self.Np[1], self.Nf)
+
+    def complex_shape_padded_I(self):
+        """A local intermediate shape of the complex data"""
+        return (3*self.Np[0]/2, self.num_processes, self.Np[1], self.Nf)
+
+    def complex_shape_padded_T0(self):
+        """The local shape of the transposed complex data padded in x and z directions"""
+        return (3*self.Np[0]/2, self.N[1], self.Nf)
+
+    def complex_shape_padded_T(self):
+        """The local shape of the transposed complex data padded in x and z directions"""
+        return (3*self.Np[0]/2, 3*self.N[1]/2, 3*self.Nf/2)
+
+    def real_shape_padded(self):
+        """The local shape of the real data"""
+        return (3*self.Np[0]/2, 3*self.N[1]/2, 3*self.N[2]/2)
+    
+    def complex_shape_padded(self):
+        return (3*self.N[0]/2, 3*self.Np[1]/2, 3*self.Nf/2)
+
+    def ifst_padded(self, fu, u, S):
+        """Inverse Shen transform of x-direction, Fourier in y and z"""
+        if self.num_processes == 1:
+            Upad_hat = zeros((self.N[0], 3*self.N[1]/2, 3*self.N[2]/2), dtype=complex)
+            Upad_hatc = zeros((self.N[0], 3*self.N[1]/2, 3*self.N[2]/2), dtype=complex)
+            Upad_hat[:, :self.N[1]/2, :fu.shape[2]] = fu[:, :self.N[1]/2, :]
+            Upad_hat[:, -self.N[1]/2:, :fu.shape[2]] = fu[:, self.N[1]/2:, :]
+            Upad_hatc = S.ifst(Upad_hat, Upad_hatc)
+            u[:] = ifft2(1.5**2*Upad_hatc, axes=(1, 2))
+        
+        else:
+            self.Upad_hat[:fu.shape[0]] = fu[:]        
+            self.Upad_hat1 = S.ifst(self.Upad_hat, self.Upad_hat1)
+            self.comm.Alltoall([self.Upad_hat1, self.mpitype], [self.Upad_mpi, self.mpitype])
+            self.Upad_hatT0[:] = rollaxis(self.Upad_mpi, 1).reshape(self.complex_shape_padded_T0())
+            self.Upad_hatT[:, :self.N[1]/2, :self.Nf] = self.Upad_hatT0[:, :self.N[1]/2]
+            self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf] = self.Upad_hatT0[:, -(self.N[1]/2):]
+            u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
+        return u
+
+    def fst_padded(self, u, fu, S):
+        """Fast Shen transform of x-direction, Fourier transform of y and z"""        
+        if self.num_processes == 1:
+            Upad_hat = zeros((self.N[0], 3*self.N[1]/2, self.Nf), dtype=complex)
+            Upad_hatc = zeros((self.N[0], 3*self.N[1]/2, self.Nf), dtype=complex)
+            Upad_hat[:] = rfft2(u, axes=(1, 2))
+            Upad_hatc = S.fst(Upad_hat, Upad_hatc)
+            fu[:, :self.N[1]/2, :] = Upad_hatc[:, :self.N[1]/2, :fu.shape[2]]
+            fu[:, self.N[1]/2:, :] = Upad_hatc[:, -self.N[1]/2:, :fu.shape[2]]
+
+        else:
+            self.Upad_hatT[:] = rfft2(u, axes=(1,2))
+            # cut the highest wavenumbers     
+            self.Upad_hatT0[:, :self.N[1]/2, :] = self.Upad_hatT[:, :self.N[1]/2, :self.Nf]
+            self.Upad_hatT0[:, self.N[1]/2:, :] = self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf]
+            self.Upad_mpi[:] = rollaxis(self.Upad_hatT0.reshape(self.complex_shape_padded_I()), 1)        
+            self.comm.Alltoall([self.Upad_mpi, self.mpitype], [self.Upad_hat, self.mpitype])
+            self.Upad_hat1[:] = 0
+            self.Upad_hat1 = S.fst(self.Upad_hat, self.Upad_hat1)
+            fu[S.slice(self.N[0])] = self.Upad_hat1[S.slice(self.N[0])]/1.5**2
+        return fu
+
+    def fss_padded(self, u, fu, S):
+        """Fast padded Shen scalar product of x-direction, Fourier transform of y and z"""        
+        if self.num_processes == 1:
+            Upad_hat = zeros((self.N[0], 3*self.N[1]/2, self.Nf), dtype=complex)
+            Upad_hatc = zeros((self.N[0], 3*self.N[1]/2, self.Nf), dtype=complex)
+            Upad_hat[:] = rfft2(u, axes=(1, 2))
+            Upad_hatc = S.fastShenScalar(Upad_hat, Upad_hatc)
+            fu[:, :self.N[1]/2, :] = Upad_hatc[:, :self.N[1]/2, :fu.shape[2]]
+            fu[:, self.N[1]/2:, :] = Upad_hatc[:, -self.N[1]/2:, :fu.shape[2]]
+
+        else:
+            self.Upad_hatT[:] = rfft2(u, axes=(1,2))
+            # cut the highest wavenumbers     
+            self.Upad_hatT0[:, :self.N[1]/2, :] = self.Upad_hatT[:, :self.N[1]/2, :self.Nf]
+            self.Upad_hatT0[:, self.N[1]/2:, :] = self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf]
+            self.Upad_mpi[:] = rollaxis(self.Upad_hatT0.reshape(self.complex_shape_padded_I()), 1)        
+            self.comm.Alltoall([self.Upad_mpi, self.mpitype], [self.Upad_hat, self.mpitype])
+            self.Upad_hat1[:] = 0
+            self.Upad_hat1 = S.fastShenScalar(self.Upad_hat, self.Upad_hat1)
+            fu[S.slice(self.N[0])] = self.Upad_hat1[S.slice(self.N[0])]/1.5**2
+        return fu
+
+    def copy_to_padded(self, fu, fp):
+        fp[:self.N[0], :self.N[1]/2, :self.Nf] = fu[:, :self.N[1]/2, :self.Nf]
+        fp[:self.N[0], -(self.N[1]/2):, :self.Nf] = fu[:, -(self.N[1]/2):, :self.Nf]
+        return fp
+    
+    def ifct_padded(self, fu, u, S):
+        """Inverse Cheb transform of x-direction, Fourier in y and z"""
+        if self.num_processes == 1:
+            Upad_hat = zeros((self.N[0], 3*self.N[1]/2, self.Nf), dtype=complex)
+            Upad_hatc = zeros((self.N[0], 3*self.N[1]/2, self.Nf), dtype=complex)
+            Upad_hat[:, :self.N[1]/2, :fu.shape[2]] = fu[:, :self.N[1]/2, :]
+            Upad_hat[:, -self.N[1]/2:, :fu.shape[2]] = fu[:, self.N[1]/2:, :]
+            Upad_hatc = S.ifct(Upad_hat, Upad_hatc)
+            u[:] = irfft2(1.5**2*Upad_hatc, axes=(1, 2))
+        
+        else:
+            self.Upad_hat[:fu.shape[0]] = fu[:]        
+            self.Upad_hat1 = S.ifct(self.Upad_hat, self.Upad_hat1)
+            self.comm.Alltoall([self.Upad_hat1, self.mpitype], [self.Upad_mpi, self.mpitype])
+            self.Upad_hatT0[:] = rollaxis(self.Upad_mpi, 1).reshape(self.complex_shape_padded_T0())
+            self.Upad_hatT[:, :self.N[1]/2, :self.Nf] = self.Upad_hatT0[:, :self.N[1]/2]
+            self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf] = self.Upad_hatT0[:, -(self.N[1]/2):]
+            u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
+        return u
+
+    def fct_padded(self, u, fu, S):
+        """Fast Shen transform of x-direction, Fourier transform of y and z"""        
+        if self.num_processes == 1:
+            Upad_hat = zeros((self.N[0], 3*self.N[1]/2, self.Nf), dtype=complex)
+            Upad_hatc = zeros((self.N[0], 3*self.N[1]/2, self.Nf), dtype=complex)
+            Upad_hat[:] = rfft2(u, axes=(1, 2))
+            Upad_hatc = S.fct(Upad_hat, Upad_hatc)
+            fu[:, :self.N[1]/2, :] = Upad_hatc[:, :self.N[1]/2, :fu.shape[2]]
+            fu[:, self.N[1]/2:, :] = Upad_hatc[:, -self.N[1]/2:, :fu.shape[2]]
+
+        else:
+            self.Upad_hatT[:] = rfft2(u, axes=(1,2))
+            # cut the highest wavenumbers     
+            self.Upad_hatT0[:, :self.N[1]/2, :] = self.Upad_hatT[:, :self.N[1]/2, :self.Nf]
+            self.Upad_hatT0[:, self.N[1]/2:, :] = self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf]
+            self.Upad_mpi[:] = rollaxis(self.Upad_hatT0.reshape(self.complex_shape_padded_I()), 1)        
+            self.comm.Alltoall([self.Upad_mpi, self.mpitype], [self.Upad_hat, self.mpitype])
+            self.Upad_hat1[:] = 0
+            self.Upad_hat1 = S.fct(self.Upad_hat, self.Upad_hat1)
+            fu[:] = self.Upad_hat1[:]/1.5**2
+        return fu
     
     def fss(self, u, fu, S):
         """Fast Shen scalar product of x-direction, Fourier transform of y and z"""

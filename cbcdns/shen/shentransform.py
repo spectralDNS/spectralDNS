@@ -125,6 +125,9 @@ class ChebyshevTransform(object):
 
         return fk
 
+    def slice(self, N):
+        return slice(0, N)
+
 class ShenDirichletBasis(ChebyshevTransform):
     
     def __init__(self, quad="GL", fast_transform=True):
@@ -195,6 +198,9 @@ class ShenDirichletBasis(ChebyshevTransform):
         fk = self.fastShenScalar(fj, fk)
         fk = self.Solver(fk)
         return fk
+    
+    def slice(self, N):
+        return slice(0, N-2)
 
 class ShenNeumannBasis(ShenDirichletBasis):
     
@@ -256,6 +262,9 @@ class ShenNeumannBasis(ShenDirichletBasis):
         self.w_hat[3:] -= self.factor*fk[1:-2]
         fj = self.ifct(self.w_hat, fj)
         return fj
+
+    def slice(self, N):
+        return slice(1, N-2)
 
 class ShenBiharmonicBasis(ShenDirichletBasis):
     
@@ -331,6 +340,8 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
         fj = self.ifct(self.w_hat, fj)
         return fj
         
+    def slice(self, N):
+        return slice(0, N-4)
     
 if __name__ == "__main__":
     from sympy import Symbol, sin, cos
