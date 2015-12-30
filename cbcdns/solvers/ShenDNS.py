@@ -105,10 +105,11 @@ def Curl3(a, c, S):
     SFTc.Mult_CTD_3D(N[0], a[1], a[2], F_tmp[1], F_tmp[2])
     dvdx = U_tmp2[1] = FST.ifct(F_tmp[1]*dealias, U_tmp2[1], S)
     dwdx = U_tmp2[2] = FST.ifct(F_tmp[2]*dealias, U_tmp2[2], S)
-    c[0] = FST.ifst((1j*K[1]*a[2] - 1j*K[2]*a[1])*dealias, c[0], S)
-    c[1] = FST.ifst(1j*K[2]*a[0]*dealias, c[1], S)
+    
+    c[0] = FST.ifst((1j*K[1]*a[2] - 1j*K[2]*a[1])*dealias_S, c[0], S)
+    c[1] = FST.ifst(1j*K[2]*a[0]*dealias_S, c[1], S)
     c[1] -= dwdx
-    c[2] = FST.ifst(1j*K[1]*a[0]*dealias, c[2], S)
+    c[2] = FST.ifst(1j*K[1]*a[0]*dealias_S, c[2], S)
     c[2] *= -1.0
     c[2] += dvdx
     return c
@@ -168,7 +169,7 @@ def standardConvection(c, U, U_hat):
     # Use regular Chebyshev basis for dvdx and dwdx
     F_tmp[0] = CDD.matvec(U_hat[0])
     F_tmp[0] = TDMASolverD(F_tmp[0])    
-    dudx = U_tmp[0] = FST.ifst(F_tmp[0]*dealias, U_tmp[0], ST)   
+    dudx = U_tmp[0] = FST.ifst(F_tmp[0]*dealias_S, U_tmp[0], ST)   
     
     #F_tmp[0] = CND.matvec(U_hat[0])
     #F_tmp[0] = TDMASolverN(F_tmp[0])    
@@ -185,32 +186,32 @@ def standardConvection(c, U, U_hat):
     #dwdx = U_tmp[2] = chebDerivative_3D0(U[2], U_tmp[2])    
     
     U_tmp2[:] = 0
-    dudy_h = 1j*K[1]*U_hat[0]*dealias
+    dudy_h = 1j*K[1]*U_hat[0]*dealias_S
     dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], ST)    
-    dudz_h = 1j*K[2]*U_hat[0]*dealias
+    dudz_h = 1j*K[2]*U_hat[0]*dealias_S
     dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], ST)
     H[0] = U[0]*dudx + U[1]*dudy + U[2]*dudz
     c[0] = FST.fss(H[0], c[0], ST)
     
     U_tmp2[:] = 0
     
-    dvdy_h = 1j*K[1]*U_hat[1]*dealias    
+    dvdy_h = 1j*K[1]*U_hat[1]*dealias_S    
     dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], ST)
     #F_tmp[0] = FST.fst(U[1], F_tmp[0], SN)
     #dvdy_h = 1j*K[1]*F_tmp[0]    
     #dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], SN)
     ##########
     
-    dvdz_h = 1j*K[2]*U_hat[1]*dealias
+    dvdz_h = 1j*K[2]*U_hat[1]*dealias_S
     dvdz = U_tmp2[1] = FST.ifst(dvdz_h, U_tmp2[1], ST)
     H[1] = U[0]*dvdx + U[1]*dvdy + U[2]*dvdz
     c[1] = FST.fss(H[1], c[1], ST)
     
     U_tmp2[:] = 0
-    dwdy_h = 1j*K[1]*U_hat[2]*dealias
+    dwdy_h = 1j*K[1]*U_hat[2]*dealias_S
     dwdy = U_tmp2[0] = FST.ifst(dwdy_h, U_tmp2[0], ST)
     
-    dwdz_h = 1j*K[2]*U_hat[2]*dealias
+    dwdz_h = 1j*K[2]*U_hat[2]*dealias_S
     dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
     
     #F_tmp[0] = FST.fst(U[2], F_tmp[0], SN)
@@ -331,7 +332,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             for i in range(3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST)
+                U_dealiased[i] = FST.ifst(U_hat[i]*dealias_S, U_dealiased[i], ST)
             
             H_hat = standardConvection(H_hat, U_dealiased, U_hat)
             #H_hat = standardConvection2(H_hat, U, U_hat)
@@ -341,15 +342,21 @@ def getConvection(convection):
     elif convection == "Divergence":
         
         def Conv(H_hat, U, U_hat):
-            H_hat = divergenceConvection(H_hat, U, U_hat, False)
+            for i in range(3):
+                U_dealiased[i] = FST.ifst(U_hat[i]*dealias_S, U_dealiased[i], ST)
+                
+            H_hat = divergenceConvection(H_hat, U_dealiased, U_hat, False)
             H_hat[:] *= -1
             return H_hat
         
     elif convection == "Skew":
         
         def Conv(H_hat, U, U_hat):
-            H_hat = standardConvection(H_hat, U, U_hat)
-            H_hat = divergenceConvection(H_hat, U, U_hat, True)        
+            for i in range(3):
+                U_dealiased[i] = FST.ifst(U_hat[i]*dealias_S, U_dealiased[i], ST)
+                
+            H_hat = standardConvection(H_hat, U_dealiased, U_hat)
+            H_hat = divergenceConvection(H_hat, U_dealiased, U_hat, True)        
             H_hat *= -0.5
             return H_hat
 
@@ -362,7 +369,7 @@ def getConvection(convection):
             
         def Conv(H_hat, U, U_hat):
             for i in range(3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST)
+                U_dealiased[i] = FST.ifst(U_hat[i]*dealias_S, U_dealiased[i], ST)
                 
             U_tmp[:] = Curl3(U_hat, U_tmp, ST)
             H_hat[:] = Cross(U_dealiased, U_tmp, H_hat, ST)

@@ -164,9 +164,9 @@ def getConvection(convection):
     elif convection == "Vortex":
         
         def Conv(H_hat, U, U_hat):
-            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB)
+            U_dealiased[0] = FST.ifst(U_hat[0]*dealias, U_dealiased[0], SB)
             for i in range(1,3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST)
+                U_dealiased[i] = FST.ifst(U_hat[i]*dealias, U_dealiased[i], ST)
                 
             U_tmp[:] = Curl(U_hat, U_tmp, ST)
             H_hat[:] = Cross(U_dealiased, U_tmp, H_hat, ST)

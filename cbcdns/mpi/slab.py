@@ -208,9 +208,13 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2)
-    kmax[0] = N[0]
+    kmax[0] = 2./3.*N[0]
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
+    
+    kmax[0] = 2./3.*(N[0]-2)
+    dealias_S = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
+                      (abs(K[2]) < kmax[2]), dtype=uint8)
     
     del kwargs 
     return locals()
@@ -292,9 +296,13 @@ def setupShenKMM(comm, float, complex, mpitype, N, L, mgrid,
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2)
-    kmax[0] = N[0]
+    kmax[0] = 2./3.*N[0]
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
+    
+    kmax[0] = 2./3.*(N[0]-2)
+    dealias_S = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
+                      (abs(K[2]) < kmax[2]), dtype=uint8)
     
     del kwargs 
     return locals()
