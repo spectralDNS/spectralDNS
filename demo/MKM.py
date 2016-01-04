@@ -35,11 +35,11 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     duplus = Um*0.2/utau  #Um*0.25/utau 
     alfaplus = config.L[1]/500.
     betaplus = config.L[2]/200.
-    sigma = 0.00055
+    sigma = 0.00055 # 0.00055
     epsilon = Um/200.   #Um/200.
     U[:] = 0
     U[1] = Um*(Y-0.5*Y**2)
-    dev = 1+0.01*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dev = 1+0.1*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
     dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
     U[1] += dd
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
@@ -62,19 +62,33 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     #U[1] += 5e-2*U0[1]
     #U[2] += 5e-2*U0[2]
     
-    # project to Dirichlet space and back
-    for i in range(3):
-        U_hat[i] = FST.fst(U[i], U_hat[i], ST)
-        
-    for i in range(3):
-        U[i] = FST.ifst(U_hat[i], U[i], ST)
-
-    for i in range(3):
-        U_hat[i] = FST.fst(U[i], U_hat[i], ST)
-
     if "KMM" in config.solver:
+        U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB'])
+        for i in range(1, 3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
+            
+        U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
+        for i in range(1, 3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)
+
+        U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB'])
+        for i in range(1, 3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
+
         g = kw['g']
         g[:] = 1j*K[1]*U_hat[2] - 1j*K[2]*U_hat[1]
+
+    else:
+        # project to Dirichlet space and back
+        for i in range(3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
+            
+        for i in range(3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)
+
+        for i in range(3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
+
 
 
     # Set the flux
@@ -164,32 +178,51 @@ def initialize3(U, U_hat, U0, U_hat0, P, P_hat, FST, SN, ST, X, Curl, sin, cos, 
     U_hat0[:] = U_hat[:]
 
  
-def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1,
+def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K, H1, H,
                    rank, conv, FST, ST, SN, num_processes, **kw):
     f = h5py.File(filename, driver="mpio", comm=comm)
     assert "0" in f["3D/checkpoint/U"]
     N = U0.shape[1]
     s = slice(rank*N, (rank+1)*N, 1)
     U0[:] = f["3D/checkpoint/U/0"][:, s]
-    for i in range(3):
-        U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
-    H_hat1[:] = conv(H_hat1, U0, U_hat0)
     
-    U0[:] = f["3D/checkpoint/U/1"][:, s]
-    P [:] = f["3D/checkpoint/P/1"][s]
-    #U0[0] += 0.01*random.randn(*U0[0].shape)
-    #if rank == 0:
-        #U0[:, 0] = 0
-    #if rank == num_processes-1:
-        #U0[:, -1] = 0
+    if config.solver in ("IPCS", "IPCSR"):
+        for i in range(3):
+            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
+        H_hat1[:] = conv(H_hat1, U0, U_hat0)
+        
+        U0[:] = f["3D/checkpoint/U/1"][:, s]
+        P [:] = f["3D/checkpoint/P/1"][s]
+        #U0[0] += 0.01*random.randn(*U0[0].shape)
+        #if rank == 0:
+            #U0[:, 0] = 0
+        #if rank == num_processes-1:
+            #U0[:, -1] = 0
 
-    for i in range(3):
-        U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
-    
-    if config.solver == "IPCSR":
-        P_hat = FST.fct(P, P_hat, SN)
-    else:
-        P_hat = FST.fst(P, P_hat, SN)
+        for i in range(3):
+            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
+        
+        if config.solver == "IPCSR":
+            P_hat = FST.fct(P, P_hat, SN)
+        else:
+            P_hat = FST.fst(P, P_hat, SN)
+
+    elif config.solver == "KMM":
+        U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB'])
+        for i in range(1,3):
+            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
+        H_hat1[:] = conv(H_hat1, U0, U_hat0)
+        H1[:] = H[:]
+        
+        U0[:] = f["3D/checkpoint/U/1"][:, s]
+        U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB'])
+        for i in range(1,3):
+            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
+        
+        g = kw['g']
+        g[:] = 1j*K[1]*U_hat0[2] - 1j*K[2]*U_hat0[1]
+        
+        
     f.close()
 
 def set_Source(Source, Sk, ST, FST, **kw):
@@ -252,7 +285,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk
         plt.draw()
 
         plt.figure()
-        im3 = plt.contourf(X[1,:,:,0], X[0,:,:,0], P[:,:,0], 100)
+        im3 = plt.contourf(X[2,:,0,:], X[0,:,0,:], U[0, :,0 ,:], 100)
         plt.colorbar(im3)
         plt.draw()
 
@@ -267,7 +300,8 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk
         im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0], 100) 
         im2.autoscale()
         im3.ax.clear()
-        im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100) 
+        #im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100) 
+        im3.ax.contourf(X[2,:,0,:], X[0,:,0,:], U[0, :,0 ,:], 100)
         im3.autoscale()
         plt.pause(1e-6)
     
@@ -410,10 +444,10 @@ if __name__ == "__main__":
     config.Shen.add_argument("--plot_result", type=int, default=100)
     config.Shen.add_argument("--sample_stats", type=int, default=100)
     solver = get_solver(update=update, family="Shen")    
-    initialize(**vars(solver))    
-    #init_from_file("IPCSRR.h5", **vars(solver))
+    #initialize(**vars(solver))    
+    init_from_file("KMM13.h5", **vars(solver))
     set_Source(**vars(solver))
-    solver.stats = Stats(solver.U, solver.comm, filename="MKMstats")
-    solver.hdf5file.fname = "KMM5.h5"
+    solver.stats = Stats(solver.U, solver.comm, filename="MKMstats13")
+    solver.hdf5file.fname = "KMM13.h5"
     solver.solve()
     s = solver.stats.get_stats()

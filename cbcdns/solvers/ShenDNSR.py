@@ -130,7 +130,8 @@ def solve():
         U0[:] = U
         
         P[:] = FST.ifct(P_hat, P, SN)        
-        conv1[:] = conv0
+        H_hat1[:] = H_hat
+        H1[:] = H
                 
         timer()
         
