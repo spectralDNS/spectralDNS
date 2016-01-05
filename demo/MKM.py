@@ -268,6 +268,11 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk
     #Source[:] += 0.05*random.randn(*U.shape)
     #for i in range(3):
         #Sk[i] = FST.fss(Source[i], Sk[i], ST)
+        
+    if config.tstep % config.print_energy0 == 0:
+        print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 2))
+        #print "H_hat1/H_hat1d"
+        #print (H_hat[1].real*H_hat[1].real + H_hat[1].imag*H_hat[1].imag).mean(axis=(0, 2))/(H_hatd[1].real*H_hatd[1].real + H_hatd[1].imag*H_hatd[1].imag).mean(axis=(0, 2))
     
     if config.tstep % config.write_result == 0 or config.tstep % config.write_yz_slice[1] == 0:
         hdf5file.write(config.tstep)
@@ -445,11 +450,12 @@ if __name__ == "__main__":
     config.Shen.add_argument("--compute_energy", type=int, default=100)
     config.Shen.add_argument("--plot_result", type=int, default=100)
     config.Shen.add_argument("--sample_stats", type=int, default=100)
+    config.Shen.add_argument("--print_energy0", type=int, default=100)
     solver = get_solver(update=update, family="Shen")    
     #initialize(**vars(solver))    
-    init_from_file("IPCS.h5", **vars(solver))
+    init_from_file("KMMt2.h5", **vars(solver))
     set_Source(**vars(solver))
-    solver.stats = Stats(solver.U, solver.comm, filename="KMMstats")
-    solver.hdf5file.fname = "KMMt.h5"
+    solver.stats = Stats(solver.U, solver.comm, filename="KMMstats2")
+    solver.hdf5file.fname = "KMMt3.h5"
     solver.solve()
     s = solver.stats.get_stats()
