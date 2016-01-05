@@ -25,14 +25,14 @@ CDD = CDDmat(K[0, :, 0, 0])
 BDD = BDDmat(K[0, :, 0, 0], ST.quad)
 BDT = BDTmat(K[0, :, 0, 0], SN.quad)
 
-#U_pad = empty((3,)+FST.real_shape_padded())
-#U_pad2 = empty((3,)+FST.real_shape_padded())
-#H_pad = empty((3,)+FST.real_shape_padded())
-#curl_pad = empty((3,)+FST.real_shape_padded())
-U_pad = empty((3, N[0], 3*N[1]/2, N[2]))
-U_pad2 = empty((3, N[0], 3*N[1]/2, N[2]))
-H_pad = empty((3, N[0], 3*N[1]/2, N[2]))
-curl_pad = empty((3, N[0], 3*N[1]/2, N[2]))
+U_pad = empty((3,)+FST.real_shape_padded())
+U_pad2 = empty((3,)+FST.real_shape_padded())
+H_pad = empty((3,)+FST.real_shape_padded())
+curl_pad = empty((3,)+FST.real_shape_padded())
+#U_pad = empty((3, N[0], 3*N[1]/2, N[2]))
+#U_pad2 = empty((3, N[0], 3*N[1]/2, N[2]))
+#H_pad = empty((3, N[0], 3*N[1]/2, N[2]))
+#curl_pad = empty((3, N[0], 3*N[1]/2, N[2]))
 U_dealiased = empty((3,)+FST.real_shape())
 
 dpdx = P.copy()
@@ -118,12 +118,12 @@ def Curl2(u_hat, c, S):
     U_pad2[:] = 0
     F_tmp[:] = 0
     SFTc.Mult_CTD_3D(N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = U_pad2[1] = FST.ifct_padded(F_tmp[1], U_pad2[1], S)
-    dwdx = U_pad2[2] = FST.ifct_padded(F_tmp[2], U_pad2[2], S)
-    c[0] = FST.ifst_padded(1j*K[1]*u_hat[2] - 1j*K[2]*u_hat[1], c[0], S)
-    c[1] = FST.ifst_padded(1j*K[2]*u_hat[0], c[1], S)
+    dvdx = U_pad2[1] = FST.ifct_padded(F_tmp[1]*dealias, U_pad2[1], S)
+    dwdx = U_pad2[2] = FST.ifct_padded(F_tmp[2]*dealias, U_pad2[2], S)
+    c[0] = FST.ifst_padded((1j*K[1]*u_hat[2] - 1j*K[2]*u_hat[1])*dealias_S, c[0], S)
+    c[1] = FST.ifst_padded(1j*K[2]*u_hat[0]*dealias_S, c[1], S)
     c[1] -= dwdx
-    c[2] = FST.ifst_padded(1j*K[1]*u_hat[0], c[2], S)
+    c[2] = FST.ifst_padded(1j*K[1]*u_hat[0]*dealias_S, c[2], S)
     c[2] *= -1.0
     c[2] += dvdx
     return c
@@ -331,11 +331,11 @@ def getConvection(convection):
     if convection == "Standard":
         
         def Conv(H_hat, U, U_hat):
-            for i in range(3):
-                U_dealiased[i] = FST.ifst(U_hat[i]*dealias_S, U_dealiased[i], ST)
+            #for i in range(3):
+                #U_dealiased[i] = FST.ifst(U_hat[i]*dealias_S, U_dealiased[i], ST)
             
-            H_hat = standardConvection(H_hat, U_dealiased, U_hat)
-            #H_hat = standardConvection2(H_hat, U, U_hat)
+            #H_hat = standardConvection(H_hat, U_dealiased, U_hat)
+            H_hat = standardConvection2(H_hat, U, U_hat)
             H_hat[:] *= -1 
             return H_hat
 
@@ -367,20 +367,20 @@ def getConvection(convection):
             #H_hat[:] = Cross(U, U_tmp, H_hat, ST)
             #return H_hat
             
-        def Conv(H_hat, U, U_hat):
-            for i in range(3):
-                U_dealiased[i] = FST.ifst(U_hat[i]*dealias_S, U_dealiased[i], ST)
-                
-            U_tmp[:] = Curl3(U_hat, U_tmp, ST)
-            H_hat[:] = Cross(U_dealiased, U_tmp, H_hat, ST)
-            return H_hat
-        
         #def Conv(H_hat, U, U_hat):
-            #curl_pad[:] = Curl2(U_hat, curl_pad, ST)
             #for i in range(3):
-                #U_pad[i] = FST.ifst_padded(U_hat[i], U_pad[i], ST)
-            #H_hat[:] = Cross2(U_pad, curl_pad, H_hat, ST)
+                #U_dealiased[i] = FST.ifst(U_hat[i]*dealias_S, U_dealiased[i], ST)
+                
+            #U_tmp[:] = Curl3(U_hat, U_tmp, ST)
+            #H_hat[:] = Cross(U_dealiased, U_tmp, H_hat, ST)
             #return H_hat
+        
+        def Conv(H_hat, U, U_hat):
+            curl_pad[:] = Curl2(U_hat, curl_pad, ST)
+            for i in range(3):
+                U_pad[i] = FST.ifst_padded(U_hat[i]*dealias_S, U_pad[i], ST)
+            H_hat[:] = Cross2(U_pad, curl_pad, H_hat, ST)
+            return H_hat
         
     return Conv           
 

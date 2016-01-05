@@ -22,6 +22,10 @@ U_pad2 = empty((3,)+FST.real_shape_padded())
 curl_pad = empty((3,)+FST.real_shape_padded())
 U_dealiased = empty((3,)+FST.real_shape())
 
+H_hatd = empty((3,)+FST.complex_shape(), dtype=complex)
+H_hatd1 = empty((3,)+FST.complex_shape(), dtype=complex)
+H_hatd0 = empty((3,)+FST.complex_shape(), dtype=complex)
+
 TDMASolverD = TDMA(ST.quad, False)
 
 alfa = K2[0] - 2.0/nu/dt
@@ -76,13 +80,13 @@ def Curl2(u_hat, c, S):
     U_pad2[:] = 0
     F_tmp[:] = 0
     SFTc.Mult_CTD_3D(N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = U_pad2[1] = FST.ifct_padded(F_tmp[1], U_pad2[1], S)
-    dwdx = U_pad2[2] = FST.ifct_padded(F_tmp[2], U_pad2[2], S)
+    dvdx = U_pad2[1] = FST.ifct_padded(F_tmp[1]*dealias, U_pad2[1], S)
+    dwdx = U_pad2[2] = FST.ifct_padded(F_tmp[2]*dealias, U_pad2[2], S)
     #c[0] = FST.ifst(1j*K[1]*a_hat[2] - 1j*K[2]*a_hat[1], c[0], S)
-    c[0] = FST.ifst_padded(g, c[0], ST)
-    c[1] = FST.ifst_padded(1j*K[2]*u_hat[0], c[1], SB)
+    c[0] = FST.ifst_padded(g*dealias_S, c[0], ST)
+    c[1] = FST.ifst_padded(1j*K[2]*u_hat[0]*dealias_B, c[1], SB)
     c[1] -= dwdx
-    c[2] = FST.ifst_padded(1j*K[1]*u_hat[0], c[2], SB)
+    c[2] = FST.ifst_padded(1j*K[1]*u_hat[0]*dealias_B, c[2], SB)
     c[2] *= -1.0
     c[2] += dvdx
     return c
@@ -168,19 +172,26 @@ def getConvection(convection):
     elif convection == "Vortex":
         
         def Conv(H_hat, U, U_hat):
-            U_dealiased[0] = FST.ifst(U_hat[0]*dealias_B, U_dealiased[0], SB)
+            U_dealiased[0] = FST.ifst(U_hat[0]*dealias_B, U_dealiased[0], SB)                
             for i in range(1,3):
                 U_dealiased[i] = FST.ifst(U_hat[i]*dealias_S, U_dealiased[i], ST)
                 
             U_tmp[:] = Curl(U_hat, U_tmp, ST)
+            # This one with regular aliasing
+            H_hatd[:] = Cross(U_dealiased, U_tmp, H_hatd, ST)
+
+            U_dealiased[0] = FST.ifst(U_hat[0]*dealias_G, U_dealiased[0], SB)
+            U_tmp[:] = Curl(U_hat, U_tmp, ST)
+            # This one with U[0] dealiased more
             H_hat[:] = Cross(U_dealiased, U_tmp, H_hat, ST)
+            
             return H_hat
 
         #def Conv(H_hat, U, U_hat):
             #curl_pad[:] = Curl2(U_hat, curl_pad, ST)
-            #U_pad[0] = FST.ifst_padded(U_hat[0], U_pad[0], SB)
+            #U_pad[0] = FST.ifst_padded(U_hat[0]*dealias_B, U_pad[0], SB)
             #for i in range(1,3):
-                #U_pad[i] = FST.ifst_padded(U_hat[i], U_pad[i], ST)
+                #U_pad[i] = FST.ifst_padded(U_hat[i]*dealias_S, U_pad[i], ST)
             #H_hat[:] = Cross2(U_pad, curl_pad, H_hat, ST)
             #return H_hat
         
@@ -207,6 +218,7 @@ def ComputeRHS(dU):
     H0[:] = 1.5*H - 0.5*H1
     H_hat0[:] = 1.5*H_hat - 0.5*H_hat1
     #H_hat0[:] *= dealias    
+    H_hatd0[:] = 1.5*H_hatd - 0.5*H_hatd1
     
     # Following modification is critical for accuracy with vortex convection, but it makes standard perform worse
     #hv[:] = -K2*BBD.matvec(H_hat0[0])
@@ -216,7 +228,7 @@ def ComputeRHS(dU):
     
     # Following does not seem to be critical
     hv -= 1j*K[1]*CBD.matvec(H_hat0[1])
-    hv -= 1j*K[2]*CBD.matvec(H_hat0[2])    
+    hv -= 1j*K[2]*CBD.matvec(H_hatd0[2])    
     #dH1dx = U_tmp[1] = FST.chebDerivative_3D0(H0[1], U_tmp[1], SB)
     #dH2dx = U_tmp[2] = FST.chebDerivative_3D0(H0[2], U_tmp[2], SB)
     #F_tmp[1] = FST.fss(dH1dx, F_tmp[1], SB)
@@ -226,7 +238,7 @@ def ComputeRHS(dU):
 
     #hv *= dealias
     
-    hg[:] = 1j*K[1]*BDD.matvec(H_hat0[2]) - 1j*K[2]*BDD.matvec(H_hat0[1])
+    hg[:] = 1j*K[1]*BDD.matvec(H_hatd0[2]) - 1j*K[2]*BDD.matvec(H_hatd0[1])
     #F_tmp[1] = FST.fss(H0[1], F_tmp[1], ST)
     #F_tmp[2] = FST.fss(H0[2], F_tmp[2], ST)
     #hg[:] = 1j*K[1]*F_tmp[2] - 1j*K[2]*F_tmp[1]    
@@ -265,8 +277,8 @@ def solve():
         if rank == 0:
             u0_hat = zeros((3, N[0]), dtype=complex)
             h0_hat = zeros((3, N[0]), dtype=complex)
-            h0_hat[1] = H_hat0[1, :, 0, 0]
-            h0_hat[2] = H_hat0[2, :, 0, 0]
+            h0_hat[1] = H_hatd0[1, :, 0, 0]
+            h0_hat[2] = H_hatd0[2, :, 0, 0]
             u0_hat[1] = U_hat0[1, :, 0, 0]
             u0_hat[2] = U_hat0[2, :, 0, 0]
             
@@ -295,6 +307,7 @@ def solve():
         U0[:] = U
         H1[:] = H
         H_hat1[:] = H_hat
+        H_hatd1[:] = H_hatd
                 
         timer()
         

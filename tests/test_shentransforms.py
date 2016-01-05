@@ -584,7 +584,7 @@ def test_CBDmat(SBST):
     Cm = CBDmat(np.arange(M).astype(np.float))    
     
     x = Symbol("x")
-    u = sin(2*pi*x)**2
+    u = sin(12*pi*x)**2
     f = u.diff(x, 1)
 
     points, weights = SD.points_and_weights(M) 
@@ -606,7 +606,7 @@ def test_CBDmat(SBST):
     cs2 = np.zeros(M)
     cs2 = SB.fastShenScalar(df, cs2)
     
-    #from IPython import embed; embed()
+    from IPython import embed; embed()
     assert np.allclose(cs, cs2)
     
     # Multidimensional version
@@ -618,8 +618,7 @@ def test_CBDmat(SBST):
     
     assert np.allclose(cs, cs2)
 
-#test_CBDmat((ShenBiharmonicBasis("GC"), ShenDirichletBasis("GC")))
-
+test_CBDmat((ShenBiharmonicBasis("GL"), ShenDirichletBasis("GL")))
 
 def test_Mult_Div():
     
@@ -816,7 +815,7 @@ def test_ABBmat(SB):
     from IPython import embed; embed()
     
 
-test_ABBmat(ShenBiharmonicBasis("GL"))
+#test_ABBmat(ShenBiharmonicBasis("GL"))
 
 
 def test_Helmholtz(ST3):
