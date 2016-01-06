@@ -268,7 +268,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk
     #for i in range(3):
         #Sk[i] = FST.fss(Source[i], Sk[i], ST)
         
-    if config.tstep % config.print_energy0 == 0:
+    if config.tstep % config.print_energy0 == 0 and rank == 0:
         print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 2))
         print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 1))
     
@@ -457,3 +457,17 @@ if __name__ == "__main__":
     solver.hdf5file.fname = "KMM666.h5"
     solver.solve()
     s = solver.stats.get_stats()
+
+    #from numpy import meshgrid, float
+    #s = solver
+    #Np = s.N / s.num_processes
+    #x1 = arange(1.5*s.N[1], dtype=float)*config.L[1]/(1.5*s.N[1])
+    #x2 = arange(1.5*s.N[2], dtype=float)*config.L[2]/(1.5*s.N[2])
+    ## Get grid for velocity points
+    #X = array(meshgrid(s.points[s.rank*Np[0]:(s.rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)    
+    #s.U_pad2[1] = s.FST.ifst_padded(s.U_hat[1], s.U_pad2[1], s.ST)
+    #plt.figure()
+    #plt.contourf(X[1,:,:,0], X[0,:,:,0], s.U_pad2[1,:,:,0], 100)
+    #plt.show()
+    
+    

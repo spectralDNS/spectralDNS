@@ -663,7 +663,8 @@ class FastShenFourierTransform(object):
         else:
             self.Uc_hat[:] = S.ifst(fu, self.Uc_hat)
             self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.U_mpi, self.mpitype])
-            self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())        
+            self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())     
+            self.Upad_hatT[:] = 0
             self.Upad_hatT[:, :self.N[1]/2, :self.Nf] = self.Uc_hatT[:, :self.N[1]/2]
             self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf] = self.Uc_hatT[:, self.N[1]/2:]
             u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
@@ -702,13 +703,12 @@ class FastShenFourierTransform(object):
         else:
             self.Upad_hatT[:] = rfft2(u, axes=(1,2))
             # cut the highest wavenumbers     
-            self.Upad_hatT0[:, :self.N[1]/2, :] = self.Upad_hatT[:, :self.N[1]/2, :self.Nf]
-            self.Upad_hatT0[:, self.N[1]/2:, :] = self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf]
-            self.Upad_mpi[:] = rollaxis(self.Upad_hatT0.reshape(self.complex_shape_padded_I()), 1)        
-            self.comm.Alltoall([self.Upad_mpi, self.mpitype], [self.Upad_hat, self.mpitype])
-            self.Upad_hat1[:] = 0
-            self.Upad_hat1 = S.fastShenScalar(self.Upad_hat, self.Upad_hat1)
-            fu[S.slice(self.N[0])] = self.Upad_hat1[S.slice(self.N[0])]/1.5**2
+            self.Uc_hatT[:, :self.N[1]/2] = self.Upad_hatT[:, :self.N[1]/2, :self.Nf]
+            self.Uc_hatT[:, self.N[1]/2:] = self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf]
+            self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+            self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+            fu = S.fastShenScalar(self.Uc_hat/1.5**2, fu)
+
         return fu
 
     def copy_to_padded(self, fu, fp):
@@ -727,12 +727,12 @@ class FastShenFourierTransform(object):
             u[:] = irfft2(1.5**2*Upad_hatc, axes=(1, 2))
         
         else:
-            self.Upad_hat[:fu.shape[0]] = fu[:]        
-            self.Upad_hat1 = S.ifct(self.Upad_hat, self.Upad_hat1)
-            self.comm.Alltoall([self.Upad_hat1, self.mpitype], [self.Upad_mpi, self.mpitype])
-            self.Upad_hatT0[:] = rollaxis(self.Upad_mpi, 1).reshape(self.complex_shape_padded_T0())
-            self.Upad_hatT[:, :self.N[1]/2, :self.Nf] = self.Upad_hatT0[:, :self.N[1]/2]
-            self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf] = self.Upad_hatT0[:, -(self.N[1]/2):]
+            self.Uc_hat[:] = S.ifct(fu, self.Uc_hat)
+            self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.U_mpi, self.mpitype])
+            self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())    
+            self.Upad_hatT[:] = 0
+            self.Upad_hatT[:, :self.N[1]/2, :self.Nf] = self.Uc_hatT[:, :self.N[1]/2]
+            self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf] = self.Uc_hatT[:, self.N[1]/2:]
             u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
         return u
 
@@ -749,13 +749,12 @@ class FastShenFourierTransform(object):
         else:
             self.Upad_hatT[:] = rfft2(u, axes=(1,2))
             # cut the highest wavenumbers     
-            self.Upad_hatT0[:, :self.N[1]/2, :] = self.Upad_hatT[:, :self.N[1]/2, :self.Nf]
-            self.Upad_hatT0[:, self.N[1]/2:, :] = self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf]
-            self.Upad_mpi[:] = rollaxis(self.Upad_hatT0.reshape(self.complex_shape_padded_I()), 1)        
-            self.comm.Alltoall([self.Upad_mpi, self.mpitype], [self.Upad_hat, self.mpitype])
-            self.Upad_hat1[:] = 0
-            self.Upad_hat1 = S.fct(self.Upad_hat, self.Upad_hat1)
-            fu[:] = self.Upad_hat1[:]/1.5**2
+            self.Uc_hatT[:, :self.N[1]/2] = self.Upad_hatT[:, :self.N[1]/2, :self.Nf]
+            self.Uc_hatT[:, self.N[1]/2:] = self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf]
+            self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+            self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+            fu = S.fct(self.Uc_hat/1.5**2, fu)
+
         return fu
     
     def fss(self, u, fu, S):
