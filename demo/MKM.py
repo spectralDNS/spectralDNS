@@ -24,7 +24,7 @@ def initOS(OS, U, X, t=0.):
             U[1, i, j, :] = v
     U[2] = 0
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_processes, Curl, conv, TDMASolverD, solvePressure, N, H, H1, H_hat, H_hat1, U_tmp, K, H_hatd, H_hatd1, **kw):
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_processes, Curl, conv, TDMASolverD, solvePressure, N, H, H1, H_hat, H_hat1, U_tmp, K, **kw):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
     utau = config.nu * config.Re_tau
@@ -39,7 +39,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     epsilon = Um/200.   #Um/200.
     U[:] = 0
     U[1] = Um*(Y-0.5*Y**2)
-    dev = 1+0.1*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dev = 1+0.01*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
     dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
     U[1] += dd
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
@@ -110,10 +110,9 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
     U0[:] = U[:]
     U_hat0[:] = U_hat[:]
     H_hat1 = conv(H_hat1, U0, U_hat0)
-    H1[:] = H[:]
-    H_hatd1[:] = H_hatd[:]
-    
- 
+    H1[:] = H[:]    
+
+
 def initialize2(U, U_hat, U0, U_hat0, P, P_hat, FST, SN, ST, X, Curl, **kw):
     """"""
     # Random streamfunction
@@ -451,10 +450,10 @@ if __name__ == "__main__":
     config.Shen.add_argument("--sample_stats", type=int, default=100)
     config.Shen.add_argument("--print_energy0", type=int, default=100)
     solver = get_solver(update=update, family="Shen")    
-    #initialize(**vars(solver))    
-    init_from_file("KMMt3.h5", **vars(solver))
+    initialize(**vars(solver))    
+    #init_from_file("KMM666.h5", **vars(solver))
     set_Source(**vars(solver))
-    solver.stats = Stats(solver.U, solver.comm, filename="KMMstats4")
-    solver.hdf5file.fname = "KMMt4.h5"
+    solver.stats = Stats(solver.U, solver.comm, filename="KMMstats")
+    solver.hdf5file.fname = "KMM666.h5"
     solver.solve()
     s = solver.stats.get_stats()

@@ -79,9 +79,9 @@ def Curl(a_hat, c, S):
     dwdx = U_tmp2[2] = FST.ifct(F_tmp[2]*dealias, U_tmp2[2], S)
     #c[0] = FST.ifst(1j*K[1]*a_hat[2] - 1j*K[2]*a_hat[1], c[0], S)
     c[0] = FST.ifst(g * dealias_S, c[0], ST)
-    c[1] = FST.ifst(1j*K[2]*a_hat[0]*dealias_G, c[1], SB)
+    c[1] = FST.ifst(1j*K[2]*a_hat[0]*dealias_B, c[1], SB)
     c[1] -= dwdx
-    c[2] = FST.ifst(1j*K[1]*a_hat[0]*dealias_G, c[2], SB)
+    c[2] = FST.ifst(1j*K[1]*a_hat[0]*dealias_B, c[2], SB)
     c[2] *= -1.0
     c[2] += dvdx
     return c
@@ -181,29 +181,25 @@ def getConvection(convection):
 
     elif convection == "Vortex":
         
-        def Conv(H_hat, U, U_hat):
-            U_dealiased[0] = FST.ifst(U_hat[0]*dealias_G, U_dealiased[0], SB)                
-            for i in range(1,3):
-                U_dealiased[i] = FST.ifst(U_hat[i]*dealias_S, U_dealiased[i], ST)
-                
-            U_tmp[:] = Curl(U_hat, U_tmp, ST)
-            H_hat[:] = Cross(U_dealiased, U_tmp, H_hat, ST)
-            
-            return H_hat
-
         #def Conv(H_hat, U, U_hat):
-            #curl_pad[:] = Curl2(U_hat, curl_pad, ST)
-            
-            #U_pad[0] = FST.ifst_padded(U_hat[0]*dealias_B, U_pad[0], SB)
+            #U_dealiased[0] = FST.ifst(U_hat[0]*dealias_B, U_dealiased[0], SB)                
             #for i in range(1,3):
-                #U_pad[i] = FST.ifst_padded(U_hat[i]*dealias_S, U_pad[i], ST)
-            ## This one with regular aliasing
-            #H_hatd[:] = Cross2(U_pad, curl_pad, H_hatd, ST)
-            #U_pad[0] = FST.ifst_padded(U_hat[0]*dealias_G, U_pad[0], SB)
-            ## This one with U[0] dealiased more
-            #H_hat[:] = Cross2(U_pad, curl_pad, H_hat, ST)
+                #U_dealiased[i] = FST.ifst(U_hat[i]*dealias_S, U_dealiased[i], ST)
+                
+            #U_tmp[:] = Curl(U_hat, U_tmp, ST)
+            #H_hat[:] = Cross(U_dealiased, U_tmp, H_hat, ST)
             
             #return H_hat
+
+        def Conv(H_hat, U, U_hat):
+            curl_pad[:] = Curl2(U_hat, curl_pad, ST)
+            
+            U_pad[0] = FST.ifst_padded(U_hat[0]*dealias_B, U_pad[0], SB)
+            for i in range(1,3):
+                U_pad[i] = FST.ifst_padded(U_hat[i]*dealias_S, U_pad[i], ST)
+            H_hat[:] = Cross2(U_pad, curl_pad, H_hat, ST)
+            
+            return H_hat
         
     return Conv           
 
