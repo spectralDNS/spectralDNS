@@ -22,10 +22,6 @@ U_pad2 = empty((3,)+FST.real_shape_padded())
 curl_pad = empty((3,)+FST.real_shape_padded())
 U_dealiased = empty((3,)+FST.real_shape())
 
-H_hatd = empty((3,)+FST.complex_shape(), dtype=complex)
-H_hatd1 = empty((3,)+FST.complex_shape(), dtype=complex)
-H_hatd0 = empty((3,)+FST.complex_shape(), dtype=complex)
-
 TDMASolverD = TDMA(ST.quad, False)
 
 alfa = K2[0] - 2.0/nu/dt
@@ -51,6 +47,20 @@ def solvePressure(P_hat, Ni):
     SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])    
     P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
     return P_hat
+
+def Curl_hat(a_hat, c, S):
+    F_tmp[:] = 0
+    U_tmp2[:] = 0
+    SFTc.Mult_CTD_3D(N[0], a_hat[1], a_hat[2], F_tmp[1], F_tmp[2])
+    dvdx_hat = F_tmp[1]
+    dwdx_hat = F_tmp[2]
+    c[0] = g 
+    c[1] = 1j*K[2]*a_hat[0]
+    c[1] -= dwdx
+    c[2] = FST.ifst(1j*K[1]*a_hat[0]*dealias_G, c[2], SB)
+    c[2] *= -1.0
+    c[2] += dvdx
+    return c
 
 def Cross(a, b, c, S):
     H[0] = a[1]*b[2]-a[2]*b[1]
@@ -172,19 +182,12 @@ def getConvection(convection):
     elif convection == "Vortex":
         
         def Conv(H_hat, U, U_hat):
-            #U_dealiased[0] = FST.ifst(U_hat[0]*dealias_B, U_dealiased[0], SB)                
+            U_dealiased[0] = FST.ifst(U_hat[0]*dealias_G, U_dealiased[0], SB)                
             for i in range(1,3):
                 U_dealiased[i] = FST.ifst(U_hat[i]*dealias_S, U_dealiased[i], ST)
                 
-            #U_tmp[:] = Curl(U_hat, U_tmp, ST)
-            ## This one with regular aliasing
-            #H_hatd[:] = Cross(U_dealiased, U_tmp, H_hatd, ST)
-
-            U_dealiased[0] = FST.ifst(U_hat[0]*dealias_G, U_dealiased[0], SB)            
             U_tmp[:] = Curl(U_hat, U_tmp, ST)
-            # This one with U[0] dealiased more
             H_hat[:] = Cross(U_dealiased, U_tmp, H_hat, ST)
-            H_hatd[:] = H_hat[:]
             
             return H_hat
 
@@ -224,14 +227,11 @@ def ComputeRHS(dU):
     # Compute convection
     H0[:] = 1.5*H - 0.5*H1
     H_hat0[:] = 1.5*H_hat - 0.5*H_hat1
-    #H_hat0[:] *= dealias    
-    H_hatd0[:] = 1.5*H_hatd - 0.5*H_hatd1
     
     # Following modification is critical for accuracy with vortex convection, but it makes standard perform worse
     #hv[:] = -K2*BBD.matvec(H_hat0[0])
     hv[:] = FST.fss(H0[0], hv, SB)
     hv *= -K2
-    #hv *= dealias
     
     # Following does not seem to be critical
     hv -= 1j*K[1]*CBD.matvec(H_hat0[1])
@@ -242,14 +242,11 @@ def ComputeRHS(dU):
     #F_tmp[2] = FST.fss(dH2dx, F_tmp[2], SB)
     #hv -= 1j*K[1]*F_tmp[1]
     #hv -= 1j*K[2]*F_tmp[2]
-
-    #hv *= dealias
     
-    hg[:] = 1j*K[1]*BDD.matvec(H_hatd0[2]) - 1j*K[2]*BDD.matvec(H_hatd0[1])
+    hg[:] = 1j*K[1]*BDD.matvec(H_hat0[2]) - 1j*K[2]*BDD.matvec(H_hat0[1])
     #F_tmp[1] = FST.fss(H0[1], F_tmp[1], ST)
     #F_tmp[2] = FST.fss(H0[2], F_tmp[2], ST)
     #hg[:] = 1j*K[1]*F_tmp[2] - 1j*K[2]*F_tmp[1]    
-    #hg[:] *= dealias
     
     dU[0] = hv*dt + diff0[0]
     dU[1] = hg*2./nu + diff0[1]
@@ -284,8 +281,8 @@ def solve():
         if rank == 0:
             u0_hat = zeros((3, N[0]), dtype=complex)
             h0_hat = zeros((3, N[0]), dtype=complex)
-            h0_hat[1] = H_hatd0[1, :, 0, 0]
-            h0_hat[2] = H_hatd0[2, :, 0, 0]
+            h0_hat[1] = H_hat0[1, :, 0, 0]
+            h0_hat[2] = H_hat0[2, :, 0, 0]
             u0_hat[1] = U_hat0[1, :, 0, 0]
             u0_hat[2] = U_hat0[2, :, 0, 0]
             
@@ -314,7 +311,6 @@ def solve():
         U0[:] = U
         H1[:] = H
         H_hat1[:] = H_hat
-        H_hatd1[:] = H_hatd
                 
         timer()
         

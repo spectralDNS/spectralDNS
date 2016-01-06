@@ -29,14 +29,16 @@ def create_wavenumber_arrays(N, Np, Nf, rank, float):
     kz[-1] *= -1
     Lp = 2*pi/config.L
     K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
-    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] # scale with physical mesh size. This takes care of mapping the physical domain to a computational cube of size (2pi)**3
-    K2 = sum(K*K, 0, dtype=float)
-    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
+    
+    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] # scale with physical mesh size. This takes care of mapping the physical domain to a computational cube of size (2pi)**3
+    K2 = sum(K*K, 0, dtype=float)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
     
     return K, K2, K_over_K2, dealias
 
@@ -202,10 +204,7 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     # Note that first direction cannot be different from 2 (yet)
     Lp = array([2, 2*pi, 2*pi])/L
     K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
-    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
-    K2 = sum(K*K, 0, dtype=float)
-    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
-
+    
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2-1)
     kmax[0] = N[0]
@@ -215,7 +214,11 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     dealias_S = dealias
     #kmax[0] = 2./3.*(N[0]-2)
     #dealias_S = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
-                      #(abs(K[2]) < kmax[2]), dtype=uint8)
+                      #(abs(K[2]) < kmax[2]), dtype=uint8)    
+    
+    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
+    K2 = sum(K*K, 0, dtype=float)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
     
     del kwargs 
     return locals()
@@ -291,10 +294,7 @@ def setupShenKMM(comm, float, complex, mpitype, N, L, mgrid,
     # Note that first direction cannot be different from 2 (yet)
     Lp = array([2, 2*pi, 2*pi])/L
     K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
-    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
-    K2 = K[1]*K[1]+K[2]*K[2]
-    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
-
+    
     # Filter for dealiasing nonlinear convection
     #kmax = 0.5*(N/2-1)
     kmax = 2./3.*(N/2)
@@ -313,12 +313,17 @@ def setupShenKMM(comm, float, complex, mpitype, N, L, mgrid,
     #dealias_B = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                       #(abs(K[2]) < kmax[2]), dtype=uint8)
     
-    kmax = 0.5*(N/2-1)
+    #kmax = 0.5*(N/2-1)
     #kmax = N/2+1
-    kmax[2] = 2./3*(N[2]/2)
-    kmax[0] = N[0]
+    #kmax[2] = 2./3*(N[2]/2)
+    #kmax[0] = N[0]
     dealias_G = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
-                      (abs(K[2]) < kmax[2]), dtype=uint8)
+                      (abs(K[2]) < kmax[2]), dtype=uint8)    
+    
+    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
+    K2 = K[1]*K[1]+K[2]*K[2]
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
     
     del kwargs 
     return locals()
@@ -402,15 +407,16 @@ def setupShenMHD(comm, float, complex, mpitype, N, L, mgrid,
     # Note that first direction cannot be different from 2 (yet)
     Lp = array([2, 2*pi, 2*pi])/L
     K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
-    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
-    K2 = sum(K*K, 0, dtype=float)
-    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
-
+    
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
     kmax[0] = N[0]
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
+
+    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
+    K2 = sum(K*K, 0, dtype=float)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
     
     del kwargs 
     return locals()
@@ -493,15 +499,17 @@ def setupShenGeneralBCs(comm, float, complex, mpitype, N, L, mgrid,
     # Note that first direction cannot be different from 2 (yet)
     Lp = array([2, 2*pi, 2*pi])/L
     K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
-    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
-    K2 = sum(K*K, 0, dtype=float)
-    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
-
+    
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
     kmax[0] = N[0]
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
+    
+    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
+    K2 = sum(K*K, 0, dtype=float)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
     
     del kwargs 
     return locals()
