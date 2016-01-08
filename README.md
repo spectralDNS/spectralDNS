@@ -3,11 +3,11 @@ spectralDNS
 
 [![Build Status](https://travis-ci.org/mikaem/spectralDNS.svg?branch=master)](https://travis-ci.org/mikaem/spectralDNS)
 
-spectralDNS is a classical pseudo-spectral Navier-Stokes DNS solver for triply periodic domains. The only unique feature is that it's written entirely in python using numpy, mpi4py and pyfftw and, stripping away unnecessary pre- and post-processing steps, the solver is approximately 100 lines long, including the MPI. MPI decomposition is performed using either the "slab" or the "pencil" approach. The code has been found to scale very well in tests on the Shaheen BlueGene/P supercomputer at KAUST Supercomputing Laboratory. Results of both weak and strong scaling tests are shown below. In addition to incompressible Navier-Stokes there are also solvers for MHD and Navier-Stokes or MHD with variable density through a Boussinesq approximation.
+spectralDNS contains a classical pseudo-spectral Navier-Stokes DNS solver for triply periodic domains. The only unique feature is that it's written entirely in python using numpy, mpi4py and pyfftw and, stripping away unnecessary pre- and post-processing steps, the solver is approximately 100 lines long, including the MPI. MPI decomposition is performed using either the "slab" or the "pencil" approach. The code has been found to scale very well in tests on the Shaheen BlueGene/P supercomputer at KAUST Supercomputing Laboratory. Results of both weak and strong scaling tests are shown below. In addition to incompressible Navier-Stokes there are also solvers for MHD and Navier-Stokes or MHD with variable density through a Boussinesq approximation.
 
 The efficiency of the pure numpy/mpi4py solver has been enhanced using Cython for certain routines. The strong scaling results on Shaheen shown below have used the optimized Python/Cython solver, which is found to be faster than a pure C++ implementation of the same solver.
 
-Work on a new solver with one nonperiodic direction using the Shen basis (Jie Shen, SIAM Journal on Scientific Computing, 16, 74-87, 1995) is in progress. 
+A channel flow solver is implemented using the Shen basis (Jie Shen, SIAM Journal on Scientific Computing, 16, 74-87, 1995) for the scheme described by Kim, Moin and Moser (J. Fluid Mechanics, Vol 177, 133-166, 1987).
 
 See the demo folder for usage.
 
