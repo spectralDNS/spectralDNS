@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from cbcdns import config
 from ..fft.wrappyfftw import *
-from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, SFTc
+from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ShenBiharmonicBasis, SFTc
 from ..shenGeneralBCs.shentransform import ShenBasis
 from ..optimization import optimizer
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange
@@ -22,6 +22,20 @@ def transpose_Umpi(U_mpi, Uc_hatT, num_processes):
     U_mpi[:] = rollaxis(Uc_hatT.reshape(Np[0], num_processes, Np[1], Nf), 1)
     return U_mpi
 
+def create_alias_filter(N, K, family="Isotropic"):
+    # Filter for dealiasing nonlinear convection
+    kmax = N/2+1
+    if config.dealias == "2/3-rule":
+        kmax = 1./3.*N
+    elif config.dealias == "3/2-rule":
+        kmax = N/2-1  # Just chopping the highest wavenumber. Should not be necessary...
+    
+    if not family=="Isotropic":
+        kmax[0] = N[0]
+    dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
+                    (abs(K[2]) < kmax[2]), dtype=uint8)
+    return dealias
+
 def create_wavenumber_arrays(N, Np, Nf, rank, float):
     kx = fftfreq(N[0], 1./N[0])
     ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
@@ -29,14 +43,10 @@ def create_wavenumber_arrays(N, Np, Nf, rank, float):
     kz[-1] *= -1
     Lp = 2*pi/config.L
     K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
+    dealias = create_alias_filter(N, K)
     K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] # scale with physical mesh size. This takes care of mapping the physical domain to a computational cube of size (2pi)**3
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
-
-    # Filter for dealiasing nonlinear convection
-    kmax = 2./3.*(N/2+1)
-    dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
-                    (abs(K[2]) < kmax[2]), dtype=uint8)
     
     return K, K2, K_over_K2, dealias
 
@@ -181,8 +191,13 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
 
     dU      = empty((3,)+FST.complex_shape(), dtype=complex)
 
-    conv0   = empty((3,)+FST.complex_shape(), dtype=complex)
-    conv1   = empty((3,)+FST.complex_shape(), dtype=complex)
+    H        = empty((3,)+FST.real_shape(), dtype=float)
+    H0       = empty((3,)+FST.real_shape(), dtype=float)
+    H1       = empty((3,)+FST.real_shape(), dtype=float)
+    H_hat    = empty((3,)+FST.complex_shape(), dtype=complex)
+    H_hat0   = empty((3,)+FST.complex_shape(), dtype=complex)
+    H_hat1   = empty((3,)+FST.complex_shape(), dtype=complex)
+
     diff0   = empty((3,)+FST.complex_shape(), dtype=complex)
     Source  = empty((3,)+FST.real_shape(), dtype=float) 
     Sk      = empty((3,)+FST.complex_shape(), dtype=complex) 
@@ -197,15 +212,90 @@ def setupShen(comm, float, complex, mpitype, N, L, mgrid,
     # Note that first direction cannot be different from 2 (yet)
     Lp = array([2, 2*pi, 2*pi])/L
     K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
+    dealias = create_alias_filter(N, K, family="Shen")
     K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+    
+    del kwargs 
+    return locals()
 
-    # Filter for dealiasing nonlinear convection
-    kmax = 2./3.*(N/2+1)
-    kmax[0] = N[0]
-    dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
-                    (abs(K[2]) < kmax[2]), dtype=uint8)
+def setupShenKMM(comm, float, complex, mpitype, N, L, mgrid,
+                 num_processes, rank, MPI, **kwargs):
+    if not num_processes in [2**i for i in range(config.M[0]+1)]:
+        raise IOError("Number of cpus must be in ", [2**i for i in range(config.M[0]+1)])
+    
+    Np = N / num_processes
+
+    # Get points and weights for Chebyshev weighted integrals
+    ST = ShenDirichletBasis(quad="GL")
+    SB = ShenBiharmonicBasis(quad="GL")
+    SN = ShenNeumannBasis(quad="GC")   # For pressure calculation
+    points, weights = ST.points_and_weights(N[0])
+    pointsp, weightsp = SB.points_and_weights(N[0])
+
+    x1 = arange(N[1], dtype=float)*L[1]/N[1]
+    x2 = arange(N[2], dtype=float)*L[2]/N[2]
+
+    # Get grid for velocity points
+    X = array(meshgrid(points[rank*Np[0]:(rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)
+
+    Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
+    Nu = N[0]-2   # Number of velocity modes in Shen basis
+    Nb = N[0]-4   # Number of velocity modes in Shen biharmonic basis
+    u_slice = slice(0, Nu)
+    v_slice = slice(0, Nb)
+    
+    FST = FastShenFourierTransform(N, MPI)
+
+    U     = empty((3,)+FST.real_shape(), dtype=float)
+    U_hat = empty((3,)+FST.complex_shape(), dtype=complex)
+    P     = empty(FST.real_shape(), dtype=float)
+    P_hat = empty(FST.complex_shape(), dtype=complex)
+
+    U0      = empty((3,)+FST.real_shape(), dtype=float)
+    U_hat0  = empty((3,)+FST.complex_shape(), dtype=complex)
+    
+    # We're solving for:
+    u = U_hat0[0]
+    g = empty(FST.complex_shape(), dtype=complex)
+
+    H        = empty((3,)+FST.real_shape(), dtype=float)
+    H0       = empty((3,)+FST.real_shape(), dtype=float)
+    H1       = empty((3,)+FST.real_shape(), dtype=float)
+    H_hat    = empty((3,)+FST.complex_shape(), dtype=complex)
+    H_hat0   = empty((3,)+FST.complex_shape(), dtype=complex)
+    H_hat1   = empty((3,)+FST.complex_shape(), dtype=complex)
+    
+    U_tmp   = empty((3,)+FST.real_shape(), dtype=float)
+    U_tmp2  = empty((3,)+FST.real_shape(), dtype=float)
+    F_tmp   = empty((3,)+FST.complex_shape(), dtype=complex)
+    F_tmp2  = empty((3,)+FST.complex_shape(), dtype=complex)
+
+    dU      = empty((3,)+FST.complex_shape(), dtype=complex)
+    hv      = empty(FST.complex_shape(), dtype=complex)
+    hg      = empty(FST.complex_shape(), dtype=complex)
+    diff0   = empty((3,)+FST.complex_shape(), dtype=complex)
+    Source  = empty((3,)+FST.real_shape(), dtype=float) 
+    Sk      = empty((3,)+FST.complex_shape(), dtype=complex) 
+    P     = empty(FST.real_shape(), dtype=float)
+    P_hat = empty(FST.complex_shape(), dtype=complex)
+
+    kx = arange(N[0]).astype(float)
+    ky = fftfreq(N[1], 1./N[1])[rank*Np[1]:(rank+1)*Np[1]]
+    kz = fftfreq(N[2], 1./N[2])[:Nf]
+    kz[-1] *= -1.0
+
+    # scale with physical mesh size. 
+    # This takes care of mapping the physical domain to a computational cube of size (2, 2pi, 2pi)
+    # Note that first direction cannot be different from 2 (yet)
+    Lp = array([2, 2*pi, 2*pi])/L
+    K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
+    dealias = create_alias_filter(N, K, family="Shen")
+    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
+    K2 = K[1]*K[1]+K[2]*K[2]
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
     
     del kwargs 
     return locals()
@@ -289,15 +379,10 @@ def setupShenMHD(comm, float, complex, mpitype, N, L, mgrid,
     # Note that first direction cannot be different from 2 (yet)
     Lp = array([2, 2*pi, 2*pi])/L
     K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
+    dealias = create_alias_filter(N, K, family="Shen")
     K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
-
-    # Filter for dealiasing nonlinear convection
-    kmax = 2./3.*(N/2+1)
-    kmax[0] = N[0]
-    dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
-                    (abs(K[2]) < kmax[2]), dtype=uint8)
     
     del kwargs 
     return locals()
@@ -380,15 +465,10 @@ def setupShenGeneralBCs(comm, float, complex, mpitype, N, L, mgrid,
     # Note that first direction cannot be different from 2 (yet)
     Lp = array([2, 2*pi, 2*pi])/L
     K  = array(meshgrid(kx, ky, kz, indexing='ij'), dtype=float)
+    dealias = create_alias_filter(N, K, family="Shen")    
     K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
-
-    # Filter for dealiasing nonlinear convection
-    kmax = 2./3.*(N/2+1)
-    kmax[0] = N[0]
-    dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
-                    (abs(K[2]) < kmax[2]), dtype=uint8)
     
     del kwargs 
     return locals()
@@ -398,6 +478,8 @@ setup = {"MHD": setupMHD,
          "VV":  setupDNS,
          "IPCS": setupShen,
          "IPCSR": setupShen,
+         "KMM": setupShenKMM,
+         "KMMRK3": setupShenKMM,
          "ChannelRK4": setupShen,
          "IPCS_MHD": setupShenMHD,
          "IPCS_GeneralBCs": setupShenGeneralBCs}[config.solver]        
@@ -486,6 +568,7 @@ class FastShenFourierTransform(object):
         self.UT      = empty((3, self.N[0], self.Np[1], self.N[2]))
         self.Uc_hat  = empty(self.complex_shape(), dtype=complex)
         self.Uc_hatT = empty(self.complex_shape_T(), dtype=complex)
+        self.Upad_hatT = empty(self.complex_shape_padded_T(), dtype=complex)
         
     def real_shape(self):
         """The local shape of the real data"""
@@ -502,6 +585,92 @@ class FastShenFourierTransform(object):
     def complex_shape_I(self):
         """A local intermediate shape of the complex data"""
         return (self.Np[0], self.num_processes, self.Np[1], self.Nf)
+
+    def complex_shape_padded_T(self):
+        """The local shape of the transposed complex data padded in x and z directions"""
+        return (self.Np[0], 3*self.N[1]/2, 3*self.N[2]/4+1)
+
+    def real_shape_padded(self):
+        """The local shape of the real data"""
+        return (self.Np[0], 3*self.N[1]/2, 3*self.N[2]/2)
+    
+    def complex_shape_padded(self):
+        return (self.N[0], 3*self.Np[1]/2, 3*self.N[2]/4+1)
+
+    def ifst_padded(self, fu, u, S):
+        """Inverse Shen transform of x-direction, Fourier in y and z.
+        
+        fu is padded with zeros using the 3/2 rule before transforming to real space
+        """
+        self.Uc_hat[:] = S.ifst(fu, self.Uc_hat)
+        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.U_mpi, self.mpitype])
+        self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())     
+        self.Upad_hatT[:] = 0
+        self.Upad_hatT[:, :self.N[1]/2, :self.Nf] = self.Uc_hatT[:, :self.N[1]/2]
+        self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf] = self.Uc_hatT[:, self.N[1]/2:]
+        u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
+        return u
+
+    def fst_padded(self, u, fu, S):
+        """Fast Shen transform of x-direction, Fourier transform of y and z
+        
+        u is of shape real_shape_padded. The output, fu, is normal complex_shape
+        """   
+        self.Upad_hatT[:] = rfft2(u, axes=(1,2))
+        # cut the highest wavenumbers     
+        self.Uc_hatT[:, :self.N[1]/2] = self.Upad_hatT[:, :self.N[1]/2, :self.Nf]
+        self.Uc_hatT[:, self.N[1]/2:] = self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf]
+        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+        fu = S.fst(self.Uc_hat/1.5**2, fu)
+        return fu
+
+    def fss_padded(self, u, fu, S):
+        """Fast padded Shen scalar product of x-direction, Fourier transform of y and z
+        
+        u is of shape real_shape_padded. The output, fu, is normal complex_shape
+        """        
+        self.Upad_hatT[:] = rfft2(u, axes=(1,2))
+        # cut the highest wavenumbers     
+        self.Uc_hatT[:, :self.N[1]/2] = self.Upad_hatT[:, :self.N[1]/2, :self.Nf]
+        self.Uc_hatT[:, self.N[1]/2:] = self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf]
+        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+        fu = S.fastShenScalar(self.Uc_hat/1.5**2, fu)
+        return fu
+
+    def copy_to_padded(self, fu, fp):
+        fp[:, :self.N[1]/2, :self.Nf] = fu[:, :self.N[1]/2]
+        fp[:, -(self.N[1]/2):, :self.Nf] = fu[:, self.N[1]/2:]
+        return fp
+    
+    def ifct_padded(self, fu, u, S):
+        """Inverse Cheb transform of x-direction, Fourier in y and z
+        
+        fu is padded with zeros using the 3/2 rule before transforming to real space
+        """
+        self.Uc_hat[:] = S.ifct(fu, self.Uc_hat)
+        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.U_mpi, self.mpitype])
+        self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())    
+        self.Upad_hatT[:] = 0
+        self.Upad_hatT[:, :self.N[1]/2, :self.Nf] = self.Uc_hatT[:, :self.N[1]/2]
+        self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf] = self.Uc_hatT[:, self.N[1]/2:]
+        u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
+        return u
+
+    def fct_padded(self, u, fu, S):
+        """Fast Shen transform of x-direction, Fourier transform of y and z
+        
+        u is of shape real_shape_padded. The output, fu, is normal complex_shape
+        """        
+        self.Upad_hatT[:] = rfft2(u, axes=(1,2))
+        # cut the highest wavenumbers     
+        self.Uc_hatT[:, :self.N[1]/2] = self.Upad_hatT[:, :self.N[1]/2, :self.Nf]
+        self.Uc_hatT[:, self.N[1]/2:] = self.Upad_hatT[:, -(self.N[1]/2):, :self.Nf]
+        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+        fu = S.fct(self.Uc_hat/1.5**2, fu)
+        return fu
     
     def fss(self, u, fu, S):
         """Fast Shen scalar product of x-direction, Fourier transform of y and z"""
@@ -527,6 +696,20 @@ class FastShenFourierTransform(object):
         fu = S.fst(self.Uc_hat, fu)
         return fu
 
+    def fft(self, u, fu):
+        """Fast Fourier transform of y and z"""
+        self.Uc_hatT[:] = rfft2(u, axes=(1,2))
+        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.U_mpi, self.mpitype], [fu, self.mpitype])
+        return fu
+    
+    def ifft(self, fu, u):
+        """Inverse Fourier transforms in y and z"""
+        self.comm.Alltoall([fu, self.mpitype], [self.U_mpi, self.mpitype])
+        self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())
+        u[:] = irfft2(self.Uc_hatT, axes=(1,2))
+        return u
+    
     def fct(self, u, fu, S):
         """Fast Cheb transform of x-direction, Fourier transform of y and z"""
         self.Uc_hatT[:] = rfft2(u, axes=(1,2))

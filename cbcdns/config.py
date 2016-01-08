@@ -25,6 +25,7 @@ parser.add_argument('--checkpoint',  default=1e8, type=int, help="Save intermedi
 parser.add_argument('--nu', default=0.000625, type=float, help='Viscosity')
 parser.add_argument('--t', default=0.0, type=float, help='Time')
 parser.add_argument('--tstep', default=0, type=int, help='Time step')
+parser.add_argument('--dealias', default='3/2-rule', choices=('3/2-rule', '2/3-rule', 'None'), help='Choose dealiasing method')
 
 # Arguments for isotropic DNS solver
 Isotropic = argparse.ArgumentParser(parents=[parser])
@@ -37,8 +38,8 @@ Isotropic.add_argument('--L', default=[2*pi, 2*pi, 2*pi], nargs='+', help='Physi
 
 # Arguments for Shen based solver with one inhomogeneous direction
 Shen = argparse.ArgumentParser(parents=[parser])
-Shen.add_argument('--solver', default='IPCS', choices=('IPCS','IPCSR', 'ChannelRK4'), help="""Choose solver.""")
-Shen.add_argument('--convection', default='Standard', choices=('Standard', 'Standard2', 'Divergence', 'Skew', 'Vortex'))
+Shen.add_argument('--solver', default='IPCS', choices=('IPCS','IPCSR', 'KMM', 'KMMRK3'), help="""Choose solver.""")
+Shen.add_argument('--convection', default='Standard', choices=('Standard', 'Divergence', 'Skew', 'Vortex'))
 Shen.add_argument('--L', default=[2, 2*pi, 2*pi], nargs='+', help='Physical mesh size')
 Shen.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2'))
 Shen.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations')

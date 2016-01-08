@@ -64,3 +64,44 @@ def CDDmat_matvec(np.ndarray[real_t, ndim=1] ud, np.ndarray[real_t, ndim=1] ld,
             for k in xrange(b.shape[2]):
                 b[i, j, k] = ud[i]*v[i+1, j, k] + ld[i-1]*v[i-1, j, k]
 
+def SBBmat_matvec(np.ndarray[real_t, ndim=1] v, np.ndarray[real_t, ndim=1] b):
+    cdef:
+        int i, j, k
+        int N = v.shape[0]-4
+        long double d, p, r, s1, s2
+        
+    j = N-1
+    s1 = 0.0
+    s2 = 0.0
+    b[j] = (8*(j+1)*(j+1)*(j+2)*(j+4))*np.pi*v[j]
+    for k in range(N-3, -1, -2):
+        j = k+2
+        d = (8*(k+1)*(k+1)*(k+2)*(k+4))*np.pi
+        p = k*d/(k+1)
+        r = 24*(k+1)*(k+2)*np.pi
+        s1 += 1./(j+3.)*v[j]
+        s2 += (j+2.)*(j+2.)/(j+3.)*v[j]
+        b[k] = d*v[k] + p*s1 + r*s2
+
+    j = N-2
+    s1 = 0.0
+    s2 = 0.0
+    b[j] = (8*(j+1)*(j+1)*(j+2)*(j+4))*np.pi*v[j]
+    for k in range(N-4, -1, -2):
+        j = k+2
+        d = (8*(k+1)*(k+1)*(k+2)*(k+4))*np.pi
+        p = k*d/(k+1)
+        r = 24*(k+1)*(k+2)*np.pi
+        s1 += v[j]/(j+3.)
+        s2 += (j+2.)*(j+2.)/(j+3.)*v[j]
+        b[k] = d*v[k] + p*s1 + r*s2
+
+def SBBmat_matvec3D(np.ndarray[complex_t, ndim=3] v, np.ndarray[complex_t, ndim=3] b):
+    cdef:
+        int i, j
+
+    for i in range(v.shape[1]):
+        for j in range(v.shape[2]):
+            SBBmat_matvec(v[:, i, j].real, b[:, i, j].real)
+            SBBmat_matvec(v[:, i, j].imag, b[:, i, j].imag)
+            

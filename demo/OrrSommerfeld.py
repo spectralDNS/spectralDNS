@@ -1,7 +1,7 @@
 """Orr-Sommerfeld"""
 from cbcdns import config, get_solver
 from OrrSommerfeld_eig import OrrSommerfeld
-from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array, zeros_like
+from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose
 from cbcdns.fft.wrappyfftw import dct
 import matplotlib.pyplot as plt
 import warnings
@@ -9,7 +9,7 @@ import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
 eps = 1e-6
-def initOS(OS, U, U_hat, X, FST, ST, t=0.):
+def initOS(OS, U, U_hat, X, t=0.):
     for i in range(U.shape[1]):
         x = X[0, i, 0, 0]
         OS.interp(x)
@@ -20,14 +20,6 @@ def initOS(OS, U, U_hat, X, FST, ST, t=0.):
             U[0, i, j, :] = u
             U[1, i, j, :] = v
     U[2] = 0
-    for i in range(3):
-        U_hat[i] = FST.fst(U[i], U_hat[i], ST)
-        
-    for i in range(3):
-        U[i] = FST.ifst(U_hat[i], U[i], ST)
-
-    for i in range(3):
-        U_hat[i] = FST.fst(U[i], U_hat[i], ST)
 
 def energy(u, N, comm, rank, L):
     uu = sum(u, axis=(1,2))
@@ -43,15 +35,30 @@ def energy(u, N, comm, rank, L):
     else:
         return 0    
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, conv1, FST,
-               ST, SN, X, N, comm, rank, L, conv, dt, TDMASolverD, **kw):        
-    OS = OrrSommerfeld(Re=config.Re, N=80)
-    initOS(OS, U0, U_hat0, X, FST, ST)
-    e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
-    if not config.solver == "ChannelRK4":
-        conv1 = conv(conv1, U0, U_hat0)
-        initOS(OS, U, U_hat, X, FST, ST, t=dt)
-        conv2 = zeros_like(conv1)
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST, U_tmp,
+               ST, SN, X, N, comm, rank, L, conv, TDMASolverD, F_tmp, H, H1, **kw):        
+    OS = OrrSommerfeld(Re=config.Re, N=100)
+    initOS(OS, U0, U_hat0, X)
+    if not config.solver in ("ChannelRK4", "KMM", "KMMRK3"):
+        for i in range(3):
+            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
+        for i in range(3):
+            U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
+        for i in range(3):
+            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
+        H_hat1 = conv(H_hat1, U0, U_hat0)
+        H1[:] = H[:]
+        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
+
+        initOS(OS, U, U_hat, X, t=config.dt)
+        for i in range(3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
+        for i in range(3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)
+        for i in range(3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
+
+        conv2 = zeros_like(H_hat1)
         conv2 = conv(conv2, U0, 0.5*(U_hat0+U_hat))  
         for j in range(3):
             conv2[j] = TDMASolverD(conv2[j])
@@ -61,24 +68,71 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, conv1, FST,
         P = FST.ifst(P_hat, P, SN)
         U0[:] = U
         U_hat0[:] = U_hat
-        config.t = dt
+        config.t = config.dt
         config.tstep = 1
+
+    elif config.solver == "ChannelRK4":        
+        for i in range(3):
+            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
+        for i in range(3):
+            U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
+        for i in range(3):
+            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
+        H_hat1 = conv(H_hat1, U0, U_hat0)
+        H1[:] = H[:]
+        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
+        
+        initOS(OS, U, U_hat, X, t=config.dt)
+        for i in range(3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
+        for i in range(3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)
+        for i in range(3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
+
+        U0[:] = U
+        U_hat0[:] = U_hat
+        config.t = config.dt
+        config.tstep = 1
+        
     else:
-        U[:] = U0[:]
-        U_hat[:] = U_hat0[:]
+        U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB']) 
+        for i in range(1, 3):
+            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
+        U0[0] = FST.ifst(U_hat0[0], U0[0], kw['SB'])
+        for i in range(1, 3):
+            U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
+        H_hat1 = conv(H_hat1, U0, U_hat0)
+        H1[:] = H[:]
+        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
+        
+        initOS(OS, U, U_hat, X, t=config.dt)
+        U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB']) 
+        for i in range(1, 3):
+            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
+        U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
+        for i in range(1, 3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)
+
+        U0[:] = U
+        U_hat0[:] = U_hat
+        config.t = config.dt
+        config.tstep = 1
+        kw['g'][:] = 0
+        
     
     return dict(OS=OS, e0=e0)
 
 def set_Source(Source, Sk, FST, ST, **kw):
     Source[:] = 0
-    Source[1, :] = -2./config.Re
+    Source[1] = -2./config.Re
     Sk[:] = 0
-    for i in range(3):
-        Sk[i] = FST.fss(Source[i], Sk[i], ST)
-
+    Sk[1] = FST.fss(Source[1], Sk[1], ST)
+        
+im1, im2, im3, im4 = (None, )*4        
 def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, **kw):
     global im1, im2, im3, im4
-    if config.tstep <= 2 and rank == 0 and config.plot_step > 0:
+    if im1 is None and rank == 0 and config.plot_step > 0:
         plt.figure()
         im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
         plt.colorbar(im1)
@@ -119,11 +173,11 @@ def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, **kw):
         pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
         e1 = 0.5*energy(pert, N, comm, rank, L)
         exact = exp(2*imag(OS.eigval)*(config.t))
-        initOS(OS, U_tmp, F_tmp, X, FST, ST, t=config.t)
+        initOS(OS, U_tmp, F_tmp, X, t=config.t)
         pert = (U[0] - U_tmp[0])**2 + (U[1]-U_tmp[1])**2
         e2 = 0.5*energy(pert, N, comm, rank, L)
         if rank == 0:
-            print "Time %2.5f Norms %2.12e %2.12e %2.12e %2.12e" %(config.t, e1/e0, exact, e1/e0-exact, sqrt(e2))
+            print "Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(config.t, e1/e0, exact, e1/e0-exact, sqrt(e2))
 
 def regression_test(U, X, OS, N, comm, rank, L, e0, FST, ST, U0, U_hat0,**kw):
     #pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
@@ -132,12 +186,25 @@ def regression_test(U, X, OS, N, comm, rank, L, e0, FST, ST, U0, U_hat0,**kw):
     #if rank == 0:
         #print "Computed error = %2.8e %2.8e " %(sqrt(abs(e1/e0-exact)), config.dt)
 
-    initOS(OS, U0, U_hat0, X, FST, ST, t=config.t)
+    initOS(OS, U0, U_hat0, X, t=config.t)
     pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
     e1 = 0.5*energy(pert, N, comm, rank, L)
     #exact = exp(2*imag(OS.eigval)*config.t)
     if rank == 0:
         print "Computed error = %2.8e %2.8e " %(sqrt(e1), config.dt)
+
+def initOS_and_project(OS, U0, U_hat0, X, FST, ST, SB, **kw):
+    initOS(OS, U0, U_hat0, X, t=config.t)
+    assert "KMM" in config.solver 
+    U_hat0[0] = FST.fst(U0[0], U_hat0[0], SB)
+    for i in range(1,3):
+        U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
+    U0[0] = FST.ifst(U_hat0[0], U0[0], SB)    
+    for i in range(1, 3):
+        U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
+    U_hat0[0] = FST.fst(U0[0], U_hat0[0], SB)
+    for i in range(1, 3):
+        U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
 
 if __name__ == "__main__":
     config.update(
@@ -146,27 +213,32 @@ if __name__ == "__main__":
         'Re': 8000.,
         'nu': 1./8000.,             # Viscosity
         'dt': 0.01,                 # Time step
-        'T': 0.02,                   # End time
+        'T': 0.01,                   # End time
         'L': [2, 2*pi, 4*pi/3.],
         'M': [7, 6, 1]
         },  "Shen"
     )
     config.Shen.add_argument("--compute_energy", type=int, default=1)
-    config.Shen.add_argument("--plot_step", type=int, default=10)
+    config.Shen.add_argument("--plot_step", type=int, default=1)
     solver = get_solver(update=update, regression_test=regression_test, family="Shen")    
     vars(solver).update(initialize(**vars(solver)))
     set_Source(**vars(solver))	
     solver.solve()
-    #from cbcdns.mpi.slab import FastShenFourierTransfers
-    #FST = solver.FST
-    #FST2 = FastShenFourierTransfers(array([2*solver.N[0], 2*solver.N[1], 2]), solver.MPI)
-    #um_hat = solver.zeros(FST2.complex_shape(), dtype=solver.complex)
-    #um = solver.zeros(FST2.real_shape())
-    #um_hat[:solver.N[0], :solver.N[1]/2, :] = solver.U_hat[0, :, :solver.N[1]/2, :]
-    #um_hat[:solver.N[0], (2*solver.N[1]-solver.N[1]/2):(2*solver.N[1]), :] = solver.U_hat[0, :, (solver.N[1]/2):, :]
-    #um = FST2.ifst(um_hat, um, solver.ST)
-    #plt.figure();plt.contourf(um[:, :, 0], 100);plt.colorbar()
+    s = solver
+    
+    #from numpy import meshgrid, float, allclose
+    #s = solver
+    #Np = s.N / s.num_processes
+    #x1 = arange(1.5*s.N[1], dtype=float)*config.L[1]/(1.5*s.N[1])
+    #x2 = arange(1.5*s.N[2], dtype=float)*config.L[2]/(1.5*s.N[2])
+    ## Get grid for velocity points
+    #X = array(meshgrid(s.points[s.rank*Np[0]:(s.rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)    
+    #s.U_pad2[0] = s.FST.ifst_padded(s.U_hat[0], s.U_pad2[0], s.SB)
+    #s.F_tmp[0] = s.FST.fst_padded(s.U_pad2[0], s.F_tmp[0], s.SB)
+    
+    #assert allclose(s.F_tmp[0], s.U_hat[0])
+    #plt.figure()
+    #plt.contourf(X[1,:,:,0], X[0,:,:,0], s.U_pad2[0,:,:,0], 100)
     #plt.show()
-    
-    
+
 
