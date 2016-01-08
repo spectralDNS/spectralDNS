@@ -65,7 +65,7 @@ if __name__ == "__main__":
         'nu': 0.00625,             # Viscosity
         'dt': 0.01,                 # Time step
         'T': 0.1,                   # End time
-        'L': [2*pi, 4*pi, 2*pi],
+        'L': [2*pi, 2*pi, 2*pi],
         'M': [5, 5, 5]
         },  "Isotropic"
     )

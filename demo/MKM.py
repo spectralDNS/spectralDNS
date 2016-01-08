@@ -399,7 +399,7 @@ class Stats(object):
         N = self.shape[0]
         s = slice(self.rank*N, (self.rank+1)*N, 1)
         Nd = self.num_samples*self.shape[1]*self.shape[2]
-        
+        self.comm.barrier()
         if tofile:
             if self.f0 is None:
                 self.create_statsfile()
@@ -440,7 +440,7 @@ if __name__ == "__main__":
         'nu': 1./180.,                  # Viscosity
         'Re_tau': 180., 
         'dt': 0.001,                  # Time step
-        'T': 100.,                   # End time
+        'T': 100.,                    # End time
         'L': [2, 4*pi, 4.*pi/3.],
         'M': [6, 6, 5]
         },  "Shen"
@@ -451,10 +451,10 @@ if __name__ == "__main__":
     config.Shen.add_argument("--print_energy0", type=int, default=100)
     solver = get_solver(update=update, family="Shen")    
     initialize(**vars(solver))    
-    #init_from_file("KMM666.h5", **vars(solver))
+    #init_from_file("Start666.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="KMMstats")
-    solver.hdf5file.fname = "KMM666.h5"
+    solver.hdf5file.fname = "KMM666t.h5"
     solver.solve()
     s = solver.stats.get_stats()
 

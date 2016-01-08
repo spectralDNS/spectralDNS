@@ -8,149 +8,23 @@ from ShenKMM import *
 a = (8./15., 5./12., 3./4.)
 b = (0.0, -17./60., -5./12.)
 
-HelmholtzSolverG = (Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[0]+b[0])/dt), ST.quad, False),
-                    Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[1]+b[1])/dt), ST.quad, False),
-                    Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[2]+b[2])/dt), ST.quad, False)
-                    )
+HelmholtzSolverG = (Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[0]+b[0])/dt), 
+                              ST.quad, False),
+                    Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[1]+b[1])/dt), 
+                              ST.quad, False),
+                    Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[2]+b[2])/dt), 
+                              ST.quad, False))
 
-BiharmonicSolverU = (Biharmonic(N[0], -nu*a[0]*dt/2., 1.+nu*a[0]*dt*K2[0], -(K2[0] + nu*a[0]*dt/2.*K2[0]**2), SB.quad),
-                     Biharmonic(N[0], -nu*(a[1]+b[1])*dt/2., 1.+nu*(a[1]+b[1])*dt*K2[0], -(K2[0] + nu*(a[1]+b[1])*dt/2.*K2[0]**2), SB.quad),
-                     Biharmonic(N[0], -nu*(a[2]+b[2])*dt/2., 1.+nu*(a[2]+b[2])*dt*K2[0], -(K2[0] + nu*(a[2]+b[2])*dt/2.*K2[0]**2), SB.quad)
-                     )
-
-HelmholtzSolverP = Helmholtz(N[0], sqrt(K2[0]), SN.quad, True)
+BiharmonicSolverU = (Biharmonic(N[0], -nu*a[0]*dt/2., 1.+nu*a[0]*dt*K2[0], 
+                                -(K2[0] + nu*a[0]*dt/2.*K2[0]**2), SB.quad),
+                     Biharmonic(N[0], -nu*(a[1]+b[1])*dt/2., 1.+nu*(a[1]+b[1])*dt*K2[0], 
+                                -(K2[0] + nu*(a[1]+b[1])*dt/2.*K2[0]**2), SB.quad),
+                     Biharmonic(N[0], -nu*(a[2]+b[2])*dt/2., 1.+nu*(a[2]+b[2])*dt*K2[0], 
+                                -(K2[0] + nu*(a[2]+b[2])*dt/2.*K2[0]**2), SB.quad))
 
 HelmholtzSolverU0 = (Helmholtz(N[0], sqrt(2./nu/(a[0]+b[0])/dt), ST.quad, False),
                      Helmholtz(N[0], sqrt(2./nu/(a[1]+b[1])/dt), ST.quad, False),
                      Helmholtz(N[0], sqrt(2./nu/(a[2]+b[2])/dt), ST.quad, False))
-
-TDMASolverD = TDMA(ST.quad, False)
-
-alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
-CDD = CDDmat(K[0, :, 0, 0])
-
-# Matrics for biharmonic equation
-CBD = CBDmat(K[0, :, 0, 0])
-ABB = ABBmat(K[0, :, 0, 0])
-BBB = BBBmat(K[0, :, 0, 0], ST.quad)
-SBB = SBBmat(K[0, :, 0, 0])
-
-# Matrices for Helmholtz equation
-ADD = ADDmat(K[0, :, 0, 0])
-BDD = BDDmat(K[0, :, 0, 0], ST.quad)
-
-# 
-BBD = BDDmat(K[0, :, 0, 0], SB.quad)
-CDB = CDBmat(K[0, :, 0, 0])
-
-def solvePressure(P_hat, Ni):
-    """Solve for pressure if Ni is fst of convection"""
-    F_tmp[0] = 0
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])    
-    P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
-    return P_hat
-
-def Cross(a, b, c, S):
-    H[0] = a[1]*b[2]-a[2]*b[1]
-    H[1] = a[2]*b[0]-a[0]*b[2]
-    H[2] = a[0]*b[1]-a[1]*b[0]
-    c[0] = FST.fst(H[0], c[0], S)
-    c[1] = FST.fst(H[1], c[1], S)
-    c[2] = FST.fst(H[2], c[2], S)    
-    return c
-
-def Curl(a, c, S):
-    F_tmp[:] = 0
-    U_tmp2[:] = 0
-    SFTc.Mult_CTD_3D(N[0], a[1], a[2], F_tmp[1], F_tmp[2])
-    dvdx = U_tmp2[1] = FST.ifct(F_tmp[1], U_tmp2[1], S)
-    dwdx = U_tmp2[2] = FST.ifct(F_tmp[2], U_tmp2[2], S)
-    #c[0] = FST.ifst(1j*K[1]*a[2] - 1j*K[2]*a[1], c[0], S)
-    c[0] = FST.ifst(g, c[0], S)
-    c[1] = FST.ifst(1j*K[2]*a[0], c[1], SB)
-    c[1] -= dwdx
-    c[2] = FST.ifst(1j*K[1]*a[0], c[2], SB)
-    c[2] *= -1.0
-    c[2] += dvdx
-    return c
-
-#@profile
-def standardConvection(c, U, U_hat):
-    c[:] = 0
-    U_tmp[:] = 0
-    
-    # dudx = 0 from continuity equation. Use Shen Dirichlet basis
-    # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = CDB.matvec(U_hat[0])
-    F_tmp[0] = TDMASolverD(F_tmp[0])    
-    dudx = U_tmp[0] = FST.ifst(F_tmp[0], U_tmp[0], ST)   
-        
-    SFTc.Mult_CTD_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = U_tmp[1] = FST.ifct(F_tmp[1], U_tmp[1], ST)
-    dwdx = U_tmp[2] = FST.ifct(F_tmp[2], U_tmp[2], ST)
-    
-    #dudx = U_tmp[0] = chebDerivative_3D0(U[0], U_tmp[0])
-    #dvdx = U_tmp[1] = chebDerivative_3D0(U[1], U_tmp[1])
-    #dwdx = U_tmp[2] = chebDerivative_3D0(U[2], U_tmp[2])    
-    
-    U_tmp2[:] = 0
-    dudy_h = 1j*K[1]*U_hat[0]
-    dudy = U_tmp2[0] = FST.ifst(dudy_h, U_tmp2[0], SB)    
-    dudz_h = 1j*K[2]*U_hat[0]
-    dudz = U_tmp2[1] = FST.ifst(dudz_h, U_tmp2[1], SB)
-    H[0] = U[0]*dudx + U[1]*dudy + U[2]*dudz
-    c[0] = FST.fst(H[0], c[0], ST)
-    
-    U_tmp2[:] = 0
-    
-    dvdy_h = 1j*K[1]*U_hat[1]    
-    dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], ST)
-    #F_tmp[0] = FST.fst(U[1], F_tmp[0], SN)
-    #dvdy_h = 1j*K[1]*F_tmp[0]    
-    #dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], SN)
-    ##########
-    
-    dvdz_h = 1j*K[2]*U_hat[1]
-    dvdz = U_tmp2[1] = FST.ifst(dvdz_h, U_tmp2[1], ST)
-    H[1] = U[0]*dvdx + U[1]*dvdy + U[2]*dvdz
-    c[1] = FST.fst(H[1], c[1], ST)
-    
-    U_tmp2[:] = 0
-    dwdy_h = 1j*K[1]*U_hat[2]
-    dwdy = U_tmp2[0] = FST.ifst(dwdy_h, U_tmp2[0], ST)
-    
-    dwdz_h = 1j*K[2]*U_hat[2]
-    dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], ST)
-    
-    #F_tmp[0] = FST.fst(U[2], F_tmp[0], SN)
-    #dwdz_h = 1j*K[2]*F_tmp[0]    
-    #dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], SN)    
-    #########
-    
-    H[2] = U[0]*dwdx + U[1]*dwdy + U[2]*dwdz
-    c[2] = FST.fst(H[2], c[2], ST)
-    
-    return c
-
-
-def getConvection(convection):
-    if convection == "Standard":
-        
-        def Conv(H_hat, U, U_hat):
-            H_hat = standardConvection(H_hat, U, U_hat)
-            H_hat[:] *= -1 
-            return H_hat
-
-    elif convection == "Vortex":
-        
-        def Conv(H_hat, U, U_hat):
-            U_tmp[:] = Curl(U_hat, U_tmp, ST)
-            H_hat[:] = Cross(U, U_tmp, H_hat, ST)
-            return H_hat
-        
-    return Conv           
-
-conv = getConvection(config.convection)
     
 U_hat1 = U_hat0.copy()
 U_hat2 = U_hat0.copy()
@@ -172,30 +46,22 @@ def RKstep(U_hat, g, dU, rk):
     
     # Compute convection
     H_hat[:] = conv(H_hat, U, U_hat)    
-    H_hat[:] *= dealias    
-
-    diff0[:] = 0
     
-    # Compute diffusion for g-equation
+    # Compute diffusion for g and u-equation
+    diff0[:] = 0
     SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, g, diff0[1])
     
-    # Compute diffusion++ for u-equation
     diff0[0] = nu*(a[rk]+b[rk])*dt/2.*SBB.matvec(U_hat[0])
     diff0[0] += (1. - nu*(a[rk]+b[rk])*dt*K2) * ABB.matvec(U_hat[0])
     diff0[0] -= (K2 - nu*(a[rk]+b[rk])*dt/2.*K2**2)*BBB.matvec(U_hat[0])
     
-    
     #hv[:] = -K2*BBD.matvec(H_hat[0])
     hv[:] = FST.fss(H[0], hv, SB)
     hv *= -K2
-    hv *= dealias
     
     hv -= 1j*K[1]*CBD.matvec(H_hat[1])
     hv -= 1j*K[2]*CBD.matvec(H_hat[2])    
     hg[:] = 1j*K[1]*BDD.matvec(H_hat[2]) - 1j*K[2]*BDD.matvec(H_hat[1])
-    #F_tmp[1] = FST.fss(H[1], F_tmp[1], ST)
-    #F_tmp[2] = FST.fss(H[2], F_tmp[2], ST)
-    #hg[:] = 1j*K[1]*F_tmp[2] - 1j*K[2]*F_tmp[1]
     
     dU[0] = (hv*a[rk] + hv0*b[rk])*dt + diff0[0]
     dU[1] = (hg*a[rk] + hg0*b[rk])*2./nu + diff0[1]
