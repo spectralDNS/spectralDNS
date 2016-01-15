@@ -427,10 +427,10 @@ class Stats(object):
         N = self.shape[0]
         s = slice(self.rank*N, (self.rank+1)*N, 1)
         for i, name in enumerate(("U", "V", "W")):
-            self.Umean[i, s] = self.f0["Average/"+name][s]
-        self.Pmean[s] = self.f0["Average/P"][s]
+            self.Umean[i, :] = self.f0["Average/"+name][s]
+        self.Pmean[:] = self.f0["Average/P"][s]
         for i, name in enumerate(("UU", "VV", "WW", "UV", "UW", "VW")):
-            self.UU[i, s] = self.f0["Reynolds Stress/"+name][s]
+            self.UU[i, :] = self.f0["Reynolds Stress/"+name][s]
         
 
 if __name__ == "__main__":
@@ -453,7 +453,7 @@ if __name__ == "__main__":
     initialize(**vars(solver))    
     #init_from_file("Start666.h5", **vars(solver))
     set_Source(**vars(solver))
-    solver.stats = Stats(solver.U, solver.comm, filename="KMMstats")
+    solver.stats = Stats(solver.U, solver.comm, fromstats="KMMstats")
     solver.hdf5file.fname = "KMM666t.h5"
     solver.solve()
     s = solver.stats.get_stats()

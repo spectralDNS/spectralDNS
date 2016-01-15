@@ -480,7 +480,6 @@ setup = {"MHD": setupMHD,
          "IPCSR": setupShen,
          "KMM": setupShenKMM,
          "KMMRK3": setupShenKMM,
-         "ChannelRK4": setupShen,
          "IPCS_MHD": setupShenMHD,
          "IPCS_GeneralBCs": setupShenGeneralBCs}[config.solver]        
 

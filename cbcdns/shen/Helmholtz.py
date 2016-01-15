@@ -109,52 +109,77 @@ class PDMA(object):
 
 class Biharmonic(object):
     
-    def __init__(self, N, a0, alfa, beta, quad="GL"):
+    def __init__(self, N, a0, alfa, beta, quad="GL", solver="scipy"):
         self.quad = quad
-        k = arange(N).astype(float)
+        self.solver = solver
+        k = arange(N)
         self.S = S = SBBmat(k)
         self.B = B = BBBmat(k, self.quad)
         self.A = A = ABBmat(k)
         self.a0 = a0
         self.alfa = alfa
         self.beta = beta
+        if not solver == "scipy":
+            sii, siu, siuu = S.dd, S.ud[0], S.ud[1]
+            ail, aii, aiu = A.ld, A.dd, A.ud
+            bill, bil, bii, biu, biuu = B.lld, B.ld, B.dd, B.ud, B.uud
+        
         if hasattr(beta, "__len__"):
             Ny, Nz = beta.shape
-            self.Le = Le = []
-            self.Lo = Lo = []
-            for i in range(Ny):
-                Lej = []
-                Loj = []
-                for j in range(Nz):
-                    AA = a0*S.diags().toarray() + alfa[i, j]*A.diags().toarray() + beta[i, j]*B.diags().toarray()
-                    Ae = AA[::2, ::2]
-                    Ao = AA[1::2, 1::2]
-                    Lej.append(lu_factor(Ae))
-                    Loj.append(lu_factor(Ao))
-                Le.append(Lej)
-                Lo.append(Loj)
+            if solver == "scipy":
+                self.Le = Le = []
+                self.Lo = Lo = []
+                for i in range(Ny):
+                    Lej = []
+                    Loj = []
+                    for j in range(Nz):
+                        AA = a0*S.diags().toarray() + alfa[i, j]*A.diags().toarray() + beta[i, j]*B.diags().toarray()
+                        Ae = AA[::2, ::2]
+                        Ao = AA[1::2, 1::2]
+                        Lej.append(lu_factor(Ae))
+                        Loj.append(lu_factor(Ao))
+                    Le.append(Lej)
+                    Lo.append(Loj)
+            else:
+                M = sii[::2].shape[0]
+                self.u0 = zeros((2, M, Ny, Nz))
+                self.u1 = zeros((2, M, Ny, Nz))
+                self.u2 = zeros((2, M, Ny, Nz))
+                self.l0 = zeros((2, M, Ny, Nz))
+                self.l1 = zeros((2, M, Ny, Nz))
+                self.ak = zeros((2, M, Ny, Nz))
+                self.bk = zeros((2, M, Ny, Nz))
+                SFTc.LU_Biharmonic_3D(a0, alfa, beta, sii, siu, siuu, ail, aii, aiu, bill, bil, bii, biu, biuu, self.u0, self.u1, self.u2, self.l0, self.l1)
+                SFTc.Biharmonic_factor_pr_3D(self.ak, self.bk, self.l0, self.l1)
+
         else:
-            AA = a0*S.diags().toarray() + alfa*A.diags().toarray() + beta*B.diags().toarray()
-            Ae = AA[::2, ::2]
-            Ao = AA[1::2, 1::2]
-            self.Le = lu_factor(Ae)
-            self.Lo = lu_factor(Ao)
-            
+            if solver == "scipy":
+                AA = a0*S.diags().toarray() + alfa*A.diags().toarray() + beta*B.diags().toarray()
+                Ae = AA[::2, ::2]
+                Ao = AA[1::2, 1::2]
+                self.Le = lu_factor(Ae)
+                self.Lo = lu_factor(Ao)
+            else:
+                self.u0 = zeros((2, M))
+                self.u1 = zeros((2, M))
+                self.u2 = zeros((2, M))
+                self.l0 = zeros((2, M))
+                self.l1 = zeros((2, M))
+                self.ak = zeros((2, M))
+                self.bk = zeros((2, M))
+                SFTc.LU_Biharmonic_1D(a0, alfa, beta, sii, siu, siuu, ail, aii, aiu, bill, bil, bii, biu, biuu, self.u0, self.u1, self.u2, self.l0, self.l1)
+                SFTc.Biharmonic_factor_pr(self.ak, self.bk, self.l0, self.l1)
         
     def __call__(self, u, b):
-        #uu = u[:-4]
-        #bb = b[:-4]
         if len(u.shape) == 3:
             Ny, Nz = u.shape[1:]
-            for i in range(Ny):
-                for j in range(Nz):
-                    u[:-4:2, i, j] = lu_solve(self.Le[i][j], b[:-4:2, i, j])
-                    u[1:-4:2, i, j] = lu_solve(self.Lo[i][j], b[1:-4:2, i, j])
-                    #AA = self.a0*self.S.diags().toarray() + self.alfa[i, j]*self.A.diags().toarray() + self.beta[i, j]*self.B.diags().toarray()
-                    #u[:-4:2, i, j] = solve(AA[::2, ::2], b[:-4:2, i, j])
-                    #u[1:-4:2, i, j] = solve(AA[1::2, 1::2], b[1:-4:2, i, j])
-                    #u[:-4, i, j] = solve(AA, b[:-4, i, j])
-                    
+            if self.solver == "scipy":
+                for i in range(Ny):
+                    for j in range(Nz):
+                        u[:-4:2, i, j] = lu_solve(self.Le[i][j], b[:-4:2, i, j])
+                        u[1:-4:2, i, j] = lu_solve(self.Lo[i][j], b[1:-4:2, i, j])
+            else:
+                SFTc.Solve_Biharmonic_3D_complex(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
         else:
             u[:-4:2] = lu_solve(self.Le, b[:-4:2])
             u[1:-4:2] = lu_solve(self.Lo, b[1:-4:2])

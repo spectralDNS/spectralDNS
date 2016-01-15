@@ -1,6 +1,6 @@
 import numpy as np
 from cbcdns import config
-from SFTc import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, SBBmat_matvec3D
+from SFTc import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, SBBmat_matvec3D, Biharmonic_matvec, Biharmonic_matvec3D
 from scipy.sparse import diags
 
 pi, zeros, ones, array = np.pi, np.zeros, np.ones, np.array
@@ -567,10 +567,17 @@ class ABBmat(object):
     def __init__(self, K):
         N = K.shape[0]-4
         self.shape = (N, N)
+        ki = K[:N]
         k = K[:N].astype(float)
-        self.dd = -4*(k+1)/(k+3)*(k+2)**2*pi
-        self.ud = 2*(k[:-2]+1)*(k[:-2]+2)*pi
-        self.ld = 2*(k[2:]-1)*(k[2:]+2)*pi
+        i = -4*(ki+1)*(k+2)**2
+        self.dd = i * pi / (k+3.)
+        i = 2*(ki[:-2]+1)*(ki[:-2]+2)
+        self.ud = i*pi
+        i = 2*(ki[2:]-1)*(ki[2:]+2)
+        self.ld = i * pi
+        #self.dd = -4*(k+1)/(k+3)*(k+2)**2*pi
+        #self.ud = 2*(k[:-2]+1)*(k[:-2]+2)*pi
+        #self.ld = 2*(k[2:]-1)*(k[2:]+2)*pi
         
     def matvec(self, v):
         N = self.shape[0]
@@ -696,10 +703,15 @@ class SBBmat(object):
         N = K.shape[0]-4
         self.shape = (N, N)
         k = K[:N].astype(float)
-        self.dd = 8.*(k+1.)**2*(k+2.)*(k+4.)*pi
+        ki = K[:N]
+        i = 8*(ki+1)**2*(ki+2)*(ki+4)
+        self.dd = i * pi
+        #self.dd = 8.*(k+1.)**2*(k+2.)*(k+4.)*pi
         self.ud = []
         for j in range(2, N, 2):
-            self.ud.append(np.array(8./(k[j:]+3.)*pi*(k[:-j]+1.)*(k[:-j]+2.)*(k[:-j]*(k[:-j]+4.)+3.*(k[j:]+2.)**2)))    
+            i = 8*(ki[:-j]+1)*(ki[:-j]+2)*(ki[:-j]*(ki[:-j]+4)+3*(ki[j:]+2)**2)
+            self.ud.append(np.array(i*pi/(k[j:]+3)))
+            #self.ud.append(np.array(8./(k[j:]+3.)*pi*(k[:-j]+1.)*(k[:-j]+2.)*(k[:-j]*(k[:-j]+4.)+3.*(k[j:]+2.)**2)))
 
         self.ld = None
         
@@ -715,3 +727,43 @@ class SBBmat(object):
             
     def diags(self):
         return diags([self.dd]+self.ud, range(0, self.shape[0], 2), shape=self.shape)
+
+from scipy.sparse.linalg import LinearOperator
+class BiharmonicI(LinearOperator):
+    
+    def __init__(self, N, a0, alfa, beta, quad="GL"):
+        self.quad = quad
+        self.N = N-4
+        k = np.arange(N)
+        self.S = S = SBBmat(k)
+        self.B = B = BBBmat(k, self.quad)
+        self.A = A = ABBmat(k)
+        k = k[:self.N]
+        self.a0 = a0
+        self.alfa = alfa
+        self.beta = beta
+        self.ldd = beta*self.B.lld
+        self.ld = alfa*self.A.ld + beta*self.B.ld
+        self.dd = a0*self.S.dd + alfa*self.A.dd + beta*self.B.dd
+        self.ud = [a0*self.S.ud[0] + alfa*self.A.ud + beta*self.B.ud]
+        self.ud.append(a0*self.S.ud[1] + beta*self.B.uud)
+        ## Not really necessary to store upper diagonals for j>k+4
+        for j in range(6, self.N, 2):
+            i = 8*(k[:-j]+1)*(k[:-j]+2)*(k[:-j]*(k[:-j]+4)+3*(k[j:]+2)**2)
+            self.ud.append(np.array(i*a0*pi/(k[j:]+3.)))
+        
+    def matvec(self, v):
+        N = self.shape()[0]
+        c = np.zeros(v.shape, dtype=v.dtype)
+        if len(v.shape) > 1:
+            Biharmonic_matvec3D(v, c, self.a0, self.ldd, self.ld, self.dd, self.ud[0], self.ud[1])
+        else:
+            Biharmonic_matvec(v, c, self.a0, self.ldd, self.ld, self.dd, self.ud[0], self.ud[1])
+        return c
+    
+    def diags(self):
+        return diags([self.ldd, self.ld, self.dd]+self.ud, range(-4, self.shape()[0], 2), shape=self.shape())
+    
+    def shape(self):
+        return (self.N, self.N)
+    

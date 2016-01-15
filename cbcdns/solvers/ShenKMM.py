@@ -13,7 +13,7 @@ hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config
                       mesh={"x": points, "xp": pointsp, "y": x1, "z": x2})  
 
 HelmholtzSolverG = Helmholtz(N[0], sqrt(K2[0]+2.0/nu/dt), ST.quad, False)
-BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0], -(K2[0] + nu*dt/2.*K2[0]**2), SB.quad)
+BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0], -(K2[0] + nu*dt/2.*K2[0]**2), quad=SB.quad, solver="cython")
 HelmholtzSolverP = Helmholtz(N[0], sqrt(K2[0]), SN.quad, True)
 HelmholtzSolverU0 = Helmholtz(N[0], sqrt(2./nu/dt), ST.quad, False)
 
@@ -66,7 +66,6 @@ def Curl(a_hat, c, S):
     SFTc.Mult_CTD_3D(N[0], a_hat[1], a_hat[2], F_tmp[1], F_tmp[2])
     dvdx = U_tmp2[1] = FST.ifct(F_tmp[1]*dealias, U_tmp2[1], S)
     dwdx = U_tmp2[2] = FST.ifct(F_tmp[2]*dealias, U_tmp2[2], S)
-    #c[0] = FST.ifst(1j*K[1]*a_hat[2] - 1j*K[2]*a_hat[1], c[0], S)
     c[0] = FST.ifst(g * dealias, c[0], ST)
     c[1] = FST.ifst(1j*K[2]*a_hat[0]*dealias, c[1], SB)
     c[1] -= dwdx
@@ -81,7 +80,6 @@ def Curl_padded(u_hat, c, S):
     SFTc.Mult_CTD_3D(N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
     dvdx = U_pad[1] = FST.ifct_padded(F_tmp[1]*dealias, U_pad[1], S)
     dwdx = U_pad[2] = FST.ifct_padded(F_tmp[2]*dealias, U_pad[2], S)
-    #c[0] = FST.ifst(1j*K[1]*a_hat[2] - 1j*K[2]*a_hat[1], c[0], S)
     c[0] = FST.ifst_padded(g*dealias, c[0], ST)
     c[1] = FST.ifst_padded(1j*K[2]*u_hat[0]*dealias, c[1], SB)
     c[1] -= dwdx
