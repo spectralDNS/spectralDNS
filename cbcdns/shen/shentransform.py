@@ -35,6 +35,16 @@ class ChebyshevTransform(object):
         self.fast_transform = fast_transform
         self.points = None
         self.weights = None
+        self.return_array = None
+        
+    def get_return_array(self, v):
+        if self.return_array is None:
+            self.return_array = np.zeros(v.shape, dtype=v.dtype)
+        else:
+            if not self.return_array.shape == v.shape:
+                self.return_array = np.zeros(v.shape, dtype=v.dtype)
+        self.return_array[:] = 0
+        return self.return_array
         
     def points_and_weights(self, N):
         self.N = N
@@ -131,10 +141,7 @@ class ChebyshevTransform(object):
 class ShenDirichletBasis(ChebyshevTransform):
     
     def __init__(self, quad="GL", fast_transform=True):
-        self.quad = quad
-        self.fast_transform = fast_transform
-        self.points = None
-        self.weights = None
+        ChebyshevTransform.__init__(self, quad=quad, fast_transform=fast_transform)
         self.N = -1
         self.ck = None
         self.w_hat = None
@@ -290,17 +297,34 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
         else:
             kk = np.mgrid[:N[0]-4, :N[1], :N[2]].astype(float)
             return kk[0]
+        
+    def set_factor_arrays(self, v):
+        recreate = False
+        if isinstance(self.factor1, np.ndarray):
+            if not self.factor1.shape == v.shape:
+                recreate = True
+            
+        if self.factor1 is None:
+            recreate = True
+            
+        if recreate:
+            if len(v.shape)==3:
+                k = self.wavenumbers(v.shape)                
+            elif len(v.shape)==1:
+                k = self.wavenumbers(v.shape[0])
+            self.factor1 = -2*(k+2)/(k+3)
+            self.factor2 = (k+1)/(k+3)
 
     def fastShenScalar(self, fj, fk):
         """Fast Shen scalar product.
         """        
         if self.fast_transform:
-            k  = self.wavenumbers(fj.shape)
-            Tk = fk.copy()
+            self.set_factor_arrays(fk)
+            Tk = self.get_return_array(fk)
             Tk = self.fastChebScalar(fj, Tk)
             fk[:] = Tk[:]
-            fk[:-4] -= 2*(k+2)/(k+3) * Tk[2:-2]
-            fk[:-4] += ((k+1)/(k+3)) * Tk[4:]
+            fk[:-4] += self.factor1 * Tk[2:-2]
+            fk[:-4] += self.factor2 * Tk[4:]
 
         else:
             if self.points is None: self.init(fj.shape[0])
@@ -316,23 +340,7 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
             self.w_hat = fk.copy()
         elif not self.w_hat.shape == fk.shape:
             self.w_hat = fk.copy()
-
-        recreate = False
-        if isinstance(self.factor1, np.ndarray):
-            if not self.factor1.shape == fk.shape:
-                recreate = True
-            
-        if self.factor1 is None:
-            recreate = True
-            
-        if recreate:
-            if len(fk.shape)==3:
-                k = self.wavenumbers(fk.shape)                
-            elif len(fk.shape)==1:
-                k = self.wavenumbers(fk.shape[0])
-            self.factor1 = -2*(k+2)/(k+3)
-            self.factor2 = (k+1)/(k+3)
-            
+        self.set_factor_arrays(fk)
         self.w_hat[:] = 0
         self.w_hat[:-4] = fk[:-4]
         self.w_hat[2:-2] += self.factor1*fk[:-4]

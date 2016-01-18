@@ -123,6 +123,7 @@ class Biharmonic(object):
             sii, siu, siuu = S.dd, S.ud[0], S.ud[1]
             ail, aii, aiu = A.ld, A.dd, A.ud
             bill, bil, bii, biu, biuu = B.lld, B.ld, B.dd, B.ud, B.uud
+            M = sii[::2].shape[0]
         
         if hasattr(beta, "__len__"):
             Ny, Nz = beta.shape
@@ -141,7 +142,6 @@ class Biharmonic(object):
                     Le.append(Lej)
                     Lo.append(Loj)
             else:
-                M = sii[::2].shape[0]
                 self.u0 = zeros((2, M, Ny, Nz))
                 self.u1 = zeros((2, M, Ny, Nz))
                 self.u2 = zeros((2, M, Ny, Nz))
@@ -181,7 +181,11 @@ class Biharmonic(object):
             else:
                 SFTc.Solve_Biharmonic_3D_complex(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
         else:
-            u[:-4:2] = lu_solve(self.Le, b[:-4:2])
-            u[1:-4:2] = lu_solve(self.Lo, b[1:-4:2])
+            if self.solver == "scipy":
+                u[:-4:2] = lu_solve(self.Le, b[:-4:2])
+                u[1:-4:2] = lu_solve(self.Lo, b[1:-4:2])
+            else:
+                SFTc.Solve_Biharmonic_1D(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
+
         return u
         

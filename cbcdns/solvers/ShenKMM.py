@@ -4,18 +4,21 @@ __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
-from ..shen.Matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, ADDmat, BDDmat, CDBmat
-from ..shen.Helmholtz import Helmholtz, TDMA, Biharmonic
+from ..shen.Matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, ADDmat, BDDmat, CDBmat, BiharmonicCoeff
+from ..shen.la import Helmholtz, TDMA, Biharmonic
 from ..shen import SFTc
 
 assert config.precision == "double"
 hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5", 
                       mesh={"x": points, "xp": pointsp, "y": x1, "z": x2})  
 
+K4 = K2**2
 HelmholtzSolverG = Helmholtz(N[0], sqrt(K2[0]+2.0/nu/dt), ST.quad, False)
-BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0], -(K2[0] + nu*dt/2.*K2[0]**2), quad=SB.quad, solver="cython")
+BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0], -(K2[0] + nu*dt/2.*K4[0]), quad=SB.quad, solver="cython")
 HelmholtzSolverP = Helmholtz(N[0], sqrt(K2[0]), SN.quad, True)
 HelmholtzSolverU0 = Helmholtz(N[0], sqrt(2./nu/dt), ST.quad, False)
+
+AC = BiharmonicCoeff(K[0, :, 0, 0], nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad)
 
 U_pad = empty((3,)+FST.real_shape_padded())
 U_pad2 = empty((3,)+FST.real_shape_padded())
@@ -52,9 +55,7 @@ def solvePressure(P_hat, Ni):
     return P_hat
 
 def Cross(a, b, c, S):
-    H[0] = a[1]*b[2]-a[2]*b[1]
-    H[1] = a[2]*b[0]-a[0]*b[2]
-    H[2] = a[0]*b[1]-a[1]*b[0]
+    H[:] = cross1(H, a, b)
     c[0] = FST.fst(H[0], c[0], S)
     c[1] = FST.fst(H[1], c[1], S)
     c[2] = FST.fst(H[2], c[2], S)    
@@ -89,9 +90,7 @@ def Curl_padded(u_hat, c, S):
     return c
 
 def Cross_padded(a, b, c, S):
-    U_pad[0] = a[1]*b[2]-a[2]*b[1]
-    U_pad[1] = a[2]*b[0]-a[0]*b[2]
-    U_pad[2] = a[0]*b[1]-a[1]*b[0]
+    U_pad[:] = cross1(U_pad, a, b)
     c[0] = FST.fst_padded(U_pad[0], c[0], S)
     c[1] = FST.fst_padded(U_pad[1], c[1], S)
     c[2] = FST.fst_padded(U_pad[2], c[2], S)    
@@ -359,7 +358,7 @@ def getConvection(convection):
 
 conv = getConvection(config.convection)
     
-#@profile
+@profile
 def ComputeRHS(dU):
     global hv
     
@@ -371,8 +370,9 @@ def ComputeRHS(dU):
     
     # Compute diffusion++ for u-equation
     diff0[0] = nu*dt/2.*SBB.matvec(u)
-    diff0[0] += (1. - nu*dt*K2) * ABB.matvec(u)
-    diff0[0] -= (K2 - nu*dt/2.*K2**2)*BBB.matvec(u)
+    diff0[0] += (1. - nu*dt*K2)*ABB.matvec(u)
+    diff0[0] -= (K2 - nu*dt/2.*K4)*BBB.matvec(u)    
+    diff0[0] = AC.matvec(u)
     
     # Compute convection
     H0[:] = 1.5*H - 0.5*H1
@@ -421,7 +421,7 @@ def solve():
         g[:] = HelmholtzSolverG(g, dU[1])
         
         f_hat = F_tmp[0]
-        f_hat = - CDB.matvec(U_hat[0])
+        f_hat[:] = -CDB.matvec(U_hat[0])
         f_hat = TDMASolverD(f_hat)
         
         U_hat[1] = -1j*(K_over_K2[1]*f_hat - K_over_K2[2]*g)

@@ -791,7 +791,7 @@ def test_ABBmat(SB):
     k = np.ones(M)*2
     k = k.repeat(16).reshape((M, 4, 4))
     k2 = k**2
-    u0_hat = u0_hat.repeat(16).reshape((M, 4, 4))    
+    u0_hat = u0_hat.repeat(16).reshape((M, 4, 4)) + 1j*u0_hat.repeat(16).reshape((M, 4, 4))
     u0 = u0.repeat(16).reshape((M, 4, 4))
     b = A.matvec(u0_hat) - k**2*B.matvec(u0_hat)
     alfa = np.ones((M, 4, 4))
@@ -801,10 +801,8 @@ def test_ABBmat(SB):
     z0_hat = BH(z0_hat, b)    
     z0 = np.zeros((M, 4, 4))
     z0 = SB.ifst(z0_hat, z0)
-    assert np.allclose(z0, u0)
-
-
     #from IPython import embed; embed()
+    assert np.allclose(z0, u0)
     
 
 #test_ABBmat(ShenBiharmonicBasis("GL"))
@@ -905,6 +903,8 @@ def test_Mult_CTD(SD):
     bw = np.zeros(N, dtype=np.complex)
     vk0 = np.zeros(N, dtype=np.complex)
     wk0 = np.zeros(N, dtype=np.complex)
+    cv = np.zeros(N, dtype=np.complex)
+    cw = np.zeros(N, dtype=np.complex)
     
     vk0 = SD.fst(vk, vk0)
     vk  = SD.ifst(vk0, vk)
@@ -915,13 +915,16 @@ def test_Mult_CTD(SD):
 
     SFTc.Mult_CTD_1D(N, vk0, wk0, bv, bw)
     
-    cv = C.matvec(vk0)
-    cw = C.matvec(wk0)
+    cv[:] = C.matvec(vk0)
+    cw[:] = C.matvec(wk0)
     cv /= B.dd
     cw /= B.dd
     
+    #from IPython import embed; embed()
     assert np.allclose(cv, bv)
     assert np.allclose(cw, bw)
+
+#test_Mult_CTD(ShenDirichletBasis("GL"))
 
 def test_Biharmonic(SB):
     M = 128

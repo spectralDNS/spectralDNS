@@ -28,7 +28,7 @@ def create_alias_filter(N, K, family="Isotropic"):
     if config.dealias == "2/3-rule":
         kmax = 1./3.*N
     elif config.dealias == "3/2-rule":
-        kmax = N/2-1  # Just chopping the highest wavenumber. Should not be necessary...
+        kmax = N/2-1  # Just chopping the highest wavenumber. Should not be necessary, but initial white noise seems to build up energy in the higheste wavenumber if this is not removed here. After reaching a fully developed flow kmax can be set to N/2 
     
     if not family=="Isotropic":
         kmax[0] = N[0]

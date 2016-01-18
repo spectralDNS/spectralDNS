@@ -52,7 +52,7 @@ def RKstep(U_hat, g, dU, rk):
     SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, g, diff0[1])
     
     diff0[0] = nu*(a[rk]+b[rk])*dt/2.*SBB.matvec(U_hat[0])
-    diff0[0] += (1. - nu*(a[rk]+b[rk])*dt*K2) * ABB.matvec(U_hat[0])
+    diff0[0] += (1. - nu*(a[rk]+b[rk])*dt*K2)*ABB.matvec(U_hat[0])
     diff0[0] -= (K2 - nu*(a[rk]+b[rk])*dt/2.*K2**2)*BBB.matvec(U_hat[0])
     
     #hv[:] = -K2*BBD.matvec(H_hat[0])

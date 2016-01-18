@@ -33,18 +33,26 @@ c = 1.0
 f = a*u.diff(x, 4) + b*u.diff(x, 2) + c*u
 
 SD = ShenBiharmonicBasis("GC", True)
-N = 256
+N = 2048
 points, weights = SD.points_and_weights(N) 
 
 uj = np.array([u.subs(x, j) for j in points], dtype=float)
 fj = np.array([f.subs(x, j) for j in points], dtype=float)     # Get f on quad points
 
 solver = Biharmonic(N, a, b, c, quad=SD.quad)
+solver2 = Biharmonic(N, a, b, c, quad=SD.quad, solver="cython")
 
 f_hat = np.zeros(N)
 f_hat = SD.fastShenScalar(fj, f_hat)
 u_hat = np.zeros(N)
+
+from time import time
+t0 = time()
 u_hat = solver(u_hat, f_hat)
+t1 = time()
+u_hat = solver2(u_hat, f_hat)
+t2 = time()
+print t2-t1, t1-t0
 
 u1 = np.zeros(N)
 u1 = SD.ifst(u_hat, u1)
@@ -88,7 +96,7 @@ l1 = np.zeros((2, M-2), float)     # Diagonal-2 entries of L
 #d = 1e-6*sii + a*aii + b*bii 
 d = np.ones(N-4)
 
-LU_Biharmonic_1D(N, a, b, c, sii, siu, siuu, ail, aii, aiu, bill, bil, bii, biu, biuu, u0, u1, u2, l0, l1)
+LU_Biharmonic_1D(a, b, c, sii, siu, siuu, ail, aii, aiu, bill, bil, bii, biu, biuu, u0, u1, u2, l0, l1)
 
 uk = np.zeros(N)
 #u0[0] = solver.Le[0].diagonal(0)
@@ -120,34 +128,37 @@ ak = np.zeros((2, M), float)
 bk = np.zeros((2, M), float)
 
 Biharmonic_factor_pr(ak, bk, l0, l1)
-Solve_Biharmonic_1D(N, fr_hat, uk, u0, u1, u2, l0, l1, ak, bk, a)
+Solve_Biharmonic_1D(fr_hat, uk, u0, u1, u2, l0, l1, ak, bk, a)
 
 ff = fr_hat.copy()
 #ff[:-4] *= d
 u_hat = solver(u_hat, ff)
 
-##Ae = AA[::2, ::2]
-##u2 =  (Ae.diagonal()[2:] - l0[0, 1:]*u1[0, 1:] - u0[0, 2:])/l1[0, :]
-##print U[0].diagonal(2) -  u2
+#Ae = AA[::2, ::2]
+#u2 =  (Ae.diagonal()[2:] - l0[0, 1:]*u1[0, 1:] - u0[0, 2:])/l1[0, :]
+#print U[0].diagonal(2) -  u2
 
 #U[0].diagonal(3) -  1./l1[0, :-1] *(Ae.diagonal(1)[2:] - l0[0, 1:-1]*U[0].diagonal(2)[1:] - U[0].diagonal(1)[2:])
 
-from scipy.linalg import svd
+#from scipy.linalg import svd
 
-def my_cond(A):
-    sigma = svd(A, full_matrices=False, compute_uv=False)
-    sigma.sort()
-    return sigma[-1]/sigma[0]
+#def my_cond(A):
+    #sigma = svd(A, full_matrices=False, compute_uv=False)
+    #sigma.sort()
+    #return sigma[-1]/sigma[0]
 
-print "Cond U = ", np.linalg.cond(U[0]), np.linalg.cond(U[1])
-print "Cond U = ", my_cond(U[0]), my_cond(U[1])
+#print "Cond U = ", np.linalg.cond(U[0]), np.linalg.cond(U[1])
+#print "Cond U = ", my_cond(U[0]), my_cond(U[1])
 
 Uc = U.copy()
 fc = fr_hat.copy()
+t0 = time()
 Solve_LUC_Biharmonic_1D(fc, uk2, Uc, ll0, ll1, 1)
+t1 = time()
+print t1-t0
 
-print "Cond U = ", np.linalg.cond(Uc[0]), np.linalg.cond(Uc[1])
-print "Cond U = ", my_cond(Uc[0]), my_cond(Uc[1])
+#print "Cond U = ", np.linalg.cond(Uc[0]), np.linalg.cond(Uc[1])
+#print "Cond U = ", my_cond(Uc[0]), my_cond(Uc[1])
 
 
 

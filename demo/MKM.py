@@ -450,8 +450,8 @@ if __name__ == "__main__":
     config.Shen.add_argument("--sample_stats", type=int, default=100)
     config.Shen.add_argument("--print_energy0", type=int, default=100)
     solver = get_solver(update=update, family="Shen")    
-    initialize(**vars(solver))    
-    #init_from_file("Start666.h5", **vars(solver))
+    #initialize(**vars(solver))    
+    init_from_file("KMM666t2.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, fromstats="KMMstats")
     solver.hdf5file.fname = "KMM666t.h5"

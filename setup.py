@@ -29,10 +29,10 @@ if not "sdist" in sys.argv:
                     args], cwd=cdir)
                     
     ext = []
-    for s in ("LUsolve", "TDMA", "PDMA"):
+    for s in ("LUsolve", "TDMA", "PDMA", "Matvec"):
         ext += cythonize(Extension("cbcdns.shen.{}".format(s), sources = [os.path.join(sdir, '{}.pyx'.format(s))], language="c++"))
         
-    for s in ("Cheb", "Matvec", "HelmholtzMHD"):
+    for s in ("Cheb", "HelmholtzMHD"):
         ext += cythonize(Extension("cbcdns.shen.{}".format(s), sources = [os.path.join(sdir, '{}.pyx'.format(s))]))    
     
     for s in ("LUsolve", "TDMA", "PDMA", "UTDMA"):

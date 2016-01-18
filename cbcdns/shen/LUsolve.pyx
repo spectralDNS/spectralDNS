@@ -723,29 +723,29 @@ def LU_Biharmonic_1D(np.float_t a,
     LU_oe_Biharmonic_1D(1, a, b, c, sii[1::2], siu[1::2], siuu[1::2], ail[1::2], aii[1::2], aiu[1::2], bill[1::2], bil[1::2], bii[1::2], biu[1::2], biuu[1::2], u0[1], u1[1], u2[1], l0[1], l1[1])
 
 def LU_oe_Biharmonic_1D(bint odd,
-                     np.float_t a, 
-                     np.float_t b, 
-                     np.float_t c, 
-                     # 3 upper diagonals of SBB
-                     np.ndarray[real_t, ndim=1] sii,
-                     np.ndarray[real_t, ndim=1] siu,
-                     np.ndarray[real_t, ndim=1] siuu,
-                     # All 3 diagonals of ABB
-                     np.ndarray[real_t, ndim=1] ail,
-                     np.ndarray[real_t, ndim=1] aii,
-                     np.ndarray[real_t, ndim=1] aiu,
-                     # All 5 diagonals of BBB
-                     np.ndarray[real_t, ndim=1] bill,
-                     np.ndarray[real_t, ndim=1] bil,
-                     np.ndarray[real_t, ndim=1] bii,
-                     np.ndarray[real_t, ndim=1] biu,
-                     np.ndarray[real_t, ndim=1] biuu,
-                     # Two upper and two lower diagonals of LU decomposition
-                     np.ndarray[real_t, ndim=1] u0,
-                     np.ndarray[real_t, ndim=1] u1,
-                     np.ndarray[real_t, ndim=1] u2,
-                     np.ndarray[real_t, ndim=1] l0,
-                     np.ndarray[real_t, ndim=1] l1):
+                        np.float_t a, 
+                        np.float_t b, 
+                        np.float_t c, 
+                        # 3 upper diagonals of SBB
+                        np.ndarray[real_t, ndim=1] sii,
+                        np.ndarray[real_t, ndim=1] siu,
+                        np.ndarray[real_t, ndim=1] siuu,
+                        # All 3 diagonals of ABB
+                        np.ndarray[real_t, ndim=1] ail,
+                        np.ndarray[real_t, ndim=1] aii,
+                        np.ndarray[real_t, ndim=1] aiu,
+                        # All 5 diagonals of BBB
+                        np.ndarray[real_t, ndim=1] bill,
+                        np.ndarray[real_t, ndim=1] bil,
+                        np.ndarray[real_t, ndim=1] bii,
+                        np.ndarray[real_t, ndim=1] biu,
+                        np.ndarray[real_t, ndim=1] biuu,
+                        # Two upper and two lower diagonals of LU decomposition
+                        np.ndarray[real_t, ndim=1] u0,
+                        np.ndarray[real_t, ndim=1] u1,
+                        np.ndarray[real_t, ndim=1] u2,
+                        np.ndarray[real_t, ndim=1] l0,
+                        np.ndarray[real_t, ndim=1] l1):
 
     cdef:
         int i, j, kk
@@ -845,6 +845,17 @@ cdef ForwardBsolve_L(vector[real]& y,
     for i in xrange(2, y.size()):
         y[i] = fk[i] - l0[i-1]*y[i-1] - l1[i-2]*y[i-2]
 
+cdef ForwardBsolve_L_complex(vector[double complex]& y, 
+                     np.ndarray[real_t, ndim=1] l0,
+                     np.ndarray[real_t, ndim=1] l1,
+                     np.ndarray[complex_t, ndim=1] fk):
+    # Solve Forward Ly = f
+    cdef int i
+    y[0] = fk[0]
+    y[1] = fk[1] - l0[0]*y[0]
+    for i in xrange(2, y.size()):
+        y[i] = fk[i] - l0[i-1]*y[i-1] - l1[i-2]*y[i-2]
+
 
 def LUC_Biharmonic_1D(np.ndarray[real_t, ndim=2] A,
                       np.ndarray[real_t, ndim=3] U,
@@ -928,9 +939,9 @@ cdef Back_LUC_solve_U(int M,
         uk[i] = (f[i] - s) / U[i, i]
 
 cdef Back_LDUC_solve_U(int M, 
-                      vector[real]& f,  # Uc = f
-                      np.ndarray[real_t, ndim=1] uk,
-                      np.ndarray[real_t, ndim=2] U):
+                       vector[real]& f,  # Uc = f
+                       np.ndarray[real_t, ndim=1] uk,
+                       np.ndarray[real_t, ndim=2] U):
     cdef:
         int i, j, k
         real s, d
@@ -949,9 +960,9 @@ cdef Back_LDUC_solve_U(int M,
         uk[i] = (f[i] - s) / U[i, i]
 
 def Biharmonic_factor_pr_3D(np.ndarray[real_t, ndim=4] a,
-                         np.ndarray[real_t, ndim=4] b,
-                         np.ndarray[real_t, ndim=4] l0,
-                         np.ndarray[real_t, ndim=4] l1):
+                            np.ndarray[real_t, ndim=4] b,
+                            np.ndarray[real_t, ndim=4] l0,
+                            np.ndarray[real_t, ndim=4] l1):
     
     cdef:
         unsigned int ii, jj
@@ -994,6 +1005,20 @@ def Biharmonic_factor_oe_pr(bint odd,
         rr = 24*(kk+1)*(kk+2)
         a[k] = pp*pi - l0[k-1]*a[k-1] - l1[k-2]*a[k-2]
         b[k] = rr*pi - l0[k-1]*b[k-1] - l1[k-2]*b[k-2]
+
+def Solve_Biharmonic_1D_complex(np.ndarray[complex_t, ndim=1] fk,
+                        np.ndarray[complex_t, ndim=1] uk,
+                        np.ndarray[real_t, ndim=2] u0,
+                        np.ndarray[real_t, ndim=2] u1,
+                        np.ndarray[real_t, ndim=2] u2,
+                        np.ndarray[real_t, ndim=2] l0,
+                        np.ndarray[real_t, ndim=2] l1,
+                        np.ndarray[real_t, ndim=2] a, 
+                        np.ndarray[real_t, ndim=2] b, 
+                        np.float_t ac):
+    
+    Solve_oe_Biharmonic_1D_complex(0, fk[::2], uk[::2], u0[0], u1[0], u2[0], l0[0], l1[0], a[0], b[0], ac)
+    Solve_oe_Biharmonic_1D_complex(1, fk[1::2], uk[1::2], u0[1], u1[1], u2[1], l0[1], l1[1], a[1], b[1], ac)
     
 def Solve_Biharmonic_1D(np.ndarray[real_t, ndim=1] fk,
                         np.ndarray[real_t, ndim=1] uk,
@@ -1005,23 +1030,22 @@ def Solve_Biharmonic_1D(np.ndarray[real_t, ndim=1] fk,
                         np.ndarray[real_t, ndim=2] a, 
                         np.ndarray[real_t, ndim=2] b, 
                         np.float_t ac):
-    cdef:
-        int i
     
-    Solve_oe_Biharmonic_1D(0, fk, uk, u0[0], u1[0], u2[0], l0[0], l1[0], a[0], b[0], ac)
-    Solve_oe_Biharmonic_1D(1, fk, uk, u0[1], u1[1], u2[1], l0[1], l1[1], a[1], b[1], ac)
+    Solve_oe_Biharmonic_1D(0, fk[::2], uk[::2], u0[0], u1[0], u2[0], l0[0], l1[0], a[0], b[0], ac)
+    Solve_oe_Biharmonic_1D(1, fk[1::2], uk[1::2], u0[1], u1[1], u2[1], l0[1], l1[1], a[1], b[1], ac)
+    
 
 def Solve_oe_Biharmonic_1D(bint odd,
-                            np.ndarray[real_t, ndim=1] fk,
-                            np.ndarray[real_t, ndim=1] uk,
-                            np.ndarray[real_t, ndim=1] u0,
-                            np.ndarray[real_t, ndim=1] u1,
-                            np.ndarray[real_t, ndim=1] u2,
-                            np.ndarray[real_t, ndim=1] l0,
-                            np.ndarray[real_t, ndim=1] l1,
-                            np.ndarray[real_t, ndim=1] a,
-                            np.ndarray[real_t, ndim=1] b,
-                            np.float_t ac):
+                           np.ndarray[real_t, ndim=1] fk,
+                           np.ndarray[real_t, ndim=1] uk,
+                           np.ndarray[real_t, ndim=1] u0,
+                           np.ndarray[real_t, ndim=1] u1,
+                           np.ndarray[real_t, ndim=1] u2,
+                           np.ndarray[real_t, ndim=1] l0,
+                           np.ndarray[real_t, ndim=1] l1,
+                           np.ndarray[real_t, ndim=1] a,
+                           np.ndarray[real_t, ndim=1] b,
+                           np.float_t ac):
     """
     Solve (aS+b*A+cB)x = f, where S, A and B are 4th order Laplace, stiffness and mass matrices of Shen with Dirichlet BC
     """
@@ -1034,23 +1058,49 @@ def Solve_oe_Biharmonic_1D(bint odd,
     M = u0.shape[0]        
 
     y.resize(M)
-    ForwardBsolve_L(y, l0, l1, fk[odd::2])
+    ForwardBsolve_L(y, l0, l1, fk)
     
     # Solve Backward U u = y 
-    BackBsolve_U(M, odd, y, uk[odd::2], u0, u1, u2, l0, l1, a, b, ac)
+    BackBsolve_U(M, odd, y, uk, u0, u1, u2, l0, l1, a, b, ac)
 
+def Solve_oe_Biharmonic_1D_complex(bint odd,
+                           np.ndarray[complex_t, ndim=1] fk,
+                           np.ndarray[complex_t, ndim=1] uk,
+                           np.ndarray[real_t, ndim=1] u0,
+                           np.ndarray[real_t, ndim=1] u1,
+                           np.ndarray[real_t, ndim=1] u2,
+                           np.ndarray[real_t, ndim=1] l0,
+                           np.ndarray[real_t, ndim=1] l1,
+                           np.ndarray[real_t, ndim=1] a,
+                           np.ndarray[real_t, ndim=1] b,
+                           np.float_t ac):
+    """
+    Solve (aS+b*A+cB)x = f, where S, A and B are 4th order Laplace, stiffness and mass matrices of Shen with Dirichlet BC
+    """
+    cdef:
+        unsigned int M
+        vector[double complex] y
+            
+    M = u0.shape[0]        
+
+    y.resize(M)
+    ForwardBsolve_L_complex(y, l0, l1, fk)
+    
+    # Solve Backward U u = y 
+    BackBsolve_U_complex(M, odd, y, uk, u0, u1, u2, l0, l1, a, b, ac)
+    
 cdef BackBsolve_U(int M,
-                 bint odd, 
-                 vector[real]& f,  # Uc = f
-                 np.ndarray[real_t, ndim=1] uk,
-                 np.ndarray[real_t, ndim=1] u0,
-                 np.ndarray[real_t, ndim=1] u1,
-                 np.ndarray[real_t, ndim=1] u2,
-                 np.ndarray[real_t, ndim=1] l0,
-                 np.ndarray[real_t, ndim=1] l1,
-                 np.ndarray[real_t, ndim=1] a,
-                 np.ndarray[real_t, ndim=1] b,
-                 np.float_t ac):
+                  bint odd, 
+                  vector[real]& f,  # Uc = f
+                  np.ndarray[real_t, ndim=1] uk,
+                  np.ndarray[real_t, ndim=1] u0,
+                  np.ndarray[real_t, ndim=1] u1,
+                  np.ndarray[real_t, ndim=1] u2,
+                  np.ndarray[real_t, ndim=1] l0,
+                  np.ndarray[real_t, ndim=1] l1,
+                  np.ndarray[real_t, ndim=1] a,
+                  np.ndarray[real_t, ndim=1] b,
+                  np.float_t ac):
     cdef:
         int i, j, k, kk
         real s1 = 0.0
@@ -1069,53 +1119,73 @@ cdef BackBsolve_U(int M,
         s2 += (uk[kk+3]/(j+3.))*((j+2)*(j+2))
         uk[kk] = (f[kk] - u1[kk]*uk[kk+1] - u2[kk]*uk[kk+2] - a[kk]*ac*s1 - b[kk]*ac*s2) / u0[kk]
 
+cdef BackBsolve_U_complex(int M,
+                  bint odd, 
+                  vector[double complex]& f,  # Uc = f
+                  np.ndarray[complex_t, ndim=1] uk,
+                  np.ndarray[real_t, ndim=1] u0,
+                  np.ndarray[real_t, ndim=1] u1,
+                  np.ndarray[real_t, ndim=1] u2,
+                  np.ndarray[real_t, ndim=1] l0,
+                  np.ndarray[real_t, ndim=1] l1,
+                  np.ndarray[real_t, ndim=1] a,
+                  np.ndarray[real_t, ndim=1] b,
+                  np.float_t ac):
+    cdef:
+        int i, j, k, kk
+        double complex s1 = 0.0
+        double complex s2 = 0.0
+    
+    uk[M-1] = f[M-1] / u0[M-1]
+    uk[M-2] = (f[M-2] - u1[M-2]*uk[M-1]) / u0[M-2]
+    uk[M-3] = (f[M-3] - u1[M-3]*uk[M-2] - u2[M-3]*uk[M-1]) / u0[M-3]
+    
+    s1 = 0.0
+    s2 = 0.0
+    for kk in xrange(M-4, -1, -1):
+        k = 2*kk+odd
+        j = k+6
+        s1 += uk[kk+3]/(j+3.)
+        s2 += (uk[kk+3]/(j+3.))*((j+2)*(j+2))
+        uk[kk] = (f[kk] - u1[kk]*uk[kk+1] - u2[kk]*uk[kk+2] - a[kk]*ac*s1 - b[kk]*ac*s2) / u0[kk]
+
 
 def Solve_Biharmonic_3D_complex(np.ndarray[complex_t, ndim=3] fk,
-                       np.ndarray[complex_t, ndim=3] uk,
-                       np.ndarray[real_t, ndim=4] u0,
-                       np.ndarray[real_t, ndim=4] u1,
-                       np.ndarray[real_t, ndim=4] u2,
-                       np.ndarray[real_t, ndim=4] l0,
-                       np.ndarray[real_t, ndim=4] l1,
-                       np.ndarray[real_t, ndim=4] a,
-                       np.ndarray[real_t, ndim=4] b,
-                       np.float_t ac):
+                                np.ndarray[complex_t, ndim=3] uk,
+                                np.ndarray[real_t, ndim=4] u0,
+                                np.ndarray[real_t, ndim=4] u1,
+                                np.ndarray[real_t, ndim=4] u2,
+                                np.ndarray[real_t, ndim=4] l0,
+                                np.ndarray[real_t, ndim=4] l1,
+                                np.ndarray[real_t, ndim=4] a,
+                                np.ndarray[real_t, ndim=4] b,
+                                np.float_t ac):
     cdef:
         unsigned int ii, jj
         
     for ii in range(fk.shape[1]):
         for jj in range(fk.shape[2]):
-            Solve_Biharmonic_1D(fk[:, ii, jj].real, 
-                               uk[:, ii, jj].real,
-                               u0[:, :, ii, jj],
-                               u1[:, :, ii, jj],
-                               u2[:, :, ii, jj],
-                               l0[:, :, ii, jj],
-                               l1[:, :, ii, jj],
-                               a[:, :, ii, jj],
-                               b[:, :, ii, jj],
-                               ac)
-            Solve_Biharmonic_1D(fk[:, ii, jj].imag, 
-                               uk[:, ii, jj].imag,
-                               u0[:, :, ii, jj],
-                               u1[:, :, ii, jj],
-                               u2[:, :, ii, jj],
-                               l0[:, :, ii, jj],
-                               l1[:, :, ii, jj],
-                               a[:, :, ii, jj],
-                               b[:, :, ii, jj],
-                               ac)
+            Solve_Biharmonic_1D_complex(fk[:, ii, jj], 
+                                uk[:, ii, jj],
+                                u0[:, :, ii, jj],
+                                u1[:, :, ii, jj],
+                                u2[:, :, ii, jj],
+                                l0[:, :, ii, jj],
+                                l1[:, :, ii, jj],
+                                a[:, :, ii, jj],
+                                b[:, :, ii, jj],
+                                ac)
 
 def Solve_Biharmonic_3D(np.ndarray[real_t, ndim=3] fk,
-                       np.ndarray[real_t, ndim=3] uk,
-                       np.ndarray[real_t, ndim=4] u0,
-                       np.ndarray[real_t, ndim=4] u1,
-                       np.ndarray[real_t, ndim=4] u2,
-                       np.ndarray[real_t, ndim=4] l0,
-                       np.ndarray[real_t, ndim=4] l1,
-                       np.ndarray[real_t, ndim=4] a,
-                       np.ndarray[real_t, ndim=4] b,
-                       np.float_t ac):
+                        np.ndarray[real_t, ndim=3] uk,
+                        np.ndarray[real_t, ndim=4] u0,
+                        np.ndarray[real_t, ndim=4] u1,
+                        np.ndarray[real_t, ndim=4] u2,
+                        np.ndarray[real_t, ndim=4] l0,
+                        np.ndarray[real_t, ndim=4] l1,
+                        np.ndarray[real_t, ndim=4] a,
+                        np.ndarray[real_t, ndim=4] b,
+                        np.float_t ac):
     cdef:
         unsigned int ii, jj
         
@@ -1133,27 +1203,27 @@ def Solve_Biharmonic_3D(np.ndarray[real_t, ndim=3] fk,
                                ac)
 
 def LU_Biharmonic_3D(np.float_t a0,  
-                    np.ndarray[real_t, ndim=2] alfa, 
-                    np.ndarray[real_t, ndim=2] beta, 
-                    # 3 upper diagonals of SBB
-                    np.ndarray[real_t, ndim=1] sii,
-                    np.ndarray[real_t, ndim=1] siu,
-                    np.ndarray[real_t, ndim=1] siuu,
-                    # All 3 diagonals of ABB
-                    np.ndarray[real_t, ndim=1] ail,
-                    np.ndarray[real_t, ndim=1] aii,
-                    np.ndarray[real_t, ndim=1] aiu,
-                    # All 5 diagonals of BBB
-                    np.ndarray[real_t, ndim=1] bill,
-                    np.ndarray[real_t, ndim=1] bil,
-                    np.ndarray[real_t, ndim=1] bii,
-                    np.ndarray[real_t, ndim=1] biu,
-                    np.ndarray[real_t, ndim=1] biuu,
-                    np.ndarray[real_t, ndim=4] u0,
-                    np.ndarray[real_t, ndim=4] u1,
-                    np.ndarray[real_t, ndim=4] u2,
-                    np.ndarray[real_t, ndim=4] l0,
-                    np.ndarray[real_t, ndim=4] l1):
+                     np.ndarray[real_t, ndim=2] alfa, 
+                     np.ndarray[real_t, ndim=2] beta, 
+                     # 3 upper diagonals of SBB
+                     np.ndarray[real_t, ndim=1] sii,
+                     np.ndarray[real_t, ndim=1] siu,
+                     np.ndarray[real_t, ndim=1] siuu,
+                     # All 3 diagonals of ABB
+                     np.ndarray[real_t, ndim=1] ail,
+                     np.ndarray[real_t, ndim=1] aii,
+                     np.ndarray[real_t, ndim=1] aiu,
+                     # All 5 diagonals of BBB
+                     np.ndarray[real_t, ndim=1] bill,
+                     np.ndarray[real_t, ndim=1] bil,
+                     np.ndarray[real_t, ndim=1] bii,
+                     np.ndarray[real_t, ndim=1] biu,
+                     np.ndarray[real_t, ndim=1] biuu,
+                     np.ndarray[real_t, ndim=4] u0,
+                     np.ndarray[real_t, ndim=4] u1,
+                     np.ndarray[real_t, ndim=4] u2,
+                     np.ndarray[real_t, ndim=4] l0,
+                     np.ndarray[real_t, ndim=4] l1):
     cdef:
         unsigned int ii, jj
         
