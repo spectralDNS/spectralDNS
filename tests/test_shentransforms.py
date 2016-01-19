@@ -1,6 +1,6 @@
 import pytest
 from cbcdns.shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ChebyshevTransform, ShenBiharmonicBasis
-from cbcdns.shen.Helmholtz import TDMA, Helmholtz
+from cbcdns.shen.la import TDMA, Helmholtz
 from cbcdns.shen.Matrices import BNNmat, BTTmat, BDDmat, CDDmat, CDNmat, BNDmat, CNDmat, BDNmat, ADDmat, ANNmat, CTDmat, BDTmat, CDTmat, BTDmat, BTNmat, BBBmat, ABBmat, SBBmat, CDBmat, CBDmat, ATTmat, BBDmat
 from cbcdns.shen import SFTc
 from cbcdns.shen.Helmholtz import Biharmonic
