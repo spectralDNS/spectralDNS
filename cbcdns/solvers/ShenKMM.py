@@ -406,7 +406,7 @@ def ComputeRHS(dU):
 def regression_test(**kw):
     pass
 
-#@profile
+@profile
 def solve():
     timer = Timer()
     

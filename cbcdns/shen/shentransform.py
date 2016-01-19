@@ -4,7 +4,7 @@ from cbcdns.fft.wrappyfftw import dct
 from cbcdns import config
 import SFTc
 import scipy.sparse.linalg as la
-from cbcdns.shen.Helmholtz import TDMA, PDMA
+from cbcdns.shen.la import TDMA, PDMA
 from cbcdns.shen.Matrices import BBBmat
 """
 Fast transforms for pure Chebyshev basis or 

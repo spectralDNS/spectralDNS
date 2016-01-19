@@ -179,7 +179,7 @@ class Biharmonic(object):
                         u[:-4:2, i, j] = lu_solve(self.Le[i][j], b[:-4:2, i, j])
                         u[1:-4:2, i, j] = lu_solve(self.Lo[i][j], b[1:-4:2, i, j])
             else:
-                SFTc.Solve_Biharmonic_3D_complex(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
+                SFTc.Solve_Biharmonic_3D_c(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
         else:
             if self.solver == "scipy":
                 u[:-4:2] = lu_solve(self.Le, b[:-4:2])
