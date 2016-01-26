@@ -1,6 +1,6 @@
 import numpy as np
 from cbcdns import config
-from SFTc import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, SBBmat_matvec3D, Biharmonic_matvec, Biharmonic_matvec3D, Tridiagonal_matvec, Tridiagonal_matvec3D, Pentadiagonal_matvec, Pentadiagonal_matvec3D, CBD_matvec3D, CBD_matvec
+from SFTc import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, SBBmat_matvec3D, Biharmonic_matvec, Biharmonic_matvec3D, Tridiagonal_matvec, Tridiagonal_matvec3D, Pentadiagonal_matvec, Pentadiagonal_matvec3D, CBD_matvec3D, CBD_matvec, ADDmat_matvec
 from scipy.sparse import diags
 
 pi, zeros, ones, array = np.pi, np.zeros, np.ones, np.array
@@ -181,18 +181,23 @@ class BDDmat(BaseMatrix):
         self.dd = pi/2*(ck[:-2]+ck[2:])
         self.ud = float(-pi/2)
         self.ld = float(-pi/2)
+        self.ones = ones(K.shape[0]-4)
     
     def matvec(self, v):
         N = self.shape[0]
         c = self.get_return_array(v)
         if len(v.shape) > 1:
-            c[:(N-2)] = self.ud*v[2:N]
-            c[:N]    += self.dd.repeat(array(v.shape[1:]).prod()).reshape(v[:N].shape)*v[:N]
-            c[2:N]   += self.ld*v[:(N-2)] 
+            #c[:(N-2)] = self.ud*v[2:N]
+            #c[:N]    += self.dd.repeat(array(v.shape[1:]).prod()).reshape(v[:N].shape)*v[:N]
+            #c[2:N]   += self.ld*v[:(N-2)]
+            ld = self.ld*self.ones
+            Tridiagonal_matvec3D(v, c, ld, self.dd, ld)
         else:
-            c[:(N-2)] = self.ud*v[2:N]
-            c[:N]    += self.dd*v[:N]
-            c[2:N]   += self.ld*v[:(N-2)]
+            #c[:(N-2)] = self.ud*v[2:N]
+            #c[:N]    += self.dd*v[:N]
+            #c[2:N]   += self.ld*v[:(N-2)]
+            ld = self.ld*self.ones
+            Tridiagonal_matvec(v, c, ld, self.dd, ld)
         return c
     
     def diags(self):
@@ -667,7 +672,8 @@ class ADDmat(BaseMatrix):
         if len(v.shape) > 1:
             raise NotImplementedError
         else:
-            c[:N] = np.dot(self.diags().toarray(), v[:N])
+            #c[:N] = np.dot(self.diags().toarray(), v[:N])
+            ADDmat_matvec(v, c, self.dd)
         return c
 
     def diags(self):
@@ -811,5 +817,4 @@ class BiharmonicCoeff(BaseMatrix):
     def diags(self):
         raise NotImplementedError
         #return diags([self.ldd, self.ld, self.dd]+self.ud, range(-4, self.shape()[0], 2), shape=self.shape())
-    
     

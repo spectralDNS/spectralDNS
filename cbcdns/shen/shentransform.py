@@ -17,6 +17,11 @@ Shen's Chebyshev basis:
   For homogeneous Neumann boundary conditions:
     
     phi_k = T_k - (k/k+2)**2 * T_{k+2}
+    
+  For Biharmonic basis with both homogeneous Dirichlet
+  and Neumann:
+  
+    phi_k = T_k - 2(k+2)/(k+3)*T_{k+2} + (k+1)/(k+3)*T_{k+4}
 
 Use either Chebyshev-Gauss (GC) or Gauss-Lobatto (GL)
 points in real space.

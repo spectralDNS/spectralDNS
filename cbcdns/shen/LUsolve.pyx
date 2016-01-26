@@ -1,8 +1,9 @@
+####!python
+####cython: boundscheck=False
+####cython: wraparound=False
 import numpy as np
 cimport numpy as np
 cimport cython
-#cython: boundscheck=False
-#cython: wraparound=False
 from libcpp.vector cimport vector
 
 ctypedef np.complex128_t complex_t
@@ -194,6 +195,102 @@ def LU_oe_HelmholtzN_1D(np.int_t N,
             d1[i+1] = s[i+1] - L[i]*d2[i]
         if i < M-2:
             d2[i+1] = g[i+1] - L[i]*d2[i]
+
+def Solve_Helmholtz_3D_n(np.int_t N,
+                       bint neumann,
+                       np.ndarray[complex_t, ndim=3] fk,
+                       np.ndarray[complex_t, ndim=3] uk,
+                       np.ndarray[real_t, ndim=4] d0,
+                       np.ndarray[real_t, ndim=4] d1,
+                       np.ndarray[real_t, ndim=4] d2,
+                       np.ndarray[real_t, ndim=4] L):
+    cdef:
+        int i, j, k, M, ke, ko, ii
+        np.ndarray[complex_t, ndim=3] y = np.zeros((uk.shape[0], uk.shape[1], uk.shape[2]), dtype=uk.dtype)
+        np.ndarray[complex_t, ndim=2] s1 = np.zeros((uk.shape[1], uk.shape[2]), dtype=uk.dtype)
+        np.ndarray[complex_t, ndim=2] s2 = np.zeros((uk.shape[1], uk.shape[2]), dtype=uk.dtype)
+        
+    M = d0.shape[1]
+    for j in xrange(uk.shape[1]):
+        for k in xrange(uk.shape[2]):
+            y[0, j, k] = fk[0, j, k]
+            y[1, j, k] = fk[1, j, k]
+            
+    if neumann:
+        for i in xrange(1, M):
+            for j in xrange(uk.shape[1]):
+                for k in xrange(uk.shape[2]):
+                    ke = 2*i
+                    ko = ke+1
+                    y[ke, j, k] = fk[ke, j, k] - L[0, i-1, j, k]*y[ke-2, j, k]
+                    if i < M-1:
+                        y[ko, j, k] = fk[ko, j, k] - L[1, i-1, j, k]*y[ko-2, j, k]
+            
+        for j in xrange(uk.shape[1]):
+            for k in xrange(uk.shape[2]):        
+                ke = 2*(M-1)
+                uk[ke, j, k] = y[ke, j, k] / d0[0, M-1, j, k]    
+        
+        for i in xrange(M-2, -1, -1):
+            for j in xrange(uk.shape[1]):
+                for k in xrange(uk.shape[2]):
+                    ke = 2*i
+                    ko = ke+1
+                    uk[ke, j, k] = y[ke, j, k] - d1[0, i, j, k]*uk[ke+2, j, k]
+                    if i == M-2:
+                        uk[ko, j, k] = y[ko, j, k]
+                    else:
+                        uk[ko, j, k] = y[ko, j, k] - d1[1, i, j, k]*uk[ko+2, j, k]
+                    
+                    if i < M-2:
+                        s1[j, k] += uk[ke+4, j, k]
+                        uk[ke, j, k] -= s1[j, k]*d2[0, i, j, k]
+                    if i < M-3:
+                        s2[j, k] += uk[ko+4, j, k]
+                        uk[ko, j, k] -= s2[j, k]*d2[1, i, j, k]
+                    
+                    uk[ke, j, k] /= d0[0, i, j, k]
+                    uk[ko, j, k] /= d0[1, i, j, k]
+        
+        for i in xrange(N-3):
+            ii = (i+1)*(i+1)
+            for j in xrange(uk.shape[1]):
+                for k in xrange(uk.shape[2]):
+                    uk[i, j, k] = uk[i, j, k] / ii
+
+        
+    else:
+        for i in xrange(1, M):
+            for j in xrange(uk.shape[1]):
+                for k in xrange(uk.shape[2]):
+                    ke = 2*i
+                    ko = ke+1
+                    y[ke, j, k] = fk[ke, j, k] - L[0, i-1, j, k]*y[ke-2, j, k]
+                    y[ko, j, k] = fk[ko, j, k] - L[1, i-1, j, k]*y[ko-2, j, k]
+            
+        for j in xrange(uk.shape[1]):
+            for k in xrange(uk.shape[2]):        
+                ke = 2*(M-1)
+                ko = ke+1            
+                uk[ke, j, k] = y[ke, j, k] / d0[0, M-1, j, k]    
+                uk[ko, j, k] = y[ko, j, k] / d0[1, M-1, j, k]    
+        
+        for i in xrange(M-2, -1, -1):
+            for j in xrange(uk.shape[1]):
+                for k in xrange(uk.shape[2]):
+                    ke = 2*i
+                    ko = ke+1
+                    uk[ke, j, k] = y[ke, j, k] - d1[0, i, j, k]*uk[ke+2, j, k]
+                    uk[ko, j, k] = y[ko, j, k] - d1[1, i, j, k]*uk[ko+2, j, k]
+                    
+                    if i < M-2:
+                        s1[j, k] += uk[ke+4, j, k]
+                        s2[j, k] += uk[ko+4, j, k]
+                        uk[ke, j, k] -= s1[j, k]*d2[0, i, j, k]
+                        uk[ko, j, k] -= s2[j, k]*d2[1, i, j, k]
+                    uk[ke, j, k] /= d0[0, i, j, k]
+                    uk[ko, j, k] /= d0[1, i, j, k]
+
 
 
 def Solve_Helmholtz_3D_complex(np.int_t N,
@@ -652,10 +749,10 @@ def Mult_CTD_1D(np.int_t N,
         real pi = np.pi
         double complex sum_u0, sum_u1, sum_u2, sum_u3 
         
-    sum_u0 = 0.0+0.0*1j
-    sum_u1 = 0.0+0.0*1j
-    sum_u2 = 0.0+0.0*1j
-    sum_u3 = 0.0+0.0*1j
+    sum_u0 = 0.0
+    sum_u1 = 0.0
+    sum_u2 = 0.0
+    sum_u3 = 0.0
     
     bv[N-1] = 0.0
     bv[N-2] = -2.*(N-1)*v_hat[N-3]
@@ -835,45 +932,31 @@ def LU_oe_Biharmonic_1D(bint odd,
         if kk < M-1:
             u1[kk] = c0[kk+1]
         if kk < M-2:
-            u2[kk] = c0[kk+2]
-
+            u2[kk] = c0[kk+2]    
 
 cdef ForwardBsolve_L(np.ndarray[T, ndim=1] y, 
                      np.ndarray[real_t, ndim=1] l0,
                      np.ndarray[real_t, ndim=1] l1,
                      np.ndarray[T, ndim=1] fk):
     # Solve Forward Ly = f
-    cdef int i
+    cdef np.intp_t i, N
     y[0] = fk[0]
     y[1] = fk[1] - l0[0]*y[0]
-    for i in xrange(2, y.size):
+    N = l0.shape[0]
+    for i in xrange(2, N):
         y[i] = fk[i] - l0[i-1]*y[i-1] - l1[i-2]*y[i-2]
-
-cdef ForwardBsolve_L2(np.ndarray[real_t, ndim=1] l0,
-                     np.ndarray[real_t, ndim=1] l1,
-                     np.ndarray[T, ndim=1] fk):
-    # Solve Forward Ly = f, put result in fk
-    cdef:
-        int i
-        T y0, y1
-    y0 = fk[0]
-    fk[1] = fk[1] - l0[0]*y0
-    for i in xrange(2, l0.shape[0]+1):
-        y1 = fk[i-1]
-        fk[i] -= (l0[i-1]*y1 + l1[i-2]*y0)
-        y0 = y1
 
 cdef ForwardBsolve_L3_c(vector[double complex]& y, 
                      np.ndarray[real_t, ndim=1] l0,
                      np.ndarray[real_t, ndim=1] l1,
                      np.ndarray[complex_t, ndim=1] fk):
     # Solve Forward Ly = f
-    cdef int i
+    cdef np.intp_t i, N
     y[0] = fk[0]
     y[1] = fk[1] - l0[0]*y[0]
-    for i in xrange(2, y.size()):
+    N = l0.shape[0]
+    for i in xrange(2, N):
         y[i] = fk[i] - l0[i-1]*y[i-1] - l1[i-2]*y[i-2]
-
 
 def LUC_Biharmonic_1D(np.ndarray[real_t, ndim=2] A,
                       np.ndarray[real_t, ndim=3] U,
@@ -1096,12 +1179,13 @@ def Solve_oe_Biharmonic_1D(bint odd,
     """
     cdef:
         unsigned int M
+        np.ndarray[T, ndim=1] y = np.zeros(u0.shape[0], dtype=fk.dtype)
             
-    M = u0.shape[0]  
-    ForwardBsolve_L2(l0, l1, fk)
+    M = u0.shape[0]
+    ForwardBsolve_L(y, l0, l1, fk)
     
     # Solve Backward U u = y 
-    BackBsolve_U(M, odd, fk, uk, u0, u1, u2, l0, l1, a, b, ac)
+    BackBsolve_U(M, odd, y, uk, u0, u1, u2, l0, l1, a, b, ac)
     
 cdef BackBsolve_U(int M,
                   bint odd, 
@@ -1252,3 +1336,94 @@ def LU_Biharmonic_3D(np.float_t a0,
                             l0[:, :, ii, jj],
                             l1[:, :, ii, jj])
             
+
+def Solve_oe_Biharmonic_1D(bint odd,
+                           np.ndarray[T, ndim=1] fk,
+                           np.ndarray[T, ndim=1] uk,
+                           np.ndarray[real_t, ndim=1] u0,
+                           np.ndarray[real_t, ndim=1] u1,
+                           np.ndarray[real_t, ndim=1] u2,
+                           np.ndarray[real_t, ndim=1] l0,
+                           np.ndarray[real_t, ndim=1] l1,
+                           np.ndarray[real_t, ndim=1] a,
+                           np.ndarray[real_t, ndim=1] b,
+                           np.float_t ac):
+    """
+    Solve (aS+b*A+cB)x = f, where S, A and B are 4th order Laplace, stiffness and mass matrices of Shen with Dirichlet BC
+    """
+    cdef:
+        unsigned int M
+        np.ndarray[T, ndim=1] y = np.zeros(u0.shape[0], dtype=fk.dtype)
+            
+    M = u0.shape[0]
+    ForwardBsolve_L(y, l0, l1, fk)
+    
+    # Solve Backward U u = y 
+    BackBsolve_U(M, odd, y, uk, u0, u1, u2, l0, l1, a, b, ac)
+
+@cython.cdivision(True)
+def Solve_Biharmonic_3D_n(np.ndarray[T, ndim=3] fk,
+                        np.ndarray[T, ndim=3] uk,
+                        np.ndarray[real_t, ndim=4] u0,
+                        np.ndarray[real_t, ndim=4] u1,
+                        np.ndarray[real_t, ndim=4] u2,
+                        np.ndarray[real_t, ndim=4] l0,
+                        np.ndarray[real_t, ndim=4] l1,
+                        np.ndarray[real_t, ndim=4] a,
+                        np.ndarray[real_t, ndim=4] b,
+                        np.float_t ac):
+    
+    cdef:
+        int i, j, k, kk, m, M, ke, ko, jj
+        np.ndarray[T, ndim=2] s1 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+        np.ndarray[T, ndim=2] s2 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+        np.ndarray[T, ndim=2] o1 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+        np.ndarray[T, ndim=2] o2 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+        np.ndarray[T, ndim=3] y = np.zeros((fk.shape[0], fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+
+
+    M = u0.shape[1]
+    for j in range(fk.shape[1]):
+        for k in range(fk.shape[2]):
+            y[0, j, k] = fk[0, j, k]
+            y[1, j, k] = fk[1, j, k]
+            y[2, j, k] = fk[2, j, k] - l0[0, 0, j, k]*y[0, j, k]
+            y[3, j, k] = fk[3, j, k] - l0[1, 0, j, k]*y[1, j, k]
+            
+    for i in xrange(2, M):
+        for j in range(fk.shape[1]):
+            for k in range(fk.shape[2]): 
+                ke = 2*i
+                ko = ke+1
+                y[ko, j, k] = fk[ko, j, k] - l0[1, i-1, j, k]*y[ko-2, j, k] - l1[1, i-2, j, k]*y[ko-4, j, k]
+                y[ke, j, k] = fk[ke, j, k] - l0[0, i-1, j, k]*y[ke-2, j, k] - l1[0, i-2, j, k]*y[ke-4, j, k]
+    
+    for j in range(fk.shape[1]):
+        for k in range(fk.shape[2]):
+            ke = 2*(M-1)
+            ko = ke+1
+            uk[ke, j, k] = y[ke, j, k] / u0[0, M-1, j, k]
+            uk[ko, j, k] = y[ko, j, k] / u0[1, M-1, j, k]
+            ke = 2*(M-2)
+            ko = ke+1
+            uk[ke, j, k] = (y[ke, j, k] - u1[0, M-2, j, k]*uk[ke+2, j, k]) / u0[0, M-2, j, k]
+            uk[ko, j, k] = (y[ko, j, k] - u1[1, M-2, j, k]*uk[ko+2, j, k]) / u0[1, M-2, j, k]
+            ke = 2*(M-3)
+            ko = ke+1
+            uk[ke, j, k] = (y[ke, j, k] - u1[0, M-3, j, k]*uk[ke+2, j, k] - u2[0, M-3, j, k]*uk[ke+4, j, k]) / u0[0, M-3, j, k]
+            uk[ko, j, k] = (y[ko, j, k] - u1[1, M-3, j, k]*uk[ko+2, j, k] - u2[1, M-3, j, k]*uk[ko+4, j, k]) / u0[1, M-3, j, k]
+            
+    
+    for kk in xrange(M-4, -1, -1):
+        for j in range(fk.shape[1]):
+            for k in range(fk.shape[2]):
+                ke = 2*kk
+                ko = ke+1
+                jj = ke+6
+                s1[j, k] += uk[jj, j, k]/(jj+3.)
+                s2[j, k] += (uk[jj, j, k]/(jj+3.))*((jj+2.)*(jj+2.))
+                uk[ke, j, k] = (y[ke, j, k] - u1[0, kk, j, k]*uk[ke+2, j, k] - u2[0, kk, j, k]*uk[ke+4, j, k] - a[0, kk, j, k]*ac*s1[j, k] - b[0, kk, j, k]*ac*s2[j, k]) / u0[0, kk, j, k]
+                jj = ko+6
+                o1[j, k] += uk[jj, j, k]/(jj+3.)
+                o2[j, k] += (uk[jj, j, k]/(jj+3.))*((jj+2.)*(jj+2.))
+                uk[ko, j, k] = (y[ko, j, k] - u1[1, kk, j, k]*uk[ko+2, j, k] - u2[1, kk, j, k]*uk[ko+4, j, k] - a[1, kk, j, k]*ac*o1[j, k] - b[1, kk, j, k]*ac*o2[j, k]) / u0[1, kk, j, k]

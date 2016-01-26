@@ -56,10 +56,35 @@ def PDMA_Symsolve(np.ndarray[np.float64_t, ndim=1] d, np.ndarray[np.float64_t, n
         b[k] -= (e[k]*b[k+2] + f[k]*b[k+4])
 
 def PDMA_Symsolve3D(np.ndarray[np.float64_t, ndim=1] d, np.ndarray[np.float64_t, ndim=1] e, 
-                    np.ndarray[np.float64_t, ndim=1] f, np.ndarray[T, ndim=3] u):
+                    np.ndarray[np.float64_t, ndim=1] f, np.ndarray[T, ndim=3] b):
     cdef:
-        unsigned int ii, jj
+        int i, j, k
+        int n = d.shape[0]
         
-    for ii in range(u.shape[1]):
-        for jj in range(u.shape[2]):
-            PDMA_Symsolve(d, e, f, u[:, ii, jj])
+    for i in xrange(b.shape[1]):
+        for j in xrange(b.shape[2]):
+            #PDMA_Symsolve(d, e, f, b[:, i, j])        
+            b[2, i, j] -= e[0]*b[0, i, j]
+            b[3, i, j] -= e[1]*b[1, i, j]    
+        
+    for k in xrange(4, n):
+        for i in xrange(b.shape[1]):
+            for j in xrange(b.shape[2]):
+                b[k, i, j] -= (e[k-2]*b[k-2, i, j] + f[k-4]*b[k-4, i, j])
+        
+    for i in xrange(b.shape[1]):
+        for j in xrange(b.shape[2]):
+            b[n-1, i, j] /= d[n-1]
+            b[n-2, i, j] /= d[n-2]    
+            b[n-3, i, j] /= d[n-3] 
+            b[n-3, i, j] -= e[n-3]*b[n-1, i, j]
+            b[n-4, i, j] /= d[n-4]
+            b[n-4, i, j] -= e[n-4]*b[n-2, i, j]    
+
+    for k in xrange(n-5,-1,-1):
+        for i in xrange(b.shape[1]):
+            for j in xrange(b.shape[2]):            
+                b[k, i, j] /= d[k] 
+                b[k, i, j] -= (e[k]*b[k+2, i, j] + f[k]*b[k+4, i, j])
+
+

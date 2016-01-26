@@ -1,9 +1,8 @@
 import pytest
 from cbcdns.shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ChebyshevTransform, ShenBiharmonicBasis
-from cbcdns.shen.la import TDMA, Helmholtz
+from cbcdns.shen.la import TDMA, Helmholtz, Biharmonic
 from cbcdns.shen.Matrices import BNNmat, BTTmat, BDDmat, CDDmat, CDNmat, BNDmat, CNDmat, BDNmat, ADDmat, ANNmat, CTDmat, BDTmat, CDTmat, BTDmat, BTNmat, BBBmat, ABBmat, SBBmat, CDBmat, CBDmat, ATTmat, BBDmat
 from cbcdns.shen import SFTc
-from cbcdns.shen.la import Biharmonic
 from scipy.linalg import solve
 
 from cbcdns import config
@@ -796,17 +795,18 @@ def test_ABBmat(SB):
     b = A.matvec(u0_hat) - k**2*B.matvec(u0_hat)
     alfa = np.ones((M, 4, 4))
     
-    BH = Biharmonic(M, 0, alfa[0], -k2[0], SB.quad)
-    z0_hat = np.zeros((M, 4, 4))
+    BH = Biharmonic(M, 0, alfa[0], -k2[0], SB.quad, "cython")
+    z0_hat = np.zeros((M, 4, 4), dtype=np.complex)
     z0_hat = BH(z0_hat, b)    
     z0 = np.zeros((M, 4, 4))
-    z0 = SB.ifst(z0_hat, z0)
+    z0 = SB.ifst(z0_hat.real, z0)
     #from IPython import embed; embed()
     assert np.allclose(z0, u0)
     
 
-#test_ABBmat(ShenBiharmonicBasis("GL"))
+#test_ABBmat(ShenBiharmonicBasis("GC"))
 
+#@profile
 def test_Helmholtz(ST2):
     M = 4*N
     kx = 12
@@ -857,11 +857,12 @@ def test_Helmholtz(ST2):
     u0_hat = H(u0_hat, f_hat)
     u0 = np.zeros((M, 4, 4), dtype=np.complex)
     u0 = ST2.ifst(u0_hat, u0)
+    #from IPython import embed; embed()
     
     assert np.linalg.norm(u0[:, 2, 2].real - u1)/(M*16) < 1e-12
     assert np.linalg.norm(u0[:, 2, 2].imag - u1)/(M*16) < 1e-12
 
-#test_Helmholtz(ShenDirichletBasis("GC"))
+#test_Helmholtz(ShenNeumannBasis("GC"))
 
 def test_Helmholtz2(SD):
     M = 2*N

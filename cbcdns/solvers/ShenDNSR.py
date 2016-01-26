@@ -7,7 +7,8 @@ from spectralinit import *
 from ShenDNS import *
 from ..shen.Matrices import CDTmat, CTDmat, BDTmat, BTDmat, BTTmat, BTNmat, CNDmat, BNDmat
 
-hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5", 
+hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, 
+                      config.solver+".h5", 
                       mesh={"x": points, "xp": pointsp, "y": x1, "z": x2})  
 
 CDT = CDTmat(K[0, :, 0, 0])
@@ -22,7 +23,7 @@ BND = BNDmat(K[0, :, 0, 0], SN.quad)
 dd = BTT.dd.repeat(array(P_hat.shape[1:]).prod()).reshape(P_hat.shape)
 
 #@profile
-def pressuregrad(P_hat, dU):
+def pressuregrad(P, P_hat, dU):
     # Pressure gradient x-direction
     dU[0] -= CDT.matvec(P_hat)
     
@@ -76,6 +77,9 @@ def updatepressure(P_hat, Pcorr, U_hat):
     P_hat -= nu*CTD.matvec(U_hat[0])/dd
     P_hat -= nu*1j*K[1]*BTD.matvec(U_hat[1])/dd
     P_hat -= nu*1j*K[2]*BTD.matvec(U_hat[2])/dd
+
+# Update ComputeRHS to use current pressuregrad
+ComputeRHS.func_globals['pressuregrad'] = pressuregrad
 
 #@profile
 pressure_error = zeros(1)

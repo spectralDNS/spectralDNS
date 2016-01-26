@@ -30,7 +30,7 @@ class Helmholtz(object):
 
     def __call__(self, u, b):
         if len(u.shape) > 1:
-            SFTc.Solve_Helmholtz_3D_complex(self.N, self.neumann, b[self.s], u[self.s], self.u0, self.u1, self.u2, self.L)
+            SFTc.Solve_Helmholtz_3D_n(self.N, self.neumann, b[self.s], u[self.s], self.u0, self.u1, self.u2, self.L)
         else:
             if u.dtype == complex128:
                 SFTc.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s].real, u[self.s].real, self.u0, self.u1, self.u2, self.L)
@@ -179,7 +179,7 @@ class Biharmonic(object):
                         u[:-4:2, i, j] = lu_solve(self.Le[i][j], b[:-4:2, i, j])
                         u[1:-4:2, i, j] = lu_solve(self.Lo[i][j], b[1:-4:2, i, j])
             else:
-                SFTc.Solve_Biharmonic_3D_c(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
+                SFTc.Solve_Biharmonic_3D_n(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
         else:
             if self.solver == "scipy":
                 u[:-4:2] = lu_solve(self.Le, b[:-4:2])
