@@ -39,6 +39,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST, U_tmp
                ST, SN, X, N, comm, rank, L, conv, TDMASolverD, F_tmp, H, H1, **kw):        
     OS = OrrSommerfeld(Re=config.Re, N=100)
     initOS(OS, U0, U_hat0, X)
+    
     if not config.solver in ("ChannelRK4", "KMM", "KMMRK3"):
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
@@ -130,7 +131,7 @@ def set_Source(Source, Sk, FST, ST, **kw):
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
         
 im1, im2, im3, im4 = (None, )*4        
-def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, **kw):
+def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, U_hat, **kw):
     global im1, im2, im3, im4
     if im1 is None and rank == 0 and config.plot_step > 0:
         plt.figure()
@@ -154,6 +155,14 @@ def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, **kw):
         
         plt.pause(1e-6)
         globals().update(im1=im1, im2=im2, im3=im3, im4=im4)
+
+    if (config.tstep % config.plot_step == 0 or
+        config.tstep % config.compute_energy == 0):
+        
+        U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
+        for i in range(1, 3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)     
+
     
     if config.tstep % config.plot_step == 0 and rank == 0 and config.plot_step > 0:
         im1.ax.clear()
