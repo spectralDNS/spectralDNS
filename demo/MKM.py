@@ -194,11 +194,6 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K, H1
         
         U0[:] = f["3D/checkpoint/U/1"][:, s]
         P [:] = f["3D/checkpoint/P/1"][s]
-        #U0[0] += 0.01*random.randn(*U0[0].shape)
-        #if rank == 0:
-            #U0[:, 0] = 0
-        #if rank == num_processes-1:
-            #U0[:, -1] = 0
 
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
@@ -208,7 +203,7 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K, H1
         else:
             P_hat = FST.fst(P, P_hat, SN)
 
-    elif config.solver == "KMM":
+    elif "KMM" in config.solver:
         U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB'])
         for i in range(1,3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
@@ -222,7 +217,7 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K, H1
         
         g = kw['g']
         g[:] = 1j*K[1]*U_hat0[2] - 1j*K[2]*U_hat0[1]
-        
+        U_hat[:] = U_hat0[:]        
         
     f.close()
 
@@ -249,7 +244,8 @@ def Q(u, rank, comm, N):
         return 0
 
 beta = zeros(1)    
-def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk, ST, U_tmp, F_tmp, comm, N, **kw):
+def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk, 
+           ST, SB, U_tmp, F_tmp, comm, N, dU, **kw):
     global im1, im2, im3, flux
 
     #q = Q(U[1], rank, comm, N)
@@ -267,6 +263,16 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk
     #Source[:] += 0.05*random.randn(*U.shape)
     #for i in range(3):
         #Sk[i] = FST.fss(Source[i], Sk[i], ST)
+        
+    if (config.tstep % config.write_result == 0 or
+        config.tstep % config.write_yz_slice[1] == 0 or
+        config.tstep % config.checkpoint == 0 or
+        config.tstep % config.plot_result == 0 or
+        config.tstep % config.compute_energy == 0):
+        
+        U[0] = FST.ifst(U_hat[0], U[0], SB)
+        for i in range(1, 3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)     
         
     if config.tstep % config.print_energy0 == 0 and rank == 0:
         print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 2))
@@ -451,10 +457,10 @@ if __name__ == "__main__":
     config.Shen.add_argument("--print_energy0", type=int, default=100)
     solver = get_solver(update=update, family="Shen")    
     #initialize(**vars(solver))    
-    init_from_file("KMM666t2.h5", **vars(solver))
+    init_from_file("KMM666t.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, fromstats="KMMstats")
-    solver.hdf5file.fname = "KMM666t.h5"
+    solver.hdf5file.fname = "KMM666t3.h5"
     solver.solve()
     s = solver.stats.get_stats()
 

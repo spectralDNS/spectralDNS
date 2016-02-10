@@ -4,7 +4,7 @@ __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
-from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, CNDmat
+from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, CNDmat, HelmholtzCoeff
 from ..shen.Helmholtz import Helmholtz, TDMA
 from ..shen import SFTc
 
@@ -24,6 +24,7 @@ BDN = BDNmat(K[0, :, 0, 0], ST.quad)
 CDD = CDDmat(K[0, :, 0, 0])
 BDD = BDDmat(K[0, :, 0, 0], ST.quad)
 BDT = BDTmat(K[0, :, 0, 0], SN.quad)
+AB = HelmholtzCoeff(K[0, :, 0, 0], -1.0, -alfa, ST.quad)
 
 U_pad = empty((3,)+FST.real_shape_padded())
 U_pad2 = empty((3,)+FST.real_shape_padded())
@@ -380,9 +381,9 @@ def ComputeRHS(dU, jj):
         
         # Compute diffusion
         diff0[:] = 0
-        SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, U_hat0[0], diff0[0])
-        SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, U_hat0[1], diff0[1])
-        SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, U_hat0[2], diff0[2])    
+        diff0[0] = AB.matvec(U_hat0[0], diff0[0])
+        diff0[1] = AB.matvec(U_hat0[1], diff0[1])
+        diff0[2] = AB.matvec(U_hat0[2], diff0[2])
     
     H_hat0[:] = 1.5*H_hat - 0.5*H_hat1
 

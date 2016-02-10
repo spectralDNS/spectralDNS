@@ -10,32 +10,32 @@ def initialize(config, **kw):
     else:
         initialize2(**kw)
         
-def initialize1(U, U_hat, X, sin, cos, fftn_mpi, **kw):    
+def initialize1(U, U_hat, X, sin, cos, FFT, **kw):    
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0 
     for i in range(3):
-        U_hat[i] = fftn_mpi(U[i], U_hat[i])
+        U_hat[i] = FFT.fftn(U[i], U_hat[i])
         
-def initialize2(U, W, W_hat, X, sin, cos, fftn_mpi, ifftn_mpi, F_tmp, 
+def initialize2(U, W, W_hat, X, sin, cos, FFT, F_tmp, 
                 cross2, K, **kw):
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0         
     for i in range(3):
-        F_tmp[i] = fftn_mpi(U[i], F_tmp[i])
+        F_tmp[i] = FFT.fftn(U[i], F_tmp[i])
 
     W_hat[:] = cross2(W_hat, K, F_tmp)
     for i in range(3):
-        W[i] = ifftn_mpi(W_hat[i], W[i])        
+        W[i] = FFT.ifftn(W_hat[i], W[i])        
 
 k = []
 w = []
 def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, float64, dx, L, sum, 
-           hdf5file, ifftn_mpi, **kw):
+           hdf5file, FFT, **kw):
     global k, w
     if tstep % config.write_result == 0 or tstep % config.write_yz_slice[1] == 0:
-        P[:] = ifftn_mpi(P_hat*1j, P)
+        P[:] = FFT.ifftn(P_hat*1j, P)
         hdf5file.write(tstep)
 
     if tstep % config.compute_energy == 0:
@@ -62,7 +62,7 @@ def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, **kw):
 if __name__ == "__main__":
     config.update(
         {
-        'nu': 0.00625,             # Viscosity
+        'nu': 0.000625,             # Viscosity
         'dt': 0.01,                 # Time step
         'T': 0.1,                   # End time
         'L': [2*pi, 2*pi, 2*pi],

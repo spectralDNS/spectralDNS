@@ -110,7 +110,6 @@ class ChebyshevTransform(object):
             
         return cj
 
-    #@profile
     def ifct(self, fk, cj):
         """Inverse fast Chebyshev transform."""
         if self.quad == "GC":
@@ -148,7 +147,6 @@ class ShenDirichletBasis(ChebyshevTransform):
     def __init__(self, quad="GL", fast_transform=True):
         ChebyshevTransform.__init__(self, quad=quad, fast_transform=fast_transform)
         self.N = -1
-        self.ck = None
         self.w_hat = None
         self.Solver = TDMA(quad, False)
         
@@ -169,6 +167,7 @@ class ShenDirichletBasis(ChebyshevTransform):
             kk = np.mgrid[:N[0]-2, :N[1], :N[2]].astype(float)
             return kk[0]
 
+    #@profile
     def fastShenScalar(self, fj, fk):
                 
         if self.fast_transform:
@@ -180,6 +179,7 @@ class ShenDirichletBasis(ChebyshevTransform):
         fk[-2:] = 0     # Last two not used by Shen
         return fk
         
+    #@profile
     def ifst(self, fk, fj):
         """Fast inverse Shen transform
         Transform needs to take into account that phi_k = T_k - T_{k+2}
@@ -194,9 +194,12 @@ class ShenDirichletBasis(ChebyshevTransform):
             if self.w_hat is None:
                 self.w_hat = fk.copy()
                 
-            self.w_hat[:] = 0
+            self.w_hat[-2:] = 0
             self.w_hat[:-2] = fk[:-2] 
             self.w_hat[2:] -= fk[:-2] 
+            #self.w_hat[:2] = fk[:2]
+            #self.w_hat[2:] = fk[2:]-fk[:-2]  
+            
             fj = self.ifct(self.w_hat, fj)
             return fj    
         
@@ -204,6 +207,7 @@ class ShenDirichletBasis(ChebyshevTransform):
             if self.points is None: self.init(fj.shape[0])
             return np.dot(self.V.T, fk[:-2])
 
+    #@profile
     def fst(self, fj, fk):
         """Fast Shen transform
         """

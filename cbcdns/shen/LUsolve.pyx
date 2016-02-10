@@ -196,6 +196,7 @@ def LU_oe_HelmholtzN_1D(np.int_t N,
         if i < M-2:
             d2[i+1] = g[i+1] - L[i]*d2[i]
 
+# Fastest version
 def Solve_Helmholtz_3D_n(np.int_t N,
                        bint neumann,
                        np.ndarray[complex_t, ndim=3] fk,
@@ -293,6 +294,7 @@ def Solve_Helmholtz_3D_n(np.int_t N,
 
 
 
+# This version slow due to slices. Could be vastly improved using memoryviews
 def Solve_Helmholtz_3D_complex(np.int_t N,
                        bint neumann,
                        np.ndarray[complex_t, ndim=3] fk,
@@ -531,96 +533,6 @@ def Mult_oe_Helmholtz_1D(np.int_t N,
             b[2*i+odd] += factor*sum_u0*g[i]
     b[odd] += factor*(d[0]*u_hat[odd] + s[0]*u_hat[odd+2] + (sum_u0+u_hat[odd+4])*g[0])
 
-
-def Mult_Mass_3D_complex(np.int_t N,
-                         bint GC, np.float_t factor,
-                         np.ndarray[complex_t, ndim=3] u_hat,
-                         np.ndarray[complex_t, ndim=3] b):
-    cdef:
-        unsigned int ii, jj
-        
-    for ii in range(u_hat.shape[1]):
-        for jj in range(u_hat.shape[2]):
-            Mult_Mass_1D(N, GC, factor,
-                              u_hat[:, ii, jj].real,
-                              b[:, ii, jj].real)
-            Mult_Mass_1D(N, GC, factor,
-                              u_hat[:, ii, jj].imag,
-                              b[:, ii, jj].imag)
-
-
-def Mult_Mass_3D(np.int_t N,
-                 bint GC,
-                 np.float_t factor,
-                 np.ndarray[real_t, ndim=3] u_hat,
-                 np.ndarray[real_t, ndim=3] b):
-    cdef:
-        unsigned int ii, jj
-        
-    for ii in range(u_hat.shape[1]):
-        for jj in range(u_hat.shape[2]):
-            Mult_Helmholtz_1D(N, GC, factor,
-                              u_hat[:, ii, jj],
-                              b[:, ii, jj])
-    
-
-def Mult_Mass_1D(np.int_t N,
-                 bint GC,
-                 np.float_t factor,
-                 np.ndarray[real_t, ndim=1] u_hat,
-                 np.ndarray[real_t, ndim=1] b):
-    Mult_oe_Mass_1D(N, 0, GC, factor, u_hat, b)
-    Mult_oe_Mass_1D(N, 1, GC, factor, u_hat, b)
-
-
-def Mult_oe_Mass_1D(np.int_t N,
-                    bint odd,
-                    bint GC,
-                    np.float_t factor,
-                    np.ndarray[real_t, ndim=1] u_hat,
-                    np.ndarray[real_t, ndim=1] b):
-    cdef:
-        unsigned int M
-        int i
-        int c0 = 0
-        real pi = np.pi
-        vector[real] d, s, g, bij
-        real sum_u0 = 0.0
-                
-    if not odd:
-        M = (N-3)/2
-    else:
-        M = (N-4)/2
-        
-    # Direct matvec using the fact that there are only three unique diagonals in matrix
-    for i in range(M+1):
-        bij.push_back(pi)
-    
-    if odd == 0:
-        bij[0] *= 1.5
-        if N % 2 == 1 and GC:
-            bij[M] *= 1.5
-    
-    else:
-        if N % 2 == 0 and GC:
-            bij[M] *= 1.5
-        
-    d.resize(M+1)
-    s.resize(M)
-
-    if odd == 1:
-        c0 = 1
-        
-    for i in xrange(M+1):
-        d[i] = bij[i]
-        if i < M:
-            s[i] = - pi/2
-            
-    b[2*M+odd] += factor*(-pi/2*u_hat[2*M+odd-2] + d[M]*u_hat[2*M+odd])
-    for i in xrange(M-1, 0, -1):
-        b[2*i+odd] += factor*(-pi/2*u_hat[2*i+odd-2] + d[i]*u_hat[2*i+odd] + s[i]*u_hat[2*i+odd+2])
-    b[odd] += factor*(d[0]*u_hat[odd] + s[0]*u_hat[odd+2])
-    
 
 def Mult_Div_3D(np.int_t N,
                 np.ndarray[real_t, ndim=2] m,
@@ -1361,6 +1273,7 @@ def Solve_oe_Biharmonic_1D(bint odd,
     # Solve Backward U u = y 
     BackBsolve_U(M, odd, y, uk, u0, u1, u2, l0, l1, a, b, ac)
 
+# This one is fastest by far
 @cython.cdivision(True)
 def Solve_Biharmonic_3D_n(np.ndarray[T, ndim=3] fk,
                         np.ndarray[T, ndim=3] uk,

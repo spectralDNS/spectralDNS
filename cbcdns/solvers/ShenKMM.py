@@ -4,7 +4,7 @@ __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
-from ..shen.Matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, ADDmat, BDDmat, CDBmat, BiharmonicCoeff
+from ..shen.Matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, ADDmat, BDDmat, CDBmat, BiharmonicCoeff, HelmholtzCoeff
 from ..shen.la import Helmholtz, TDMA, Biharmonic
 from ..shen import SFTc
 
@@ -18,8 +18,6 @@ BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0], -(K2[0] + nu*dt/
 HelmholtzSolverP = Helmholtz(N[0], sqrt(K2[0]), SN.quad, True)
 HelmholtzSolverU0 = Helmholtz(N[0], sqrt(2./nu/dt), ST.quad, False)
 
-AC = BiharmonicCoeff(K[0, :, 0, 0], nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad)
-
 U_pad = empty((3,)+FST.real_shape_padded())
 U_pad2 = empty((3,)+FST.real_shape_padded())
 H_pad = empty((3,)+FST.real_shape_padded())
@@ -32,6 +30,9 @@ TDMASolverD = TDMA(ST.quad, False)
 
 alfa = K2[0] - 2.0/nu/dt
 CDD = CDDmat(K[0, :, 0, 0])
+
+AB = HelmholtzCoeff(K[0, :, 0, 0], -1.0, -alfa, ST.quad)
+AC = BiharmonicCoeff(K[0, :, 0, 0], nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad)
 
 # Matrics for biharmonic equation
 CBD = CBDmat(K[0, :, 0, 0])
@@ -151,7 +152,7 @@ def standardConvection(c, U, U_hat):
     
     return c
 
-def standardConvection_padded(c, U, U_hat):
+def standardConvection_padded(c, U_hat):
     c[:] = 0
     U_pad[:] = 0
     U_pad2[:] = 0
@@ -250,7 +251,7 @@ def divergenceConvection(c, U, U_hat, add=False):
 
     return c    
 
-def divergenceConvection_padded(c, U, U_hat, add=False):
+def divergenceConvection_padded(c, U_hat, add=False):
     """c_i = div(u_i u_j)"""
     if not add: c.fill(0)
     U_pad[0] = FST.ifst_padded(U_hat[0]*dealias, U_pad[0], SB)
@@ -302,7 +303,7 @@ def getConvection(convection):
                     
                 H_hat = standardConvection(H_hat, U_dealiased, U_hat)            
             else:
-                H_hat = standardConvection_padded(H_hat, U, U_hat)
+                H_hat = standardConvection_padded(H_hat, U_hat)
             H_hat[:] *= -1; H[:] *= -1
             return H_hat
         
@@ -315,7 +316,7 @@ def getConvection(convection):
                     U_dealiased[i] = FST.ifst(U_hat[i]*dealias, U_dealiased[i], ST)                
                 H_hat = divergenceConvection(H_hat, U_dealiased, U_hat, False)
             else:
-                H_hat = divergenceConvection_padded(H_hat, U, U_hat, False)                
+                H_hat = divergenceConvection_padded(H_hat, U_hat, False)                
             H_hat[:] *= -1; H[:] *= -1
             return H_hat
         
@@ -331,8 +332,8 @@ def getConvection(convection):
                 H_hat = divergenceConvection(H_hat, U_dealiased, U_hat, True)        
             
             else:
-                H_hat = standardConvection_padded(H_hat, U, U_hat)
-                H_hat = divergenceConvection_padded(H_hat, U, U_hat, True)        
+                H_hat = standardConvection_padded(H_hat, U_hat)
+                H_hat = divergenceConvection_padded(H_hat, U_hat, True)        
             H_hat *= -0.5; H[:] *= -0.5
             return H_hat
 
@@ -357,8 +358,20 @@ def getConvection(convection):
     return Conv           
 
 conv = getConvection(config.convection)
+
+@optimizer
+def add_diffusion_u(u, d, AC, SBB, ABB, BBB, nu, dt, K2, K4):
+    d[:] = nu*dt/2.*SBB.matvec(u)
+    d += (1. - nu*dt*K2)*ABB.matvec(u)
+    d -= (K2 - nu*dt/2.*K4)*BBB.matvec(u)    
+    return d
+
+@optimizer
+def assembleAB(H, H0, H1, H_hat, H_hat0, H_hat1):
+    H0[:] = 1.5*H - 0.5*H1
+    H_hat0[:] = 1.5*H_hat - 0.5*H_hat1
     
-@profile
+#@profile
 def ComputeRHS(dU):
     global hv
     
@@ -366,47 +379,29 @@ def ComputeRHS(dU):
     diff0[:] = 0
     
     # Compute diffusion for g-equation
-    SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, g, diff0[1])
+    diff0[1] = AB.matvec(g, diff0[1])
     
     # Compute diffusion++ for u-equation
-    diff0[0] = nu*dt/2.*SBB.matvec(u)
-    diff0[0] += (1. - nu*dt*K2)*ABB.matvec(u)
-    diff0[0] -= (K2 - nu*dt/2.*K4)*BBB.matvec(u)    
-    diff0[0] = AC.matvec(u)
+    diff0[0] = add_diffusion_u(u, diff0[0], AC, SBB, ABB, BBB, nu, dt, K2, K4)
     
-    # Compute convection
-    H0[:] = 1.5*H - 0.5*H1
-    H_hat0[:] = 1.5*H_hat - 0.5*H_hat1
+    # Assemble convection with Adams-Bashforth convection
+    assembleAB(H, H0, H1, H_hat, H_hat0, H_hat1)    
     
     # Following modification is critical for accuracy with vortex convection, but it makes standard perform worse
     #hv[:] = -K2*BBD.matvec(H_hat0[0])
     hv[:] = FST.fss(H0[0], hv, SB)
-    hv *= -K2
-    
-    # Following does not seem to be critical
+    hv *= -K2    
     hv -= 1j*K[1]*CBD.matvec(H_hat0[1])
-    hv -= 1j*K[2]*CBD.matvec(H_hat0[2])    
-    #dH1dx = U_tmp[1] = FST.chebDerivative_3D0(H0[1], U_tmp[1], SB)
-    #dH2dx = U_tmp[2] = FST.chebDerivative_3D0(H0[2], U_tmp[2], SB)
-    #F_tmp[1] = FST.fss(dH1dx, F_tmp[1], SB)
-    #F_tmp[2] = FST.fss(dH2dx, F_tmp[2], SB)
-    #hv -= 1j*K[1]*F_tmp[1]
-    #hv -= 1j*K[2]*F_tmp[2]
-    
-    hg[:] = 1j*K[1]*BDD.matvec(H_hat0[2]) - 1j*K[2]*BDD.matvec(H_hat0[1])
-    #F_tmp[1] = FST.fss(H0[1], F_tmp[1], ST)
-    #F_tmp[2] = FST.fss(H0[2], F_tmp[2], ST)
-    #hg[:] = 1j*K[1]*F_tmp[2] - 1j*K[2]*F_tmp[1]    
-    
+    hv -= 1j*K[2]*CBD.matvec(H_hat0[2])        
+    hg[:] = 1j*K[1]*BDD.matvec(H_hat0[2]) - 1j*K[2]*BDD.matvec(H_hat0[1])    
     dU[0] = hv*dt + diff0[0]
-    dU[1] = hg*2./nu + diff0[1]
-        
+    dU[1] = hg*2./nu + diff0[1]        
     return dU
 
 def regression_test(**kw):
     pass
 
-@profile
+#@profile
 def solve():
     timer = Timer()
     
@@ -448,10 +443,6 @@ def solve():
             U_hat[1, :, 0, 0] = u0_hat[1]
             U_hat[2, :, 0, 0] = u0_hat[2]
         
-        U[0] = FST.ifst(U_hat[0], U[0], SB)
-        for i in range(1, 3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
-
         update(**globals())
  
         # Rotate velocities

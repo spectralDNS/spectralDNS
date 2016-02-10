@@ -1,7 +1,7 @@
 from cbcdns import config, get_solver
 from numpy import array, pi
 
-def initialize(UB_hat, UB, U, B, X, sin, cos, fftn_mpi, **kw):
+def initialize(UB_hat, UB, U, B, X, sin, cos, FFT, **kw):
     # Taylor-Green initialization
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
@@ -10,13 +10,13 @@ def initialize(UB_hat, UB, U, B, X, sin, cos, fftn_mpi, **kw):
     B[1] = cos(X[0])*cos(X[1])*cos(X[2])
     B[2] = 0 
     for i in range(6):
-        UB_hat[i] = fftn_mpi(UB[i], UB_hat[i])
+        UB_hat[i] = FFT.fftn(UB[i], UB_hat[i])
         
 def update(t, tstep, dt, comm, rank, P, P_hat, U, B, curl, float64, dx, L, sum, 
-           hdf5file, ifftn_mpi, **kw):
+           hdf5file, FFT, **kw):
     
     if tstep % config.write_result == 0 or tstep % config.write_yz_slice[1] == 0:
-        P = ifftn_mpi(P_hat*1j, P)
+        P = FFT.ifftn(P_hat*1j, P)
         hdf5file.write(tstep)
 
 def regression_test(t, tstep, comm, U, B, float64, dx, L, sum,  rank, **kw):

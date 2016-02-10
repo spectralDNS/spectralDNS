@@ -7,7 +7,7 @@ __all__ = ['dct', 'fft', 'ifft', 'fft2', 'ifft2', 'fftn', 'ifftn',
            'rfft', 'irfft', 'rfft2', 'irfft2', 'rfftn', 'irfftn', 
            'fftfreq', 'empty', 'zeros']
 
-from numpy import empty, zeros, iscomplexobj
+from numpy import empty, zeros, iscomplexobj, zeros_like
 from numpy.fft import fftfreq, fft, ifft, fftn, ifftn, rfft, irfft, rfft2, irfft2, rfftn, irfftn, fft2, ifft2
 from scipy.fftpack import dct
 
@@ -48,11 +48,14 @@ try:
     rfft2_object  = {}
     rfft_object   = {}
     rfftn_object  = {}
-    if hasattr(pyfftw.builders, "dchjt"):
+    if hasattr(pyfftw.builders, "dchijt"):
         def dct(a, type=2, axis=0):
             global dct_object
             if not (a.shape, type) in dct_object:
-                b = a.copy()
+                if iscomplexobj(a):
+                    b = a.real.copy()
+                else:
+                    b = a.copy()
                 dct_object[(a.shape, type)] = (pyfftw.builders.dct(b, axis=axis, type=type), a.copy())
                 
             dobj, c = dct_object[(a.shape, type)]
@@ -72,9 +75,11 @@ try:
         dct1 = pyfftw.interfaces.scipy_fftpack.dct
         def dct(x, type=2, axis=0):
             if iscomplexobj(x):
-                xreal = dct1(x.real, type=type, axis=axis)
-                ximag = dct1(x.imag, type=type, axis=axis)
-                return xreal + ximag*1j
+                c = zeros_like(x)
+                c.real[:] = dct1(x.real, type=type, axis=axis)
+                c.imag[:] = dct1(x.imag, type=type, axis=axis)
+                return c
+
             else:
                 return dct1(x, type=type, axis=axis)
         

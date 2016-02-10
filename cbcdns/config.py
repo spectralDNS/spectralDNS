@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser(prog='cbcdns', add_help=False)
 
 parser.add_argument('--decomposition', default='slab', choices=('slab', 'pencil', 'line'), help="Choose 3D decomposition between slab and pencil. For 2D problems line is the only choice and is made automatically.")
 parser.add_argument('--precision', default='double', choices=('single', 'double'))
-parser.add_argument('--optimization', default='', choices=('cython', 'weave', 'numba', 'numexpr'))
+parser.add_argument('--optimization', default='', choices=('cython', 'weave', 'numba'))
 parser.add_argument('--communication', default='alltoall', choices=('alltoall', 'sendrecv_replace'), help='only for slab')
 parser.add_argument('--make_profile', default=0, help='Enable cProfile profiler')
 parser.add_argument('--dt', default=0.01, type=float, help='Time step size')

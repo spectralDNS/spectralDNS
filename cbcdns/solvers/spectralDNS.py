@@ -11,21 +11,21 @@ def standardConvection(c):
     """c_i = u_j du_i/dx_j"""
     for i in range(3):
         for j in range(3):
-            U_tmp[j] = ifftn_mpi(1j*K[j]*U_hat[i], U_tmp[j])
-        c[i] = fftn_mpi(sum(U*U_tmp, 0), c[i])
+            U_tmp[j] = FFT.ifftn(1j*K[j]*U_hat[i], U_tmp[j])
+        c[i] = FFT.fftn(sum(U*U_tmp, 0), c[i])
     return c
 
 def divergenceConvection(c, add=False):
     """c_i = div(u_i u_j)"""
     if not add: c.fill(0)
     for i in range(3):
-        F_tmp[i] = fftn_mpi(U[0]*U[i], F_tmp[i])
+        F_tmp[i] = FFT.fftn(U[0]*U[i], F_tmp[i])
     c[0] += 1j*sum(K*F_tmp, 0)
     c[1] += 1j*K[0]*F_tmp[1]
     c[2] += 1j*K[0]*F_tmp[2]
-    F_tmp[0] = fftn_mpi(U[1]*U[1], F_tmp[0])
-    F_tmp[1] = fftn_mpi(U[1]*U[2], F_tmp[1])
-    F_tmp[2] = fftn_mpi(U[2]*U[2], F_tmp[2])
+    F_tmp[0] = FFT.fftn(U[1]*U[1], F_tmp[0])
+    F_tmp[1] = FFT.fftn(U[1]*U[2], F_tmp[1])
+    F_tmp[2] = FFT.fftn(U[2]*U[2], F_tmp[2])
     c[1] += (1j*K[1]*F_tmp[0] + 1j*K[2]*F_tmp[1])
     c[2] += (1j*K[1]*F_tmp[1] + 1j*K[2]*F_tmp[2])
     return c
@@ -34,18 +34,18 @@ def divergenceConvection(c, add=False):
 def Cross(a, b, c):
     """c_k = F_k(a x b)"""
     U_tmp[:] = cross1(U_tmp, a, b)
-    c[0] = fftn_mpi(U_tmp[0], c[0])
-    c[1] = fftn_mpi(U_tmp[1], c[1])
-    c[2] = fftn_mpi(U_tmp[2], c[2])
+    c[0] = FFT.fftn(U_tmp[0], c[0])
+    c[1] = FFT.fftn(U_tmp[1], c[1])
+    c[2] = FFT.fftn(U_tmp[2], c[2])
     return c
 
 #@profile
 def Curl(a, c):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
     F_tmp[:] = cross2(F_tmp, K, a)
-    c[0] = ifftn_mpi(F_tmp[0], c[0])
-    c[1] = ifftn_mpi(F_tmp[1], c[1])
-    c[2] = ifftn_mpi(F_tmp[2], c[2])    
+    c[0] = FFT.ifftn(F_tmp[0], c[0])
+    c[1] = FFT.ifftn(F_tmp[1], c[1])
+    c[2] = FFT.ifftn(F_tmp[2], c[2])    
     return c
 
 def getConvection(convection):
@@ -104,7 +104,7 @@ def ComputeRHS(dU, rk):
     
     if rk > 0: # For rk=0 the correct values are already in U
         for i in range(3):
-            U[i] = ifftn_mpi(U_hat[i], U[i])
+            U[i] = FFT.ifftn(U_hat[i], U[i])
                         
     dU = conv(dU)
 
@@ -131,7 +131,7 @@ def solve():
         U_hat[:] = integrate(t, tstep, dt)
 
         for i in range(3):
-            U[i] = ifftn_mpi(U_hat[i], U[i])
+            U[i] = FFT.ifftn(U_hat[i], U[i])
                  
         update(t, tstep, **globals())
         

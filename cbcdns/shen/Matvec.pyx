@@ -519,3 +519,82 @@ def CBD_matvec(np.ndarray[T, ndim=1] v,
     i = N
     b[i] = ld[i-1]* v[i-1] + ud[i]*v[i+1]
 
+def Helmholtz_matvec(np.ndarray[T, ndim=1] v, 
+                     np.ndarray[T, ndim=1] b,
+                     real_t alfa, 
+                     real_t beta,
+                     np.ndarray[real_t, ndim=1] dd,
+                     np.ndarray[real_t, ndim=1] ud,
+                     np.ndarray[real_t, ndim=1] bd):
+    # b = (alfa*A + beta*B)*v 
+    # For B matrix ld = ud = -pi/2
+    cdef:
+        int i, j, k
+        int N = dd.shape[0]
+        T s1 = 0.0
+        T s2 = 0.0
+        double pi_half = np.pi/2
+        double p
+
+    k = N-1
+    b[k] = (dd[k]*alfa + bd[k]*beta)*v[k] - pi_half*beta*v[k-2]
+    b[k-1] = (dd[k-1]*alfa + bd[k-1]*beta)*v[k-1] - pi_half*beta*v[k-3]
+                        
+    for k in range(N-3, 1, -1):
+        p = ud[k]*alfa
+        if k % 2 == 0:
+            s2 += v[k+2]
+            b[k] = (dd[k]*alfa + bd[k]*beta)*v[k] - pi_half*beta*(v[k-2] + v[k+2]) + p*s2
+        else:
+            s1 += v[k+2]
+            b[k] = (dd[k]*alfa + bd[k]*beta)*v[k] - pi_half*beta*(v[k-2] + v[k+2]) + p*s1
+                    
+    k = 1
+    s1 += v[k+2]
+    s2 += v[k+1]
+    b[k] = (dd[k]*alfa + bd[k]*beta)*v[k] - pi_half*beta*v[k+2] + ud[k]*alfa*s1
+    b[k-1] = (dd[k-1]*alfa + bd[k-1]*beta)*v[k-1] - pi_half*beta*v[k+1] + ud[k-1]*alfa*s2
+
+
+def Helmholtz_matvec3D(np.ndarray[T, ndim=3] v, 
+                       np.ndarray[T, ndim=3] b,
+                       real_t alfa, 
+                       np.ndarray[real_t, ndim=2] beta,
+                       np.ndarray[real_t, ndim=1] dd,
+                       np.ndarray[real_t, ndim=1] ud,
+                       np.ndarray[real_t, ndim=1] bd):
+    # b = (alfa*A + beta*B)*v 
+    # For B matrix ld = ud = -pi/2
+    cdef:
+        int i, j, k
+        int N = dd.shape[0]
+        np.ndarray[T, ndim=2] s1 = np.zeros((v.shape[1], v.shape[2]), dtype=v.dtype)
+        np.ndarray[T, ndim=2] s2 = np.zeros((v.shape[1], v.shape[2]), dtype=v.dtype)
+        double pi_half = np.pi/2
+        double p
+
+    k = N-1
+    for i in xrange(v.shape[1]):
+        for j in xrange(v.shape[2]):
+            b[k, i, j] = (dd[k]*alfa + bd[k]*beta[i, j])*v[k, i, j] - pi_half*beta[i, j]*v[k-2, i, j]
+            b[k-1, i, j] = (dd[k-1]*alfa + bd[k-1]*beta[i, j])*v[k-1, i, j] - pi_half*beta[i, j]*v[k-3, i, j]
+                        
+    for k in range(N-3, 1, -1):
+        p = ud[k]*alfa
+        for i in xrange(v.shape[1]):
+            for j in xrange(v.shape[2]):
+                if k % 2 == 0:
+                    s2[i, j] += v[k+2, i, j]
+                    b[k, i, j] = (dd[k]*alfa + bd[k]*beta[i, j])*v[k, i, j] - pi_half*beta[i, j]*(v[k-2, i, j] + v[k+2, i, j]) + p*s2[i, j]
+                else:
+                    s1[i, j] += v[k+2, i, j]
+                    b[k, i, j] = (dd[k]*alfa + bd[k]*beta[i, j])*v[k, i, j] - pi_half*beta[i, j]*(v[k-2, i, j] + v[k+2, i, j]) + p*s1[i, j]
+                    
+    k = 1
+    for i in xrange(v.shape[1]):
+        for j in xrange(v.shape[2]):
+            s1[i, j] += v[k+2, i, j]
+            s2[i, j] += v[k+1, i, j]
+            b[k, i, j] = (dd[k]*alfa + bd[k]*beta[i, j])*v[k, i, j] - pi_half*beta[i, j]*v[k+2, i, j] + ud[k]*alfa*s1[i, j]
+            b[k-1, i, j] = (dd[k-1]*alfa + bd[k-1]*beta[i, j])*v[k-1, i, j] - pi_half*beta[i, j]*v[k+1, i, j] + ud[k-1]*alfa*s2[i, j]
+

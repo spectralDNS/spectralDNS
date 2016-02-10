@@ -4,8 +4,10 @@ __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from numpy import *
-from numpy.fft import fftfreq, fft, ifft, irfft2, rfft2, rfftn, irfftn
+from numpy.fft import fftfreq, fft, ifft, irfft2, rfft2
 from mpi4py import MPI
+
+from pyfftw.interfaces.numpy_fft import fft, ifft, irfft2, rfft2
 
 #try:
     #from cbcdns.fft.wrappyfftw import *
@@ -68,7 +70,7 @@ def Curl(a, c):
     c[1] = ifftn_mpi(1j*(K[2]*a[0]-K[0]*a[2]), c[1])
     c[0] = ifftn_mpi(1j*(K[1]*a[2]-K[2]*a[1]), c[0])
     return c
-@profile
+#@profile
 def ComputeRHS(dU, rk):
     if rk > 0:
         for i in range(3):

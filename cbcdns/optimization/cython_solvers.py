@@ -4,6 +4,34 @@ cimport numpy as np
 
 {0}
 
+def add_diffusion_u_KMM(u, d, AC, SBB, ABB, BBB, nu, dt, K2, K4):
+    d = AC.matvec(u, d)
+    return d
+
+def add_diffusion_u_KMMRK3(u, d, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
+    d = AC.matvec(u, d)
+    return d
+
+def assembleAB_KMM(np.ndarray[real_t, ndim=4] H, 
+                   np.ndarray[real_t, ndim=4] H0, 
+                   np.ndarray[real_t, ndim=4] H1, 
+                   np.ndarray[complex_t, ndim=4] H_hat, 
+                   np.ndarray[complex_t, ndim=4] H_hat0, 
+                   np.ndarray[complex_t, ndim=4] H_hat1):
+    cdef int i, j, k, l
+    
+    for l in range(H.shape[0]):
+        for i in range(H.shape[1]):
+            for j in range(H.shape[2]):
+                for k in range(H.shape[3]):
+                    H0[l, i, j, k] = 1.5*H[l, i, j, k] - 0.5*H1[l, i, j, k]
+
+    for l in range(H_hat.shape[0]):
+        for i in range(H_hat.shape[1]):
+            for j in range(H_hat.shape[2]):
+                for k in range(H_hat.shape[3]):
+                    H_hat0[l, i, j, k] = 1.5*H_hat[l, i, j, k] - 0.5*H_hat1[l, i, j, k]
+
 def add_pressure_diffusion_NS(np.ndarray[complex_t, ndim=4] du,
                               np.ndarray[complex_t, ndim=4] u_hat,
                               np.ndarray[real_t, ndim=3] ksq,

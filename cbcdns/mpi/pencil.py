@@ -8,7 +8,8 @@ from cbcdns import config
 from ..optimization import optimizer
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis
 
-__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
+#__all__ = ['setup', 'ifftn_mpi', 'fftn_mpi']
+__all__ = ['setup']
 
 @optimizer
 def transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1):
@@ -68,15 +69,16 @@ def create_wavenumber_arrays(N, N1, N2, xyrank, xzrank, float):
     k2 = slice(xyrank*N2[0], (xyrank+1)*N2[0], 1)
     k1 = slice(xzrank*N1[2]/2, (xzrank+1)*N1[2]/2, 1)
     K  = array(meshgrid(kx[k2], ky, kz[k1], indexing='ij'), dtype=float)
-    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] # scale with physical mesh size. This takes care of mapping the physical domain to a computational cube of size (2pi)**3
-    K2 = sum(K*K, 0, dtype=float)
-    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
     # Filter for dealiasing nonlinear convection
     kmax = 2./3.*(N/2+1)
     dealias = array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                     (abs(K[2]) < kmax[2]), dtype=uint8)
-    
+
+    # Scale with physical mesh size. This takes care of mapping the physical domain to a computational cube of size (2pi)**3
+    K[0] *= Lp[0]; K[1] *= Lp[1]; K[2] *= Lp[2] 
+    K2 = sum(K*K, 0, dtype=float)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
     return K, K2, K_over_K2, dealias
 
 def setupDNS(comm, float, complex, uint8, mpitype, N, L,
@@ -120,24 +122,23 @@ def setupDNS(comm, float, complex, uint8, mpitype, N, L,
     The Nyquist mode in included in temporary arrays simply because rfft/irfft 
     expect N/2+1 modes.
     """
+    FFT = FastFourierTransform(N, P1, comm, mpitype)
 
     Nf = N[2]/2+1 # Total Fourier coefficients in z-direction
-    U     = empty((3, N1[0], N2[1], N[2]), dtype=float)
-    U_hat = empty((3, N2[0], N[1], N1[2]/2), dtype=complex)
-    P     = empty((N1[0], N2[1], N[2]), dtype=float)
-    P_hat = empty((N2[0], N[1], N1[2]/2), dtype=complex)
+    U     = empty((3,) + FFT.real_shape(), dtype=float)
+    U_hat = empty((3,) + FFT.complex_shape(), dtype=complex)
+    P     = empty(FFT.real_shape(), dtype=float)
+    P_hat = empty(FFT.complex_shape(), dtype=complex)
 
     # RHS array
-    dU = empty((3, N2[0], N[1], N1[2]/2), dtype=complex)
+    dU = empty((3,) + FFT.complex_shape(), dtype=complex)
     
     # work arrays (Not required by all convection methods)
-    U_tmp  = empty((3, N1[0], N2[1], N[2]), dtype=float)
-    F_tmp  = empty((3, N2[0], N[1], N1[2]/2), dtype=complex)
-    curl   = empty((3, N1[0], N2[1], N[2]), dtype=float)
+    U_tmp  = empty((3,) + FFT.real_shape(), dtype=float)
+    F_tmp  = empty((3,) + FFT.complex_shape(), dtype=complex)
+    curl   = empty((3,) + FFT.real_shape(), dtype=float)
     Source = None
     
-    init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy)    
-
     K, K2, K_over_K2, dealias = create_wavenumber_arrays(N, N1, N2, xyrank, xzrank, float)
 
     del kwargs
@@ -175,12 +176,14 @@ def setupMHD(comm, float, complex, uint8, mpitype, N, L,
     x2 = slice(xyrank * N2[1], (xyrank+1) * N2[1], 1)
     X = mgrid[x1, x2, :N[2]].astype(float)
     X[0] *= L[0]/N[0]; X[1] *= L[1]/N[1]; X[2] *= L[2]/N[2]
+    
+    FFT = FastFourierTransform(N, P1, comm, mpitype)
 
     Nf = N[2]/2+1 # Total Fourier coefficients in z-direction
-    UB     = empty((6, N1[0], N2[1], N[2]), dtype=float)
-    UB_hat = empty((6, N2[0], N[1], N1[2]/2), dtype=complex)
-    P      = empty((N1[0], N2[1], N[2]), dtype=float)
-    P_hat  = empty((N2[0], N[1], N1[2]/2), dtype=complex)
+    UB     = empty((6,) + FFT.real_shape(), dtype=float)
+    UB_hat = empty((6,) + FFT.complex_shape(), dtype=complex)
+    P      = empty(FFT.real_shape(), dtype=float)
+    P_hat  = empty(FFT.complex_shape(), dtype=complex)
 
     # Create views into large data structures
     U     = UB[:3] 
@@ -189,15 +192,13 @@ def setupMHD(comm, float, complex, uint8, mpitype, N, L,
     B_hat = UB_hat[3:]
 
     # RHS array
-    dU = empty((6, N2[0], N[1], N1[2]/2), dtype=complex)
+    dU = empty((6,) + FFT.complex_shape(), dtype=complex)
 
     # work arrays (Not required by all convection methods)
-    U_tmp  = empty((3, N1[0], N2[1], N[2]), dtype=float)
-    F_tmp  = empty((3, 3, N2[0], N[1], N1[2]/2), dtype=complex)
-    curl   = empty((3, N1[0], N2[1], N[2]), dtype=float)
+    U_tmp  = empty((3,) + FFT.real_shape(), dtype=float)
+    F_tmp  = empty((3, 3,) + FFT.complex_shape(), dtype=complex)
+    curl   = empty((3,) + FFT.real_shape(), dtype=float)
     Source = None
-    
-    init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy)    
     
     K, K2, K_over_K2, dealias = create_wavenumber_arrays(N, N1, N2, xyrank, xzrank, float)
     
@@ -208,57 +209,97 @@ setup = {"MHD": setupMHD,
          "NS":  setupDNS,
          "VV":  setupDNS}[config.solver]
 
-def init_fft(N1, N2, Nf, N, complex, P1, P2, mpitype, commxz, commxy):
-    # Initialize MPI work arrays globally
-    Uc_hat_z  = empty((N1[0], N2[1], Nf), dtype=complex)
-    Uc_hat_x  = empty((N[0], N2[1], N1[2]/2), dtype=complex)
-    Uc_hat_xr = empty((N[0], N2[1], N1[2]/2), dtype=complex)
-    Uc_hat_y  = zeros((N2[0], N[1], N1[2]/2), dtype=complex)
-    globals().update(locals())
+class FastFourierTransform(object):
+    
+    def __init__(self, N, P1, comm, mpitype):
+        self.N = N
+        self.Nf = Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
+        self.comm = comm
+        self.mpitype = mpitype
+        self.num_processes = comm.Get_size()
+        self.rank = comm.Get_rank()        
+        self.P1 = P1
+        self.P2 = P2 = self.num_processes / P1
+        self.N1 = N1 = N / P1
+        self.N2 = N2 = N / P2
+        self.commxz = comm.Split(self.rank/P1)
+        self.commxy = comm.Split(self.rank%P1)
 
-#@profile
-def ifftn_mpi(fu, u):
-    """ifft in three directions using mpi.
-    Need to do ifft in reversed order of fft
-    """
-    # Do first owned direction
-    Uc_hat_y[:] = ifft(fu, axis=1)
+        # Initialize MPI work arrays globally
+        self.Uc_hat_z  = empty((N1[0], N2[1], Nf), dtype=complex)
+        self.Uc_hat_x  = empty((N[0], N2[1], N1[2]/2), dtype=complex)
+        self.Uc_hat_xr = empty((N[0], N2[1], N1[2]/2), dtype=complex)
+        self.Uc_hat_y  = zeros((N2[0], N[1], N1[2]/2), dtype=complex)
 
-    # Transform to x all but k=N/2 (the neglected Nyquist mode)
-    Uc_hat_x[:] = 0
-    Uc_hat_x[:] = transform_Uc_xy(Uc_hat_x, Uc_hat_y, P2)
-           
-    # Communicate in xz-plane and do fft in x-direction
-    commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
-    Uc_hat_x[:] = ifft(Uc_hat_xr, axis=0)
+    def real_shape(self):
+        """The local shape of the real data"""
+        return (self.N1[0], self.N2[1], self.N[2])
+
+    def complex_shape(self):
+        """The local shape of the complex data"""
+        return (self.N2[0], self.N[1], self.N1[2]/2)
+    
+    def complex_shape_T(self):
+        """The local transposed shape of the complex data"""
+        return (self.Np[0], self.N[1], self.Nf)
         
-    # Communicate and transform in xy-plane
-    commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
-    Uc_hat_z[:] = transform_Uc_zx(Uc_hat_z, Uc_hat_xr, P1)
+    def complex_shape_I(self):
+        """A local intermediate shape of the complex data"""
+        return (self.Np[0], self.num_processes, self.Np[1], self.Nf)
+
+    #def complex_shape_padded_T(self):
+        #"""The local shape of the transposed complex data padded in x and z directions"""
+        #return (3*self.Np[0]/2, 3*self.N[1]/2, 3*self.N[2]/4+1)
+
+    #def real_shape_padded(self):
+        #"""The local shape of the real data"""
+        #return (3*self.Np[0]/2, 3*self.N[1]/2, 3*self.N[2]/2)
+    
+    #def complex_shape_padded(self):
+        #return (3*self.N[0]/2, 3*self.Np[1]/2, 3*self.N[2]/4+1)
+    
+    def ifftn(self, fu, u):
+        """ifft in three directions using mpi.
+        Need to do ifft in reversed order of fft
+        """
+        # Do first owned direction
+        self.Uc_hat_y[:] = ifft(fu, axis=1)
+
+        # Transform to x all but k=N/2 (the neglected Nyquist mode)
+        self.Uc_hat_x[:] = 0
+        self.Uc_hat_x[:] = transform_Uc_xy(self.Uc_hat_x, self.Uc_hat_y, self.P2)
             
-    # Do fft for y-direction
-    Uc_hat_z[:, :, -1] = 0
-    u[:] = irfft(Uc_hat_z, axis=2)
-    return u
+        # Communicate in xz-plane and do fft in x-direction
+        self.commxy.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+        self.Uc_hat_x[:] = ifft(self.Uc_hat_xr, axis=0)
+            
+        # Communicate and transform in xy-plane
+        self.commxz.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+        self.Uc_hat_z[:] = transform_Uc_zx(self.Uc_hat_z, self.Uc_hat_xr, self.P1)
+                
+        # Do fft for y-direction
+        self.Uc_hat_z[:, :, -1] = 0
+        u[:] = irfft(self.Uc_hat_z, axis=2)
+        return u
+
+    #@profile
+    def fftn(self, u, fu):
+        """fft in three directions using mpi
+        """
+        # Do fft in z direction on owned data
+        self.Uc_hat_z[:] = rfft(u, axis=2)
         
-#@profile
-def fftn_mpi(u, fu):
-    """fft in three directions using mpi
-    """    
-    # Do fft in z direction on owned data
-    Uc_hat_z[:] = rfft(u, axis=2)
-    
-    # Transform to x direction neglecting k=N/2 (Nyquist)
-    Uc_hat_x[:] = transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1)
-    
-    # Communicate and do fft in x-direction
-    commxz.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])
-    Uc_hat_x[:] = fft(Uc_hat_xr, axis=0)        
-    
-    # Communicate and transform to final z-direction
-    commxy.Alltoall([Uc_hat_x, mpitype], [Uc_hat_xr, mpitype])  
-    Uc_hat_y[:] = transform_Uc_yx(Uc_hat_y, Uc_hat_xr, P2)
-                                   
-    # Do fft for last direction 
-    fu[:] = fft(Uc_hat_y, axis=1)
-    return fu
+        # Transform to x direction neglecting k=N/2 (Nyquist)
+        self.Uc_hat_x[:] = transform_Uc_xz(self.Uc_hat_x, self.Uc_hat_z, self.P1)
+        
+        # Communicate and do fft in x-direction
+        self.commxz.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+        self.Uc_hat_x[:] = fft(self.Uc_hat_xr, axis=0)        
+        
+        # Communicate and transform to final z-direction
+        self.commxy.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])  
+        self.Uc_hat_y[:] = transform_Uc_yx(self.Uc_hat_y, self.Uc_hat_xr, self.P2)
+                                    
+        # Do fft for last direction 
+        fu[:] = fft(self.Uc_hat_y, axis=1)
+        return fu
