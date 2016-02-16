@@ -59,7 +59,7 @@ def reference(Re, t, num_terms=200):
         u += a*exp(-b*t)*c
     return u
 
-def update(rank, X, U, P, N, comm, L, points, ST, num_processes, **kw):
+def update(rank, X, U, P, N, comm, L, x0, ST, num_processes, **kw):
     global im1
     if config.tstep == 2 and rank == 0 and config.plot_step > 0:
         plt.figure()
@@ -84,17 +84,17 @@ def update(rank, X, U, P, N, comm, L, points, ST, num_processes, **kw):
         comm.Gather(u0, uall, root=0)
         if rank == 0:
             uall = uall.reshape((N[0],))
-            #x = points
+            #x = x0
             #pc = zeros(len(x))
             #pc = ST.fct(uall, pc)  # Cheb transform of result
             #solution at x = 0
             #u = n_cheb.chebval(0, pc)
-            u_exact = exact(points, config.Re, config.t)
+            u_exact = exact(x0, config.Re, config.t)
             #print u_exact-uall
             #u_exact = reference(config.Re, config.t)
             print "Time %2.5f Error %2.12e " %(config.t, sqrt(sum((u_exact-uall)**2)/N[0]))
 
-def regression_test(U, X, N, comm, rank, L, ST, num_processes, points, **kw):
+def regression_test(U, X, N, comm, rank, L, ST, num_processes, x0, **kw):
     u0 = U[1, :, 0, 0].copy()
     uall = None
     if rank == 0:
@@ -102,13 +102,13 @@ def regression_test(U, X, N, comm, rank, L, ST, num_processes, points, **kw):
     comm.Gather(u0, uall, root=0)
     if rank == 0:
         uall = uall.reshape((N[0],))
-        #x = points
+        #x = x0
         #pc = zeros(len(x))
         #pc = ST.fct(uall, pc)  # Cheb transform of result
         #solution at x = 0
         #u = n_cheb.chebval(0, pc)
         #u_exact = reference(config.Re, config.t)
-        u_exact = exact(points, config.Re, config.t)
+        u_exact = exact(x0, config.Re, config.t)
         print "Computed error = %2.8e %2.8e " %(sqrt(sum((uall-u_exact)**2)/N[0]), config.dt)
 
 if __name__ == "__main__":

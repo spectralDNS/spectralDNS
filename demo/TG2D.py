@@ -2,14 +2,14 @@ from cbcdns import config, get_solver
 from numpy import pi, sin, cos, exp, zeros
 import matplotlib.pyplot as plt
 
-def initialize(U, U_hat, X, sin, cos, fft2_mpi, **kw):    
+def initialize(U, U_hat, X, sin, cos, FFT, **kw):    
     U[0] = sin(X[0])*cos(X[1])
     U[1] = -sin(X[1])*cos(X[0])
     for i in range(2):
-        U_hat[i] = fft2_mpi(U[i], U_hat[i])
+        U_hat[i] = FFT.fft2(U[i], U_hat[i])
 
 im = None
-def update(t, tstep, N, U_hat, curl, X, nu, ifft2_mpi, K, P, P_hat, hdf5file, **kw):
+def update(t, tstep, N, U_hat, curl, X, nu, FFT, K, P, P_hat, hdf5file, **kw):
     global im
     # initialize plot
     if tstep == 1:
@@ -18,11 +18,11 @@ def update(t, tstep, N, U_hat, curl, X, nu, ifft2_mpi, K, P, P_hat, hdf5file, **
         plt.draw()
         
     if tstep % config.write_result == 0:
-        P = ifft2_mpi(P_hat*1j, P)
+        P = FFT.ifft2(P_hat*1j, P)
         hdf5file.write(tstep)
 
     if tstep % config.plot_result == 0 and config.plot_result > 0:
-        curl = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
+        curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         im.set_data(curl[:, :])
         im.autoscale()
         plt.pause(1e-6)

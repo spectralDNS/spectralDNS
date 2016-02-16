@@ -2,7 +2,7 @@ from cbcdns import config, get_solver
 import matplotlib.pyplot as plt
 from numpy import zeros
 
-def initialize(X, U, U_hat, exp, sin, cos, tanh, Np, N, pi, fft2_mpi, **kwargs):
+def initialize(X, U, U_hat, exp, sin, cos, tanh, N, pi, FFT, **kwargs):
     Um = 0.5*(config.U1 - config.U2)
     U[1] = config.A*sin(2*X[0])       
     U[0, :, :N[1]/4] = config.U1 - Um*exp((X[1,:, :N[1]/4] - 0.5*pi)/config.delta)
@@ -11,14 +11,14 @@ def initialize(X, U, U_hat, exp, sin, cos, tanh, Np, N, pi, fft2_mpi, **kwargs):
     U[0, :, 3*N[1]/4:] = config.U1 - Um*exp(-1.0*(X[1, :, 3*N[1]/4:] - 1.5*pi)/config.delta)
           
     for i in range(2):
-        U_hat[i] = fft2_mpi(U[i], U_hat[i])
+        U_hat[i] = FFT.fft2(U[i], U_hat[i])
 
 im, im2 = None, None
-def update(t, tstep, comm, rank, N, L, dx, ifft2_mpi, U_hat, U, sum,
+def update(t, tstep, comm, rank, N, L, dx, FFT, U_hat, U, sum,
            P_hat, P, hdf5file, float64, K, curl, **kwargs):
     global im, im2
     if tstep % config.write_result == 0 or tstep % config.write_yz_slice[1] == 0:
-        P = ifft2_mpi(P_hat*1j, P)
+        P = FFT.ifft2(P_hat*1j, P)
         hdf5file.write(tstep)           
 
     if tstep % config.compute_energy == 0:
@@ -47,8 +47,8 @@ def update(t, tstep, comm, rank, N, L, dx, ifft2_mpi, U_hat, U, sum,
         globals().update(dict(im=im, im2=im2))
 
     if tstep % config.plot_result == 0 and config.plot_result > 0:
-        curl[:] = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
-        P = ifft2_mpi(1j*P_hat, P)
+        curl[:] = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
+        P = FFT.ifft2(1j*P_hat, P)
         im.set_data(P[:, :].T)
         im.autoscale()
         plt.pause(1e-6)

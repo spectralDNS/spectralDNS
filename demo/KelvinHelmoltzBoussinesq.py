@@ -2,7 +2,7 @@ from cbcdns import config, get_solver
 import matplotlib.pyplot as plt
 from numpy import zeros, exp
 
-def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, Np, N, pi, fft2_mpi, float, **kwargs):
+def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, N, pi, FFT, float, **kwargs):
 
     Um = 0.5*(config.U1 - config.U2)
     U[1] = config.A*sin(2*X[0])
@@ -22,10 +22,10 @@ def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, Np, N, pi, fft2_mpi, 
     rho -= rho0
     
     for i in range(3):
-        Ur_hat[i] = fft2_mpi(Ur[i], Ur_hat[i]) 
+        Ur_hat[i] = FFT.fft2(Ur[i], Ur_hat[i]) 
 
 im, im2 = None, None
-def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, ifft2_mpi, U_hat, U, sum, 
+def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, FFT, U_hat, U, sum, 
            P_hat, P, hdf5file, float64, rho_hat, **kwargs):
     global im, im2
         
@@ -50,7 +50,7 @@ def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, ifft2_mpi, U_hat, U, su
         globals().update(dict(im=im, im2=im2))
 
     if tstep % config.plot_result == 0 and config.plot_result > 0:
-        curl[:] = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
+        curl[:] = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         im.set_data(rho[:, :].T)
         im.autoscale()
         plt.pause(1e-6)
@@ -61,8 +61,8 @@ def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, ifft2_mpi, U_hat, U, su
             print tstep
             
     if tstep % config.write_result == 0 or tstep % config.write_yz_slice[1] == 0:
-        P = ifft2_mpi(P_hat*1j, P)
-        curl = ifft2_mpi(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
+        P = FFT.ifft2(P_hat*1j, P)
+        curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         hdf5file.write(tstep)           
 
     if tstep % config.compute_energy == 0:

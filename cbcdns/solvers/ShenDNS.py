@@ -10,7 +10,7 @@ from ..shen import SFTc
 
 assert config.precision == "double"
 hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5", 
-                      mesh={"x": points, "xp": pointsp, "y": x1, "z": x2})  
+                      mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
 
 HelmholtzSolverU = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), ST.quad, False)
 HelmholtzSolverP = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2), SN.quad, True)
@@ -109,12 +109,12 @@ def Curl_padded(u_hat, c, S):
     U_pad2[:] = 0
     F_tmp[:] = 0
     SFTc.Mult_CTD_3D(N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = U_pad2[1] = FST.ifct_padded(F_tmp[1]*dealias, U_pad2[1], S)
-    dwdx = U_pad2[2] = FST.ifct_padded(F_tmp[2]*dealias, U_pad2[2], S)
-    c[0] = FST.ifst_padded((1j*K[1]*u_hat[2] - 1j*K[2]*u_hat[1])*dealias, c[0], S)
-    c[1] = FST.ifst_padded(1j*K[2]*u_hat[0]*dealias, c[1], S)
+    dvdx = U_pad2[1] = FST.ifct_padded(F_tmp[1], U_pad2[1], S)
+    dwdx = U_pad2[2] = FST.ifct_padded(F_tmp[2], U_pad2[2], S)
+    c[0] = FST.ifst_padded((1j*K[1]*u_hat[2] - 1j*K[2]*u_hat[1]), c[0], S)
+    c[1] = FST.ifst_padded(1j*K[2]*u_hat[0], c[1], S)
     c[1] -= dwdx
-    c[2] = FST.ifst_padded(1j*K[1]*u_hat[0]*dealias, c[2], S)
+    c[2] = FST.ifst_padded(1j*K[1]*u_hat[0], c[2], S)
     c[2] *= -1.0
     c[2] += dvdx
     return c
@@ -364,7 +364,7 @@ def getConvection(convection):
             else:
                 curl_pad[:] = Curl_padded(U_hat, curl_pad, ST)
                 for i in range(3):
-                    U_pad[i] = FST.ifst_padded(U_hat[i]*dealias, U_pad[i], ST)
+                    U_pad[i] = FST.ifst_padded(U_hat[i], U_pad[i], ST)
                 H_hat[:] = Cross_padded(U_pad, curl_pad, H_hat, ST)
             return H_hat
         
@@ -409,6 +409,9 @@ def solvePressure(P_hat, Ni):
     return P_hat
 
 def regression_test(**kw):
+    pass
+
+def update(**kwargs):
     pass
 
 #@profile

@@ -266,16 +266,27 @@ def test_BBDmat(SBSD):
     assert np.allclose(u0, u2)
     
     # Multidimensional version
-    fj = fj.repeat(16).reshape((N, 4, 4)) + 1j*fj.repeat(16).reshape((N, 4, 4))
-    f_hat = f_hat.repeat(16).reshape((N, 4, 4)) + 1j*f_hat.repeat(16).reshape((N, 4, 4))
-    
-    u0 = np.zeros((N, 4, 4), dtype=np.complex)
+    fj = fj.repeat(N*N).reshape((N, N, N)) + 1j*fj.repeat(N*N).reshape((N, N, N))
+    f_hat = f_hat.repeat(N*N).reshape((N, N, N)) + 1j*f_hat.repeat(N*N).reshape((N, N, N))
+        
+    u0 = np.zeros((N, N, N), dtype=np.complex)
     u0 = SB.fastShenScalar(fj, u0)    
     u2 = B.matvec(f_hat)
-    assert np.linalg.norm(u2-u0)/(N*16) < 1e-12    
+    assert np.linalg.norm(u2-u0)/(N*N*N) < 1e-12    
+    
+    FST = FastShenFourierTransform(np.array([N, N, N]), MPI)
+    f_hat = np.zeros(FST.complex_shape(), dtype=np.complex)
+    fj = np.random.random((N, N, N))
+    f_hat = FST.fst(fj, f_hat, SD)
+    fj = FST.ifst(f_hat, fj, SD)
+    
+    z0 = B.matvec(f_hat)
+    z1 = z0.copy()*0
+    z1 = FST.fss(fj, z1, SB)
+    assert np.linalg.norm(z1-z0)/(N*N*N) < 1e-12    
 
-#test_BBDmat((ShenBiharmonicBasis("GL"), ShenDirichletBasis("GL")))
 
+test_BBDmat((ShenBiharmonicBasis("GL"), ShenDirichletBasis("GL")))
 
 def test_BTXmat(SXST):
     SX, ST = SXST

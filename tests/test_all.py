@@ -25,6 +25,12 @@ def test_single_VV():
 def test_single_VV2():
     d = subprocess.check_output("mpirun -np 1 python TG.py --solver VV --optimization cython", shell=True)
 
+def test_single_KMM():
+    d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py --solver KMM --optimization cython", shell=True)
+
+def test_single_IPCS():
+    d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py --solver IPCS --optimization cython", shell=True)
+
 def test_mpi_slab_DNS():
     d = subprocess.check_output("mpirun -np 4 python TG.py --solver NS", shell=True)
 
@@ -49,3 +55,11 @@ def test_mpi_slab_MHD():
 def test_mpi_pencil_MHD():
     d = subprocess.check_output("mpirun -np 4 python TGMHD.py --solver MHD --decomposition pencil --P1 2", shell=True)
     
+def test_mpi_slab_DNS2D():
+    d = subprocess.check_output("mpirun -np 4 python TG2D.py --solver NS2D", shell=True)
+
+def test_mpi_KMM():
+    d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --solver KMM --optimization cython", shell=True)
+
+def test_mpi_IPCS():
+    d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --solver IPCS --optimization cython", shell=True)
