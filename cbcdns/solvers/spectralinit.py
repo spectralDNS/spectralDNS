@@ -13,7 +13,7 @@ from cbcdns.h5io import *
 from cbcdns.optimization import *
 
 # Import problem specific methods and solver methods specific to either slab or pencil decomposition
-from cbcdns.mpi import *
+from cbcdns.mesh import *
 from cbcdns.maths import *
 
 comm = MPI.COMM_WORLD
