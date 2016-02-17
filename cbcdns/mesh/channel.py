@@ -22,7 +22,7 @@ def setupShen(N, L, MPI, float, complex, **kwargs):
     u_slice = slice(0, Nu)
     p_slice = slice(1, Nu)
     
-    FST = FastShenFourierTransform(N, L, MPI, config.precision)
+    FST = FastShenFourierTransform(N, L, MPI)
     
     # Get grid for velocity points
     X = FST.get_local_mesh(ST)
@@ -79,7 +79,7 @@ def setupShenKMM(N, L, MPI, float, complex, **kwargs):
     u_slice = slice(0, Nu)
     v_slice = slice(0, Nb)
     
-    FST = FastShenFourierTransform(N, L, MPI, config.precision)
+    FST = FastShenFourierTransform(N, L, MPI)
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
 
@@ -137,7 +137,7 @@ def setupShenMHD(N, L, MPI, float, complex, **kwargs):
     u_slice = slice(0, Nu)
     p_slice = slice(1, Nu)
 
-    FST = FastShenFourierTransform(N, L, MPI, config.precision)
+    FST = FastShenFourierTransform(N, L, MPI)
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
 
@@ -190,7 +190,7 @@ def setupShenGeneralBCs(N, L, MPI, float, complex, **kwargs):
     u_slice = slice(0, Nu)
     p_slice = slice(1, Nu)
 
-    FST = FastShenFourierTransform(N, L, MPI, config.precision)
+    FST = FastShenFourierTransform(N, L, MPI)
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
 
@@ -226,8 +226,8 @@ def setupShenGeneralBCs(N, L, MPI, float, complex, **kwargs):
 
 class FastShenFourierTransform(slab_FFT):
     
-    def __init__(self, N, L, MPI, precision):        
-        slab_FFT.__init__(self, N, L, MPI, precision)
+    def __init__(self, N, L, MPI):        
+        slab_FFT.__init__(self, N, L, MPI, "double")
         # Initialize intermediate MPI work arrays
         self.U_mpi2  = empty((self.num_processes, self.Np[0], self.Np[1], self.N[2]))
         self.UT      = empty((3, self.N[0], self.Np[1], self.N[2]))

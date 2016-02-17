@@ -60,6 +60,7 @@ def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, **kw):
         assert round(w - 0.375249930801, 7) == 0
 
 if __name__ == "__main__":
+    from numpy import allclose, random
     config.update(
         {
         'nu': 0.000625,             # Viscosity
@@ -77,3 +78,11 @@ if __name__ == "__main__":
     solver.hdf5file.components["W2"] = solver.curl[2]
     initialize(**vars(solver))
     solver.solve()
+    s = solver
+    FFT = s.FFT
+    s.U[0] = random.random(FFT.real_shape())
+    s.U_hat[0] = FFT.fftn(s.U[0], s.U_hat[0])
+    s.U_tmp[0] = FFT.ifftn(s.U_hat[0], s.U_tmp[0])
+    print s.U_tmp[0]-s.U[0]
+    assert allclose(s.U_tmp[0], s.U[0])
+    

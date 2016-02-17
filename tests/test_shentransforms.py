@@ -6,9 +6,9 @@ from cbcdns.shen import SFTc
 from scipy.linalg import solve
 
 from cbcdns import config
-config.decomposition = "slab"
+config.mesh = "channel"
 config.solver = "IPCS"
-from cbcdns.mpi.slab import FastShenFourierTransform
+from cbcdns.mesh.channel import FastShenFourierTransform
 from mpi4py import MPI
 
 from sympy import chebyshevt, Symbol, sin, cos, pi
@@ -274,7 +274,7 @@ def test_BBDmat(SBSD):
     u2 = B.matvec(f_hat)
     assert np.linalg.norm(u2-u0)/(N*N*N) < 1e-12    
     
-    FST = FastShenFourierTransform(np.array([N, N, N]), MPI)
+    FST = FastShenFourierTransform(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), MPI)
     f_hat = np.zeros(FST.complex_shape(), dtype=np.complex)
     fj = np.random.random((N, N, N))
     f_hat = FST.fst(fj, f_hat, SD)
@@ -286,7 +286,7 @@ def test_BBDmat(SBSD):
     assert np.linalg.norm(z1-z0)/(N*N*N) < 1e-12    
 
 
-test_BBDmat((ShenBiharmonicBasis("GL"), ShenDirichletBasis("GL")))
+#test_BBDmat((ShenBiharmonicBasis("GL"), ShenDirichletBasis("GL")))
 
 def test_BTXmat(SXST):
     SX, ST = SXST
@@ -359,7 +359,7 @@ def test_transforms(ST):
 #test_transforms(ShenBiharmonicBasis("GC"))
 
 def test_FST(ST):
-    FST = FastShenFourierTransform(np.array([N, 4, 4]), MPI)
+    FST = FastShenFourierTransform(np.array([N, 4, 4]), np.array([2*pi, 2*pi, 2*pi]), MPI)
     points, weights = ST.points_and_weights(N)
     fj = np.random.random((N,4,4))    
     f_hat = fj.copy()
