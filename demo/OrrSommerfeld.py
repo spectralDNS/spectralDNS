@@ -212,18 +212,17 @@ def initOS_and_project(OS, U0, U_hat0, X, FST, ST, SB, **kw):
 if __name__ == "__main__":
     config.update(
         {
-        'solver': 'IPCS',
         'Re': 8000.,
         'nu': 1./8000.,             # Viscosity
         'dt': 0.01,                 # Time step
         'T': 0.01,                   # End time
         'L': [2, 2*pi, 4*pi/3.],
-        'M': [7, 6, 1]
-        },  "Shen"
+        'M': [7, 5, 2]
+        },  "channel"
     )
-    config.Shen.add_argument("--compute_energy", type=int, default=1)
-    config.Shen.add_argument("--plot_step", type=int, default=1)
-    solver = get_solver(update=update, regression_test=regression_test, family="Shen")    
+    config.channel.add_argument("--compute_energy", type=int, default=1)
+    config.channel.add_argument("--plot_step", type=int, default=1)
+    solver = get_solver(update=update, regression_test=regression_test, mesh="channel")    
     vars(solver).update(initialize(**vars(solver)))
     set_Source(**vars(solver))	
     solver.solve()

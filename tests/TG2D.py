@@ -27,9 +27,9 @@ if __name__ == '__main__':
       'dt': 0.05,
       'T': 10,
       'write_result': 100,
-      'M': [6, 6]}
+      'M': [6, 6]}, 'doublyperiodic'
     )
 
-    solver = get_solver(update=update, regression_test=regression_test)
+    solver = get_solver(update=update, regression_test=regression_test, mesh='doublyperiodic')
     initialize(**vars(solver))
     solver.solve()

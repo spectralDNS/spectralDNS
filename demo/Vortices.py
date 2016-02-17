@@ -2,7 +2,7 @@ from cbcdns import config, get_solver
 import matplotlib.pyplot as plt
 from numpy import array, sqrt, random, exp, pi
 
-def initialize(W, W_hat, fftn_mpi, X, **kwargs):
+def initialize(W, W_hat, FFT, X, **kwargs):
     W[:] = 0
     if config.init == 'random':
         W[:] = 0.3*random.randn(*W.shape)
@@ -13,11 +13,11 @@ def initialize(W, W_hat, fftn_mpi, X, **kwargs):
                    -0.5*exp(-((X[1]-pi-pi/4)**2+(X[2]-pi-pi/4)**2)/(0.4))
     
     for i in range(3):
-        W_hat[i] = fftn_mpi(W[i], W_hat[i])
+        W_hat[i] = FFT.fftn(W[i], W_hat[i])
         
     return W, W_hat
 
-def set_source(U, Source, fftn_mpi, N, X, **kwargs):
+def set_source(U, Source, FFT, N, X, **kwargs):
     U[:] = 0
     if config.init == 'random':
         #U[0, :, N/2, (2*N)/3] = 200
@@ -30,15 +30,15 @@ def set_source(U, Source, fftn_mpi, N, X, **kwargs):
     else:
         pass
     
-    Source[0] = fftn_mpi(U[0], Source[0])
-    Source[1] = fftn_mpi(U[1], Source[1])
-    Source[2] = fftn_mpi(U[2], Source[2])    
+    Source[0] = FFT.fftn(U[0], Source[0])
+    Source[1] = FFT.fftn(U[1], Source[1])
+    Source[2] = FFT.fftn(U[2], Source[2])    
     
     return Source
 
 im, im2 = None, None    
 def update(t, tstep, dt, comm, rank, P, P_hat, U, W, W_hat, Curl, hdf5file, 
-           Source, ifftn_mpi, X, Nf, N, **soak):    
+           Source, X, **kw):    
     global im, im2
     if tstep == 1 and rank == 0:
         plt.figure()
@@ -77,17 +77,17 @@ def finalize(rank, Nf, X, U, W_hat, Curl, **soak):
 if __name__ == "__main__":
     config.update(
         {
-        'solver': 'VV',
         'nu': 0.000625,              # Viscosity
         'dt': 0.01,                  # Time step
         'T': 50,                     # End time
         'write_result': 100
         }
     )        
-    config.Isotropic.add_argument("--init", default='random', choices=('random', 'vortex'))
-    config.Isotropic.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
-    solver = get_solver(update)
+    config.triplyperiodic.add_argument("--init", default='random', choices=('random', 'vortex'))
+    config.triplyperiodic.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
+    solver = get_solver(update=update, mesh="triplyperiodic")
     assert config.decomposition == 'slab'
+    assert config.solver == 'VV'
     solver.W, solver.W_hat = initialize(**vars(solver))
     solver.Source = set_source(**vars(solver))
     solver.solve()

@@ -73,7 +73,6 @@ def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, FFT, U_hat, U, sum,
 if __name__ == "__main__":
     config.update(
         {
-            'solver': 'Bq2D',
             'nu': 1.0e-08,
             'dt': 0.001,
             'T': 1.0,
@@ -88,11 +87,12 @@ if __name__ == "__main__":
             'k0': 2,
             'rho1': 1.0,
             'rho2': 3.0,
-        }
+        }, 'doublyperiodic'
     )
-    config.Isotropic.add_argument("--plot_result", type=int, default=10)
-    config.Isotropic.add_argument("--compute_energy", type=int, default=2)
-    solver = get_solver(update)
+    config.doublyperiodic.add_argument("--plot_result", type=int, default=10)
+    config.doublyperiodic.add_argument("--compute_energy", type=int, default=2)
+    solver = get_solver(update, mesh='doublyperiodic')
     solver.hdf5file.components["curl"] = solver.curl
+    assert config.solver == 'Bq2D'
     initialize(**vars(solver))
     solver.solve()

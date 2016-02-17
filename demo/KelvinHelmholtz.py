@@ -60,22 +60,22 @@ def update(t, tstep, comm, rank, N, L, dx, FFT, U_hat, U, sum,
 
 if __name__ == "__main__":
     config.update(
-    {
-    'solver': 'NS2D',
-    'nu': 1.0e-05,
-    'dt': 0.007,
-    'T': 25.0,
-    'U1':-0.5,
-    'U2':0.5,
-    'l0': 0.001,    # Smoothing parameter
-    'A': 0.01,      # Amplitude of perturbation
-    'delta': 0.1,   # Width of perturbations
-    'write_result': 500
-    }
+        {
+        'nu': 1.0e-05,
+        'dt': 0.007,
+        'T': 25.0,
+        'U1':-0.5,
+        'U2':0.5,
+        'l0': 0.001,    # Smoothing parameter
+        'A': 0.01,      # Amplitude of perturbation
+        'delta': 0.1,   # Width of perturbations
+        'write_result': 500
+        }, 'doublyperiodic'
     )
     # Adding new arguments required here to allow overloading through commandline
-    config.Isotropic.add_argument("--plot_result", type=int, default=10)    
-    config.Isotropic.add_argument("--compute_energy", type=int, default=10)
-    solver = get_solver(update)
+    config.doublyperiodic.add_argument('--plot_result', type=int, default=10)    
+    config.doublyperiodic.add_argument('--compute_energy', type=int, default=10)
+    solver = get_solver(update, mesh='doublyperiodic')
+    assert config.solver == 'NS2D'
     initialize(**vars(solver))
     solver.solve()

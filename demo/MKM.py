@@ -2,7 +2,7 @@
 from cbcdns import config, get_solver
 from numpy import dot, real, pi, exp, sum, complex, float, zeros, arange, imag, cos, where, pi, random, exp, sin, log, array, zeros_like
 import h5py
-from cbcdns.fft.wrappyfftw import dct
+from mpiFFT4py import dct
 import matplotlib.pyplot as plt
 import warnings
 import matplotlib.cbook
@@ -24,7 +24,7 @@ def initOS(OS, U, X, t=0.):
             U[1, i, j, :] = v
     U[2] = 0
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_processes, 
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_processes, 
                Curl, conv, TDMASolverD, solvePressure, N, H_hat, H_hat1, U_tmp, K, **kw):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
@@ -104,14 +104,14 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, SN, X, comm, rank, num_p
             conv2[j] = TDMASolverD(conv2[j])
         conv2 *= -1
         P_hat = solvePressure(P_hat, conv2)
-        P = FST.ifst(P_hat, P, SN)
+        P = FST.ifst(P_hat, P, kw['SN'])
         
     U0[:] = U[:]
     U_hat0[:] = U_hat[:]
     H_hat1 = conv(H_hat1, U0, U_hat0)
  
 def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K,
-                   rank, conv, FST, ST, SN, num_processes, **kw):
+                   rank, conv, FST, ST, **kw):
     f = h5py.File(filename, driver="mpio", comm=comm)
     assert "0" in f["3D/checkpoint/U"]
     N = U0.shape[1]
@@ -130,9 +130,9 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K,
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
         
         if config.solver == "IPCSR":
-            P_hat = FST.fct(P, P_hat, SN)
+            P_hat = FST.fct(P, P_hat, kw['SN'])
         else:
-            P_hat = FST.fst(P, P_hat, SN)
+            P_hat = FST.fst(P, P_hat, kw['SN'])
 
     elif "KMM" in config.solver:
         U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB'])
@@ -174,7 +174,7 @@ def Q(u, rank, comm, N):
         return 0
 
 beta = zeros(1)    
-def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, SN, Source, Sk, 
+def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk, 
            ST, SB, U_tmp, F_tmp, comm, N, dU, diff0, hv, **kw):
     global im1, im2, im3, flux
 
@@ -372,24 +372,23 @@ class Stats(object):
 if __name__ == "__main__":
     config.update(
         {
-        'solver': 'IPCS',
         'nu': 1./180.,                  # Viscosity
         'Re_tau': 180., 
         'dt': 0.001,                  # Time step
         'T': 100.,                    # End time
         'L': [2, 4*pi, 4.*pi/3.],
         'M': [6, 6, 5]
-        },  "Shen"
+        },  "channel"
     )
-    config.Shen.add_argument("--compute_energy", type=int, default=100)
-    config.Shen.add_argument("--plot_result", type=int, default=100)
-    config.Shen.add_argument("--sample_stats", type=int, default=100)
-    config.Shen.add_argument("--print_energy0", type=int, default=100)
-    solver = get_solver(update=update, family="Shen")    
-    #initialize(**vars(solver))    
-    init_from_file("KMM666t5.h5", **vars(solver))
+    config.channel.add_argument("--compute_energy", type=int, default=100)
+    config.channel.add_argument("--plot_result", type=int, default=100)
+    config.channel.add_argument("--sample_stats", type=int, default=100)
+    config.channel.add_argument("--print_energy0", type=int, default=100)
+    solver = get_solver(update=update, mesh="channel")    
+    initialize(**vars(solver))    
+    #init_from_file("KMM666t5.h5", **vars(solver))
     set_Source(**vars(solver))
-    solver.stats = Stats(solver.U, solver.comm, fromstats="KMMstats")
+    solver.stats = Stats(solver.U, solver.comm, filename="KMMstats")
     solver.hdf5file.fname = "KMM666t4.h5"
     solver.solve()
     s = solver.stats.get_stats()

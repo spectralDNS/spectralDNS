@@ -39,16 +39,15 @@ def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, X, nu, *
 if __name__ == '__main__':
     config.update(
     {
-      'solver': 'NS2D',
       'nu': 0.01,
       'dt': 0.05,
       'T': 10,
       'write_result': 100,
-      'M': [6, 6]}
+      'M': [6, 6]}, 'doublyperiodic'
     )
 
-    config.Isotropic.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
-    solver = get_solver(update=update, regression_test=regression_test)
+    config.doublyperiodic.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
+    solver = get_solver(update=update, regression_test=regression_test, mesh="doublyperiodic")
     solver.hdf5file.components["curl"] = solver.curl
     initialize(**vars(solver))
     solver.solve()

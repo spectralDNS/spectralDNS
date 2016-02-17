@@ -2,12 +2,11 @@
 from numpy.polynomial import chebyshev as n_cheb
 from cbcdns import config, get_solver
 from numpy import dot, real, pi, exp, sum, zeros, cos, exp, arange, imag, sqrt, array
-from cbcdns.fft.wrappyfftw import dct
+from mpiFFT4py import dct
 import matplotlib.pyplot as plt
 import warnings
 import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
-
 
 def energy(u, N, comm, rank, L):
     uu = sum(u, axis=(1,2))
@@ -29,13 +28,12 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, **kw):
     P[:] = 0
     P_hat[:] = 0
 
-def set_Source(Source, Sk, fss, ST, **kw):
+def set_Source(Source, Sk, FST, ST, **kw):
     Source[:] = 0
     Source[1, :] = -2./config.Re
     Sk[:] = 0
     for i in range(3):
-        Sk[i] = fss(Source[i], Sk[i], ST)
-
+        Sk[i] = FST.fss(Source[i], Sk[i], ST)
 
 def exact(x, Re, t, num_terms=400):
     beta = 2./Re
@@ -114,18 +112,17 @@ def regression_test(U, X, N, comm, rank, L, ST, num_processes, x0, **kw):
 if __name__ == "__main__":
     config.update(
         {
-        'solver': 'IPCS',
         'Re': 800.,
         'nu': 1./800.,             # Viscosity
         'dt': 0.5,                 # Time step
         'T': 50.,                   # End time
         'L': [2, 2*pi, 4*pi/3.],
-        'M': [6, 5, 1]
-        },  "Shen"
+        'M': [6, 5, 2]
+        },  "channel"
     )
-    config.Shen.add_argument("--compute_energy", type=int, default=5)
-    config.Shen.add_argument("--plot_step", type=int, default=10)
-    solver = get_solver(update=update, regression_test=regression_test, family="Shen")    
+    config.channel.add_argument("--compute_energy", type=int, default=5)
+    config.channel.add_argument("--plot_step", type=int, default=10)
+    solver = get_solver(update=update, regression_test=regression_test, mesh="channel")    
     initialize(**vars(solver))
     set_Source(**vars(solver))
     solver.solve()

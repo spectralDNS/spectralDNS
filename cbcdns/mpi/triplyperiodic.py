@@ -8,7 +8,7 @@ from mpiFFT4py import *
 
 __all__ = ['setup']
 
-def setupDNS(float, complex, FFT, **kwargs):    
+def setupDNS(float, complex, FFT, sum, where, **kwargs):    
     
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()
@@ -36,7 +36,7 @@ def setupDNS(float, complex, FFT, **kwargs):
     del kwargs
     return locals() # Lazy (need only return what is needed)
 
-def setupMHD(float, complex, FFT, **kwargs):
+def setupMHD(float, complex, FFT, sum, where, **kwargs):
     
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()

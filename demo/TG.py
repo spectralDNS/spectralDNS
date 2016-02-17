@@ -67,10 +67,10 @@ if __name__ == "__main__":
         'T': 0.1,                   # End time
         'L': [2*pi, 2*pi, 2*pi],
         'M': [5, 5, 5]
-        },  "Isotropic"
+        },  "triplyperiodic"
     )
-    config.Isotropic.add_argument("--compute_energy", type=int, default=2)
-    solver = get_solver(update=update)
+    config.triplyperiodic.add_argument("--compute_energy", type=int, default=2)
+    solver = get_solver(update=update, mesh="triplyperiodic")
     solver.hdf5file.fname = "NS7.h5"
     solver.hdf5file.components["W0"] = solver.curl[0]
     solver.hdf5file.components["W1"] = solver.curl[1]
