@@ -16,16 +16,16 @@ Source = U_hat.copy()*0    # Possible source term initialized to zero
 def Curl(a, c):
     """c = curl(a) = F_inv(F(curl(a))/K2) = F_inv(1j*(K x a)/K2)"""
     F_tmp[:] = cross2(F_tmp, K_over_K2, a)
-    c[0] = ifftn_mpi(F_tmp[0], c[0])
-    c[1] = ifftn_mpi(F_tmp[1], c[1])
-    c[2] = ifftn_mpi(F_tmp[2], c[2])    
+    c[0] = FFT.ifftn(F_tmp[0], c[0])
+    c[1] = FFT.ifftn(F_tmp[1], c[1])
+    c[2] = FFT.ifftn(F_tmp[2], c[2])    
     return c
 
 #@profile
 def ComputeRHS(dU, rk):
     if rk > 0:
         for i in range(3):
-            W[i] = ifftn_mpi(W_hat[i], W[i])
+            W[i] = FFT.ifftn(W_hat[i], W[i])
             
     U[:] = Curl(W_hat, U)
     F_tmp[:] = Cross(U, W, F_tmp)
@@ -49,7 +49,7 @@ def solve():
         W_hat = integrate(t, tstep, dt)
 
         for i in range(3):
-            W[i] = ifftn_mpi(W_hat[i], W[i])
+            W[i] = FFT.ifftn(W_hat[i], W[i])
                         
         update(t, tstep, **globals())
         

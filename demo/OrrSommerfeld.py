@@ -36,9 +36,10 @@ def energy(u, N, comm, rank, L):
         return 0    
 
 def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST, U_tmp,
-               ST, SN, X, N, comm, rank, L, conv, TDMASolverD, F_tmp, H, H1, **kw):        
+               ST, X, N, comm, rank, L, conv, TDMASolverD, F_tmp, H, H1, **kw):        
     OS = OrrSommerfeld(Re=config.Re, N=100)
     initOS(OS, U0, U_hat0, X)
+    
     if not config.solver in ("ChannelRK4", "KMM", "KMMRK3"):
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
@@ -65,7 +66,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST, U_tmp
         conv2 *= -1
         P_hat = solvePressure(P_hat, conv2)
 
-        P = FST.ifst(P_hat, P, SN)
+        P = FST.ifst(P_hat, P, kw['SN'])
         U0[:] = U
         U_hat0[:] = U_hat
         config.t = config.dt
@@ -130,8 +131,8 @@ def set_Source(Source, Sk, FST, ST, **kw):
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
         
 im1, im2, im3, im4 = (None, )*4        
-def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, **kw):
-    global im1, im2, im3, im4
+def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, U_hat, **kw):
+    global im1, im2, im3
     if im1 is None and rank == 0 and config.plot_step > 0:
         plt.figure()
         im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
@@ -144,16 +145,22 @@ def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, **kw):
         plt.draw()
 
         plt.figure()
-        im3 = plt.contourf(X[1,:,:,0], X[0,:,:,0], P[:,:,0], 100)
-        plt.colorbar(im3)
-        plt.draw()
-        
-        plt.figure()
-        im4 = plt.quiver(X[1, :,:,0], X[0,:,:,0], U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
+        im3 = plt.quiver(X[1, :,:,0], X[0,:,:,0], U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
         plt.draw()
         
         plt.pause(1e-6)
-        globals().update(im1=im1, im2=im2, im3=im3, im4=im4)
+        globals().update(im1=im1, im2=im2, im3=im3)
+
+    if (config.tstep % config.plot_step == 0 or
+        config.tstep % config.compute_energy == 0):
+        
+        if "KMM" in config.solver:
+            U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
+            for i in range(1, 3):
+                U[i] = FST.ifst(U_hat[i], U[i], ST)     
+        else:
+            for i in range(3):
+                U[i] = FST.ifst(U_hat[i], U[i], ST)
     
     if config.tstep % config.plot_step == 0 and rank == 0 and config.plot_step > 0:
         im1.ax.clear()
@@ -162,12 +169,8 @@ def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, **kw):
         im2.ax.clear()
         im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0]-(1-X[0,:,:,0]**2), 100)         
         im2.autoscale()
-        im3.ax.clear()
-        im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100) 
-        im3.autoscale()
-        im4.set_UVC(U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
+        im3.set_UVC(U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
         plt.pause(1e-6)
-                
 
     if config.tstep % config.compute_energy == 0: 
         pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
@@ -209,18 +212,17 @@ def initOS_and_project(OS, U0, U_hat0, X, FST, ST, SB, **kw):
 if __name__ == "__main__":
     config.update(
         {
-        'solver': 'IPCS',
         'Re': 8000.,
         'nu': 1./8000.,             # Viscosity
         'dt': 0.01,                 # Time step
         'T': 0.01,                   # End time
         'L': [2, 2*pi, 4*pi/3.],
-        'M': [7, 6, 1]
-        },  "Shen"
+        'M': [7, 5, 2]
+        },  "channel"
     )
-    config.Shen.add_argument("--compute_energy", type=int, default=1)
-    config.Shen.add_argument("--plot_step", type=int, default=1)
-    solver = get_solver(update=update, regression_test=regression_test, family="Shen")    
+    config.channel.add_argument("--compute_energy", type=int, default=1)
+    config.channel.add_argument("--plot_step", type=int, default=1)
+    solver = get_solver(update=update, regression_test=regression_test, mesh="channel")    
     vars(solver).update(initialize(**vars(solver)))
     set_Source(**vars(solver))	
     solver.solve()

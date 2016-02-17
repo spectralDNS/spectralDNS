@@ -27,7 +27,7 @@ def divergenceConvection(z0, z1, c):
     """
     for i in range(3):
         for j in range(3):
-            F_tmp[i, j] = fftn_mpi(z0[i]*z1[j], F_tmp[i, j])
+            F_tmp[i, j] = FFT.fftn(z0[i]*z1[j], F_tmp[i, j])
             
     c = set_Elsasser(c, F_tmp, K)
     #c[:3] = -1j*(K[0]*(F_tmp[:, 0] + F_tmp[0, :])
@@ -43,7 +43,7 @@ def divergenceConvection(z0, z1, c):
 def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U, B
         for i in range(6):
-            UB[i] = ifftn_mpi(UB_hat[i], UB[i])
+            UB[i] = FFT.ifftn(UB_hat[i], UB[i])
     
     # Compute convective term and place in dU
     dU = divergenceConvection(U+B, U-B, dU)
@@ -80,7 +80,7 @@ def solve():
         UB_hat[:] = integrate(t, tstep, dt)
 
         for i in range(6):
-            UB[i] = ifftn_mpi(UB_hat[i], UB[i])
+            UB[i] = FFT.ifftn(UB_hat[i], UB[i])
                  
         update(t, tstep, **globals())
         

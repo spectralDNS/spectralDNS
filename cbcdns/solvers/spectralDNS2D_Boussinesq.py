@@ -29,21 +29,21 @@ def add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Ri, 
 def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U, V, W
         for i in range(3):
-            Ur[i] = ifft2_mpi(Ur_hat[i], Ur[i])
+            Ur[i] = FFT.ifft2(Ur_hat[i], Ur[i])
 
     F_tmp[0] = cross2(F_tmp[0], K, U_hat)
-    curl[:] = ifft2_mpi(F_tmp[0], curl)
-    dU[0] = fft2_mpi(U[1]*curl, dU[0])
-    dU[1] = fft2_mpi(-U[0]*curl, dU[1])
+    curl[:] = FFT.ifft2(F_tmp[0], curl)
+    dU[0] = FFT.fft2(U[1]*curl, dU[0])
+    dU[1] = FFT.fft2(-U[0]*curl, dU[1])
    
-    F_tmp[0] = fft2_mpi(U[0]*rho, F_tmp[0])
-    F_tmp[1] = fft2_mpi(U[1]*rho, F_tmp[1])
+    F_tmp[0] = FFT.fft2(U[0]*rho, F_tmp[0])
+    F_tmp[1] = FFT.fft2(U[1]*rho, F_tmp[1])
     dU[2] = -1j*(K[0]*F_tmp[0]+K[1]*F_tmp[1])
     
-    #U_tmp[0] = ifft2_mpi(1j*K[0]*rho_hat, U_tmp[0])
-    #U_tmp[1] = ifft2_mpi(1j*K[1]*rho_hat, U_tmp[1])          
-    #F_tmp[0] = fft2_mpi(U[0]*U_tmp[0], F_tmp[0])      
-    #F_tmp[1] = fft2_mpi(U[1]*U_tmp[1], F_tmp[1])    
+    #U_tmp[0] = FFT.ifft2(1j*K[0]*rho_hat, U_tmp[0])
+    #U_tmp[1] = FFT.ifft2(1j*K[1]*rho_hat, U_tmp[1])          
+    #F_tmp[0] = FFT.fft2(U[0]*U_tmp[0], F_tmp[0])      
+    #F_tmp[1] = FFT.fft2(U[1]*U_tmp[1], F_tmp[1])    
     #dU[2] = -1.0*(F_tmp[0] + F_tmp[1])    
     
     dU = dealias_rhs(dU, dealias)
@@ -69,7 +69,7 @@ def solve():
         Ur_hat[:] = integrate(t, tstep, dt)
 
         for i in range(3):
-            Ur[i] = ifft2_mpi(Ur_hat[i], Ur[i])
+            Ur[i] = FFT.ifft2(Ur_hat[i], Ur[i])
                  
         update(t, tstep, **globals())
         

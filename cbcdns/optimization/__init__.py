@@ -18,12 +18,9 @@ def optimizer(func):
     NS solver.
     
     """
+    
     try: # Look for optimized version of function
-        if config.optimization in ('numexpr'):
-            mod = eval('{0}_module'.format(config.optimization))
-            
-        else:
-            mod = eval('{0}_{1}'.format(config.optimization, config.precision))
+        mod = eval('{0}_{1}'.format(config.optimization, config.precision))
             
         # Check for generic implementation first, then solver specific 
         name = func.func_name

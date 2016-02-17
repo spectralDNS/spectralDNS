@@ -1,7 +1,7 @@
 import pytest
 from cbcdns.shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ChebyshevTransform, ShenBiharmonicBasis
 from cbcdns.shen.la import TDMA, Helmholtz, Biharmonic
-from cbcdns.shen.Matrices import BNNmat, BTTmat, BDDmat, CDDmat, CDNmat, BNDmat, CNDmat, BDNmat, ADDmat, ANNmat, CTDmat, BDTmat, CDTmat, BTDmat, BTNmat, BBBmat, ABBmat, SBBmat, CDBmat, CBDmat, ATTmat, BBDmat
+from cbcdns.shen.Matrices import BNNmat, BTTmat, BDDmat, CDDmat, CDNmat, BNDmat, CNDmat, BDNmat, ADDmat, ANNmat, CTDmat, BDTmat, CDTmat, BTDmat, BTNmat, BBBmat, ABBmat, SBBmat, CDBmat, CBDmat, ATTmat, BBDmat, HelmholtzCoeff
 from cbcdns.shen import SFTc
 from scipy.linalg import solve
 
@@ -266,16 +266,27 @@ def test_BBDmat(SBSD):
     assert np.allclose(u0, u2)
     
     # Multidimensional version
-    fj = fj.repeat(16).reshape((N, 4, 4)) + 1j*fj.repeat(16).reshape((N, 4, 4))
-    f_hat = f_hat.repeat(16).reshape((N, 4, 4)) + 1j*f_hat.repeat(16).reshape((N, 4, 4))
-    
-    u0 = np.zeros((N, 4, 4), dtype=np.complex)
+    fj = fj.repeat(N*N).reshape((N, N, N)) + 1j*fj.repeat(N*N).reshape((N, N, N))
+    f_hat = f_hat.repeat(N*N).reshape((N, N, N)) + 1j*f_hat.repeat(N*N).reshape((N, N, N))
+        
+    u0 = np.zeros((N, N, N), dtype=np.complex)
     u0 = SB.fastShenScalar(fj, u0)    
     u2 = B.matvec(f_hat)
-    assert np.linalg.norm(u2-u0)/(N*16) < 1e-12    
+    assert np.linalg.norm(u2-u0)/(N*N*N) < 1e-12    
+    
+    FST = FastShenFourierTransform(np.array([N, N, N]), MPI)
+    f_hat = np.zeros(FST.complex_shape(), dtype=np.complex)
+    fj = np.random.random((N, N, N))
+    f_hat = FST.fst(fj, f_hat, SD)
+    fj = FST.ifst(f_hat, fj, SD)
+    
+    z0 = B.matvec(f_hat)
+    z1 = z0.copy()*0
+    z1 = FST.fss(fj, z1, SB)
+    assert np.linalg.norm(z1-z0)/(N*N*N) < 1e-12    
 
-#test_BBDmat((ShenBiharmonicBasis("GL"), ShenDirichletBasis("GL")))
 
+test_BBDmat((ShenBiharmonicBasis("GL"), ShenDirichletBasis("GL")))
 
 def test_BTXmat(SXST):
     SX, ST = SXST
@@ -957,6 +968,41 @@ def test_Biharmonic(SB):
     assert np.allclose(u1, uj)
 
 #test_Biharmonic(ShenBiharmonicBasis("GC"))
+
+def test_Helmholtz_matvec(SD):
+    M = 2*N
+    kx = 11
+    points, weights = SD.points_and_weights(M)
+    uj = np.random.randn(M)
+    u_hat = np.zeros(M)
+    u_hat = SD.fst(uj, u_hat)
+    uj = SD.ifst(u_hat, uj)
+    
+    A = ADDmat(np.arange(M).astype(np.float))
+    B = BDDmat(np.arange(M).astype(np.float), SD.quad)
+    AB = HelmholtzCoeff(np.arange(M).astype(np.float), 1, kx**2, SD.quad)
+    s = slice(0, M-2)
+
+    u1 = np.zeros(M)
+    u1 = SD.fst(uj, u1)
+    c = A.matvec(u1)+kx**2*B.matvec(u1)
+
+    b = np.zeros(M)
+    #SFTc.Mult_Helmholtz_1D(M, SD.quad=="GL", 1, kx**2, u1, b)
+    b = AB.matvec(u1, b)
+    assert np.allclose(c, b)
+    
+    b = np.zeros((M, 4, 4), dtype=np.complex)
+    u1 = u1.repeat(16).reshape((M, 4, 4)) +1j*u1.repeat(16).reshape((M, 4, 4))
+    kx = np.zeros((4, 4))+kx
+    #SFTc.Mult_Helmholtz_3D_complex(M, SD.quad=="GL", 1.0, kx**2, u1, b)
+    AB = HelmholtzCoeff(np.arange(M).astype(np.float), 1, kx**2, SD.quad)
+    b = AB.matvec(u1, b)
+    
+    assert np.linalg.norm(b[:, 2, 2].real - c)/(M*16) < 1e-12
+    assert np.linalg.norm(b[:, 2, 2].imag - c)/(M*16) < 1e-12
+
+#test_Helmholtz_matvec(ShenDirichletBasis("GL"))  
   
 #test_ADDmat(ShenNeumannBasis("GL")) 
 #test_Helmholtz2(ShenDirichletBasis("GL")) 

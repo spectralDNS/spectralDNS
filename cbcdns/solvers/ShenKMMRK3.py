@@ -8,24 +8,19 @@ from ShenKMM import *
 a = (8./15., 5./12., 3./4.)
 b = (0.0, -17./60., -5./12.)
 
-HelmholtzSolverG = (Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[0]+b[0])/dt), 
-                              ST.quad, False),
-                    Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[1]+b[1])/dt), 
-                              ST.quad, False),
-                    Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[2]+b[2])/dt), 
-                              ST.quad, False))
+HelmholtzSolverG = [Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[rk]+b[rk])/dt), 
+                              ST.quad, False) for rk in range(3)]
 
-BiharmonicSolverU = (Biharmonic(N[0], -nu*a[0]*dt/2., 1.+nu*a[0]*dt*K2[0], 
-                                -(K2[0] + nu*a[0]*dt/2.*K2[0]**2), SB.quad),
-                     Biharmonic(N[0], -nu*(a[1]+b[1])*dt/2., 1.+nu*(a[1]+b[1])*dt*K2[0], 
-                                -(K2[0] + nu*(a[1]+b[1])*dt/2.*K2[0]**2), SB.quad),
-                     Biharmonic(N[0], -nu*(a[2]+b[2])*dt/2., 1.+nu*(a[2]+b[2])*dt*K2[0], 
-                                -(K2[0] + nu*(a[2]+b[2])*dt/2.*K2[0]**2), SB.quad))
+BiharmonicSolverU = [Biharmonic(N[0], -nu*(a[rk]+b[rk])*dt/2., 1.+nu*(a[rk]+b[rk])*dt*K2[0], 
+                                -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)]
 
-HelmholtzSolverU0 = (Helmholtz(N[0], sqrt(2./nu/(a[0]+b[0])/dt), ST.quad, False),
-                     Helmholtz(N[0], sqrt(2./nu/(a[1]+b[1])/dt), ST.quad, False),
-                     Helmholtz(N[0], sqrt(2./nu/(a[2]+b[2])/dt), ST.quad, False))
-    
+HelmholtzSolverU0 = [Helmholtz(N[0], sqrt(2./nu/(a[rk]+b[rk])/dt), ST.quad, False) for rk in range(3)]
+
+AC = [BiharmonicCoeff(K[0, :, 0, 0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2[0]),
+                      -(K2[0] - nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)]
+
+AB = [HelmholtzCoeff(K[0, :, 0, 0], -1.0, -(K2[0] - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)]
+
 U_hat1 = U_hat0.copy()
 U_hat2 = U_hat0.copy()
 hg0 = hg.copy()
@@ -34,37 +29,35 @@ u0_hat = zeros((3, N[0]), dtype=complex)
 h0_hat = zeros((3, N[0]), dtype=complex)
 h0 = zeros((2, N[0]), dtype=complex)
 h1 = zeros((2, N[0]), dtype=complex)
-#@profile
+
+@optimizer
+def add_diffusion_u(u, d, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
+    d[:] = nu*(a+b)*dt/2.*SBB.matvec(u)
+    d += (1. - nu*(a+b)*dt*K2)*ABB.matvec(u)
+    d -= (K2 - nu*(a+b)*dt/2.*K2**2)*BBB.matvec(u)
+    return d
 
 def RKstep(U_hat, g, dU, rk):
     global conv1, hv, hg, hv0, hg0, a, b, h0, h1
-    
-    if rk > 0: # For rk=0 the correct values are already in U
-        U[0] = FST.ifst(U_hat[0], U[0], SB)
-        for i in range(1, 3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
     
     # Compute convection
     H_hat[:] = conv(H_hat, U, U_hat)    
     
     # Compute diffusion for g and u-equation
-    diff0[:] = 0
-    SFTc.Mult_Helmholtz_3D_complex(N[0], ST.quad=="GL", -1, alfa, g, diff0[1])
+    diff0[1] = AB[rk].matvec(g, diff0[1])
     
-    diff0[0] = nu*(a[rk]+b[rk])*dt/2.*SBB.matvec(U_hat[0])
-    diff0[0] += (1. - nu*(a[rk]+b[rk])*dt*K2)*ABB.matvec(U_hat[0])
-    diff0[0] -= (K2 - nu*(a[rk]+b[rk])*dt/2.*K2**2)*BBB.matvec(U_hat[0])
+    # Compute diffusion++ for u-equation
+    diff0[0] = add_diffusion_u(U_hat[0], diff0[0], AC[rk], SBB, ABB, BBB, nu, dt, K2, K4, a[rk], b[rk])
     
     #hv[:] = -K2*BBD.matvec(H_hat[0])
     hv[:] = FST.fss(H[0], hv, SB)
     hv *= -K2
-    
     hv -= 1j*K[1]*CBD.matvec(H_hat[1])
     hv -= 1j*K[2]*CBD.matvec(H_hat[2])    
     hg[:] = 1j*K[1]*BDD.matvec(H_hat[2]) - 1j*K[2]*BDD.matvec(H_hat[1])
     
     dU[0] = (hv*a[rk] + hv0*b[rk])*dt + diff0[0]
-    dU[1] = (hg*a[rk] + hg0*b[rk])*2./nu + diff0[1]
+    dU[1] = (hg*a[rk] + hg0*b[rk])*2./nu/(a[rk]+b[rk]) + diff0[1]
     
     U_hat[0] = BiharmonicSolverU[rk](U_hat[0], dU[0])
     g[:] = HelmholtzSolverG[rk](g, dU[1])
@@ -78,7 +71,7 @@ def RKstep(U_hat, g, dU, rk):
     
     U_hat[1] = -1j*(K_over_K2[1]*f_hat - K_over_K2[2]*g)
     U_hat[2] = -1j*(K_over_K2[2]*f_hat + K_over_K2[1]*g) 
-    
+
     # Remains to fix wavenumber 0    
     if rank == 0:
         h0_hat[1, :] = H_hat[1, :, 0, 0]
@@ -125,16 +118,8 @@ def solve():
             hg0[:] = hg
             h0[:]  = h1
         
-        U[0] = FST.ifst(U_hat[0], U[0], SB)
-        for i in range(1, 3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
-
         update(**globals())
- 
-        # Rotate velocities
-        U_hat0[:] = U_hat
-        U0[:] = U
-                
+                 
         timer()
         
         if config.tstep == 1 and config.make_profile:

@@ -1,6 +1,6 @@
 import numpy as np
 from cbcdns import config
-from SFTc import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, SBBmat_matvec3D, Biharmonic_matvec, Biharmonic_matvec3D, Tridiagonal_matvec, Tridiagonal_matvec3D, Pentadiagonal_matvec, Pentadiagonal_matvec3D, CBD_matvec3D, CBD_matvec, ADDmat_matvec
+from SFTc import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, SBBmat_matvec3D, Biharmonic_matvec, Biharmonic_matvec3D, Tridiagonal_matvec, Tridiagonal_matvec3D, Pentadiagonal_matvec, Pentadiagonal_matvec3D, CBD_matvec3D, CBD_matvec, ADDmat_matvec, Helmholtz_matvec3D, Helmholtz_matvec
 from scipy.sparse import diags
 
 pi, zeros, ones, array = np.pi, np.zeros, np.ones, np.array
@@ -790,8 +790,7 @@ class BiharmonicCoeff(BaseMatrix):
     def __init__(self, K, a0, alfa, beta, quad="GL"):
         BaseMatrix.__init__(self)
         self.quad = quad
-        self.N = K.shape[0]-4
-        N = K.shape[0]-4
+        N = self.N = K.shape[0]-4
         self.shape = (N, N)
         self.S = SBBmat(K)
         self.B = BBBmat(K, self.quad)
@@ -800,10 +799,10 @@ class BiharmonicCoeff(BaseMatrix):
         self.alfa = alfa
         self.beta = beta
                 
-    def matvec(self, v):
+    def matvec(self, v, c):
         N = self.shape[0]
         #c = np.zeros(v.shape, dtype=v.dtype)
-        c = self.get_return_array(v)
+        c[:] = 0
         if len(v.shape) > 1:
             Biharmonic_matvec3D(v, c, self.a0, self.alfa, self.beta, self.S.dd, self.S.ud[0], 
                                 self.S.ud[1], self.A.ld, self.A.dd, self.A.ud,
@@ -817,4 +816,30 @@ class BiharmonicCoeff(BaseMatrix):
     def diags(self):
         raise NotImplementedError
         #return diags([self.ldd, self.ld, self.dd]+self.ud, range(-4, self.shape()[0], 2), shape=self.shape())
+    
+class HelmholtzCoeff(BaseMatrix):
+    
+    def __init__(self, K, alfa, beta, quad="GL"):
+        """alfa*ADD + beta*BDD
+        """
+        BaseMatrix.__init__(self)
+        self.quad = quad
+        N = self.N = K.shape[0]-2
+        self.shape = (N, N)
+        self.B = BDDmat(K, self.quad)
+        self.A = ADDmat(K)
+        self.alfa = alfa
+        self.beta = beta
+                
+    def matvec(self, v, c):
+        N = self.shape[0]
+        c[:] = 0
+        if len(v.shape) > 1:
+            Helmholtz_matvec3D(v, c, self.alfa, self.beta, self.A.dd, self.A.ud[0], self.B.dd)
+        else:
+            Helmholtz_matvec(v, c, self.alfa, self.beta, self.A.dd, self.A.ud[0], self.B.dd)
+        return c
+    
+    def diags(self):
+        raise NotImplementedError
     
