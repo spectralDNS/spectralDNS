@@ -55,8 +55,8 @@ def test_mpi_slab_MHD():
 def test_mpi_pencil_MHD():
     d = subprocess.check_output("mpirun -np 4 python TGMHD.py --decomposition pencil --P1 2 MHD", shell=True)
     
-def test_mpi_slab_DNS2D():
-    d = subprocess.check_output("mpirun -np 4 python TG2D.py NS2D", shell=True)
+#def test_mpi_slab_DNS2D():
+    #d = subprocess.check_output("mpirun -np 4 python TG2D.py NS2D", shell=True)
 
 def test_mpi_KMM():
     d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --optimization cython KMM", shell=True)
