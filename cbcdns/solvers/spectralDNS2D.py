@@ -22,13 +22,13 @@ def add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, nu):
 
 def ComputeRHS(dU, rk):
     if rk > 0: # For rk=0 the correct values are already in U, V, W
-        U[0] = ifft2_mpi(U_hat[0], U[0])
-        U[1] = ifft2_mpi(U_hat[1], U[1])
+        U[0] = FFT.ifft2(U_hat[0], U[0])
+        U[1] = FFT.ifft2(U_hat[1], U[1])
         
     F_tmp[0] = cross2(F_tmp[0], K, U_hat)
-    curl[:] = ifft2_mpi(F_tmp[0], curl)
-    dU[0] = fft2_mpi(U[1]*curl, dU[0])
-    dU[1] = fft2_mpi(-U[0]*curl, dU[1])
+    curl[:] = FFT.ifft2(F_tmp[0], curl)
+    dU[0] = FFT.fft2(U[1]*curl, dU[0])
+    dU[1] = FFT.fft2(-U[0]*curl, dU[1])
 
     # Dealias the nonlinear convection
     #dU = dealias_rhs(dU, dealias)
@@ -53,7 +53,7 @@ def solve():
         U_hat[:] = integrate(t, tstep, dt)
 
         for i in range(2): 
-            U[i] = ifft2_mpi(U_hat[i], U[i])
+            U[i] = FFT.ifft2(U_hat[i], U[i])
 
         update(t, tstep, **globals())
 

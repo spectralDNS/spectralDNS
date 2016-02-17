@@ -1,7 +1,6 @@
 import numpy as np
 from numpy.polynomial import chebyshev as n_cheb
-from cbcdns.fft.wrappyfftw import dct
-from cbcdns import config
+from mpiFFT4py import dct
 import SFTc
 import scipy.sparse.linalg as la
 from cbcdns.shen.la import TDMA, PDMA

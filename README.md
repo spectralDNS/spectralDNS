@@ -3,9 +3,11 @@ spectralDNS
 
 [![Build Status](https://travis-ci.org/mikaem/spectralDNS.svg?branch=master)](https://travis-ci.org/mikaem/spectralDNS)
 
-spectralDNS contains a classical pseudo-spectral Navier-Stokes DNS solver for triply periodic domains. The only unique feature is that it's written entirely in python using numpy, mpi4py and pyfftw and, stripping away unnecessary pre- and post-processing steps, the solver is approximately 100 lines long, including the MPI. MPI decomposition is performed using either the "slab" or the "pencil" approach. The code has been found to scale very well in tests on the Shaheen BlueGene/P supercomputer at KAUST Supercomputing Laboratory. Results of both weak and strong scaling tests are shown below. In addition to incompressible Navier-Stokes there are also solvers for MHD and Navier-Stokes or MHD with variable density through a Boussinesq approximation.
+spectralDNS contains a classical high-performance pseudo-spectral Navier-Stokes DNS solver for triply periodic domains. The most notable feature of this solver is that it's written entirely in Python using NumPy, MPI for Python (mpi4py) and pyFFTW. MPI decomposition is performed using either the "slab" or the "pencil" approach and, stripping away unnecessary pre- and post-processing steps, the slab solver is no more than 100 lines long, including the MPI. The code has been found to scale very well in tests on the Shaheen Blue Gene/P supercomputer at KAUST Supercomputing Laboratory. Results of both weak and strong scaling tests are shown below. In addition to incompressible Navier-Stokes there are also solvers for MHD and Navier-Stokes or MHD with variable density through a Boussinesq approximation. The solver is described more thoroughly in this paper:
 
-The efficiency of the pure numpy/mpi4py solver has been enhanced using Cython for certain routines. The strong scaling results on Shaheen shown below have used the optimized Python/Cython solver, which is found to be faster than a pure C++ implementation of the same solver.
+M. Mortensen and H. P. Langtangen "High performance Python for direct numerical simulations of turbulent flows", in press, Computer Physics Communications (2016) http://arxiv.org/pdf/1602.03638v1.pdf
+
+The efficiency of the pure NumPy/mpi4py solver has been enhanced using Cython for certain routines. The strong scaling results on Shaheen shown below have used the optimized Python/Cython solver, which is found to be faster than a pure C++ implementation of the same solver.
 
 A channel flow solver is implemented using the Shen basis (Jie Shen, SIAM Journal on Scientific Computing, 16, 74-87, 1995) for the scheme described by Kim, Moin and Moser (J. Fluid Mechanics, Vol 177, 133-166, 1987).
 

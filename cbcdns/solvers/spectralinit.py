@@ -7,12 +7,13 @@ from mpi4py import MPI
 from cbcdns import config
 import sys, cProfile
 from numpy import *
+from mpiFFT4py import slab_FFT, pencil_FFT, line_FFT
 from cbcdns.utilities import *
 from cbcdns.h5io import *
 from cbcdns.optimization import *
 
 # Import problem specific methods and solver methods specific to either slab or pencil decomposition
-from cbcdns.mpi import *
+from cbcdns.mesh import *
 from cbcdns.maths import *
 
 comm = MPI.COMM_WORLD
@@ -33,9 +34,22 @@ L = config.L = array([eval(str(f)) for f in config.L], dtype=float)
 N = 2**M
 dx = (L/N).astype(float)
 
+if config.mesh in ('doublyperiodic', 'triplyperiodic'):
+    if config.decomposition == 'slab':
+        FFT = slab_FFT(N, L, MPI, config.precision)
+        
+    elif config.decomposition == 'pencil':
+        if config.Pencil_alignment == 'X':
+            FFT = pencil_FFT['X'](N, L, MPI, config.precision, config.P1)
+        else:
+            FFT = pencil_FFT['Y'](N, L, MPI, config.precision, config.P1)
+            
+    elif config.decomposition == 'line':
+        FFT = line_FFT(N, L, MPI, config.precision)
+
 if config.make_profile: profiler = cProfile.Profile()
 
-# Set up solver using either slab or decomposition
+# Set up solver using either slab or pencil decomposition
 vars().update(setup(**vars()))
 
 def update(t, tstep, **kwargs):

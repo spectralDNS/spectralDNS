@@ -2,12 +2,11 @@
 from numpy.polynomial import chebyshev as n_cheb
 from cbcdns import config, get_solver
 from numpy import dot, real, pi, exp, sum, zeros, cos, exp, arange, imag, sqrt, array
-from cbcdns.fft.wrappyfftw import dct
+from mpiFFT4py import dct
 import matplotlib.pyplot as plt
 import warnings
 import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
-
 
 def energy(u, N, comm, rank, L):
     uu = sum(u, axis=(1,2))
@@ -29,13 +28,12 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, **kw):
     P[:] = 0
     P_hat[:] = 0
 
-def set_Source(Source, Sk, fss, ST, **kw):
+def set_Source(Source, Sk, FST, ST, **kw):
     Source[:] = 0
     Source[1, :] = -2./config.Re
     Sk[:] = 0
     for i in range(3):
-        Sk[i] = fss(Source[i], Sk[i], ST)
-
+        Sk[i] = FST.fss(Source[i], Sk[i], ST)
 
 def exact(x, Re, t, num_terms=400):
     beta = 2./Re
@@ -59,7 +57,7 @@ def reference(Re, t, num_terms=200):
         u += a*exp(-b*t)*c
     return u
 
-def update(rank, X, U, P, N, comm, L, points, ST, num_processes, **kw):
+def update(rank, X, U, P, N, comm, L, x0, ST, num_processes, **kw):
     global im1
     if config.tstep == 2 and rank == 0 and config.plot_step > 0:
         plt.figure()
@@ -84,17 +82,17 @@ def update(rank, X, U, P, N, comm, L, points, ST, num_processes, **kw):
         comm.Gather(u0, uall, root=0)
         if rank == 0:
             uall = uall.reshape((N[0],))
-            #x = points
+            #x = x0
             #pc = zeros(len(x))
             #pc = ST.fct(uall, pc)  # Cheb transform of result
             #solution at x = 0
             #u = n_cheb.chebval(0, pc)
-            u_exact = exact(points, config.Re, config.t)
+            u_exact = exact(x0, config.Re, config.t)
             #print u_exact-uall
             #u_exact = reference(config.Re, config.t)
             print "Time %2.5f Error %2.12e " %(config.t, sqrt(sum((u_exact-uall)**2)/N[0]))
 
-def regression_test(U, X, N, comm, rank, L, ST, num_processes, points, **kw):
+def regression_test(U, X, N, comm, rank, L, ST, num_processes, x0, **kw):
     u0 = U[1, :, 0, 0].copy()
     uall = None
     if rank == 0:
@@ -102,30 +100,29 @@ def regression_test(U, X, N, comm, rank, L, ST, num_processes, points, **kw):
     comm.Gather(u0, uall, root=0)
     if rank == 0:
         uall = uall.reshape((N[0],))
-        #x = points
+        #x = x0
         #pc = zeros(len(x))
         #pc = ST.fct(uall, pc)  # Cheb transform of result
         #solution at x = 0
         #u = n_cheb.chebval(0, pc)
         #u_exact = reference(config.Re, config.t)
-        u_exact = exact(points, config.Re, config.t)
+        u_exact = exact(x0, config.Re, config.t)
         print "Computed error = %2.8e %2.8e " %(sqrt(sum((uall-u_exact)**2)/N[0]), config.dt)
 
 if __name__ == "__main__":
     config.update(
         {
-        'solver': 'IPCS',
         'Re': 800.,
         'nu': 1./800.,             # Viscosity
         'dt': 0.5,                 # Time step
         'T': 50.,                   # End time
         'L': [2, 2*pi, 4*pi/3.],
-        'M': [6, 5, 1]
-        },  "Shen"
+        'M': [6, 5, 2]
+        },  "channel"
     )
-    config.Shen.add_argument("--compute_energy", type=int, default=5)
-    config.Shen.add_argument("--plot_step", type=int, default=10)
-    solver = get_solver(update=update, regression_test=regression_test, family="Shen")    
+    config.channel.add_argument("--compute_energy", type=int, default=5)
+    config.channel.add_argument("--plot_step", type=int, default=10)
+    solver = get_solver(update=update, regression_test=regression_test, mesh="channel")    
     initialize(**vars(solver))
     set_Source(**vars(solver))
     solver.solve()

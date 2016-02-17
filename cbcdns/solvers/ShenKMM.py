@@ -10,12 +10,11 @@ from ..shen import SFTc
 
 assert config.precision == "double"
 hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5", 
-                      mesh={"x": points, "xp": pointsp, "y": x1, "z": x2})  
+                      mesh={"x": x0, "y": x1, "z": x2})  
 
 K4 = K2**2
 HelmholtzSolverG = Helmholtz(N[0], sqrt(K2[0]+2.0/nu/dt), ST.quad, False)
 BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0], -(K2[0] + nu*dt/2.*K4[0]), quad=SB.quad, solver="cython")
-HelmholtzSolverP = Helmholtz(N[0], sqrt(K2[0]), SN.quad, True)
 HelmholtzSolverU0 = Helmholtz(N[0], sqrt(2./nu/dt), ST.quad, False)
 
 U_pad = empty((3,)+FST.real_shape_padded())
@@ -45,15 +44,17 @@ ADD = ADDmat(K[0, :, 0, 0])
 BDD = BDDmat(K[0, :, 0, 0], ST.quad)
 
 # 
-BBD = BDDmat(K[0, :, 0, 0], SB.quad)
+BBD = BBDmat(K[0, :, 0, 0], SB.quad)
 CDB = CDBmat(K[0, :, 0, 0])
 
 def solvePressure(P_hat, Ni):
     """Solve for pressure if Ni is fst of convection"""
-    F_tmp[0] = 0
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])    
-    P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
-    return P_hat
+    pass
+    #F_tmp[0] = 0
+    #SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])    
+    #HelmholtzSolverP = Helmholtz(N[0], sqrt(K2[0]), SN.quad, True)
+    #P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
+    #return P_hat
 
 def Cross(a, b, c, S):
     H[:] = cross1(H, a, b)
@@ -80,12 +81,12 @@ def Curl_padded(u_hat, c, S):
     U_pad[:] = 0
     F_tmp[:] = 0
     SFTc.Mult_CTD_3D(N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = U_pad[1] = FST.ifct_padded(F_tmp[1]*dealias, U_pad[1], S)
-    dwdx = U_pad[2] = FST.ifct_padded(F_tmp[2]*dealias, U_pad[2], S)
-    c[0] = FST.ifst_padded(g*dealias, c[0], ST)
-    c[1] = FST.ifst_padded(1j*K[2]*u_hat[0]*dealias, c[1], SB)
+    dvdx = U_pad[1] = FST.ifct_padded(F_tmp[1], U_pad[1], S)
+    dwdx = U_pad[2] = FST.ifct_padded(F_tmp[2], U_pad[2], S)
+    c[0] = FST.ifst_padded(g, c[0], S)
+    c[1] = FST.ifst_padded(1j*K[2]*u_hat[0], c[1], SB)
     c[1] -= dwdx
-    c[2] = FST.ifst_padded(1j*K[1]*u_hat[0]*dealias, c[2], SB)
+    c[2] = FST.ifst_padded(1j*K[1]*u_hat[0], c[2], SB)
     c[2] *= -1.0
     c[2] += dvdx
     return c
@@ -95,9 +96,6 @@ def Cross_padded(a, b, c, S):
     c[0] = FST.fst_padded(U_pad[0], c[0], S)
     c[1] = FST.fst_padded(U_pad[1], c[1], S)
     c[2] = FST.fst_padded(U_pad[2], c[2], S)    
-    H[0] = FST.ifst(c[0], H[0], S)
-    H[1] = FST.ifst(c[1], H[1], S)
-    H[2] = FST.ifst(c[2], H[2], S)
     return c
 
 #@profile
@@ -157,54 +155,50 @@ def standardConvection_padded(c, U_hat):
     U_pad[:] = 0
     U_pad2[:] = 0
     
-    U_pad[0] = FST.ifst_padded(U_hat[0]*dealias, U_pad[0], SB)
+    U_pad[0] = FST.ifst_padded(U_hat[0], U_pad[0], SB)
     for i in range(1,3):
-        U_pad[i] = FST.ifst_padded(U_hat[i]*dealias, U_pad[i], ST)
+        U_pad[i] = FST.ifst_padded(U_hat[i], U_pad[i], ST)
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
     F_tmp[0] = CDB.matvec(U_hat[0])
     F_tmp[0] = TDMASolverD(F_tmp[0])    
-    dudx = U_pad2[0] = FST.ifst_padded(F_tmp[0]*dealias, U_pad2[0], ST)   
+    dudx = U_pad2[0] = FST.ifst_padded(F_tmp[0], U_pad2[0], ST)   
         
     SFTc.Mult_CTD_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = U_pad2[1] = FST.ifct_padded(F_tmp[1]*dealias, U_pad2[1], ST)
-    dwdx = U_pad2[2] = FST.ifct_padded(F_tmp[2]*dealias, U_pad2[2], ST)
+    dvdx = U_pad2[1] = FST.ifct_padded(F_tmp[1], U_pad2[1], ST)
+    dwdx = U_pad2[2] = FST.ifct_padded(F_tmp[2], U_pad2[2], ST)
     
     curl_pad[:] = 0
-    dudy_h = 1j*K[1]*U_hat[0]*dealias
+    dudy_h = 1j*K[1]*U_hat[0]
     dudy = curl_pad[0] = FST.ifst_padded(dudy_h, curl_pad[0], SB)    
-    dudz_h = 1j*K[2]*U_hat[0]*dealias
+    dudz_h = 1j*K[2]*U_hat[0]
     dudz = curl_pad[1] = FST.ifst_padded(dudz_h, curl_pad[1], SB)
     H_pad[0] = U_pad[0]*dudx + U_pad[1]*dudy + U_pad[2]*dudz
     c[0] = FST.fst_padded(H_pad[0], c[0], ST)
     
     curl_pad[:] = 0
     
-    dvdy_h = 1j*K[1]*U_hat[1]*dealias    
+    dvdy_h = 1j*K[1]*U_hat[1]
     dvdy = curl_pad[0] = FST.ifst_padded(dvdy_h, curl_pad[0], ST)
     ##########
     
-    dvdz_h = 1j*K[2]*U_hat[1]*dealias
+    dvdz_h = 1j*K[2]*U_hat[1]
     dvdz = curl_pad[1] = FST.ifst_padded(dvdz_h, curl_pad[1], ST)
     H_pad[1] = U_pad[0]*dvdx + U_pad[1]*dvdy + U_pad[2]*dvdz
     c[1] = FST.fst_padded(H_pad[1], c[1], ST)
     
     curl_pad[:] = 0
-    dwdy_h = 1j*K[1]*U_hat[2]*dealias
+    dwdy_h = 1j*K[1]*U_hat[2]
     dwdy = curl_pad[0] = FST.ifst_padded(dwdy_h, curl_pad[0], ST)
     
-    dwdz_h = 1j*K[2]*U_hat[2]*dealias
+    dwdz_h = 1j*K[2]*U_hat[2]
     dwdz = curl_pad[1] = FST.ifst_padded(dwdz_h, curl_pad[1], ST)
     
     #########
     
     H_pad[2] = U_pad[0]*dwdx + U_pad[1]*dwdy + U_pad[2]*dwdz
     c[2] = FST.fst_padded(H_pad[2], c[2], ST)
-    
-    H[0] = FST.ifst(c[0], H[0], ST)    
-    H[1] = FST.ifst(c[1], H[1], ST)    
-    H[2] = FST.ifst(c[2], H[2], ST)    
     
     return c
 
@@ -245,18 +239,14 @@ def divergenceConvection(c, U, U_hat, add=False):
     c[2] += 1j*K[1]*F_tmp[1]  # dvwdy
     c[2] += 1j*K[2]*F_tmp[2]  # dwwdz
     
-    H[0] = FST.ifst(c[0], H[0], ST)    
-    H[1] = FST.ifst(c[1], H[1], ST)    
-    H[2] = FST.ifst(c[2], H[2], ST)    
-
     return c    
 
 def divergenceConvection_padded(c, U_hat, add=False):
     """c_i = div(u_i u_j)"""
     if not add: c.fill(0)
-    U_pad[0] = FST.ifst_padded(U_hat[0]*dealias, U_pad[0], SB)
+    U_pad[0] = FST.ifst_padded(U_hat[0], U_pad[0], SB)
     for i in range(1,3):
-        U_pad[i] = FST.ifst_padded(U_hat[i]*dealias, U_pad[i], ST)
+        U_pad[i] = FST.ifst_padded(U_hat[i], U_pad[i], ST)
     
     F_tmp[0] = FST.fst_padded(U_pad[0]*U_pad[0], F_tmp[0], ST)
     F_tmp[1] = FST.fst_padded(U_pad[0]*U_pad[1], F_tmp[1], ST)
@@ -283,14 +273,8 @@ def divergenceConvection_padded(c, U_hat, add=False):
     c[1] += 1j*K[1]*F_tmp[0]  # dvvdy
     c[1] += 1j*K[2]*F_tmp[1]  # dvwdz  
     c[2] += 1j*K[1]*F_tmp[1]  # dvwdy
-    c[2] += 1j*K[2]*F_tmp[2]  # dwwdz
-    
-    H[0] = FST.ifst(c[0], H[0], ST)    
-    H[1] = FST.ifst(c[1], H[1], ST)    
-    H[2] = FST.ifst(c[2], H[2], ST)    
-
+    c[2] += 1j*K[2]*F_tmp[2]  # dwwdz    
     return c    
-
 
 def getConvection(convection):
     if convection == "Standard":
@@ -304,7 +288,7 @@ def getConvection(convection):
                 H_hat = standardConvection(H_hat, U_dealiased, U_hat)            
             else:
                 H_hat = standardConvection_padded(H_hat, U_hat)
-            H_hat[:] *= -1; H[:] *= -1
+            H_hat[:] *= -1
             return H_hat
         
     elif convection == "Divergence":
@@ -317,7 +301,7 @@ def getConvection(convection):
                 H_hat = divergenceConvection(H_hat, U_dealiased, U_hat, False)
             else:
                 H_hat = divergenceConvection_padded(H_hat, U_hat, False)                
-            H_hat[:] *= -1; H[:] *= -1
+            H_hat[:] *= -1
             return H_hat
         
     elif convection == "Skew":
@@ -334,7 +318,7 @@ def getConvection(convection):
             else:
                 H_hat = standardConvection_padded(H_hat, U_hat)
                 H_hat = divergenceConvection_padded(H_hat, U_hat, True)        
-            H_hat *= -0.5; H[:] *= -0.5
+            H_hat *= -0.5
             return H_hat
 
     elif convection == "Vortex":
@@ -349,9 +333,9 @@ def getConvection(convection):
                 H_hat[:] = Cross(U_dealiased, U_tmp, H_hat, ST)
             else:
                 curl_pad[:] = Curl_padded(U_hat, curl_pad, ST)            
-                U_pad2[0] = FST.ifst_padded(U_hat[0]*dealias, U_pad[0], SB)
+                U_pad2[0] = FST.ifst_padded(U_hat[0], U_pad[0], SB)
                 for i in range(1,3):
-                    U_pad2[i] = FST.ifst_padded(U_hat[i]*dealias, U_pad[i], ST)
+                    U_pad2[i] = FST.ifst_padded(U_hat[i], U_pad[i], ST)
                 H_hat[:] = Cross_padded(U_pad2, curl_pad, H_hat, ST)
             return H_hat
         
@@ -367,8 +351,7 @@ def add_diffusion_u(u, d, AC, SBB, ABB, BBB, nu, dt, K2, K4):
     return d
 
 @optimizer
-def assembleAB(H, H0, H1, H_hat, H_hat0, H_hat1):
-    H0[:] = 1.5*H - 0.5*H1
+def assembleAB(H_hat, H_hat0, H_hat1):
     H_hat0[:] = 1.5*H_hat - 0.5*H_hat1
     
 #@profile
@@ -385,12 +368,10 @@ def ComputeRHS(dU):
     diff0[0] = add_diffusion_u(u, diff0[0], AC, SBB, ABB, BBB, nu, dt, K2, K4)
     
     # Assemble convection with Adams-Bashforth convection
-    assembleAB(H, H0, H1, H_hat, H_hat0, H_hat1)    
+    assembleAB(H_hat, H_hat0, H_hat1)    
     
-    # Following modification is critical for accuracy with vortex convection, but it makes standard perform worse
-    #hv[:] = -K2*BBD.matvec(H_hat0[0])
-    hv[:] = FST.fss(H0[0], hv, SB)
-    hv *= -K2    
+    # Assemble hv, hg and remaining dU
+    hv[:] = -K2*BBD.matvec(H_hat0[0])
     hv -= 1j*K[1]*CBD.matvec(H_hat0[1])
     hv -= 1j*K[2]*CBD.matvec(H_hat0[2])        
     hg[:] = 1j*K[1]*BDD.matvec(H_hat0[2]) - 1j*K[2]*BDD.matvec(H_hat0[1])    
@@ -399,6 +380,9 @@ def ComputeRHS(dU):
     return dU
 
 def regression_test(**kw):
+    pass
+
+def update(**kwargs):
     pass
 
 #@profile
