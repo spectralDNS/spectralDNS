@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
 from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, CNDmat, HelmholtzCoeff
-from ..shen.Helmholtz import Helmholtz, TDMA
+from ..shen.la import Helmholtz, TDMA
 from ..shen import SFTc
 
 assert config.precision == "double"
