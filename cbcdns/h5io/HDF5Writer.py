@@ -180,7 +180,7 @@ try:
                             
 except:
     class HDF5Writer(object):
-        def __init__(self, comm, N, dtype, comps, filename="U.h5"):
+        def __init__(self, comm, dtype, comps, filename="U.h5", mesh={}, fromfile=None):
             if comm.Get_rank() == 0:
                 print Warning("Need to install h5py to allow storing results")
         
