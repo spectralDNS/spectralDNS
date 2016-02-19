@@ -4,15 +4,6 @@ language: python
 python:
     - 2.7
     
-env:
-    - MPI=mpich3
-    - MPI=mpich2
-    - MPI=openmpi
-
-matrix:
-  allow_failures:
-    - env: MPI=mpich3
-
 branches:
   only:
     - master
@@ -22,11 +13,6 @@ cache:
 
 before_install:
     - sudo apt-get update -q
-    - sh ./tests/install-mpi.sh $MPI
-    #- pip install -q Cython
-    #- pip install -q mpi4py
-    #- cython --version
-
 
 install:
     # We do this conditionally because it saves us some downloading if the
@@ -55,17 +41,7 @@ install:
     - source activate test-environment
     - python setup.py install
     - which python
-    - which mpirun
     
-#before_script:
-    #- sudo hostname localhost
-    #- which python
-    #- MPIEXEC='mpiexec';
-    #- test $MPI == mpich1 && MPIEXEC='mpirun' || true
-    #- test $MPI == mpich1 && PYTHON=$(command -v $PYTHON) || true
-    #- test $MPI == mpich2 && MPIEXEC='mpiexec -launcher fork' || true
-    #- test $MPI == mpich3 && MPIEXEC='mpiexec -launcher fork' || true
-
 script: cd $PWD/tests; py.test
 
 #notifications:
