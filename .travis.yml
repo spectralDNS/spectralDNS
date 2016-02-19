@@ -26,9 +26,7 @@ before_install:
     #- pip install -q Cython
     #- pip install -q mpi4py
     #- cython --version
-#install:
-    #- pip install .
-    
+
 install:
     # We do this conditionally because it saves us some downloading if the
     # version is the same.
