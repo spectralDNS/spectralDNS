@@ -30,16 +30,16 @@ if not "sdist" in sys.argv:
                     
     ext = []
     for s in ("LUsolve", "TDMA", "PDMA", "Matvec"):
-        ext += cythonize(Extension("cbcdns.shen.{}".format(s), sources = [os.path.join(sdir, '{}.pyx'.format(s))], language="c++"))
+        ext += cythonize(Extension("cbcdns.shen.{0}".format(s), sources = [os.path.join(sdir, '{0}.pyx'.format(s))], language="c++"))
         
     for s in ("Cheb", "HelmholtzMHD"):
-        ext += cythonize(Extension("cbcdns.shen.{}".format(s), sources = [os.path.join(sdir, '{}.pyx'.format(s))]))    
+        ext += cythonize(Extension("cbcdns.shen.{0}".format(s), sources = [os.path.join(sdir, '{0}.pyx'.format(s))]))    
     
     for s in ("LUsolve", "TDMA", "PDMA", "UTDMA"):
-        ext += cythonize(Extension("cbcdns.shenGeneralBCs.{}".format(s), sources = [os.path.join(sgdir, '{}.pyx'.format(s))], language="c++"))
+        ext += cythonize(Extension("cbcdns.shenGeneralBCs.{0}".format(s), sources = [os.path.join(sgdir, '{0}.pyx'.format(s))], language="c++"))
         
     for s in ("Matvec", "Matrices"):
-        ext += cythonize(Extension("cbcdns.shenGeneralBCs.{}".format(s), sources = [os.path.join(sgdir, '{}.pyx'.format(s))]))    
+        ext += cythonize(Extension("cbcdns.shenGeneralBCs.{0}".format(s), sources = [os.path.join(sgdir, '{0}.pyx'.format(s))]))    
 
     [e.extra_compile_args.extend(["-Ofast"]) for e in ext]
     [e.include_dirs.extend([get_include()]) for e in ext]
