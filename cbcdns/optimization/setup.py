@@ -36,7 +36,7 @@ ctypedef np.int64_t int_t
 }
 
 for module in ("integrators", "maths", "solvers", "mpi"):
-    ff = open("cython_{0}.py".format(module)).read()
+    ff = open("cython_{0}.in".format(module)).read()
     fs = open("cython_single_{0}.pyx".format(module), "w")
     fs.write(ff.format(precision["single"]))
     fs.close()
@@ -48,7 +48,7 @@ for module in ("integrators", "maths", "solvers", "mpi"):
 prec = {"single": ("float32", "complex64"),
         "double": ("float64", "complex128")}
 
-ff = open("numba_module.py").read()
+ff = open("numba_module.in").read()
 fs = open("numba_single.py", "w")
 fs.write(ff.format(*prec["single"]))
 fs.close()
