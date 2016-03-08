@@ -1,0 +1,31 @@
+package:
+  name: spectraldns
+  version: "1.0"
+  
+source:
+  git_url: https://github.com/spectralDNS/spectralDNS.git
+  git_tag: master
+
+build:
+  number: 1
+
+requirements:
+  build:
+    - python
+    - cython
+    - numpy
+
+  run:
+    - python
+    - numpy
+    - scipy
+    - mpi4py
+    - mpifft4py
+    - sympy
+
+test:
+    requires:
+      - python
+      - numpy
+      - scipy
+      - pytest
