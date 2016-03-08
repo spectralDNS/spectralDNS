@@ -54,11 +54,8 @@ if not "sdist" in sys.argv:
     for s in ("Matvec", "Matrices"):
         ext += cythonize(Extension("cbcdns.shenGeneralBCs.{0}".format(s), sources = [os.path.join(sgdir, '{0}.pyx'.format(s))]))    
 
-    #extra_compile_args = ['-w', '-Ofast']
-    #[e.extra_compile_args.extend(extra_compile_args) for e in ext]
     [e.include_dirs.extend([get_include()]) for e in ext]
     ext0 = cythonize(os.path.join(cdir, "*.pyx"))
-    #[e.extra_compile_args.extend(extra_compile_args) for e in ext0]
     [e.include_dirs.extend([get_include()]) for e in ext0]
     ext += ext0
     cmdclass = {'build_ext': build_ext_subclass}

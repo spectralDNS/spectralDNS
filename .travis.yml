@@ -19,7 +19,6 @@ install:
     - conda update -q conda
     # Useful for debugging any issues with conda
     - conda info -a
-    - conda config --add channels mikaem
     - conda config --add channels spectralDNS
     - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION Cython mpi4py scipy pytest mpifft4py sympy
     #- wget https://github.com/spectralDNS/mpiFFT4py/archive/1.0.tar.gz
