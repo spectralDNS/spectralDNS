@@ -11,4 +11,4 @@ engine:
 install:
   - conda config --set always_yes true
   - conda config --add channels mikaem
-  - conda build --quiet conf/conda
+  - conda build conf/conda
