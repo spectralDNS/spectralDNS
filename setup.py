@@ -21,13 +21,26 @@ sgdir = os.path.join(cwd, "cbcdns", "shenGeneralBCs")
 
 ext = None
 cmdclass = {}
+class build_ext_subclass(build_ext):
+    def build_extensions(self):
+        extra_compile_args = ['-w', '-Ofast']
+        cmd = "echo | %s -E - %s &>/dev/null" % (
+            self.compiler.compiler[0], " ".join(extra_compile_args))
+        try:
+            subprocess.check_call(cmd, shell=True)
+        except:
+            extra_compile_args = ['-w', '-O3']
+        for e in self.extensions:
+            e.extra_compile_args = extra_compile_args
+        build_ext.build_extensions(self)
+
 args = ""
 if not "sdist" in sys.argv:
     if "build_ext" in sys.argv:
         args = "build_ext --inplace"
     subprocess.call([sys.executable, os.path.join(cdir, "setup.py"),
                     args], cwd=cdir)
-                    
+    
     ext = []
     for s in ("LUsolve", "TDMA", "PDMA", "Matvec"):
         ext += cythonize(Extension("cbcdns.shen.{0}".format(s), sources = [os.path.join(sdir, '{0}.pyx'.format(s))], language="c++"))
@@ -41,13 +54,14 @@ if not "sdist" in sys.argv:
     for s in ("Matvec", "Matrices"):
         ext += cythonize(Extension("cbcdns.shenGeneralBCs.{0}".format(s), sources = [os.path.join(sgdir, '{0}.pyx'.format(s))]))    
 
-    [e.extra_compile_args.extend(["-Ofast"]) for e in ext]
+    #extra_compile_args = ['-w', '-Ofast']
+    #[e.extra_compile_args.extend(extra_compile_args) for e in ext]
     [e.include_dirs.extend([get_include()]) for e in ext]
     ext0 = cythonize(os.path.join(cdir, "*.pyx"))
-    [e.extra_compile_args.extend(["-Ofast"]) for e in ext0]
+    #[e.extra_compile_args.extend(extra_compile_args) for e in ext0]
     [e.include_dirs.extend([get_include()]) for e in ext0]
     ext += ext0
-    cmdclass = {'build_ext': build_ext}
+    cmdclass = {'build_ext': build_ext_subclass}
             
 else:
     # Remove generated files
