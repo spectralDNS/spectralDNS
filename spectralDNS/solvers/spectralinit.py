@@ -39,10 +39,7 @@ if config.mesh in ('doublyperiodic', 'triplyperiodic'):
         FFT = slab_FFT(N, L, MPI, config.precision)
         
     elif config.decomposition == 'pencil':
-        if config.Pencil_alignment == 'X':
-            FFT = pencil_FFT['X'](N, L, MPI, config.precision, config.P1)
-        else:
-            FFT = pencil_FFT['Y'](N, L, MPI, config.precision, config.P1)
+        FFT = pencil_FFT(N, L, MPI, config.precision, P1=config.P1, alignment=config.Pencil_alignment)
             
     elif config.decomposition == 'line':
         FFT = line_FFT(N, L, MPI, config.precision)

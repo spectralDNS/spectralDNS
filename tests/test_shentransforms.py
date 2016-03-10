@@ -262,7 +262,6 @@ def test_BBDmat(SBSD):
     u0 = np.zeros(N)
     u0 = SB.fastShenScalar(fj, u0)
     
-    #from IPython import embed; embed()
     assert np.allclose(u0, u2)
     
     # Multidimensional version
@@ -279,12 +278,12 @@ def test_BBDmat(SBSD):
     fj = np.random.random((N, N, N))
     f_hat = FST.fst(fj, f_hat, SD)
     fj = FST.ifst(f_hat, fj, SD)
+    f_hat = FST.fst(fj, f_hat, SD)
     
     z0 = B.matvec(f_hat)
     z1 = z0.copy()*0
     z1 = FST.fss(fj, z1, SB)
     assert np.linalg.norm(z1-z0)/(N*N*N) < 1e-12    
-
 
 #test_BBDmat((ShenBiharmonicBasis("GL"), ShenDirichletBasis("GL")))
 

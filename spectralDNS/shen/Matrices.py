@@ -363,6 +363,7 @@ class BBDmat(BaseMatrix):
         
     def matvec(self, v):
         c = self.get_return_array(v)
+        c[:] = 0
         N = self.shape[0]
         if len(v.shape) > 1:
             vv = v[:-2]
