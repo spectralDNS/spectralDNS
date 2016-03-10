@@ -6,7 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 Velocity-vorticity formulation
 """
 from spectralinit import *
-from spectralDNS import Cross, hdf5file, regression_test
+from NS import Cross, hdf5file, regression_test
 
 # Rename variable since we are working with a vorticity formulation
 W = U.copy()               # W is vorticity
