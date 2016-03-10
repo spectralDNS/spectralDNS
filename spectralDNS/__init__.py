@@ -16,13 +16,13 @@ def get_solver(update=None, regression_test=None, mesh="triplyperiodic"):
         vars(config).update(vars(args))
             
         if config.solver == 'NS':
-            import spectralDNS.solvers.spectralDNS as solver
+            import spectralDNS.solvers.NS as solver
             
         elif config.solver == 'VV':
-            import spectralDNS.solvers.spectralDNSVV as solver
+            import spectralDNS.solvers.VV as solver
 
         elif config.solver == 'MHD':
-            import spectralDNS.solvers.spectralMHD3D as solver
+            import spectralDNS.solvers.MHD as solver
             
         else:
             raise AttributeError("Wrong solver!")
@@ -32,10 +32,10 @@ def get_solver(update=None, regression_test=None, mesh="triplyperiodic"):
         vars(config).update(vars(args))
     
         if config.solver == 'NS2D':
-            import spectralDNS.solvers.spectralDNS2D as solver
+            import spectralDNS.solvers.NS2D as solver
 
         elif config.solver == 'Bq2D':
-            import spectralDNS.solvers.spectralDNS2D_Boussinesq as solver
+            import spectralDNS.solvers.NS2D_Boussinesq as solver
             
         else:
             raise AttributeError("Wrong solver!")
