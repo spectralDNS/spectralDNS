@@ -1,4 +1,4 @@
-from cbcdns import config, get_solver
+from spectralDNS import config, get_solver
 from numpy import pi, sin, cos, exp, zeros
 import matplotlib.pyplot as plt
 

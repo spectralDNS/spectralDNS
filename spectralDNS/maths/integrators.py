@@ -3,7 +3,7 @@ __date__ = "2015-04-07"
 __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from cbcdns import config
+from spectralDNS import config
 from ..optimization import optimizer, wraps
 
 __all__ = ['getintegrator']
@@ -39,7 +39,7 @@ def AB2(u0, u1, dU, dt, tstep, ComputeRHS):
 def getintegrator(dU, ComputeRHS, float, array, **kw):
     """Return integrator using choice in global parameter integrator.
     """
-    if config.solver in ("NS", "VV", "NS2D", "ChannelRK4"):
+    if config.solver in ("NS", "VV", "NS2D"):
         u0 = kw['U_hat']
     elif config.solver == "MHD":
         u0 = kw['UB_hat']
@@ -62,6 +62,7 @@ def getintegrator(dU, ComputeRHS, float, array, **kw):
         def func(t, tstep, dt):
             return ForwardEuler(u0, u1, dU, dt, ComputeRHS)
         return func
+    
     else:
         @wraps(AB2)
         def func(t, tstep, dt):

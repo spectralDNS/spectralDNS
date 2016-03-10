@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from scipy.linalg import solve_banded
 from scipy.sparse import diags
 import scipy.sparse.linalg as la
-from cbcdns.shen.shentransform import ShenNeumannBasis, ShenDirichletBasis
-from cbcdns.shen import SFTc
+from spectralDNS.shen.shentransform import ShenNeumannBasis, ShenDirichletBasis
+from spectralDNS.shen import SFTc
 
 """
 Solve Helmholtz equation on (-1, 1) with homogeneous Neumann bcs

@@ -1,5 +1,5 @@
 """Turbulent channel"""
-from cbcdns import config, get_solver
+from spectralDNS import config, get_solver
 from numpy import dot, real, pi, exp, sum, complex, float, zeros, arange, imag, cos, where, pi, random, exp, sin, log, array, zeros_like
 import h5py
 from mpiFFT4py import dct

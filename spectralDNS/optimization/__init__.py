@@ -4,7 +4,7 @@ __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from functools import wraps
-from cbcdns import config
+from spectralDNS import config
 
 def optimizer(func):
     """Decorator used to wrap calls to optimized versions of functions.
@@ -20,7 +20,7 @@ def optimizer(func):
     """
     
     try: # Look for optimized version of function
-        mod = eval('{0}_{1}'.format(config.optimization, config.precision))
+        mod = eval("_".join((config.optimization, config.precision)))
             
         # Check for generic implementation first, then solver specific 
         name = func.func_name

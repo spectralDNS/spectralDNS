@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 from scipy.linalg import solve_banded, lu_factor, lu_solve
 from scipy.sparse import diags
 import scipy.sparse.linalg as la
-from cbcdns.shen.shentransform import ShenBiharmonicBasis
-from cbcdns.shen.Matrices import ABBmat, BBBmat, SBBmat
-from cbcdns.shen.Helmholtz import Biharmonic
+from spectralDNS.shen.shentransform import ShenBiharmonicBasis
+from spectralDNS.shen.Matrices import ABBmat, BBBmat, SBBmat
+from spectralDNS.shen.Helmholtz import Biharmonic
 from scipy.linalg import solve
 """
 Solve biharmonic equation on (-1, 1)
@@ -82,7 +82,7 @@ assert np.allclose(u1, uj)
 #uj = uj.repeat(16).reshape((N, 4, 4)) + 1j*uj.repeat(16).reshape((N, 4, 4))
 #assert np.allclose(u1, uj)
 
-from cbcdns.shen.SFTc import *
+from spectralDNS.shen.SFTc import *
 sii, siu, siuu = solver.S.dd, solver.S.ud[0], solver.S.ud[1]
 ail, aii, aiu = solver.A.ld, solver.A.dd, solver.A.ud
 bill, bil, bii, biu, biuu = solver.B.lld, solver.B.ld, solver.B.dd, solver.B.ud, solver.B.uud

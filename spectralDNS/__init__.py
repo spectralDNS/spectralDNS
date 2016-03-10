@@ -16,13 +16,13 @@ def get_solver(update=None, regression_test=None, mesh="triplyperiodic"):
         vars(config).update(vars(args))
             
         if config.solver == 'NS':
-            import cbcdns.solvers.spectralDNS as solver
+            import spectralDNS.solvers.spectralDNS as solver
             
         elif config.solver == 'VV':
-            import cbcdns.solvers.spectralDNSVV as solver
+            import spectralDNS.solvers.spectralDNSVV as solver
 
         elif config.solver == 'MHD':
-            import cbcdns.solvers.spectralMHD3D as solver
+            import spectralDNS.solvers.spectralMHD3D as solver
             
         else:
             raise AttributeError("Wrong solver!")
@@ -32,10 +32,10 @@ def get_solver(update=None, regression_test=None, mesh="triplyperiodic"):
         vars(config).update(vars(args))
     
         if config.solver == 'NS2D':
-            import cbcdns.solvers.spectralDNS2D as solver
+            import spectralDNS.solvers.spectralDNS2D as solver
 
         elif config.solver == 'Bq2D':
-            import cbcdns.solvers.spectralDNS2D_Boussinesq as solver
+            import spectralDNS.solvers.spectralDNS2D_Boussinesq as solver
             
         else:
             raise AttributeError("Wrong solver!")
@@ -45,16 +45,16 @@ def get_solver(update=None, regression_test=None, mesh="triplyperiodic"):
         vars(config).update(vars(args))
         
         if config.solver == 'IPCS':
-            import cbcdns.solvers.ShenDNS as solver           
+            import spectralDNS.solvers.ShenDNS as solver           
             
         elif config.solver == 'IPCSR':
-            import cbcdns.solvers.ShenDNSR as solver
+            import spectralDNS.solvers.ShenDNSR as solver
             
         elif config.solver == 'KMM':
-            import cbcdns.solvers.ShenKMM as solver
+            import spectralDNS.solvers.ShenKMM as solver
 
         elif config.solver == 'KMMRK3':
-            import cbcdns.solvers.ShenKMMRK3 as solver
+            import spectralDNS.solvers.ShenKMMRK3 as solver
         
         else:
             raise AttributeError("Wrong solver!")
@@ -64,7 +64,7 @@ def get_solver(update=None, regression_test=None, mesh="triplyperiodic"):
         #vars(config).update(vars(args))
 
         #if config.solver == 'IPCS_MHD':
-            #import cbcdns.solvers.ShenMHD as solver            
+            #import spectralDNS.solvers.ShenMHD as solver            
         
         #else:
             #raise AttributeError("Wrong solver!")
@@ -74,7 +74,7 @@ def get_solver(update=None, regression_test=None, mesh="triplyperiodic"):
         #vars(config).update(vars(args))
         
         #if config.solver == 'IPCS_GeneralBCs':
-            #import cbcdns.solvers.ShenDNSGeneralBCs as solver
+            #import spectralDNS.solvers.ShenDNSGeneralBCs as solver
             
         #else:
             #raise AttributeError("Wrong solver!")

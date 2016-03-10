@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 from scipy.linalg import solve_banded
 from scipy.sparse import diags
 import scipy.sparse.linalg as la
-from cbcdns.shen.shentransform import ShenDirichletBasis
-from cbcdns.shen import SFTc
-from cbcdns.shen.Matrices import Amat, BDmat
+from spectralDNS.shen.shentransform import ShenDirichletBasis
+from spectralDNS.shen import SFTc
+from spectralDNS.shen.Matrices import Amat, BDmat
 
 """
 Solve Helmholtz equation on (-1, 1) with homogeneous bcs

@@ -1,7 +1,7 @@
 """Hartmann"""
-from cbcdns import config, get_solver
+from spectralDNS import config, get_solver
 from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, cosh, sinh, linalg, inf
-from cbcdns.fft.wrappyfftw import dct
+from spectralDNS.fft.wrappyfftw import dct
 import matplotlib.pyplot as plt
 import warnings
 import matplotlib.cbook

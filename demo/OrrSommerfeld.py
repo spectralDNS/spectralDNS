@@ -1,8 +1,8 @@
 """Orr-Sommerfeld"""
-from cbcdns import config, get_solver
+from spectralDNS import config, get_solver
 from OrrSommerfeld_eig import OrrSommerfeld
 from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose
-from cbcdns.fft.wrappyfftw import dct
+from spectralDNS.fft.wrappyfftw import dct
 import matplotlib.pyplot as plt
 import warnings
 import matplotlib.cbook

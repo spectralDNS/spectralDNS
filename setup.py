@@ -15,9 +15,9 @@ minor = 0
 maintenance = 0
 
 cwd = os.path.abspath(os.path.dirname(__file__))
-cdir = os.path.join(cwd, "cbcdns", "optimization")
-sdir = os.path.join(cwd, "cbcdns", "shen")
-sgdir = os.path.join(cwd, "cbcdns", "shenGeneralBCs")
+cdir = os.path.join(cwd, "spectralDNS", "optimization")
+sdir = os.path.join(cwd, "spectralDNS", "shen")
+sgdir = os.path.join(cwd, "spectralDNS", "shenGeneralBCs")
 
 ext = None
 cmdclass = {}
@@ -43,16 +43,16 @@ if not "sdist" in sys.argv:
     
     ext = []
     for s in ("LUsolve", "TDMA", "PDMA", "Matvec"):
-        ext += cythonize(Extension("cbcdns.shen.{0}".format(s), sources = [os.path.join(sdir, '{0}.pyx'.format(s))], language="c++"))
+        ext += cythonize(Extension("spectralDNS.shen.{0}".format(s), sources = [os.path.join(sdir, '{0}.pyx'.format(s))], language="c++"))
         
     for s in ("Cheb", "HelmholtzMHD"):
-        ext += cythonize(Extension("cbcdns.shen.{0}".format(s), sources = [os.path.join(sdir, '{0}.pyx'.format(s))]))    
+        ext += cythonize(Extension("spectralDNS.shen.{0}".format(s), sources = [os.path.join(sdir, '{0}.pyx'.format(s))]))    
     
     for s in ("LUsolve", "TDMA", "PDMA", "UTDMA"):
-        ext += cythonize(Extension("cbcdns.shenGeneralBCs.{0}".format(s), sources = [os.path.join(sgdir, '{0}.pyx'.format(s))], language="c++"))
+        ext += cythonize(Extension("spectralDNS.shenGeneralBCs.{0}".format(s), sources = [os.path.join(sgdir, '{0}.pyx'.format(s))], language="c++"))
         
     for s in ("Matvec", "Matrices"):
-        ext += cythonize(Extension("cbcdns.shenGeneralBCs.{0}".format(s), sources = [os.path.join(sgdir, '{0}.pyx'.format(s))]))    
+        ext += cythonize(Extension("spectralDNS.shenGeneralBCs.{0}".format(s), sources = [os.path.join(sgdir, '{0}.pyx'.format(s))]))    
 
     [e.include_dirs.extend([get_include()]) for e in ext]
     ext0 = cythonize(os.path.join(cdir, "*.pyx"))
@@ -66,9 +66,9 @@ else:
         if "single" in name or "double" in name:
             os.remove(os.path.join(cdir, name))
  
-setup(name = "cbcdns",
+setup(name = "spectralDNS",
       version = "%d.%d.%d" % (major, minor, maintenance),
-      description = "cbcdns -- Spectral Navier-Stokes solvers framework from the Center of Biomedical Computing",
+      description = "spectralDNS -- Spectral Navier-Stokes solvers framework from the Center of Biomedical Computing",
       long_description = "",
       author = "Mikael Mortensen",
       author_email = "mikaem@math.uio.no", 
@@ -84,17 +84,17 @@ setup(name = "cbcdns",
           'Topic :: Scientific/Engineering :: Mathematics',
           'Topic :: Software Development :: Libraries :: Python Modules',
           ],
-      packages = ["cbcdns",
-                  "cbcdns.h5io",
-                  "cbcdns.mesh",
-                  "cbcdns.utilities",
-                  "cbcdns.maths",
-                  "cbcdns.shen",
-                  "cbcdns.shenGeneralBCs",
-                  "cbcdns.solvers",
-                  "cbcdns.optimization",
+      packages = ["spectralDNS",
+                  "spectralDNS.h5io",
+                  "spectralDNS.mesh",
+                  "spectralDNS.utilities",
+                  "spectralDNS.maths",
+                  "spectralDNS.shen",
+                  "spectralDNS.shenGeneralBCs",
+                  "spectralDNS.solvers",
+                  "spectralDNS.optimization",
                   ],
-      package_dir = {"cbcdns": "cbcdns"},
+      package_dir = {"spectralDNS": "spectralDNS"},
       ext_modules = ext,
       cmdclass = cmdclass
     )

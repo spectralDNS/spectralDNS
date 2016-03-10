@@ -16,10 +16,10 @@ import sys
 import warnings
 import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
-from cbcdns.utilities import Timer
+from spectralDNS.utilities import Timer
 
 try:
-    from cbcdns.fft.wrappyfftw import *
+    from spectralDNS.fft.wrappyfftw import *
 except ImportError:
     pass # Rely on numpy.fft routines
 

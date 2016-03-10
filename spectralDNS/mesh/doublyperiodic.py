@@ -4,7 +4,7 @@ __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from mpiFFT4py import *
-from cbcdns import config
+from spectralDNS import config
 from ..optimization import optimizer
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, conj
 

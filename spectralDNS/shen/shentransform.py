@@ -3,8 +3,8 @@ from numpy.polynomial import chebyshev as n_cheb
 from mpiFFT4py import dct
 import SFTc
 import scipy.sparse.linalg as la
-from cbcdns.shen.la import TDMA, PDMA
-from cbcdns.shen.Matrices import BBBmat
+from spectralDNS.shen.la import TDMA, PDMA
+from spectralDNS.shen.Matrices import BBBmat
 """
 Fast transforms for pure Chebyshev basis or 
 Shen's Chebyshev basis: 

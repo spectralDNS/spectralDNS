@@ -1,4 +1,4 @@
-from cbcdns import config
+from spectralDNS import config
 from numpy import zeros, ones, arange, pi, mgrid, float, complex, int
 import SFTc
 from ShenMatrices import B_matrix, C_matrix, A_matrix, D_matrix 

@@ -1,7 +1,7 @@
 """
 2D test case with three vortices
 """
-from cbcdns import config, get_solver
+from spectralDNS import config, get_solver
 from numpy import zeros
 import matplotlib.pyplot as plt
 

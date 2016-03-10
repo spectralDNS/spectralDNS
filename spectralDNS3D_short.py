@@ -10,7 +10,7 @@ from mpi4py import MPI
 from pyfftw.interfaces.numpy_fft import fft, ifft, irfft2, rfft2
 
 #try:
-    #from cbcdns.fft.wrappyfftw import *
+    #from spectralDNS.fft.wrappyfftw import *
 #except ImportError:
     #pass # Rely on numpy.fft routines
 

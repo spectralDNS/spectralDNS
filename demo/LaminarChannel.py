@@ -1,6 +1,6 @@
 """Orr-Sommerfeld"""
 from numpy.polynomial import chebyshev as n_cheb
-from cbcdns import config, get_solver
+from spectralDNS import config, get_solver
 from numpy import dot, real, pi, exp, sum, zeros, cos, exp, arange, imag, sqrt, array
 from mpiFFT4py import dct
 import matplotlib.pyplot as plt

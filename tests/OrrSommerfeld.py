@@ -1,5 +1,5 @@
 """Orr-Sommerfeld"""
-from cbcdns import config, get_solver
+from spectralDNS import config, get_solver
 from OrrSommerfeld_eig import OrrSommerfeld
 from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose
 from mpiFFT4py import dct

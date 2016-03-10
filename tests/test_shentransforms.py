@@ -1,14 +1,14 @@
 import pytest
-from cbcdns.shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ChebyshevTransform, ShenBiharmonicBasis
-from cbcdns.shen.la import TDMA, Helmholtz, Biharmonic
-from cbcdns.shen.Matrices import BNNmat, BTTmat, BDDmat, CDDmat, CDNmat, BNDmat, CNDmat, BDNmat, ADDmat, ANNmat, CTDmat, BDTmat, CDTmat, BTDmat, BTNmat, BBBmat, ABBmat, SBBmat, CDBmat, CBDmat, ATTmat, BBDmat, HelmholtzCoeff
-from cbcdns.shen import SFTc
+from spectralDNS.shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ChebyshevTransform, ShenBiharmonicBasis
+from spectralDNS.shen.la import TDMA, Helmholtz, Biharmonic
+from spectralDNS.shen.Matrices import BNNmat, BTTmat, BDDmat, CDDmat, CDNmat, BNDmat, CNDmat, BDNmat, ADDmat, ANNmat, CTDmat, BDTmat, CDTmat, BTDmat, BTNmat, BBBmat, ABBmat, SBBmat, CDBmat, CBDmat, ATTmat, BBDmat, HelmholtzCoeff
+from spectralDNS.shen import SFTc
 from scipy.linalg import solve
 
-from cbcdns import config
+from spectralDNS import config
 config.mesh = "channel"
 config.solver = "IPCS"
-from cbcdns.mesh.channel import FastShenFourierTransform
+from spectralDNS.mesh.channel import FastShenFourierTransform
 from mpi4py import MPI
 
 from sympy import chebyshevt, Symbol, sin, cos, pi

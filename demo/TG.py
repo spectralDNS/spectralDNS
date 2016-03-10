@@ -1,4 +1,4 @@
-from cbcdns import config, get_solver
+from spectralDNS import config, get_solver
 import matplotlib.pyplot as plt
 from numpy import array, pi
 from numpy.linalg import norm
@@ -67,7 +67,10 @@ if __name__ == "__main__":
         'dt': 0.01,                 # Time step
         'T': 0.1,                   # End time
         'L': [2*pi, 2*pi, 2*pi],
-        'M': [5, 5, 5]
+        'M': [5, 5, 5],
+        #'decomposition': 'pencil',
+        #'Pencil_alignment': 'Y',
+        #'P1': 2
         },  "triplyperiodic"
     )
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=2)
@@ -78,11 +81,4 @@ if __name__ == "__main__":
     solver.hdf5file.components["W2"] = solver.curl[2]
     initialize(**vars(solver))
     solver.solve()
-    s = solver
-    FFT = s.FFT
-    s.U[0] = random.random(FFT.real_shape())
-    s.U_hat[0] = FFT.fftn(s.U[0], s.U_hat[0])
-    s.U_tmp[0] = FFT.ifftn(s.U_hat[0], s.U_tmp[0])
-    print s.U_tmp[0]-s.U[0]
-    assert allclose(s.U_tmp[0], s.U[0])
     

@@ -4,17 +4,17 @@ __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from mpi4py import MPI
-from cbcdns import config
+from spectralDNS import config
 import sys, cProfile
 from numpy import *
 from mpiFFT4py import slab_FFT, pencil_FFT, line_FFT
-from cbcdns.utilities import *
-from cbcdns.h5io import *
-from cbcdns.optimization import *
+from spectralDNS.utilities import *
+from spectralDNS.h5io import *
+from spectralDNS.optimization import *
 
 # Import problem specific methods and solver methods specific to either slab or pencil decomposition
-from cbcdns.mesh import *
-from cbcdns.maths import *
+from spectralDNS.mesh import *
+from spectralDNS.maths import *
 
 comm = MPI.COMM_WORLD
 comm.barrier()

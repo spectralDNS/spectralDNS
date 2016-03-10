@@ -1,4 +1,4 @@
-from cbcdns import config, get_solver
+from spectralDNS import config, get_solver
 from numpy import array, pi
 
 def initialize(UB_hat, UB, U, B, X, sin, cos, FFT, **kw):
