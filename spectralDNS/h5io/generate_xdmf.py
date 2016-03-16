@@ -45,7 +45,12 @@ channel =  """
 def generate_xdmf(h5filename):
     f = h5py.File(h5filename)
     comps = f["3D"].keys()
-    popped = [comps.remove(i) for i in ("checkpoint", "oldcheckpoint", "mesh")]
+    for i in ("checkpoint", "oldcheckpoint", "mesh"):
+        try:
+            popped = comps.remove(i)
+        except:
+            pass
+            
     N = f.attrs["N"]
     L = f.attrs["L"]
     if len(f["/".join(("3D", comps[0]))]) > 0:
