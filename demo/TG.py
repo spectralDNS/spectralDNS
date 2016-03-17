@@ -1,5 +1,4 @@
 from spectralDNS import config, get_solver
-import matplotlib.pyplot as plt
 from numpy import array, pi
 from numpy.linalg import norm
 
