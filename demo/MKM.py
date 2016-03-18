@@ -266,7 +266,7 @@ class Stats(object):
             if self.f0 is None:
                 self.create_statsfile()
             else:
-                self.f0 = h5py.File(self.fname+".h5")
+                self.f0 = h5py.File(self.fname+".h5", "a", driver="mpio", comm=self.comm)
                 
             for i, name in enumerate(("U", "V", "W")):
                 self.f0["Average/"+name][s] = self.Umean[i]/Nd
@@ -285,7 +285,7 @@ class Stats(object):
         
     def fromfile(self, filename="stats"):
         self.fname = filename
-        self.f0 = h5py.File(filename+".h5")
+        self.f0 = h5py.File(filename+".h5", "a", driver="mpio", comm=self.comm)
         N = self.shape[0]
         s = slice(self.rank*N, (self.rank+1)*N, 1)
         for i, name in enumerate(("U", "V", "W")):
@@ -293,7 +293,6 @@ class Stats(object):
         self.Pmean[:] = self.f0["Average/P"][s]
         for i, name in enumerate(("UU", "VV", "WW", "UV", "UW", "VW")):
             self.UU[i, :] = self.f0["Reynolds Stress/"+name][s]
-        
 
 if __name__ == "__main__":
     config.update(
