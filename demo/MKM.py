@@ -340,7 +340,7 @@ class Stats(object):
             if self.f0 is None:
                 self.create_statsfile()
             else:
-                self.f0 = h5py.File(self.fname+".h5")
+                self.f0 = h5py.File(self.fname+".h5", "a", driver="mpio", comm=self.comm)
                 
             for i, name in enumerate(("U", "V", "W")):
                 self.f0["Average/"+name][s] = self.Umean[i]/Nd
@@ -359,7 +359,7 @@ class Stats(object):
         
     def fromfile(self, filename="stats"):
         self.fname = filename
-        self.f0 = h5py.File(filename+".h5")
+        self.f0 = h5py.File(filename+".h5", "a", driver="mpio", comm=self.comm)
         N = self.shape[0]
         s = slice(self.rank*N, (self.rank+1)*N, 1)
         for i, name in enumerate(("U", "V", "W")):
@@ -367,7 +367,6 @@ class Stats(object):
         self.Pmean[:] = self.f0["Average/P"][s]
         for i, name in enumerate(("UU", "VV", "WW", "UV", "UW", "VW")):
             self.UU[i, :] = self.f0["Reynolds Stress/"+name][s]
-        
 
 if __name__ == "__main__":
     config.update(
@@ -386,23 +385,11 @@ if __name__ == "__main__":
     config.channel.add_argument("--print_energy0", type=int, default=100)
     solver = get_solver(update=update, mesh="channel")    
     initialize(**vars(solver))    
-    #init_from_file("KMM666t5.h5", **vars(solver))
+    #init_from_file("KMM666.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="KMMstats")
-    solver.hdf5file.fname = "KMM666t4.h5"
+    solver.hdf5file.fname = "KMM666.h5"
     solver.solve()
     s = solver.stats.get_stats()
-
-    #from numpy import meshgrid, float
-    #s = solver
-    #Np = s.N / s.num_processes
-    #x1 = arange(1.5*s.N[1], dtype=float)*config.L[1]/(1.5*s.N[1])
-    #x2 = arange(1.5*s.N[2], dtype=float)*config.L[2]/(1.5*s.N[2])
-    ## Get grid for velocity points
-    #X = array(meshgrid(s.points[s.rank*Np[0]:(s.rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)    
-    #s.U_pad2[1] = s.FST.ifst_padded(s.U_hat[1], s.U_pad2[1], s.ST)
-    #plt.figure()
-    #plt.contourf(X[1,:,:,0], X[0,:,:,0], s.U_pad2[1,:,:,0], 100)
-    #plt.show()
     
     
