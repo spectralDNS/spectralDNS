@@ -3,11 +3,6 @@ from spectralDNS import config, get_solver
 from numpy import dot, real, pi, exp, sum, complex, float, zeros, arange, imag, cos, where, pi, random, exp, sin, log, array, zeros_like
 import h5py
 from mpiFFT4py import dct
-import matplotlib.pyplot as plt
-import warnings
-import matplotlib.cbook
-from OrrSommerfeld_eig import OrrSommerfeld
-warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
 # Use constant flux and adjust pressure gradient dynamically
 flux = array([1645.46])
@@ -213,38 +208,6 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
         
     if config.tstep % config.checkpoint == 0:
         hdf5file.checkpoint(U, P, U0)
-
-    if config.tstep == 1 and rank == 0 and config.plot_result > 0:
-        plt.figure()
-        im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
-        plt.colorbar(im1)
-        plt.draw()
-
-        plt.figure()
-        im2 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[1,:,:,0], 100)
-        plt.colorbar(im2)
-        plt.draw()
-
-        plt.figure()
-        im3 = plt.contourf(X[2,:,0,:], X[0,:,0,:], U[0, :,0 ,:], 100)
-        plt.colorbar(im3)
-        plt.draw()
-
-        plt.pause(1e-6)    
-        globals().update(im1=im1, im2=im2, im3=im3)
-        
-    if config.tstep % config.plot_result == 0 and rank == 0 and config.plot_result > 0:
-        im1.ax.clear()
-        im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100)         
-        im1.autoscale()
-        im2.ax.clear()
-        im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0], 100) 
-        im2.autoscale()
-        im3.ax.clear()
-        #im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100) 
-        im3.ax.contourf(X[2,:,0,:], X[0,:,0,:], U[0, :,0 ,:], 100)
-        im3.autoscale()
-        plt.pause(1e-6)
     
     if config.tstep % config.compute_energy == 0: 
         e0 = Q(U[0]*U[0], rank, comm, N)
@@ -256,43 +219,6 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
 
     if config.tstep % config.sample_stats == 0:
         stats(U, P)
-
-def refine(x, y, z, infile, comm):
-    filename, ending = infile.split(".")
-    fin = h5py.File(infile, driver="mpio", comm=comm)    
-    fout = h5py.File(filename+"_refined.h5", "w", driver="mpio", comm=comm)
-    assert "checkpoint" in f["3D"]
-    N0 = Pold.shape
-    N1 = N0.copy()
-    if x: N1[0] *= 2
-    if y: N1[1] *= 2
-    if z: N1[2] *= 2
-    rank = comm.Get_rank()
-    
-    if config.decomposition == 'slab':
-        
-        Np0 = N0 / comm.Get_size()        
-        Np1 = N1 / comm.Get_size()   
-        Nf0 = N0[2]/2+1
-        Nf1 = N1[2]/2+1
-        s = slice(rank*Np0[0], (rank+1)*Np0[0], 1)
-        U0 = f["3D/checkpoint/U/1"][s]
-        P0 = f["3D/checkpoint/P/1"][s]
-        U1 = np.zeros((3, Np1[0], N1[1], N1[2]), dtype=float)
-        P1 = np.zeros((Np1[0], N1[1], N1[2]), dtype=float)
-        U0_hat  = empty((3, N0[0], Np0[1], Nf0), dtype=complex)
-        P0_hat  = empty((N0[0], Np0[1], Nf0), dtype=complex)
-        U1_hat  = empty((3, N1[0], Np1[1], Nf1), dtype=complex)
-        P1_hat  = empty((N1[0], Np1[1], Nf1), dtype=complex)
-
-        U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype=complex)
-        U_mpi2  = empty((num_processes, Np[0], Np[1], N[2]))
-        UT      = empty((3, N[0], Np[1], N[2]))
-        Uc_hat  = empty((N[0], Np[1], Nf), dtype=complex)
-        Uc_hatT = empty((Np[0], N[1], Nf), dtype=complex)
-        
-
-    
 
 class Stats(object):
     
@@ -372,12 +298,12 @@ class Stats(object):
 if __name__ == "__main__":
     config.update(
         {
-        'nu': 1./180.,                  # Viscosity
-        'Re_tau': 180., 
+        'nu': 1./395.,                  # Viscosity
+        'Re_tau': 395., 
         'dt': 0.001,                  # Time step
         'T': 100.,                    # End time
-        'L': [2, 4*pi, 4.*pi/3.],
-        'M': [6, 6, 5]
+        'L': [2, 2*pi, pi],
+        'M': [6, 6, 6]
         },  "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=100)
@@ -385,24 +311,11 @@ if __name__ == "__main__":
     config.channel.add_argument("--sample_stats", type=int, default=100)
     config.channel.add_argument("--print_energy0", type=int, default=100)
     solver = get_solver(update=update, mesh="channel")    
-    initialize(**vars(solver))    
-    #init_from_file("KMM666t5.h5", **vars(solver))
+    #initialize(**vars(solver))    
+    init_from_file("KMM888.h5", **vars(solver))
     set_Source(**vars(solver))
-    solver.stats = Stats(solver.U, solver.comm, filename="KMMstats")
-    solver.hdf5file.fname = "KMM666t4.h5"
+    solver.stats = Stats(solver.U, solver.comm, filename="KMM395stats")
+    solver.hdf5file.fname = "KMM888t.h5"
     solver.solve()
     s = solver.stats.get_stats()
 
-    #from numpy import meshgrid, float
-    #s = solver
-    #Np = s.N / s.num_processes
-    #x1 = arange(1.5*s.N[1], dtype=float)*config.L[1]/(1.5*s.N[1])
-    #x2 = arange(1.5*s.N[2], dtype=float)*config.L[2]/(1.5*s.N[2])
-    ## Get grid for velocity points
-    #X = array(meshgrid(s.points[s.rank*Np[0]:(s.rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)    
-    #s.U_pad2[1] = s.FST.ifst_padded(s.U_hat[1], s.U_pad2[1], s.ST)
-    #plt.figure()
-    #plt.contourf(X[1,:,:,0], X[0,:,:,0], s.U_pad2[1,:,:,0], 100)
-    #plt.show()
-    
-    
