@@ -27,7 +27,7 @@ def update(t, tstep, N, U_hat, curl, X, nu, FFT, K, P, P_hat, hdf5file, **kw):
         im.autoscale()
         plt.pause(1e-6)
         
-def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, X, nu, **kw):
+def regression_test(t, tstep, comm, U, Curl, float64, dx, L, sum, rank, X, nu, U_hat, **kw):
     k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
     U[0] = -sin(X[1])*cos(X[0])*exp(-2*nu*t)
     U[1] = sin(X[0])*cos(X[1])*exp(-2*nu*t)    

@@ -29,6 +29,7 @@ def setupDNS(float, complex, FFT, sum, where, **kwargs):
 
     # work arrays (Not required by all convection methods)
     U_tmp  = empty((3,) + FFT.real_shape(), dtype=float)
+    U_dealiased  = empty((3,) + FFT.real_shape(), dtype=float)
     F_tmp  = empty((3,) + FFT.complex_shape(), dtype=complex)
     curl   = empty((3,) + FFT.real_shape(), dtype=float)   
     Source = None

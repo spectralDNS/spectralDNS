@@ -26,12 +26,11 @@ def ComputeRHS(dU, rk):
         U[1] = FFT.ifft2(U_hat[1], U[1])
         
     F_tmp[0] = cross2(F_tmp[0], K, U_hat)
-    curl[:] = FFT.ifft2(F_tmp[0], curl)
-    dU[0] = FFT.fft2(U[1]*curl, dU[0])
-    dU[1] = FFT.fft2(-U[0]*curl, dU[1])
-
-    # Dealias the nonlinear convection
-    #dU = dealias_rhs(dU, dealias)
+    curl[:] = FFT.ifft2(F_tmp[0]*dealias, curl)
+    U_dealiased[0] = FFT.ifft2(U_hat[0], U_dealiased[0])
+    U_dealiased[1] = FFT.ifft2(U_hat[1], U_dealiased[1])
+    dU[0] = FFT.fft2(U_dealiased[1]*curl, dU[0])
+    dU[1] = FFT.fft2(-U_dealiased[0]*curl, dU[1])
 
     dU = add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, nu)
     

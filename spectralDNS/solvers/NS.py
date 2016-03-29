@@ -7,25 +7,25 @@ from spectralinit import *
 
 hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5")
 
-def standardConvection(c):
+def standardConvection(c, U_dealiased):
     """c_i = u_j du_i/dx_j"""
     for i in range(3):
         for j in range(3):
-            U_tmp[j] = FFT.ifftn(1j*K[j]*U_hat[i], U_tmp[j])
-        c[i] = FFT.fftn(sum(U*U_tmp, 0), c[i])
+            U_tmp[j] = FFT.ifftn(1j*K[j]*U_hat[i]*dealias, U_tmp[j])
+        c[i] = FFT.fftn(sum(U_dealiased*U_tmp, 0), c[i])
     return c
 
-def divergenceConvection(c, add=False):
+def divergenceConvection(c, U_dealiased, add=False):
     """c_i = div(u_i u_j)"""
     if not add: c.fill(0)
     for i in range(3):
-        F_tmp[i] = FFT.fftn(U[0]*U[i], F_tmp[i])
+        F_tmp[i] = FFT.fftn(U_dealiased[0]*U_dealiased[i], F_tmp[i])
     c[0] += 1j*sum(K*F_tmp, 0)
     c[1] += 1j*K[0]*F_tmp[1]
     c[2] += 1j*K[0]*F_tmp[2]
-    F_tmp[0] = FFT.fftn(U[1]*U[1], F_tmp[0])
-    F_tmp[1] = FFT.fftn(U[1]*U[2], F_tmp[1])
-    F_tmp[2] = FFT.fftn(U[2]*U[2], F_tmp[2])
+    F_tmp[0] = FFT.fftn(U_dealiased[1]*U_dealiased[1], F_tmp[0])
+    F_tmp[1] = FFT.fftn(U_dealiased[1]*U_dealiased[2], F_tmp[1])
+    F_tmp[2] = FFT.fftn(U_dealiased[2]*U_dealiased[2], F_tmp[2])
     c[1] += (1j*K[1]*F_tmp[0] + 1j*K[2]*F_tmp[1])
     c[2] += (1j*K[1]*F_tmp[1] + 1j*K[2]*F_tmp[2])
     return c
@@ -40,9 +40,11 @@ def Cross(a, b, c):
     return c
 
 #@profile
-def Curl(a, c):
+def Curl(a, c, dealiasing=True):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
     F_tmp[:] = cross2(F_tmp, K, a)
+    if dealiasing:
+        F_tmp[:] = dealias_rhs(F_tmp, dealias)
     c[0] = FFT.ifftn(F_tmp[0], c[0])
     c[1] = FFT.ifftn(F_tmp[1], c[1])
     c[2] = FFT.ifftn(F_tmp[2], c[2])    
@@ -53,30 +55,38 @@ def getConvection(convection):
     if convection == "Standard":
         
         def Conv(dU):
-            dU = standardConvection(dU)
+            for i in range(3):
+                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i])
+            dU = standardConvection(dU, U_dealiased)
             dU[:] *= -1 
             return dU
         
     elif convection == "Divergence":
         
         def Conv(dU):
-            dU = divergenceConvection(dU, False)
+            for i in range(3):
+                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i])
+            dU = divergenceConvection(dU, U_dealiased, False)
             dU[:] *= -1
             return dU
         
     elif convection == "Skewed":
         
         def Conv(dU):
-            dU = standardConvection(dU)
-            dU = divergenceConvection(dU, True)        
+            for i in range(3):
+                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i])
+            dU = standardConvection(dU, U_dealiased)
+            dU = divergenceConvection(dU, U_dealiased, True)
             dU *= -0.5
             return dU
         
     elif convection == "Vortex":
         
         def Conv(dU):
+            for i in range(3):
+                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i])
             curl[:] = Curl(U_hat, curl)
-            dU = Cross(U, curl, dU)
+            dU = Cross(U_dealiased, curl, dU)
             return dU
         
     return Conv           
@@ -108,8 +118,6 @@ def ComputeRHS(dU, rk):
                         
     dU = conv(dU)
 
-    dU = dealias_rhs(dU, dealias)
-    
     dU = add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu)
         
     return dU

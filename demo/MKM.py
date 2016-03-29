@@ -159,6 +159,8 @@ def set_Source(Source, Sk, ST, FST, **kw):
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
     
 def Q(u, rank, comm, N):
+    """Integrate u over entire computational domain
+    """
     L = config.L
     uu = sum(u, axis=(1,2))
     c = zeros(N[0])

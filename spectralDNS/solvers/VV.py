@@ -10,12 +10,15 @@ from NS import Cross, hdf5file, regression_test
 
 # Rename variable since we are working with a vorticity formulation
 W = U.copy()               # W is vorticity
-W_hat = U_hat              # U_hat is used in subroutines, rename here for convenience
+W_hat = U_hat              # U is used in setup, rename here for convenience
+W_dealiased = U_dealiased.copy()
 Source = U_hat.copy()*0    # Possible source term initialized to zero
 
-def Curl(a, c):
+def Curl(a, c, dealiasing=True):
     """c = curl(a) = F_inv(F(curl(a))/K2) = F_inv(1j*(K x a)/K2)"""
     F_tmp[:] = cross2(F_tmp, K_over_K2, a)
+    if dealiasing:
+        F_tmp[:] = dealias_rhs(F_tmp, dealias)
     c[0] = FFT.ifftn(F_tmp[0], c[0])
     c[1] = FFT.ifftn(F_tmp[1], c[1])
     c[2] = FFT.ifftn(F_tmp[2], c[2])    
@@ -27,10 +30,11 @@ def ComputeRHS(dU, rk):
         for i in range(3):
             W[i] = FFT.ifftn(W_hat[i], W[i])
             
-    U[:] = Curl(W_hat, U)
-    F_tmp[:] = Cross(U, W, F_tmp)
+    U_dealiased[:] = Curl(W_hat, U_dealiased)
+    for i in range(3):
+        W_dealiased[i] = FFT.ifftn(W_hat[i]*dealias, W_dealiased[i])
+    F_tmp[:] = Cross(U_dealiased, W_dealiased, F_tmp)
     dU = cross2(dU, K, F_tmp)    
-    dU = dealias_rhs(dU, dealias)
     dU -= nu*K2*W_hat    
     dU += Source    
     return dU

@@ -31,30 +31,34 @@ def initialize2(U, W, W_hat, X, sin, cos, FFT, F_tmp,
 
 k = []
 w = []
-def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, float64, dx, L, sum, 
-           hdf5file, FFT, **kw):
+def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, Curl, float64, dx, L, sum, 
+           hdf5file, FFT, W_hat, **kw):
     global k, w
     if tstep % config.write_result == 0 or tstep % config.write_yz_slice[1] == 0:
         P[:] = FFT.ifftn(P_hat*1j, P)
         hdf5file.write(tstep)
 
     if tstep % config.compute_energy == 0:
-        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
         if config.solver == 'NS':
             ww = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
         elif config.solver == 'VV':
+            U = Curl(W_hat, U, dealiasing=False)
             ww = comm.reduce(sum(kw['W'].astype(float64)*kw['W'].astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+            
+        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
         if rank == 0:
             k.append(kk)
             w.append(ww)
             print t, float(kk), float(ww)
 
-def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, **kw):
-    k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
+def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, **kw):    
     if config.solver == 'NS':
         w = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     elif config.solver == 'VV':
+        U = Curl(W_hat, U, dealiasing=False)
         w = comm.reduce(sum(kw['W'].astype(float64)*kw['W'].astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+
+    k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
     if rank == 0:
         assert round(k - 0.124953117517, 7) == 0
         assert round(w - 0.375249930801, 7) == 0
