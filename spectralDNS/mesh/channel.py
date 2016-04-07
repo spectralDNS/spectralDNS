@@ -244,16 +244,6 @@ class FastShenFourierTransform(slab_FFT):
     def complex_shape_padded(self):
         return (self.N[0], 3*self.Np[1]/2, 3*self.N[2]/4+1)
     
-    def copy_to_padded(self, fu, fp):
-        fp[:, :self.N[1]/2, :self.Nf] = fu[:, :self.N[1]/2]
-        fp[:, -(self.N[1]/2):, :self.Nf] = fu[:, self.N[1]/2:]
-        return fp
-    
-    def copy_from_padded(self, fp, fu):
-        fu[:, :self.N[1]/2] = fp[:, :self.N[1]/2, :self.Nf]
-        fu[:, self.N[1]/2:] = fp[:, -(self.N[1]/2):, :self.Nf]
-        return fu
-    
     def get_mesh_dims(self, ST):
         return [self.get_mesh_dim(ST, i) for i in range(3)]
         
@@ -299,14 +289,26 @@ class FastShenFourierTransform(slab_FFT):
                         (abs(K[2]) < kmax[2]), dtype=uint8)
         return dealias
 
+    def copy_to_padded(self, fu, fp):
+        fp[:, :self.N[1]/2, :self.Nf] = fu[:, :self.N[1]/2]
+        fp[:, -(self.N[1]/2):, :self.Nf] = fu[:, self.N[1]/2:]
+        fp[:, -self.N[1]/2, 0] *= 2
+        return fp
+    
+    def copy_from_padded(self, fp, fu):
+        fu[:, :self.N[1]/2] = fp[:, :self.N[1]/2, :self.Nf]
+        fu[:, self.N[1]/2:] = fp[:, -(self.N[1]/2):, :self.Nf]
+        return fu
+    
     def ifst_padded(self, fu, u, S):
         """Inverse Shen transform of x-direction, Fourier in y and z.
         
         fu is padded with zeros using the 3/2 rule before transforming to real space
         """
+        self.init_work_arrays()
         self.Uc_hat[:] = S.ifst(fu, self.Uc_hat)
-        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.U_mpi, self.mpitype])
-        self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())     
+        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.Uc_mpi, self.mpitype])
+        self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())     
         self.Upad_hatT[:] = 0
         self.Upad_hatT = self.copy_to_padded(self.Uc_hatT, self.Upad_hatT)
         u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
@@ -317,12 +319,13 @@ class FastShenFourierTransform(slab_FFT):
         
         u is of shape real_shape_padded. The output, fu, is normal complex_shape
         """   
-        self.Upad_hatT[:] = rfft2(u, axes=(1,2))
+        self.init_work_arrays()
+        self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
         # cut the highest wavenumbers     
         self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
-        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-        self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
-        fu = S.fst(self.Uc_hat/1.5**2, fu)
+        self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+        fu = S.fst(self.Uc_hat, fu)
         return fu
 
     def fss_padded(self, u, fu, S):
@@ -330,12 +333,13 @@ class FastShenFourierTransform(slab_FFT):
         
         u is of shape real_shape_padded. The output, fu, is normal complex_shape
         """        
-        self.Upad_hatT[:] = rfft2(u, axes=(1,2))
+        self.init_work_arrays()
+        self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
         # cut the highest wavenumbers     
         self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
-        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-        self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
-        fu = S.fastShenScalar(self.Uc_hat/1.5**2, fu)
+        self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+        fu = S.fastShenScalar(self.Uc_hat, fu)
         return fu
     
     def ifct_padded(self, fu, u, S):
@@ -343,9 +347,10 @@ class FastShenFourierTransform(slab_FFT):
         
         fu is padded with zeros using the 3/2 rule before transforming to real space
         """
+        self.init_work_arrays()
         self.Uc_hat[:] = S.ifct(fu, self.Uc_hat)
-        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.U_mpi, self.mpitype])
-        self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())    
+        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.Uc_mpi, self.mpitype])
+        self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())    
         self.Upad_hatT[:] = 0
         self.Upad_hatT = self.copy_to_padded(self.Uc_hatT, self.Upad_hatT)
         u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
@@ -356,65 +361,72 @@ class FastShenFourierTransform(slab_FFT):
         
         u is of shape real_shape_padded. The output, fu, is normal complex_shape
         """        
-        self.Upad_hatT[:] = rfft2(u, axes=(1,2))
+        self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
         # cut the highest wavenumbers     
         self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
-        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-        self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
-        fu = S.fct(self.Uc_hat/1.5**2, fu)
+        self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+        fu = S.fct(self.Uc_hat, fu)
         return fu
     
     def fss(self, u, fu, S):
         """Fast Shen scalar product of x-direction, Fourier transform of y and z"""
+        self.init_work_arrays()
         self.Uc_hatT[:] = rfft2(u, axes=(1,2))
-        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-        self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+        self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
         fu = S.fastShenScalar(self.Uc_hat, fu)
         return fu
 
     def ifst(self, fu, u, S):
         """Inverse Shen transform of x-direction, Fourier in y and z"""
+        self.init_work_arrays()
         self.Uc_hat[:] = S.ifst(fu, self.Uc_hat)
-        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.U_mpi, self.mpitype])
-        self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())
+        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.Uc_mpi, self.mpitype])
+        self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())
         u[:] = irfft2(self.Uc_hatT, axes=(1,2))
         return u
 
     def fst(self, u, fu, S):
         """Fast Shen transform of x-direction, Fourier transform of y and z"""
+        self.init_work_arrays()
         self.Uc_hatT[:] = rfft2(u, axes=(1,2))
-        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-        self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+        self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
         fu = S.fst(self.Uc_hat, fu)
         return fu
 
     def fft(self, u, fu):
         """Fast Fourier transform of y and z"""
+        self.init_work_arrays()
         self.Uc_hatT[:] = rfft2(u, axes=(1,2))
-        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-        self.comm.Alltoall([self.U_mpi, self.mpitype], [fu, self.mpitype])
+        self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.Uc_mpi, self.mpitype], [fu, self.mpitype])
         return fu
     
     def ifft(self, fu, u):
         """Inverse Fourier transforms in y and z"""
-        self.comm.Alltoall([fu, self.mpitype], [self.U_mpi, self.mpitype])
-        self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())
+        self.init_work_arrays()
+        self.comm.Alltoall([fu, self.mpitype], [self.Uc_mpi, self.mpitype])
+        self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())
         u[:] = irfft2(self.Uc_hatT, axes=(1,2))
         return u
     
     def fct(self, u, fu, S):
         """Fast Cheb transform of x-direction, Fourier transform of y and z"""
+        self.init_work_arrays()
         self.Uc_hatT[:] = rfft2(u, axes=(1,2))
-        self.U_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-        self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
+        self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
         fu = S.fct(self.Uc_hat, fu)
         return fu
 
     def ifct(self, fu, u, S):
         """Inverse Cheb transform of x-direction, Fourier in y and z"""
+        self.init_work_arrays()
         self.Uc_hat[:] = S.ifct(fu, self.Uc_hat)
-        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.U_mpi, self.mpitype])
-        self.Uc_hatT[:] = rollaxis(self.U_mpi, 1).reshape(self.complex_shape_T())
+        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.Uc_mpi, self.mpitype])
+        self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())
         u[:] = irfft2(self.Uc_hatT, axes=(1,2))
         return u
 

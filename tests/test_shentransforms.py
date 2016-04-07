@@ -99,6 +99,7 @@ def test_scalarproduct(ST):
     fj = np.array([f.subs(x, j) for j in points], dtype=float)
     u0 = np.zeros(N)
     u1 = np.zeros(N)
+    ST.fast_transform = True
     if ST.__class__.__name__ == "ChebyshevTransform":
         u0 = ST.fastChebScalar(fj, u0)
     else:
@@ -381,6 +382,38 @@ def test_FST(ST):
     assert np.allclose(fj, u0)
 
 #test_FST(ShenBiharmonicBasis("GC"))    
+
+def test_FST_padded(ST):
+    FST = FastShenFourierTransform(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), MPI)
+    points, weights = ST.points_and_weights(N)
+    
+    fj = np.random.random(FST.real_shape())
+    f_hat = np.zeros(FST.complex_shape(), dtype=FST.complex)
+        
+    if not ST.__class__.__name__ == "ChebyshevTransform":
+        f_hat = FST.fst(fj, f_hat, ST)
+        fj = FST.ifst(f_hat, fj, ST)
+        f_hat = FST.fst(fj, f_hat, ST)
+    else:
+        f_hat = FST.fct(fj, f_hat, ST)
+        fj = FST.ifct(f_hat, fj, ST)
+        f_hat = FST.fct(fj, f_hat, ST)
+
+    # Then check if transformations work as they should
+    fj_padded = np.zeros(FST.real_shape_padded(), FST.float)
+    c_hat = np.zeros(FST.complex_shape(), dtype=FST.complex)
+    
+    if ST.__class__.__name__ == "ChebyshevTransform":
+        fj_padded = FST.ifct_padded(f_hat, fj_padded, ST)
+        c_hat = FST.fct_padded(fj_padded, c_hat, ST)
+    else:
+        fj_padded = FST.ifst_padded(f_hat, fj_padded, ST)
+        c_hat = FST.fst_padded(fj_padded, c_hat, ST)
+
+    #from IPython import embed; embed()
+    assert np.allclose(c_hat, f_hat)
+
+#test_FST_padded(ShenBiharmonicBasis("GC"))
     
 def test_CDDmat(SD):
     M = 256
@@ -709,7 +742,7 @@ def test_ADDmat(ST2):
 
 
 def test_SBBmat(SB):
-    M = 6*N
+    M = 72
     u = sin(4*pi*x)**2
     f = u.diff(x, 4)
     

@@ -40,7 +40,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_proce
     epsilon = Um/200.   #Um/200.
     U[:] = 0
     U[1] = Um*(Y-0.5*Y**2)
-    dev = 1+0.01*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dev = 1+0.02*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
     dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
     U[1] += dd
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
@@ -393,5 +393,18 @@ if __name__ == "__main__":
     solver.hdf5file.fname = "KMM666.h5"
     solver.solve()
     s = solver.stats.get_stats()
-    
+
+    from numpy import meshgrid, float
+    s = solver
+    Np = s.N / s.num_processes
+    x1 = arange(1.5*s.N[1], dtype=float)*config.L[1]/(1.5*s.N[1])
+    x2 = arange(1.5*s.N[2], dtype=float)*config.L[2]/(1.5*s.N[2])
+    points, weights = s.ST.points_and_weights(s.N[0])
+    # Get grid for velocity points
+    X = array(meshgrid(points[s.rank*Np[0]:(s.rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)    
+    s.U_pad2[1] = s.FST.ifst_padded(s.U_hat[1], s.U_pad2[1], s.ST)
+    plt.figure()
+    plt.contourf(X[1,:,:,0], X[0,:,:,0], s.U_pad2[1,:,:,0], 100)
+    plt.colorbar()
+    plt.show()    
     
