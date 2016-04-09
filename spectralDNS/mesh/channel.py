@@ -7,7 +7,7 @@ from spectralDNS import config
 from mpiFFT4py import *
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ShenBiharmonicBasis, SFTc
 from ..shenGeneralBCs.shentransform import ShenBasis
-from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange, log2
+from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange, conj
 
 __all__ = ['setup']
 
@@ -292,12 +292,16 @@ class FastShenFourierTransform(slab_FFT):
     def copy_to_padded(self, fu, fp):
         fp[:, :self.N[1]/2, :self.Nf] = fu[:, :self.N[1]/2]
         fp[:, -(self.N[1]/2):, :self.Nf] = fu[:, self.N[1]/2:]
-        fp[:, -self.N[1]/2, 0] *= 2
+        fp[:, :, self.Nf-1] *= 0.5  
+        fp[:, -self.N[1]/2, :] *= 0.5
+        fp[:, self.N[1]/2, :] = fp[:, -self.N[1]/2, :]
         return fp
     
     def copy_from_padded(self, fp, fu):
         fu[:, :self.N[1]/2] = fp[:, :self.N[1]/2, :self.Nf]
         fu[:, self.N[1]/2:] = fp[:, -(self.N[1]/2):, :self.Nf]
+        fu[:, :, self.Nf-1] *= 2
+        fu[:, -self.N[1]/2, :] *= 2
         return fu
     
     def ifst_padded(self, fu, u, S):
