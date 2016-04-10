@@ -3,16 +3,19 @@ __date__ = "2015-04-09"
 __copyright__ = "Copyright (C) 2015 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
+import sys
+
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 import config
 
-def get_solver(update=None, regression_test=None, mesh="triplyperiodic"):
-    
+def get_solver(update=None, regression_test=None, mesh="triplyperiodic",manually_specified_argv=None):
+    argv = manually_specified_argv or sys.argv[1:]
+
     config.mesh = mesh
     if mesh is "triplyperiodic":
         
-        args = config.triplyperiodic.parse_args()     
+        args = config.triplyperiodic.parse_args(argv)
         vars(config).update(vars(args))
             
         if config.solver == 'NS':
@@ -28,7 +31,7 @@ def get_solver(update=None, regression_test=None, mesh="triplyperiodic"):
             raise AttributeError("Wrong solver!")
 
     elif mesh is "doublyperiodic":        
-        args = config.doublyperiodic.parse_args()     
+        args = config.doublyperiodic.parse_args(argv)
         vars(config).update(vars(args))
     
         if config.solver == 'NS2D':
@@ -41,7 +44,7 @@ def get_solver(update=None, regression_test=None, mesh="triplyperiodic"):
             raise AttributeError("Wrong solver!")
 
     elif mesh is "channel":
-        args = config.channel.parse_args()     
+        args = config.channel.parse_args(argv)
         vars(config).update(vars(args))
         
         if config.solver == 'IPCS':
