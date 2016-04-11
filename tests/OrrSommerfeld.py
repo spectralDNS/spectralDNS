@@ -31,7 +31,7 @@ def energy(u, N, comm, rank, L):
     else:
         return 0    
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST, U_tmp,
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
                ST, X, N, comm, rank, L, conv, TDMASolverD, F_tmp, H, H1, **kw):        
     OS = OrrSommerfeld(Re=config.Re, N=100)
     initOS(OS, U0, U_hat0, X)

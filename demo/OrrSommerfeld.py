@@ -35,7 +35,7 @@ def energy(u, N, comm, rank, L):
     else:
         return 0    
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST, U_tmp,
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
                ST, X, N, comm, rank, L, conv, TDMASolverD, F_tmp, H, H1, **kw):        
     OS = OrrSommerfeld(Re=config.Re, N=100)
     initOS(OS, U0, U_hat0, X)
@@ -107,7 +107,7 @@ def set_Source(Source, Sk, FST, ST, **kw):
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
         
 im1, im2, im3, im4 = (None, )*4        
-def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, U_hat, **kw):
+def update(rank, X, U, P, OS, N, comm, L, e0, F_tmp, FST, ST, U_hat, **kw):
     global im1, im2, im3
     if im1 is None and rank == 0 and config.plot_step > 0:
         plt.figure()
@@ -149,6 +149,7 @@ def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, U_hat, **kw
         plt.pause(1e-6)
 
     if config.tstep % config.compute_energy == 0: 
+        U_tmp = FST.get_real_workarray(0, False, 3)
         pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
         e1 = 0.5*energy(pert, N, comm, rank, L)
         exact = exp(2*imag(OS.eigval)*(config.t))

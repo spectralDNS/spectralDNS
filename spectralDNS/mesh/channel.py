@@ -99,8 +99,6 @@ def setupShenKMM(N, L, MPI, float, complex, **kwargs):
     H_hat0   = empty((3,)+FST.complex_shape(), dtype=complex)
     H_hat1   = empty((3,)+FST.complex_shape(), dtype=complex)
     
-    U_tmp   = empty((3,)+FST.real_shape(), dtype=float)
-    U_tmp2  = empty((3,)+FST.real_shape(), dtype=float)
     F_tmp   = empty((3,)+FST.complex_shape(), dtype=complex)
     F_tmp2  = empty((3,)+FST.complex_shape(), dtype=complex)
 
