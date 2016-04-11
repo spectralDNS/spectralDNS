@@ -1,6 +1,6 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2015-10-29"
-__copyright__ = "Copyright (C) 2015 " + __author__
+__copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *

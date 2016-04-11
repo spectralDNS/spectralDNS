@@ -325,7 +325,6 @@ class FastShenFourierTransform(slab_FFT):
         """   
         self.init_work_arrays()
         self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
-        # cut the highest wavenumbers     
         self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
         self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
         self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
@@ -339,7 +338,6 @@ class FastShenFourierTransform(slab_FFT):
         """        
         self.init_work_arrays()
         self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
-        # cut the highest wavenumbers     
         self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
         self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
         self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
@@ -365,8 +363,8 @@ class FastShenFourierTransform(slab_FFT):
         
         u is of shape real_shape_padded. The output, fu, is normal complex_shape
         """        
+        self.init_work_arrays()
         self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
-        # cut the highest wavenumbers     
         self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
         self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
         self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])

@@ -1,6 +1,6 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2015-01-02"
-__copyright__ = "Copyright (C) 2014 " + __author__
+__copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 """
 Velocity-vorticity formulation
