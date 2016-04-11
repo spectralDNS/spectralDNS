@@ -47,6 +47,8 @@ BDD = BDDmat(K[0, :, 0, 0], ST.quad)
 BBD = BBDmat(K[0, :, 0, 0], SB.quad)
 CDB = CDBmat(K[0, :, 0, 0])
 
+padding = config.dealias == '3/2-rule'
+
 def solvePressure(P_hat, Ni):
     """Solve for pressure if Ni is fst of convection"""
     pass
@@ -57,46 +59,47 @@ def solvePressure(P_hat, Ni):
     #return P_hat
 
 def Cross(a, b, c, S):
-    H[:] = cross1(H, a, b)
-    c[0] = FST.fst(H[0], c[0], S)
-    c[1] = FST.fst(H[1], c[1], S)
-    c[2] = FST.fst(H[2], c[2], S)    
+    Uc = FST.get_real_workarray(2, padding, 3)
+    Uc[:] = cross1(Uc, a, b)
+    c[0] = FST.fst(Uc[0], c[0], S, dealias=config.dealias)
+    c[1] = FST.fst(Uc[1], c[1], S, dealias=config.dealias)
+    c[2] = FST.fst(Uc[2], c[2], S, dealias=config.dealias)
     return c
+
+#def Cross_padded(a, b, c, S):
+    #U_pad[:] = cross1(U_pad, a, b)
+    #c[0] = FST.fst_padded(U_pad[0], c[0], S)
+    #c[1] = FST.fst_padded(U_pad[1], c[1], S)
+    #c[2] = FST.fst_padded(U_pad[2], c[2], S)    
+    #return c
 
 def Curl(a_hat, c, S):
     F_tmp[:] = 0
-    U_tmp2[:] = 0
+    Uc = FST.get_real_workarray(2, padding, 3)
     SFTc.Mult_CTD_3D(N[0], a_hat[1], a_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = U_tmp2[1] = FST.ifct(F_tmp[1]*dealias, U_tmp2[1], S)
-    dwdx = U_tmp2[2] = FST.ifct(F_tmp[2]*dealias, U_tmp2[2], S)
-    c[0] = FST.ifst(g * dealias, c[0], ST)
-    c[1] = FST.ifst(1j*K[2]*a_hat[0]*dealias, c[1], SB)
+    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], S, dealias=config.dealias)
+    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], S, dealias=config.dealias)
+    c[0] = FST.ifst(g, c[0], ST, dealias=config.dealias)
+    c[1] = FST.ifst(1j*K[2]*a_hat[0], c[1], SB, dealias=config.dealias)
     c[1] -= dwdx
-    c[2] = FST.ifst(1j*K[1]*a_hat[0]*dealias, c[2], SB)
+    c[2] = FST.ifst(1j*K[1]*a_hat[0], c[2], SB, dealias=config.dealias)
     c[2] *= -1.0
     c[2] += dvdx
     return c
 
-def Curl_padded(u_hat, c, S):
-    U_pad[:] = 0
-    F_tmp[:] = 0
-    SFTc.Mult_CTD_3D(N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = U_pad[1] = FST.ifct_padded(F_tmp[1], U_pad[1], S)
-    dwdx = U_pad[2] = FST.ifct_padded(F_tmp[2], U_pad[2], S)
-    c[0] = FST.ifst_padded(g, c[0], S)
-    c[1] = FST.ifst_padded(1j*K[2]*u_hat[0], c[1], SB)
-    c[1] -= dwdx
-    c[2] = FST.ifst_padded(1j*K[1]*u_hat[0], c[2], SB)
-    c[2] *= -1.0
-    c[2] += dvdx
-    return c
-
-def Cross_padded(a, b, c, S):
-    U_pad[:] = cross1(U_pad, a, b)
-    c[0] = FST.fst_padded(U_pad[0], c[0], S)
-    c[1] = FST.fst_padded(U_pad[1], c[1], S)
-    c[2] = FST.fst_padded(U_pad[2], c[2], S)    
-    return c
+#def Curl_padded(u_hat, c, S):
+    #U_pad[:] = 0
+    #F_tmp[:] = 0
+    #SFTc.Mult_CTD_3D(N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
+    #dvdx = U_pad[1] = FST.ifct_padded(F_tmp[1], U_pad[1], S)
+    #dwdx = U_pad[2] = FST.ifct_padded(F_tmp[2], U_pad[2], S)
+    #c[0] = FST.ifst_padded(g, c[0], S)
+    #c[1] = FST.ifst_padded(1j*K[2]*u_hat[0], c[1], SB)
+    #c[1] -= dwdx
+    #c[2] = FST.ifst_padded(1j*K[1]*u_hat[0], c[2], SB)
+    #c[2] *= -1.0
+    #c[2] += dvdx
+    #return c
 
 #@profile
 def standardConvection(c, U, U_hat):
@@ -324,19 +327,16 @@ def getConvection(convection):
     elif convection == "Vortex":
         
         def Conv(H_hat, U, U_hat):
-            if not config.dealias == '3/2-rule':
-                U_dealiased[0] = FST.ifst(U_hat[0]*dealias, U_dealiased[0], SB)                
-                for i in range(1,3):
-                    U_dealiased[i] = FST.ifst(U_hat[i]*dealias, U_dealiased[i], ST)
-                    
-                U_tmp[:] = Curl(U_hat, U_tmp, ST)
-                H_hat[:] = Cross(U_dealiased, U_tmp, H_hat, ST)
-            else:
-                curl_pad[:] = Curl_padded(U_hat, curl_pad, ST)            
-                U_pad2[0] = FST.ifst_padded(U_hat[0], U_pad[0], SB)
-                for i in range(1,3):
-                    U_pad2[i] = FST.ifst_padded(U_hat[i], U_pad[i], ST)
-                H_hat[:] = Cross_padded(U_pad2, curl_pad, H_hat, ST)
+            
+            U_dealiased = FST.get_real_workarray(0, padding, 3)
+            curl_dealiased = FST.get_real_workarray(1, padding, 3)
+            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
+            for i in range(1, 3):
+                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
+            
+            curl_dealiased[:] = Curl(U_hat, curl_dealiased, ST)
+            H_hat[:] = Cross(U_dealiased, curl_dealiased, H_hat, ST)
+            
             return H_hat
         
     return Conv           
