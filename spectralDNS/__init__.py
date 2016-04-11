@@ -9,7 +9,7 @@ from mpi4py import MPI
 comm = MPI.COMM_WORLD
 import config
 
-def get_solver(update=None, regression_test=None, mesh="triplyperiodic",manually_specified_argv=None):
+def get_solver(update=None, regression_test=None, mesh="triplyperiodic",manually_specified_argv=None,additional_callback=None):
     argv = manually_specified_argv or sys.argv[1:]
 
     config.mesh = mesh
@@ -84,4 +84,5 @@ def get_solver(update=None, regression_test=None, mesh="triplyperiodic",manually
     
     if update: solver.update = update
     if regression_test: solver.regression_test = regression_test
+    if additional_callback: solver.additional_callback = additional_callback
     return solver

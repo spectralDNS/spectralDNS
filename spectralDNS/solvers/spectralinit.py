@@ -52,6 +52,9 @@ vars().update(setup(**vars()))
 def update(t, tstep, **kwargs):
     pass
 
+def additional_callback(t,tstep,**kwargs):
+    pass
+
 def set_source(Source, **kwargs):
     Source[:] = 0
     return Source

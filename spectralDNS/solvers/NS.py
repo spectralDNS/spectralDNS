@@ -133,14 +133,22 @@ def solve():
     t = 0.0
     tstep = 0
     while t < config.T-1e-8:
-        t += dt 
-        tstep += 1
         
-        U_hat[:] = integrate(t, tstep, dt)
+        kwargs = {
+                "additional_callback":additional_callback,
+                "t":t,
+                "dt":dt,
+                "tstep": tstep,
+                "global_vars":globals()
+                }
+        U_hat[:] = integrate(t, tstep, dt,kwargs)
 
         for i in range(3):
             U[i] = FFT.ifftn(U_hat[i], U[i])
                  
+        t += dt 
+        tstep += 1
+
         update(t, tstep, **globals())
         
         timer()

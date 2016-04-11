@@ -9,11 +9,13 @@ from ..optimization import optimizer, wraps
 __all__ = ['getintegrator']
 
 @optimizer
-def RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS):
+def RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS,kw):
     """Runge Kutta fourth order"""
     u2[:] = u1[:] = u0
     for rk in range(4):
         dU = ComputeRHS(dU, rk)
+        if rk == 0 and "additional_callback" in kw:
+            kw["additional_callback"](dU=dU,**kw)
         if rk < 3:
             u0[:] = u1 + b[rk]*dt*dU
         u2 += a[rk]*dt*dU
@@ -21,13 +23,13 @@ def RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS):
     return u0
 
 @optimizer
-def ForwardEuler(u0, u1, dU, dt, ComputeRHS):
+def ForwardEuler(u0, u1, dU, dt, ComputeRHS,kw):
     dU = ComputeRHS(dU, 0)        
     u0 += dU*dt
     return u0
 
 @optimizer
-def AB2(u0, u1, dU, dt, tstep, ComputeRHS):
+def AB2(u0, u1, dU, dt, tstep, ComputeRHS,kw):
     dU = ComputeRHS(dU, 0)
     if tstep == 1:
         u0 += dU*dt
@@ -53,18 +55,18 @@ def getintegrator(dU, ComputeRHS, float, array, **kw):
         b = array([0.5, 0.5, 1.], dtype=float)
         u2 = u0.copy()
         @wraps(RK4)
-        def func(t, tstep, dt):
-            return RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS)
+        def func(t, tstep, dt,additional_args = {}):
+            return RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS,additional_args)
         return func
             
     elif config.integrator == "ForwardEuler":  
         @wraps(ForwardEuler)
-        def func(t, tstep, dt):
-            return ForwardEuler(u0, u1, dU, dt, ComputeRHS)
+        def func(t, tstep, dt,additional_args = {}):
+            return ForwardEuler(u0, u1, dU, dt, ComputeRHS,additional_args)
         return func
     
     else:
         @wraps(AB2)
-        def func(t, tstep, dt):
-            return AB2(u0, u1, dU, dt, tstep, ComputeRHS)
+        def func(t, tstep, dt,additional_args = {}):
+            return AB2(u0, u1, dU, dt, tstep, ComputeRHS,additional_args)
         return func
