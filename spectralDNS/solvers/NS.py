@@ -139,6 +139,7 @@ def solve():
                 "t":t,
                 "dt":dt,
                 "tstep": tstep,
+                "T": config.T,
                 "global_vars":globals()
                 }
         U_hat[:] = integrate(t, tstep, dt,kwargs)
@@ -156,6 +157,17 @@ def solve():
         if tstep == 1 and config.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
+
+    kwargs = {
+            "additional_callback":additional_callback,
+            "t":t,
+            "dt":dt,
+            "tstep": tstep,
+            "T": config.T,
+            "global_vars":globals()
+            }
+    ComputeRHS(dU,0)
+    additional_callback(dU=dU,**kwargs)
 
     timer.final(MPI, rank)
     
