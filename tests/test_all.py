@@ -4,6 +4,9 @@ import subprocess
 def test_single_DNS():
     d = subprocess.check_output("mpirun -np 1 python TG.py NS", shell=True)
 
+def test_single_dealias_DNS():
+    d = subprocess.check_output("mpirun -np 1 python TG.py --dealias '3/2-rule' NS", shell=True)
+
 def test_single_DNS2():
     d = subprocess.check_output("mpirun -np 1 python TG.py --optimization cython NS", shell=True)
 
@@ -34,8 +37,14 @@ def test_single_IPCS():
 def test_mpi_slab_DNS():
     d = subprocess.check_output("mpirun -np 4 python TG.py NS", shell=True)
 
+def test_mpi_dealias_DNS():
+    d = subprocess.check_output("mpirun -np 4 python TG.py --dealias '3/2-rule' NS", shell=True)
+
 def test_mpi_pencil_DNS():
     d = subprocess.check_output("mpirun -np 4 python TG.py --decomposition pencil --P1 2 NS", shell=True)
+
+#def test_mpi_pencil_dealias_DNS():
+    #d = subprocess.check_output("mpirun -np 4 python TG.py --decomposition pencil --P1 2 --dealias '3/2-rule' NS", shell=True)
 
 def test_mpi_pencil_DNS2():
     d = subprocess.check_output("mpirun -np 8 python TG.py --decomposition pencil --P1 2 NS", shell=True)
