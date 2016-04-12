@@ -32,7 +32,7 @@ def energy(u, N, comm, rank, L):
         return 0    
 
 def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
-               ST, X, N, comm, rank, L, conv, TDMASolverD, F_tmp, H, H1, **kw):        
+               ST, X, N, comm, rank, L, conv, TDMASolverD, F_tmp, **kw):        
     OS = OrrSommerfeld(Re=config.Re, N=100)
     initOS(OS, U0, U_hat0, X)
     
@@ -44,7 +44,6 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
         H_hat1 = conv(H_hat1, U0, U_hat0)
-        H1[:] = H[:]
         e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
 
         initOS(OS, U, U_hat, X, t=config.dt)
@@ -76,7 +75,6 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
         for i in range(1, 3):
             U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
         H_hat1 = conv(H_hat1, U0, U_hat0)
-        H1[:] = H[:]
         e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
         
         initOS(OS, U, U_hat, X, t=config.dt)

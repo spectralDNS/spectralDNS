@@ -54,7 +54,7 @@ def solvePressure(P_hat, Ni):
     #return P_hat
 
 def Cross(a, b, c, S):
-    Uc = FST.get_real_workarray(2, padding, 3)
+    Uc = FST.get_workarray(a, 2)
     Uc[:] = cross1(Uc, a, b)
     c[0] = FST.fst(Uc[0], c[0], S, dealias=config.dealias)
     c[1] = FST.fst(Uc[1], c[1], S, dealias=config.dealias)
@@ -63,7 +63,7 @@ def Cross(a, b, c, S):
 
 def Curl(a_hat, c, S):
     F_tmp[:] = 0
-    Uc = FST.get_real_workarray(2, padding, 3)
+    Uc = FST.get_workarray(c, 2)
     SFTc.Mult_CTD_3D(N[0], a_hat[1], a_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], S, dealias=config.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], S, dealias=config.dealias)
@@ -76,10 +76,11 @@ def Curl(a_hat, c, S):
     return c
 
 #@profile
-def standardConvection(c, U, U_hat):
+def standardConvection(c, U_dealiased, U_hat):
     c[:] = 0
-    Uc = FST.get_real_workarray(1, padding, 3)
-    Uc2 = FST.get_real_workarray(2, padding, 3)
+    U = U_dealiased
+    Uc = FST.get_workarray(U, 1)
+    Uc2 = FST.get_workarray(U, 2)
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
@@ -149,12 +150,15 @@ def divergenceConvection(c, U, U_hat, add=False):
     
     return c
 
+# Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved
+work_shape = FST.real_shape_padded() if config.dealias == '3/2-rule' else FST.real_shape()
+
 def getConvection(convection):
     if convection == "Standard":
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = FST.get_real_workarray(0, padding, 3)
+            U_dealiased = FST.get_workarray(((3,)+work_shape, float), 0)
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
             for i in range(1, 3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
@@ -167,7 +171,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = FST.get_real_workarray(0, padding, 3)
+            U_dealiased = FST.get_workarray(((3,)+work_shape, float), 0)
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
             for i in range(1, 3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
@@ -180,7 +184,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = FST.get_real_workarray(0, padding, 3)
+            U_dealiased = FST.get_workarray(((3,)+work_shape, float), 0)
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
             for i in range(1, 3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
@@ -194,8 +198,8 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = FST.get_real_workarray(0, padding, 3)
-            curl_dealiased = FST.get_real_workarray(1, padding, 3)
+            U_dealiased = FST.get_workarray(((3,)+work_shape, float), 0)
+            curl_dealiased = FST.get_workarray(((3,)+work_shape, float), 1)
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
             for i in range(1, 3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
@@ -298,7 +302,6 @@ def solve():
         # Rotate velocities
         U_hat0[:] = U_hat
         U0[:] = U
-        H1[:] = H
         H_hat1[:] = H_hat
                 
         timer()

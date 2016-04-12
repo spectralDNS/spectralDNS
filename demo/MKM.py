@@ -25,7 +25,7 @@ def initOS(OS, U, X, t=0.):
     U[2] = 0
 
 def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_processes, 
-               Curl, conv, TDMASolverD, solvePressure, N, H_hat, H_hat1, U_tmp, K, **kw):
+               Curl, conv, TDMASolverD, solvePressure, N, H_hat, H_hat1, K, **kw):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
     utau = config.nu * config.Re_tau
@@ -177,7 +177,7 @@ def Q(u, rank, comm, N):
 
 beta = zeros(1)    
 def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk, 
-           ST, SB, U_tmp, F_tmp, comm, N, dU, diff0, hv, **kw):
+           ST, SB, F_tmp, comm, N, dU, diff0, hv, **kw):
     global im1, im2, im3, flux
 
     #q = Q(U[1], rank, comm, N)
@@ -390,21 +390,21 @@ if __name__ == "__main__":
     #init_from_file("KMM666.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="KMMstats")
-    solver.hdf5file.fname = "KMM666.h5"
+    solver.hdf5file.fname = "KMM665.h5"
     solver.solve()
     s = solver.stats.get_stats()
 
-    from numpy import meshgrid, float
-    s = solver
-    Np = s.N / s.num_processes
-    x1 = arange(1.5*s.N[1], dtype=float)*config.L[1]/(1.5*s.N[1])
-    x2 = arange(1.5*s.N[2], dtype=float)*config.L[2]/(1.5*s.N[2])
-    points, weights = s.ST.points_and_weights(s.N[0])
-    # Get grid for velocity points
-    X = array(meshgrid(points[s.rank*Np[0]:(s.rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)    
-    s.U_pad2[1] = s.FST.ifst_padded(s.U_hat[1], s.U_pad2[1], s.ST)
-    plt.figure()
-    plt.contourf(X[1,:,:,0], X[0,:,:,0], s.U_pad2[1,:,:,0], 100)
-    plt.colorbar()
-    plt.show()    
+    #from numpy import meshgrid, float
+    #s = solver
+    #Np = s.N / s.num_processes
+    #x1 = arange(1.5*s.N[1], dtype=float)*config.L[1]/(1.5*s.N[1])
+    #x2 = arange(1.5*s.N[2], dtype=float)*config.L[2]/(1.5*s.N[2])
+    #points, weights = s.ST.points_and_weights(s.N[0])
+    ## Get grid for velocity points
+    #X = array(meshgrid(points[s.rank*Np[0]:(s.rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)    
+    #s.U_pad2[1] = s.FST.ifst_padded(s.U_hat[1], s.U_pad2[1], s.ST)
+    #plt.figure()
+    #plt.contourf(X[1,:,:,0], X[0,:,:,0], s.U_pad2[1,:,:,0], 100)
+    #plt.colorbar()
+    #plt.show()    
     

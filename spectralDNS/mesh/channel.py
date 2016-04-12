@@ -7,7 +7,7 @@ from spectralDNS import config
 from mpiFFT4py import *
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ShenBiharmonicBasis, SFTc
 from ..shenGeneralBCs.shentransform import ShenBasis
-from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange, conj
+from numpy import array, ndarray, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange, conj
 
 __all__ = ['setup']
 
@@ -39,16 +39,11 @@ def setupShen(N, L, MPI, float, complex, **kwargs):
     U_hat1  = empty((3,)+FST.complex_shape(), dtype=complex)
 
     U_tmp   = empty((3,)+FST.real_shape(), dtype=float)
-    U_tmp2  = empty((3,)+FST.real_shape(), dtype=float)
-    U_tmp3  = empty((3,)+FST.real_shape(), dtype=float)
     F_tmp   = empty((3,)+FST.complex_shape(), dtype=complex)
     F_tmp2  = empty((3,)+FST.complex_shape(), dtype=complex)
 
     dU      = empty((3,)+FST.complex_shape(), dtype=complex)
 
-    H        = empty((3,)+FST.real_shape(), dtype=float)
-    H0       = empty((3,)+FST.real_shape(), dtype=float)
-    H1       = empty((3,)+FST.real_shape(), dtype=float)
     H_hat    = empty((3,)+FST.complex_shape(), dtype=complex)
     H_hat0   = empty((3,)+FST.complex_shape(), dtype=complex)
     H_hat1   = empty((3,)+FST.complex_shape(), dtype=complex)
@@ -92,9 +87,6 @@ def setupShenKMM(N, L, MPI, float, complex, **kwargs):
     u = U_hat0[0]
     g = empty(FST.complex_shape(), dtype=complex)
 
-    H        = empty((3,)+FST.real_shape(), dtype=float)
-    H0       = empty((3,)+FST.real_shape(), dtype=float)
-    H1       = empty((3,)+FST.real_shape(), dtype=float)
     H_hat    = empty((3,)+FST.complex_shape(), dtype=complex)
     H_hat0   = empty((3,)+FST.complex_shape(), dtype=complex)
     H_hat1   = empty((3,)+FST.complex_shape(), dtype=complex)
@@ -233,9 +225,6 @@ class FastShenFourierTransform(slab_FFT):
         self.U_mpi2  = empty((self.num_processes, self.Np[0], self.Np[1], self.N[2]))
         self.UT      = empty((3, self.N[0], self.Np[1], self.N[2]))
         self.Upad_hatT = empty(self.complex_shape_padded_T(), dtype=self.complex)
-        self.dealias = 1
-        if config.dealias == "2/3-rule":
-            self.dealias = self.get_dealias_filter()
         
     def complex_shape_padded_T(self):
         """The local shape of the transposed complex data padded in x and z directions"""
@@ -293,107 +282,31 @@ class FastShenFourierTransform(slab_FFT):
                         (abs(K[2]) < kmax[2]), dtype=uint8)
         return dealias
     
-    def get_complex_workarray(self, i=0, padding=False, comps=1):
-        if padding:
-            shape = self.complex_shape_padded() if comps == 1 else (comps,)+self.complex_shape_padded()
-            a = _work_arrays[(shape, self.complex, i)]
-        else:
-            shape = self.complex_shape() if comps == 1 else (comps,)+self.complex_shape()
-            a = _work_arrays[(shape, self.complex, i)]
-        a[:] = 0
-        return a
-
-    def get_real_workarray(self, i=0, padding=False, comps=1):
-        if padding:
-            shape = self.real_shape_padded() if comps == 1 else (comps,)+self.real_shape_padded()
-            a = _work_arrays[(shape, self.float, i)]
-        else:
-            shape = self.real_shape() if comps == 1 else (comps,)+self.real_shape()
-            a = _work_arrays[(shape, self.float, i)]
+    def get_workarray(self, a, i=0):
+        if isinstance(a, ndarray):
+            shape = a.shape
+            dtype = a.dtype
             
+        elif isinstance(a, tuple):
+            assert len(a) == 2
+            shape, dtype = a
+            
+        else:
+            raise TypeError("Wrong type for get_workarray")
+        
+        a = _work_arrays[(shape, dtype, i)]
         a[:] = 0
         return a
 
     def copy_to_padded(self, fu, fp):
         fp[:, :self.N[1]/2, :self.Nf] = fu[:, :self.N[1]/2]
         fp[:, -(self.N[1]/2):, :self.Nf] = fu[:, self.N[1]/2:]
-        fp[:, :, self.Nf-1] *= 0.5  
-        fp[:, -self.N[1]/2, :] *= 0.5
-        fp[:, self.N[1]/2, :] = fp[:, -self.N[1]/2, :]
         return fp
     
     def copy_from_padded(self, fp, fu):
+        fu[:] = 0
         fu[:, :self.N[1]/2] = fp[:, :self.N[1]/2, :self.Nf]
         fu[:, self.N[1]/2:] = fp[:, -(self.N[1]/2):, :self.Nf]
-        fu[:, :, self.Nf-1] *= 2
-        fu[:, -self.N[1]/2, :] *= 2
-        return fu
-    
-    def ifst_padded(self, fu, u, S):
-        """Inverse Shen transform of x-direction, Fourier in y and z.
-        
-        fu is padded with zeros using the 3/2 rule before transforming to real space
-        """
-        self.init_work_arrays()
-        self.Uc_hat[:] = S.ifst(fu, self.Uc_hat)
-        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.Uc_mpi, self.mpitype])
-        self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())     
-        self.Upad_hatT[:] = 0
-        self.Upad_hatT = self.copy_to_padded(self.Uc_hatT, self.Upad_hatT)
-        u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
-        return u
-
-    def fst_padded(self, u, fu, S):
-        """Fast Shen transform of x-direction, Fourier transform of y and z
-        
-        u is of shape real_shape_padded. The output, fu, is normal complex_shape
-        """   
-        self.init_work_arrays()
-        self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
-        self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
-        self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-        self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
-        fu = S.fst(self.Uc_hat, fu)
-        return fu
-
-    def fss_padded(self, u, fu, S):
-        """Fast padded Shen scalar product of x-direction, Fourier transform of y and z
-        
-        u is of shape real_shape_padded. The output, fu, is normal complex_shape
-        """        
-        self.init_work_arrays()
-        self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
-        self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
-        self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-        self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
-        fu = S.fastShenScalar(self.Uc_hat, fu)
-        return fu
-    
-    def ifct_padded(self, fu, u, S):
-        """Inverse Cheb transform of x-direction, Fourier in y and z
-        
-        fu is padded with zeros using the 3/2 rule before transforming to real space
-        """
-        self.init_work_arrays()
-        self.Uc_hat[:] = S.ifct(fu, self.Uc_hat)
-        self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.Uc_mpi, self.mpitype])
-        self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())    
-        self.Upad_hatT[:] = 0
-        self.Upad_hatT = self.copy_to_padded(self.Uc_hatT, self.Upad_hatT)
-        u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
-        return u
-
-    def fct_padded(self, u, fu, S):
-        """Fast Shen transform of x-direction, Fourier transform of y and z
-        
-        u is of shape real_shape_padded. The output, fu, is normal complex_shape
-        """        
-        self.init_work_arrays()
-        self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
-        self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
-        self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-        self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
-        fu = S.fct(self.Uc_hat, fu)
         return fu
     
     def fss(self, u, fu, S, dealias=None):
@@ -419,7 +332,10 @@ class FastShenFourierTransform(slab_FFT):
         self.init_work_arrays()
         if not dealias == '3/2-rule':
             if dealias == '2/3-rule':
+                if self.dealias is None:
+                    self.dealias = self.get_dealias_filter()
                 fu *= self.dealias
+                
             self.Uc_hat[:] = S.ifst(fu, self.Uc_hat)
             self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.Uc_mpi, self.mpitype])
             self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())
@@ -492,6 +408,8 @@ class FastShenFourierTransform(slab_FFT):
         self.init_work_arrays()
         if not dealias == '3/2-rule':
             if dealias == '2/3-rule':
+                if self.dealias is None:
+                    self.dealias = self.get_dealias_filter()
                 fu *= self.dealias
 
             self.Uc_hat[:] = S.ifct(fu, self.Uc_hat)

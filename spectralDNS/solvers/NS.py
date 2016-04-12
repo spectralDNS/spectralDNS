@@ -7,86 +7,95 @@ from spectralinit import *
 
 hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5")
 
-def standardConvection(c, U_dealiased):
+def standardConvection(c, U_dealiased, dealias=None):
     """c_i = u_j du_i/dx_j"""
+    Uc = FFT.get_workarray(U_dealiased, 2)
     for i in range(3):
         for j in range(3):
-            U_tmp[j] = FFT.ifftn(1j*K[j]*U_hat[i]*dealias, U_tmp[j])
-        c[i] = FFT.fftn(sum(U_dealiased*U_tmp, 0), c[i])
+            Uc[j] = FFT.ifftn(1j*K[j]*U_hat[i], Uc[j], dealias)
+        c[i] = FFT.fftn(sum(U_dealiased*Uc, 0), c[i], dealias)
     return c
 
-def divergenceConvection(c, U_dealiased, add=False):
+def divergenceConvection(c, U_dealiased, dealias=None, add=False):
     """c_i = div(u_i u_j)"""
     if not add: c.fill(0)
     for i in range(3):
-        F_tmp[i] = FFT.fftn(U_dealiased[0]*U_dealiased[i], F_tmp[i])
+        F_tmp[i] = FFT.fftn(U_dealiased[0]*U_dealiased[i], F_tmp[i], dealias)
     c[0] += 1j*sum(K*F_tmp, 0)
     c[1] += 1j*K[0]*F_tmp[1]
     c[2] += 1j*K[0]*F_tmp[2]
-    F_tmp[0] = FFT.fftn(U_dealiased[1]*U_dealiased[1], F_tmp[0])
-    F_tmp[1] = FFT.fftn(U_dealiased[1]*U_dealiased[2], F_tmp[1])
-    F_tmp[2] = FFT.fftn(U_dealiased[2]*U_dealiased[2], F_tmp[2])
+    F_tmp[0] = FFT.fftn(U_dealiased[1]*U_dealiased[1], F_tmp[0], dealias)
+    F_tmp[1] = FFT.fftn(U_dealiased[1]*U_dealiased[2], F_tmp[1], dealias)
+    F_tmp[2] = FFT.fftn(U_dealiased[2]*U_dealiased[2], F_tmp[2], dealias)
     c[1] += (1j*K[1]*F_tmp[0] + 1j*K[2]*F_tmp[1])
     c[2] += (1j*K[1]*F_tmp[1] + 1j*K[2]*F_tmp[2])
     return c
 
 #@profile
-def Cross(a, b, c):
+def Cross(a, b, c, dealias=None):
     """c_k = F_k(a x b)"""
-    U_tmp[:] = cross1(U_tmp, a, b)
-    c[0] = FFT.fftn(U_tmp[0], c[0])
-    c[1] = FFT.fftn(U_tmp[1], c[1])
-    c[2] = FFT.fftn(U_tmp[2], c[2])
+    Uc = FFT.get_workarray(a, 2)
+    Uc[:] = cross1(Uc, a, b)
+    c[0] = FFT.fftn(Uc[0], c[0], dealias)
+    c[1] = FFT.fftn(Uc[1], c[1], dealias)
+    c[2] = FFT.fftn(Uc[2], c[2], dealias)
     return c
 
 #@profile
-def Curl(a, c, dealiasing=True):
+def Curl(a, c, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
     F_tmp[:] = cross2(F_tmp, K, a)
-    if dealiasing:
-        F_tmp[:] = dealias_rhs(F_tmp, dealias)
-    c[0] = FFT.ifftn(F_tmp[0], c[0])
-    c[1] = FFT.ifftn(F_tmp[1], c[1])
-    c[2] = FFT.ifftn(F_tmp[2], c[2])    
+    c[0] = FFT.ifftn(F_tmp[0], c[0], dealias)
+    c[1] = FFT.ifftn(F_tmp[1], c[1], dealias)
+    c[2] = FFT.ifftn(F_tmp[2], c[2], dealias)    
     return c
+
+# Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved
+work_shape = FFT.real_shape_padded() if config.dealias == '3/2-rule' else FFT.real_shape()
 
 def getConvection(convection):
     """Return function used to compute convection"""
     if convection == "Standard":
         
         def Conv(dU):
+            U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i])
-            dU = standardConvection(dU, U_dealiased)
+                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i], config.dealias)
+            dU = standardConvection(dU, U_dealiased, config.dealias)
             dU[:] *= -1 
             return dU
         
     elif convection == "Divergence":
         
         def Conv(dU):
+            U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i])
-            dU = divergenceConvection(dU, U_dealiased, False)
+                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i], config.dealias)
+            dU = divergenceConvection(dU, U_dealiased, config.dealias, False)
             dU[:] *= -1
             return dU
         
     elif convection == "Skewed":
         
         def Conv(dU):
+            U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i])
-            dU = standardConvection(dU, U_dealiased)
-            dU = divergenceConvection(dU, U_dealiased, True)
+                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i], config.dealias)
+            dU = standardConvection(dU, U_dealiased, config.dealias)
+            dU = divergenceConvection(dU, U_dealiased, config.dealias, True)
             dU *= -0.5
             return dU
         
     elif convection == "Vortex":
         
         def Conv(dU):
+            U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
+            curl_dealiased = FFT.get_workarray(((3,)+work_shape, float), 1)
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i])
-            curl[:] = Curl(U_hat, curl)
-            dU = Cross(U_dealiased, curl, dU)
+                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], config.dealias)
+            
+            curl_dealiased[:] = Curl(U_hat, curl_dealiased, config.dealias)
+            dU = Cross(U_dealiased, curl_dealiased, dU, config.dealias)
             return dU
         
     return Conv           

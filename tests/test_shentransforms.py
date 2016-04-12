@@ -400,6 +400,9 @@ def test_FST_padded(ST):
         fj = FST.ifct(f_hat, fj, ST)
         f_hat = FST.fct(fj, f_hat, ST)
 
+    # Eliminate Nyquist frequency due to assymmetry issue
+    f_hat[:, -N/2] = 0 
+
     # Then check if transformations work as they should
     fj_padded = np.zeros(FST.real_shape_padded(), FST.float)
     c_hat = np.zeros(FST.complex_shape(), dtype=FST.complex)
