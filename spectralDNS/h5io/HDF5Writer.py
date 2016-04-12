@@ -5,7 +5,6 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 """Wrap call to hdf5 to allow running without installing h5py
 """
-from spectralDNS import config
 from numpy.linalg import norm
 
 __all__ = ['HDF5Writer']
@@ -14,18 +13,18 @@ try:
     import h5py
     class HDF5Writer(object):
     
-        def __init__(self, comm, dtype, comps, filename="U.h5", mesh={}, fromfile=None):
-            self.comm = comm
+        def __init__(self, context,  comps, filename="U.h5", mesh={}, fromfile=None):
+            self.comm = comm = context.comm
             self.components = comps
             self.fname = filename
-            self.dtype = dtype
+            self.dtype = dtype = context.types["float"]
             self.f = None
-            self.N = 2**config.M
+            self.N = 2**context.model_params["M"]
             self.rank = self.comm.Get_rank()
             self.dim = len(comps[comps.keys()[0]].shape)
             self.mesh = mesh
             num_processes = self.comm.Get_size()
-            if config.decomposition == "pencil":
+            if context.decomposition == "pencil":
                 commxz = comm.Split(self.rank/config.P1)
                 commxy = comm.Split(self.rank%config.P1)    
                 xzrank = commxz.Get_rank() # Local rank in xz-plane
@@ -67,7 +66,7 @@ try:
             else:
                 self.f = h5py.File(self.fname, driver="mpio", comm=self.comm)
             
-            if config.decomposition in ("slab", "pencil"):
+            if context.decomposition in ("slab", "pencil"):
                 shape = [3] + list(self.N)
                 if not "0" in self.f["3D/checkpoint/U"].keys():
                     self.f["3D/checkpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
@@ -87,7 +86,7 @@ try:
                     self.f["2D/oldcheckpoint/U"].create_dataset("1", shape=shape, dtype=self.dtype)
                     self.f["2D/oldcheckpoint/P"].create_dataset("1", shape=self.N, dtype=self.dtype)
 
-            if config.decomposition == 'slab':
+            if context.decomposition == 'slab':
                 
                 Np = self.N / self.comm.Get_size()
                 
@@ -102,7 +101,7 @@ try:
                 self.f["3D/checkpoint/U/1"][:, s] = U
                 self.f["3D/checkpoint/P/1"][s] = P
 
-            elif config.decomposition == 'pencil':
+            elif context.decomposition == 'pencil':
                 
                 x1, x2 = self.x1, self.x2
                 # Backup previous solution
@@ -114,7 +113,7 @@ try:
                 self.f["3D/checkpoint/U/1"][:, x1, x2] = U
                 self.f["3D/checkpoint/P/1"][x1, x2] = P
                 
-            elif config.decomposition == 'line':
+            elif context.decomposition == 'line':
                 
                 Np =  N / self.comm.Get_size()                
                 # Backup previous solution
@@ -135,28 +134,28 @@ try:
                 
             N = self.N
             
-            if tstep % config.write_result == 0 and config.decomposition == 'slab':
+            if tstep % config.write_result == 0 and context.decomposition == 'slab':
                 
                 Np = N / self.comm.Get_size()                
                 for comp, val in self.components.iteritems():
                     self.f["3D/"+comp].create_dataset(str(tstep), shape=N, dtype=self.dtype)
                     self.f["3D/%s/%d"%(comp,tstep)][self.rank*Np[0]:(self.rank+1)*Np[0]] = val
 
-            elif tstep % config.write_result == 0 and config.decomposition == 'pencil':
+            elif tstep % config.write_result == 0 and context.decomposition == 'pencil':
                 
                 x1, x2 = self.x1, self.x2
                 for comp, val in self.components.iteritems():
                     self.f["3D/"+comp].create_dataset(str(tstep), shape=N, dtype=self.dtype)
                     self.f["3D/%s/%d"%(comp, tstep)][x1, x2, :] = val
                     
-            elif tstep % config.write_result == 0 and config.decomposition == 'line':
+            elif tstep % config.write_result == 0 and context.decomposition == 'line':
                 
                 Np =  N / self.comm.Get_size()                
                 for comp, val in self.components.iteritems():
                     self.f["2D/"+comp].create_dataset(str(tstep), shape=(N[0], N[1]), dtype=self.dtype)
                     self.f["2D/%s/%d"%(comp,tstep)][self.rank*Np[0]:(self.rank+1)*Np[0]] = val                
                     
-            if tstep % config.write_yz_slice[1] == 0 and config.decomposition == 'slab':
+            if tstep % config.write_yz_slice[1] == 0 and context.decomposition == 'slab':
                 i = config.write_yz_slice[0]
                 Np = N / self.comm.Get_size()     
                 for comp in self.components:
@@ -166,7 +165,7 @@ try:
                     for comp, val in self.components.iteritems():                
                         self.f["2D/%s/%d"%(comp, tstep)][:] = val[i-self.rank*Np[0]]
 
-            elif tstep % config.write_yz_slice[1] == 0 and config.decomposition == 'pencil':
+            elif tstep % config.write_yz_slice[1] == 0 and context.decomposition == 'pencil':
                 i = config.write_yz_slice[0]
                 x1, x2 = self.x1, self.x2
                 for comp in self.components:
@@ -180,7 +179,7 @@ try:
                             
 except:
     class HDF5Writer(object):
-        def __init__(self, comm, dtype, comps, filename="U.h5", mesh={}, fromfile=None):
+        def __init__(self, context,  comps, filename="U.h5", mesh={}, fromfile=None):
             if comm.Get_rank() == 0:
                 print Warning("Need to install h5py to allow storing results")
         

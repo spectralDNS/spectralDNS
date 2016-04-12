@@ -3,17 +3,21 @@ __date__ = "2014-12-30"
 __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from spectralDNS import config
+from numpy import sum,where
 from mpiFFT4py import *
 
-__all__ = ['setup']
+_all__ = ['setup']
+#TODO Find out why sum, where were included as params here
+def setupDNS(context):
+   
+    float = context.types["float"]
+    complex = context.types["complex"]
+    FFT = context.FFT
 
-def setupDNS(float, complex, FFT, sum, where, **kwargs):    
-    
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()
     dealias = None
-    if not config.dealias == "3/2-rule":
+    if not context.dealias_name == "3/2-rule":
         dealias = FFT.get_dealias_filter()
     
     K2 = sum(K*K, 0, dtype=float)
@@ -34,15 +38,23 @@ def setupDNS(float, complex, FFT, sum, where, **kwargs):
     curl   = empty((3,) + FFT.real_shape(), dtype=float)   
     Source = None
     
-    del kwargs
+    to_return = locals()
+    del to_return["context"]
+    del to_return["float"]
+    del to_return["complex"]
+    del to_return["FFT"]
     return locals() # Lazy (need only return what is needed)
 
-def setupMHD(float, complex, FFT, sum, where, **kwargs):
+def setupMHD(context):
+
+    float = context.types["float"]
+    complex = context.types["complex"]
+    FFT = context.FFT
     
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()
     dealias = None
-    if not config.dealias == "3/2-rule":
+    if not context.dealias_name == "3/2-rule":
         dealias = FFT.get_dealias_filter()
     
     K2 = sum(K*K, 0, dtype=float)
@@ -68,9 +80,15 @@ def setupMHD(float, complex, FFT, sum, where, **kwargs):
     curl   = empty((3,) + FFT.real_shape(), dtype=float)   
     Source = None
     
-    del kwargs
+    to_return = locals()
+    del to_return["context"]
+    del to_return["float"]
+    del to_return["complex"]
+    del to_return["FFT"]
+ 
     return locals() # Lazy (need only return what is needed)
-        
-setup = {"MHD": setupMHD,
+
+def setup(solver,**kwargs):
+        return {"MHD": setupMHD,
          "NS":  setupDNS,
-         "VV":  setupDNS}[config.solver]        
+         "VV":  setupDNS}[solver](**kwargs)
