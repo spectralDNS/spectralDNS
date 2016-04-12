@@ -42,7 +42,7 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, Curl, float64, dx, L, su
         if config.solver == 'NS':
             ww = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
         elif config.solver == 'VV':
-            U = Curl(kw['W_hat'], U, dealiasing=False)
+            U = Curl(kw['W_hat'], U)
             ww = comm.reduce(sum(kw['W'].astype(float64)*kw['W'].astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
             
         kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
