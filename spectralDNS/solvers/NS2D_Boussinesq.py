@@ -27,17 +27,20 @@ def add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Ri, 
     return dU
 
 def ComputeRHS(dU, rk):
-    if rk > 0: # For rk=0 the correct values are already in U, V, W
-        for i in range(3):
-            Ur[i] = FFT.ifft2(Ur_hat[i], Ur[i])
+    Ur_dealiased = FFT.get_workarray(((3,)+FFT.real_shape(), float), 0)
+    for i in range(3):
+        Ur_dealiased[i] = FFT.ifft2(Ur_hat[i], Ur_dealiased[i], config.dealias)
+        
+    U_dealiased = Ur_dealiased[:2]
+    rho_dealiased = Ur_dealiased[2]
 
     F_tmp[0] = cross2(F_tmp[0], K, U_hat)
-    curl[:] = FFT.ifft2(F_tmp[0], curl)
-    dU[0] = FFT.fft2(U[1]*curl, dU[0])
-    dU[1] = FFT.fft2(-U[0]*curl, dU[1])
+    curl[:] = FFT.ifft2(F_tmp[0], curl, config.dealias)
+    dU[0] = FFT.fft2(U_dealiased[1]*curl, dU[0], config.dealias)
+    dU[1] = FFT.fft2(-U_dealiased[0]*curl, dU[1], config.dealias)
    
-    F_tmp[0] = FFT.fft2(U[0]*rho, F_tmp[0])
-    F_tmp[1] = FFT.fft2(U[1]*rho, F_tmp[1])
+    F_tmp[0] = FFT.fft2(U_dealiased[0]*rho_dealiased, F_tmp[0], config.dealias)
+    F_tmp[1] = FFT.fft2(U_dealiased[1]*rho_dealiased, F_tmp[1], config.dealias)
     dU[2] = -1j*(K[0]*F_tmp[0]+K[1]*F_tmp[1])
     
     #U_tmp[0] = FFT.ifft2(1j*K[0]*rho_hat, U_tmp[0])
@@ -45,8 +48,6 @@ def ComputeRHS(dU, rk):
     #F_tmp[0] = FFT.fft2(U[0]*U_tmp[0], F_tmp[0])      
     #F_tmp[1] = FFT.fft2(U[1]*U_tmp[1], F_tmp[1])    
     #dU[2] = -1.0*(F_tmp[0] + F_tmp[1])    
-    
-    dU = dealias_rhs(dU, dealias)
     
     dU = add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Ri, Pr)
     

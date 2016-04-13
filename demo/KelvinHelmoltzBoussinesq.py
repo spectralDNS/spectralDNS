@@ -93,6 +93,6 @@ if __name__ == "__main__":
     config.doublyperiodic.add_argument("--compute_energy", type=int, default=2)
     solver = get_solver(update, mesh='doublyperiodic')
     solver.hdf5file.components["curl"] = solver.curl
-    assert config.solver == 'Bq2D'
+    
     initialize(**vars(solver))
     solver.solve()
