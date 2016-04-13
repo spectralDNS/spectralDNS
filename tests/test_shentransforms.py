@@ -8,6 +8,7 @@ from scipy.linalg import solve
 from spectralDNS import config
 config.mesh = "channel"
 config.solver = "IPCS"
+config.dealias = "3/2-rule"
 from spectralDNS.mesh.channel import FastShenFourierTransform
 from mpi4py import MPI
 
@@ -399,16 +400,19 @@ def test_FST_padded(ST):
         fj = FST.ifct(f_hat, fj, ST)
         f_hat = FST.fct(fj, f_hat, ST)
 
+    # Eliminate Nyquist frequency due to assymmetry issue
+    f_hat[:, -N/2] = 0 
+
     # Then check if transformations work as they should
     fj_padded = np.zeros(FST.real_shape_padded(), FST.float)
     c_hat = np.zeros(FST.complex_shape(), dtype=FST.complex)
     
     if ST.__class__.__name__ == "ChebyshevTransform":
-        fj_padded = FST.ifct_padded(f_hat, fj_padded, ST)
-        c_hat = FST.fct_padded(fj_padded, c_hat, ST)
+        fj_padded = FST.ifct(f_hat, fj_padded, ST, dealias="3/2-rule")
+        c_hat = FST.fct(fj_padded, c_hat, ST, dealias="3/2-rule")
     else:
-        fj_padded = FST.ifst_padded(f_hat, fj_padded, ST)
-        c_hat = FST.fst_padded(fj_padded, c_hat, ST)
+        fj_padded = FST.ifst(f_hat, fj_padded, ST, dealias="3/2-rule")
+        c_hat = FST.fst(fj_padded, c_hat, ST, dealias="3/2-rule")
 
     #from IPython import embed; embed()
     assert np.allclose(c_hat, f_hat)

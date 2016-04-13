@@ -1,28 +1,26 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2015-01-02"
-__copyright__ = "Copyright (C) 2014 " + __author__
+__copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 """
 Velocity-vorticity formulation
 """
 from spectralinit import *
-from NS import Cross, hdf5file, regression_test
+from NS import Cross, hdf5file, regression_test, work_shape
 
 # Rename variable since we are working with a vorticity formulation
 W = U.copy()               # W is vorticity
 W_hat = U_hat              # U is used in setup, rename here for convenience
-W_dealiased = U_dealiased.copy()
 Source = U_hat.copy()*0    # Possible source term initialized to zero
 
-def Curl(a, c, dealiasing=True):
-    """c = curl(a) = F_inv(F(curl(a))/K2) = F_inv(1j*(K x a)/K2)"""
+def Curl(a, c, dealias=None):
+    """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
     F_tmp[:] = cross2(F_tmp, K_over_K2, a)
-    if dealiasing:
-        F_tmp[:] = dealias_rhs(F_tmp, dealias)
-    c[0] = FFT.ifftn(F_tmp[0], c[0])
-    c[1] = FFT.ifftn(F_tmp[1], c[1])
-    c[2] = FFT.ifftn(F_tmp[2], c[2])    
+    c[0] = FFT.ifftn(F_tmp[0], c[0], dealias)
+    c[1] = FFT.ifftn(F_tmp[1], c[1], dealias)
+    c[2] = FFT.ifftn(F_tmp[2], c[2], dealias)    
     return c
+
 
 #@profile
 def ComputeRHS(dU, rk):
@@ -30,10 +28,12 @@ def ComputeRHS(dU, rk):
         for i in range(3):
             W[i] = FFT.ifftn(W_hat[i], W[i])
             
-    U_dealiased[:] = Curl(W_hat, U_dealiased)
+    U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
+    W_dealiased = FFT.get_workarray(((3,)+work_shape, float), 1)
+    U_dealiased[:] = Curl(W_hat, U_dealiased, config.dealias)
     for i in range(3):
-        W_dealiased[i] = FFT.ifftn(W_hat[i]*dealias, W_dealiased[i])
-    F_tmp[:] = Cross(U_dealiased, W_dealiased, F_tmp)
+        W_dealiased[i] = FFT.ifftn(W_hat[i], W_dealiased[i], config.dealias)
+    F_tmp[:] = Cross(U_dealiased, W_dealiased, F_tmp, config.dealias)
     dU = cross2(dU, K, F_tmp)    
     dU -= nu*K2*W_hat    
     dU += Source    
