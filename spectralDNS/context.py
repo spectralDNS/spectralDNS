@@ -48,7 +48,9 @@ class Context:
         self.types["float"], self.types["complex"], self.types["mpitype"] = {"single": (np.float32, np.complex64, MPI.F_FLOAT_COMPLEX),
                                    "double": (np.float64, np.complex128, MPI.F_DOUBLE_COMPLEX)}[precision]
         M = self.model_params["M"] = np.array([eval(str(f)) for f in args.M], dtype=int)
-        L = self.model_params["L"] = np.array([eval(str(f)) for f in args.L], dtype=self.types["float"])
+        #L = self.model_params["L"] = np.array([eval(str(f)) for f in args.L], dtype=self.types["float"])
+        #TODO: Maybe reset L
+        L = self.model_params["L"] = np.ones(3,dtype=self.types["float"])*2*np.pi
         N = self.model_params["N"] = 2**M
         dx = self.model_params["dx"] = (L/N).astype(self.types["float"])
         nu = self.model_params["nu"] = self.types["float"](args.nu)
