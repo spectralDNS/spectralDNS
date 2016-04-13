@@ -60,7 +60,7 @@ def getConvection(convection):
         def Conv(dU):
             U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i], config.dealias)
+                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], config.dealias)
             dU = standardConvection(dU, U_dealiased, config.dealias)
             dU[:] *= -1 
             return dU
@@ -70,7 +70,7 @@ def getConvection(convection):
         def Conv(dU):
             U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i], config.dealias)
+                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], config.dealias)
             dU = divergenceConvection(dU, U_dealiased, config.dealias, False)
             dU[:] *= -1
             return dU
@@ -80,7 +80,7 @@ def getConvection(convection):
         def Conv(dU):
             U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i], config.dealias)
+                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], config.dealias)
             dU = standardConvection(dU, U_dealiased, config.dealias)
             dU = divergenceConvection(dU, U_dealiased, config.dealias, True)
             dU *= -0.5
