@@ -42,8 +42,6 @@ BDD = BDDmat(K[0, :, 0, 0], ST.quad)
 BBD = BBDmat(K[0, :, 0, 0], SB.quad)
 CDB = CDBmat(K[0, :, 0, 0])
 
-padding = config.dealias == '3/2-rule'
-
 def solvePressure(P_hat, Ni):
     """Solve for pressure if Ni is fst of convection"""
     pass

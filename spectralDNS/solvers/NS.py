@@ -126,7 +126,7 @@ def ComputeRHS(dU, rk):
             U[i] = FFT.ifftn(U_hat[i], U[i])
                         
     dU = conv(dU)
-
+    
     dU = add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu)
         
     return dU
