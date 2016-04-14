@@ -5,7 +5,8 @@ import h5py
 from mpiFFT4py import dct
 
 # Use constant flux and adjust pressure gradient dynamically
-flux = array([1645.46])
+#flux = array([1645.46])
+flux = array([692.6])
 
 def initOS(OS, U, X, t=0.):
     for i in range(U.shape[1]):
@@ -171,7 +172,7 @@ def Q(u, rank, comm, N):
 beta = zeros(1)    
 def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk, 
            ST, SB, U_tmp, F_tmp, comm, N, dU, diff0, hv, **kw):
-    global im1, im2, im3, flux
+    global flux
 
     #q = Q(U[1], rank, comm, N)
     #beta[0] = (flux[0] - q)/(array(config.L).prod())
@@ -311,10 +312,10 @@ if __name__ == "__main__":
     config.channel.add_argument("--print_energy0", type=int, default=100)
     solver = get_solver(update=update, mesh="channel")    
     #initialize(**vars(solver))    
-    init_from_file("KMM888.h5", **vars(solver))
+    init_from_file("KMM888t4.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="KMM395stats")
-    solver.hdf5file.fname = "KMM888t.h5"
+    solver.hdf5file.fname = "KMM888t2.h5"
     solver.solve()
     s = solver.stats.get_stats()
 
