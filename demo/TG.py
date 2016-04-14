@@ -30,30 +30,49 @@ def initialize2(U, W, W_hat, X, sin, cos, FFT, F_tmp,
 
 k = []
 w = []
-def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, float64, dx, L, sum, 
-           hdf5file, FFT, **kw):
-    global k, w
+im1 = None
+def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, Curl, float64, dx, L, sum, 
+           hdf5file, FFT, X, **kw):
+    global k, w, im1
     if tstep % config.write_result == 0 or tstep % config.write_yz_slice[1] == 0:
         P[:] = FFT.ifftn(P_hat*1j, P)
         hdf5file.write(tstep)
+        
+    if im1 is None and rank == 0 and config.plot_step > 0:
+        plt.figure()
+        im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,10], 100)
+        plt.colorbar(im1)
+        plt.draw()
+        plt.pause(1e-6)
+        globals().update(im1=im1)
+        
+    if tstep % config.plot_step == 0 and rank == 0 and config.plot_step > 0:
+        im1.ax.clear()
+        im1.ax.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,10], 100) 
+        im1.autoscale()
+        plt.pause(1e-6)
 
     if tstep % config.compute_energy == 0:
-        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
         if config.solver == 'NS':
             ww = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
         elif config.solver == 'VV':
+            U = Curl(kw['W_hat'], U)
             ww = comm.reduce(sum(kw['W'].astype(float64)*kw['W'].astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+            
+        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
         if rank == 0:
             k.append(kk)
             w.append(ww)
             print t, float(kk), float(ww)
 
-def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, **kw):
-    k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
+def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, **kw):    
     if config.solver == 'NS':
         w = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     elif config.solver == 'VV':
+        U = Curl(W_hat, U)
         w = comm.reduce(sum(kw['W'].astype(float64)*kw['W'].astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+
+    k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
     if rank == 0:
         assert round(k - 0.124953117517, 7) == 0
         assert round(w - 0.375249930801, 7) == 0
@@ -73,6 +92,7 @@ if __name__ == "__main__":
         },  "triplyperiodic"
     )
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=2)
+    config.triplyperiodic.add_argument("--plot_step", type=int, default=10)
     solver = get_solver(update=update, mesh="triplyperiodic")
     solver.hdf5file.fname = "NS7.h5"
     solver.hdf5file.components["W0"] = solver.curl[0]

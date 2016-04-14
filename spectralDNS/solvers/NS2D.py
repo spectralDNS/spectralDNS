@@ -1,6 +1,6 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2014-11-07"
-__copyright__ = "Copyright (C) 2014 " + __author__
+__copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
@@ -21,20 +21,14 @@ def add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, nu):
     return dU
 
 def ComputeRHS(dU, rk):
-    if rk > 0: # For rk=0 the correct values are already in U, V, W
-        U[0] = FFT.ifft2(U_hat[0], U[0])
-        U[1] = FFT.ifft2(U_hat[1], U[1])
-        
     F_tmp[0] = cross2(F_tmp[0], K, U_hat)
-    curl[:] = FFT.ifft2(F_tmp[0], curl)
-    dU[0] = FFT.fft2(U[1]*curl, dU[0])
-    dU[1] = FFT.fft2(-U[0]*curl, dU[1])
-
-    # Dealias the nonlinear convection
-    #dU = dealias_rhs(dU, dealias)
-
-    dU = add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, nu)
-    
+    curl[:] = FFT.ifft2(F_tmp[0], curl, config.dealias)
+    U_dealiased = FFT.get_workarray(((2,)+FFT.real_shape(), float), 0)
+    U_dealiased[0] = FFT.ifft2(U_hat[0], U_dealiased[0], config.dealias)
+    U_dealiased[1] = FFT.ifft2(U_hat[1], U_dealiased[1], config.dealias)
+    dU[0] = FFT.fft2(U_dealiased[1]*curl, dU[0], config.dealias)
+    dU[1] = FFT.fft2(-U_dealiased[0]*curl, dU[1], config.dealias)
+    dU = add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, nu)    
     return dU
 
 integrate = getintegrator(**vars())   
@@ -71,4 +65,3 @@ def solve():
     regression_test(t, tstep, **globals())
     
     hdf5file.close()
-

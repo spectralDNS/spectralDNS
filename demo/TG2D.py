@@ -19,6 +19,7 @@ def update(t, tstep, N, U_hat, curl, X, nu, FFT, K, P, P_hat, hdf5file, **kw):
         
     if tstep % config.write_result == 0:
         P = FFT.ifft2(P_hat*1j, P)
+        curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         hdf5file.write(tstep)
 
     if tstep % config.plot_result == 0 and config.plot_result > 0:
@@ -27,7 +28,7 @@ def update(t, tstep, N, U_hat, curl, X, nu, FFT, K, P, P_hat, hdf5file, **kw):
         im.autoscale()
         plt.pause(1e-6)
         
-def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, X, nu, **kw):
+def regression_test(t, tstep, comm, U, float64, dx, L, sum, rank, X, nu, U_hat, **kw):
     k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
     U[0] = -sin(X[1])*cos(X[0])*exp(-2*nu*t)
     U[1] = sin(X[0])*cos(X[1])*exp(-2*nu*t)    

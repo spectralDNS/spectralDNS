@@ -3,11 +3,10 @@ package:
   version: "1.0"
   
 source:
-  git_url: https://github.com/spectralDNS/spectralDNS.git
-  git_tag: master
-
+  git_url: ../../  
+  
 build:
-  number: 1
+  number: 2
 
 requirements:
   build:

@@ -21,7 +21,7 @@ def initOS(OS, U, X, t=0.):
     U[2] = 0
 
 def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_processes, 
-               Curl, conv, TDMASolverD, solvePressure, N, H_hat, H_hat1, U_tmp, K, **kw):
+               Curl, conv, TDMASolverD, solvePressure, N, H_hat, H_hat1, K, **kw):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
     utau = config.nu * config.Re_tau
@@ -36,7 +36,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_proce
     epsilon = Um/200.   #Um/200.
     U[:] = 0
     U[1] = Um*(Y-0.5*Y**2)
-    dev = 1+0.01*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dev = 1+0.02*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
     dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
     U[1] += dd
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
@@ -155,6 +155,8 @@ def set_Source(Source, Sk, ST, FST, **kw):
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
     
 def Q(u, rank, comm, N):
+    """Integrate u over entire computational domain
+    """
     L = config.L
     uu = sum(u, axis=(1,2))
     c = zeros(N[0])
@@ -318,4 +320,5 @@ if __name__ == "__main__":
     solver.hdf5file.fname = "KMM888t2.h5"
     solver.solve()
     s = solver.stats.get_stats()
+
 

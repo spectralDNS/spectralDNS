@@ -34,12 +34,15 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, float64, dx, L, sum,
         P = FFT.ifftn(P_hat*1j, P)
         hdf5file.write(tstep)
 
-def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, **kw):
-    k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
+def regression_test(t, tstep, comm, U_hat, U, curl, float64, dx, L, sum, rank, Curl, **kw):
     if config.solver == 'NS':
+        curl[:] = Curl(U_hat, curl)
         w = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     elif config.solver == 'VV':
+        U = Curl(kw['W_hat'], U)
         w = comm.reduce(sum(kw['W'].astype(float64)*kw['W'].astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+
+    k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
     if rank == 0:
         assert round(k - 0.124953117517, 7) == 0
         assert round(w - 0.375249930801, 7) == 0

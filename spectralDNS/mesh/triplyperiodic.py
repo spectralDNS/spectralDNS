@@ -1,6 +1,6 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2014-12-30"
-__copyright__ = "Copyright (C) 2014 " + __author__
+__copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralDNS import config
@@ -29,6 +29,7 @@ def setupDNS(float, complex, FFT, sum, where, **kwargs):
 
     # work arrays (Not required by all convection methods)
     U_tmp  = empty((3,) + FFT.real_shape(), dtype=float)
+    U_dealiased  = empty((3,) + FFT.real_shape(), dtype=float)
     F_tmp  = empty((3,) + FFT.complex_shape(), dtype=complex)
     curl   = empty((3,) + FFT.real_shape(), dtype=float)   
     Source = None

@@ -2,7 +2,7 @@
 from spectralDNS import config, get_solver
 from OrrSommerfeld_eig import OrrSommerfeld
 from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose
-from spectralDNS.fft.wrappyfftw import dct
+from mpiFFT4py import dct
 import matplotlib.pyplot as plt
 import warnings
 import matplotlib.cbook
@@ -35,12 +35,12 @@ def energy(u, N, comm, rank, L):
     else:
         return 0    
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST, U_tmp,
-               ST, X, N, comm, rank, L, conv, TDMASolverD, F_tmp, H, H1, **kw):        
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
+               ST, X, N, comm, rank, L, conv, TDMASolverD, F_tmp, **kw):        
     OS = OrrSommerfeld(Re=config.Re, N=100)
     initOS(OS, U0, U_hat0, X)
     
-    if not config.solver in ("ChannelRK4", "KMM", "KMMRK3"):
+    if not config.solver in ("KMM", "KMMRK3"):
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
         for i in range(3):
@@ -48,7 +48,6 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST, U_tmp
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
         H_hat1 = conv(H_hat1, U0, U_hat0)
-        H1[:] = H[:]
         e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
 
         initOS(OS, U, U_hat, X, t=config.dt)
@@ -71,30 +70,6 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST, U_tmp
         U_hat0[:] = U_hat
         config.t = config.dt
         config.tstep = 1
-
-    elif config.solver == "ChannelRK4":        
-        for i in range(3):
-            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
-        for i in range(3):
-            U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
-        for i in range(3):
-            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
-        H_hat1 = conv(H_hat1, U0, U_hat0)
-        H1[:] = H[:]
-        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
-        
-        initOS(OS, U, U_hat, X, t=config.dt)
-        for i in range(3):
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
-        for i in range(3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
-        for i in range(3):
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
-
-        U0[:] = U
-        U_hat0[:] = U_hat
-        config.t = config.dt
-        config.tstep = 1
         
     else:
         U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB']) 
@@ -104,7 +79,6 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST, U_tmp
         for i in range(1, 3):
             U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
         H_hat1 = conv(H_hat1, U0, U_hat0)
-        H1[:] = H[:]
         e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
         
         initOS(OS, U, U_hat, X, t=config.dt)
@@ -131,7 +105,7 @@ def set_Source(Source, Sk, FST, ST, **kw):
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
         
 im1, im2, im3, im4 = (None, )*4        
-def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, U_hat, **kw):
+def update(rank, X, U, P, OS, N, comm, L, e0, F_tmp, FST, ST, U_hat, **kw):
     global im1, im2, im3
     if im1 is None and rank == 0 and config.plot_step > 0:
         plt.figure()
@@ -173,6 +147,7 @@ def update(rank, X, U, P, OS, N, comm, L, e0, U_tmp, F_tmp, FST, ST, U_hat, **kw
         plt.pause(1e-6)
 
     if config.tstep % config.compute_energy == 0: 
+        U_tmp = FST.get_real_workarray(0, False, 3)
         pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
         e1 = 0.5*energy(pert, N, comm, rank, L)
         exact = exp(2*imag(OS.eigval)*(config.t))
@@ -226,21 +201,3 @@ if __name__ == "__main__":
     vars(solver).update(initialize(**vars(solver)))
     set_Source(**vars(solver))	
     solver.solve()
-    s = solver
-    
-    #from numpy import meshgrid, float, allclose
-    #s = solver
-    #Np = s.N / s.num_processes
-    #x1 = arange(1.5*s.N[1], dtype=float)*config.L[1]/(1.5*s.N[1])
-    #x2 = arange(1.5*s.N[2], dtype=float)*config.L[2]/(1.5*s.N[2])
-    ## Get grid for velocity points
-    #X = array(meshgrid(s.points[s.rank*Np[0]:(s.rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)    
-    #s.U_pad2[0] = s.FST.ifst_padded(s.U_hat[0], s.U_pad2[0], s.SB)
-    #s.F_tmp[0] = s.FST.fst_padded(s.U_pad2[0], s.F_tmp[0], s.SB)
-    
-    #assert allclose(s.F_tmp[0], s.U_hat[0])
-    #plt.figure()
-    #plt.contourf(X[1,:,:,0], X[0,:,:,0], s.U_pad2[0,:,:,0], 100)
-    #plt.show()
-
-

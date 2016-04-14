@@ -21,12 +21,6 @@ install:
     - conda info -a
     - conda config --add channels spectralDNS
     - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION Cython mpi4py scipy pytest mpifft4py sympy
-    #- wget https://github.com/spectralDNS/mpiFFT4py/archive/1.0.tar.gz
-    #- tar -xzvf 1.0.tar.gz
-    #- cd mpiFFT4py-1.0 && python setup.py install -- && cd ..
-    #- export PYTHONPATH="$HOME/miniconda/lib/python2.7/site-packages:$PYTHONPATH";
-    #- git clone https://github.com/spectralDNS/mpiFFT4py.git
-    #- cd mpiFFT4py && python setup.py install && cd ..
     - source activate test-environment
     - python setup.py install
     
