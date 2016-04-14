@@ -16,6 +16,7 @@ def initializeContext(context,args):
     context.NS = {}
     U = context.mesh_vars["U"]
     P = context.mesh_vars["P"]
+    FFT = context.FFT
 
     context.hdf5file = HDF5Writer(context, {"U":U[0], "V":U[1], "W":U[2], "P":P}, context.solver_name+".h5")
     # Set up function to perform temporal integration (using config.integrator parameter)
@@ -24,18 +25,19 @@ def initializeContext(context,args):
     context.time_integrator["integrate"] = integrate
 
     context.NS["convection"] = args.convection
+    context.mesh_vars["work_shape"] = FFT.real_shape_padded() if context.dealias_name == '3/2-rule' else FFT.real_shape()
     context.NS["conv"] = getConvection(context)
 
     # Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved
-    context.mesh_vars["work_shape"] = FFT.real_shape_padded() if context.dealias_name == '3/2-rule' else FFT.real_shape()
 
-def standardConvection(context,c, U_dealiased,U_hat,dealias=None):
+def standardConvection(context,c,U_hat,dealias=None):
     """c_i = u_j du_i/dx_j"""
     FFT=context.FFT
     dealias = context.mesh_vars["dealias"]
     K = context.mesh_vars["K"]
     U_tmp = context.mesh_vars["U_tmp"]
 
+    #TODO: maybe pass U_dealiased to the function so this doesn't cause an error.
     Uc = FFT.get_workarray(U_dealiased, 2)
 
     for i in range(3):
@@ -44,7 +46,7 @@ def standardConvection(context,c, U_dealiased,U_hat,dealias=None):
         c[i] = FFT.fftn(sum(U_dealiased*Uc, 0), c[i], dealias)
     return c
 
-def divergenceConvection(context,c, U_dealiased, dealias=None add=False):
+def divergenceConvection(context,c, U_dealiased, dealias=None,add=False):
     """c_i = div(u_i u_j)"""
     FFT = context.FFT
     F_tmp = context.mesh_vars["F_tmp"]
@@ -94,10 +96,7 @@ def getConvection(context):
 
     """Return function used to compute convection"""
     convection = context.NS["convection"]
-    dealias = context.mesh_vars["dealias"]
-    curl = context.mesh_vars["curl"]
     FFT = context.FFT
-    U_dealiased = context.mesh_vars["U_dealiased"]
     work_shape = context.mesh_vars["work_shape"]
 
     if convection == "Standard":
@@ -105,8 +104,8 @@ def getConvection(context):
         def Conv(dU,U_hat):
             U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i], context.dealias_name)
-            dU = standardConvection(context,dU, U_dealiased,U_hat, context.dealias_name)
+                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], context.dealias_name)
+            dU = standardConvection(context,dU, U_hat, context.dealias_name)
             dU[:] *= -1 
             return dU
         
@@ -114,7 +113,7 @@ def getConvection(context):
         def Conv(dU,U_hat):
             U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i], context.dealias_name)
+                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], context.dealias_name)
             dU = divergenceConvection(context,dU, U_dealiased,U_hat, context.dealias_name, False)
             dU[:] *= -1
             return dU
@@ -124,8 +123,8 @@ def getConvection(context):
         def Conv(dU,U_hat):
             U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i]*dealias, U_dealiased[i], context.dealias_name)
-            dU = standardConvection(context,dU, U_dealiased,U_hat, context.dealias_name)
+                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], context.dealias_name)
+            dU = standardConvection(context,dU, U_hat, context.dealias_name)
             dU = divergenceConvection(context,dU, U_dealiased,U_hat,context.dealias_name, True)
             dU *= -0.5
             return dU
@@ -135,13 +134,15 @@ def getConvection(context):
         def Conv(dU,U_hat):
             U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
             curl_dealiased = FFT.get_workarray(((3,)+work_shape, float), 1)
-            #TODO: Modify the line below based once I know whether it is correct or not
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], context.dealias_name)
             
             curl_dealiased[:] = Curl(context,U_hat, curl_dealiased, context.dealias_name)
             dU = Cross(context,U_dealiased, curl_dealiased, dU, context.dealias_name)
             return dU
+    else:
+        raise AssertionError("Invalid convection specified")
+
         
     return Conv           
 
