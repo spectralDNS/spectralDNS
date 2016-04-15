@@ -13,11 +13,13 @@ requirements:
     - python
     - cython
     - numpy
+    - hdf5 ==1.8.14
     - h5py ==2.6.0
 
   run:
     - python
     - numpy
+    - hdf5 ==1.8.14
     - h5py ==2.6.0
     - mpi4py
     - mpifft4py
@@ -27,7 +29,3 @@ test:
     requires:
       - python
       - pytest
-      - h5py ==2.6.0
-      - mpi4py
-      - mpifft4py
-      - sympy
