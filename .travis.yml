@@ -20,7 +20,7 @@ install:
     # Useful for debugging any issues with conda
     - conda info -a
     - conda config --add channels spectralDNS
-    - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION Cython mpi4py scipy pytest mpifft4py sympy
+    - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION Cython mpi4py scipy pytest mpifft4py sympy h5py=2.6.0
     - source activate test-environment
     - python setup.py install
     
