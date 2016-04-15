@@ -18,7 +18,6 @@ requirements:
   run:
     - python
     - numpy
-    - scipy
     - h5py ==2.6.0
     - mpi4py
     - mpifft4py
@@ -28,3 +27,7 @@ test:
     requires:
       - python
       - pytest
+      - h5py ==2.6.0
+      - mpi4py
+      - mpifft4py
+      - sympy
