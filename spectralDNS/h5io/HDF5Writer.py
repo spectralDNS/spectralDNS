@@ -171,5 +171,8 @@ except:
         def write(self, tstep):
             pass
         
+        def check_if_write(self, tstep):
+            return False
+        
         def close(self):
             del self
