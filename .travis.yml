@@ -21,7 +21,7 @@ install:
     - conda info -a
     - conda config --add channels spectralDNS
     - conda config --add channels mikaem/label/dev
-    - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION Cython mpi4py scipy pytest mpifft4py sympy h5py=2.6.0
+    - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION Cython mpi4py scipy pytest mpifft4py sympy h5py==2.6.0
     - source activate test-environment
     - python setup.py install
     
