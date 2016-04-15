@@ -10,7 +10,6 @@ engine:
 
 install:
   - conda config --set always_yes true
-  - conda update -q conda
   - conda config --add channels spectralDNS
   - conda config --add channels mikaem/label/dev
   - conda build conf/conda
