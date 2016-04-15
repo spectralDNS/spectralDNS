@@ -196,12 +196,8 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
     #for i in range(3):
         #Sk[i] = FST.fss(Source[i], Sk[i], ST)
         
-    if (config.tstep % config.write_result == 0 or
-        config.tstep % config.write_yz_slice[1] == 0 or
-        config.tstep % config.checkpoint == 0 or
-        config.tstep % config.plot_result == 0 or
+    if (hdf5file.check_if_write(tstep) or config.tstep % config.plot_result == 0 or
         config.tstep % config.compute_energy == 0):
-        
         U[0] = FST.ifst(U_hat[0], U[0], SB)
         for i in range(1, 3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)     
@@ -210,7 +206,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
         print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 2))
         print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 1))
     
-    if config.tstep % config.write_result == 0 or config.tstep % config.write_yz_slice[1] == 0:
+    if hdf5file.check_if_write(tstep):
         hdf5file.write(config.tstep)
         
     if config.tstep % config.checkpoint == 0:

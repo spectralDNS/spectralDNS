@@ -53,7 +53,7 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, W, W_hat, Curl, hdf5file,
         plt.pause(1e-6)
         globals().update(im=im, im2=im2)
     
-    if tstep % config.write_result == 0:
+    if hdf5file.check_if_write(tstep):    
         U = Curl(W_hat, U)
         P[:] = sqrt(W[0]*W[0] + W[1]*W[1] + W[2]*W[2])
         hdf5file.write(tstep)
@@ -87,7 +87,6 @@ if __name__ == "__main__":
     config.triplyperiodic.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
     solver = get_solver(update=update, mesh="triplyperiodic")
     assert config.decomposition == 'slab'
-    assert config.solver == 'VV'
     solver.W, solver.W_hat = initialize(**vars(solver))
     solver.Source = set_source(**vars(solver))
     solver.solve()

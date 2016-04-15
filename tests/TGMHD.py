@@ -15,7 +15,7 @@ def initialize(UB_hat, UB, U, B, X, sin, cos, FFT, **kw):
 def update(t, tstep, dt, comm, rank, P, P_hat, U, B, curl, float64, dx, L, sum, 
            hdf5file, FFT, **kw):
     
-    if tstep % config.write_result == 0 or tstep % config.write_yz_slice[1] == 0:
+    if hdf5file.check_if_write(tstep):
         P = FFT.ifftn(P_hat*1j, P)
         hdf5file.write(tstep)
 

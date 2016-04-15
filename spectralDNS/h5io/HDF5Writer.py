@@ -14,35 +14,29 @@ try:
     import h5py
     class HDF5Writer(object):
     
-        def __init__(self, comm, dtype, comps, filename="U.h5", mesh={}, fromfile=None):
-            self.comm = comm
+        def __init__(self, FFT, dtype, comps, filename="U.h5", mesh={}, fromfile=None):
+            self.FFT = FFT
             self.components = comps
             self.fname = filename
             self.dtype = dtype
             self.f = None
             self.N = 2**config.M
-            self.rank = self.comm.Get_rank()
             self.dim = len(comps[comps.keys()[0]].shape)
             self.mesh = mesh
-            num_processes = self.comm.Get_size()
-            if config.decomposition == "pencil":
-                commxz = comm.Split(self.rank/config.P1)
-                commxy = comm.Split(self.rank%config.P1)    
-                xzrank = commxz.Get_rank() # Local rank in xz-plane
-                xyrank = commxy.Get_rank() # Local rank in xy-plane 
-                P2 = num_processes / config.P1
-                N1 = self.N/config.P1
-                N2 = self.N/P2
-                self.x1 = slice(xzrank * N1[0], (xzrank+1) * N1[0], 1)
-                self.x2 = slice(xyrank * N2[1], (xyrank+1) * N2[1], 1)
             
         def init_h5file(self):
-            self.f = h5py.File(self.fname, "w", driver="mpio", comm=self.comm)            
+            self.f = h5py.File(self.fname, "w", driver="mpio", comm=self.FFT.comm)
             self.f.create_group("3D")
-            self.f.create_group("2D")    # For slices in 3D geometries
+            self.f.create_group("2D")
+            self.f["2D"].create_group("xy") # For slices in 3D geometries
+            self.f["2D"].create_group("xz")
+            self.f["2D"].create_group("yz")
             for c in self.components:
                 self.f["2D"].create_group(c)
                 self.f["3D"].create_group(c)
+                self.f["2D/xy"].create_group(c)
+                self.f["2D/xz"].create_group(c)
+                self.f["2D/yz"].create_group(c)
                 
             # Create groups for intermediate checkpoint solutions
             dim = str(self.dim)+"D"
@@ -55,12 +49,29 @@ try:
             self.f.attrs.create("dt", config.dt)
             self.f.attrs.create("N", self.N)    
             self.f.attrs.create("L", config.L)    
-            self.f["2D"].attrs.create("i", config.write_yz_slice[0])
+            self.f["2D/yz"].attrs.create("i", config.write_yz_slice[0])
+            self.f["2D/xy"].attrs.create("j", config.write_xy_slice[0])
+            self.f["2D/xz"].attrs.create("k", config.write_xz_slice[0])
+            
             if len(self.mesh) > 0:
                 self.f["3D"].create_group("mesh")
             for key,val in self.mesh.iteritems():
                 self.f["3D/mesh/"].create_dataset(key, shape=(len(val),), dtype=self.dtype)
                 self.f["3D/mesh/"+key][:] = val
+            
+        def check_if_write(self, tstep):
+            if config.write_result % tstep == 0:
+                return True
+            elif config.checkpoint % tstep == 0:
+                return True 
+            elif config.write_xy_slice[1] % tstep == 0:
+                return True
+            elif config.write_yz_slice[1] % tstep == 0:
+                return True
+            elif config.write_xz_slice[1] % tstep == 0:
+                return True
+            else:
+                return False
             
         def checkpoint(self, U, P, U0):
             if self.f is None: self.init_h5file() 
@@ -86,93 +97,66 @@ try:
                     self.f["2D/oldcheckpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
                     self.f["2D/oldcheckpoint/U"].create_dataset("1", shape=shape, dtype=self.dtype)
                     self.f["2D/oldcheckpoint/P"].create_dataset("1", shape=self.N, dtype=self.dtype)
-
-            if config.decomposition == 'slab':
                 
-                Np = self.N / self.comm.Get_size()
-                
-                # Backup previous solution
-                s = slice(self.rank*Np[0], (self.rank+1)*Np[0], 1)
-                self.f["3D/oldcheckpoint/U/0"][:, s]  = self.f["3D/checkpoint/U/0"][:, s]
-                self.f["3D/oldcheckpoint/U/1"][:, s] = self.f["3D/checkpoint/U/1"][:, s]
-                self.f["3D/oldcheckpoint/P/1"][s] = self.f["3D/checkpoint/P/1"][s]
-                
-                # Get new values
-                self.f["3D/checkpoint/U/0"][:, s] = U0
-                self.f["3D/checkpoint/U/1"][:, s] = U
-                self.f["3D/checkpoint/P/1"][s] = P
-
-            elif config.decomposition == 'pencil':
-                
-                x1, x2 = self.x1, self.x2
-                # Backup previous solution
-                self.f["3D/oldcheckpoint/U/0"][:, x1, x2] = self.f["3D/checkpoint/U/0"][:, x1, x2]
-                self.f["3D/oldcheckpoint/U/1"][:, x1, x2] = self.f["3D/checkpoint/U/1"][:, x1, x2]
-                self.f["3D/oldcheckpoint/P/1"][:, x1, x2] = self.f["3D/checkpoint/P/1"][:, x1, x2]
-                # Get new values
-                self.f["3D/checkpoint/U/0"][:, x1, x2] = U0
-                self.f["3D/checkpoint/U/1"][:, x1, x2] = U
-                self.f["3D/checkpoint/P/1"][x1, x2] = P
-                
-            elif config.decomposition == 'line':
-                
-                Np =  N / self.comm.Get_size()                
-                # Backup previous solution
-                s = slice(self.rank*Np[0], (self.rank+1)*Np[0], 1)
-                self.f["2D/oldcheckpoint/U/0"][:, ] = self.f["2D/checkpoint/U/0"][:, s]
-                self.f["2D/oldcheckpoint/U/1"][:, s] = self.f["2D/checkpoint/U/1"][:, s]
-                self.f["2D/oldcheckpoint/P/1"][:, s] = self.f["2D/checkpoint/P/1"][:, s]
-                # Get new values
-                self.f["2D/checkpoint/U/0"][:, s] = U0
-                self.f["2D/checkpoint/U/1"][:, s] = U
-                self.f["2D/checkpoint/P/1"][s] = P
+            # Backup previous solution
+            s = FFT.real_local_slice()
+            self.f["3D/oldcheckpoint/U/0"][:, s]  = self.f["3D/checkpoint/U/0"][:, s]
+            self.f["3D/oldcheckpoint/U/1"][:, s] = self.f["3D/checkpoint/U/1"][:, s]
+            self.f["3D/oldcheckpoint/P/1"][s] = self.f["3D/checkpoint/P/1"][s]
+            
+            # Get new values
+            self.f["3D/checkpoint/U/0"][:, s] = U0
+            self.f["3D/checkpoint/U/1"][:, s] = U
+            self.f["3D/checkpoint/P/1"][s] = P
             self.f.close()
             
         def write(self, tstep):
             if self.f is None: self.init_h5file() 
             else:
-                self.f = h5py.File(self.fname, driver="mpio", comm=self.comm)
+                self.f = h5py.File(self.fname, driver="mpio", comm=self.FFT.comm)
                 
             N = self.N
-            
-            if tstep % config.write_result == 0 and config.decomposition == 'slab':
-                
-                Np = N / self.comm.Get_size()                
+            dim = str(self.dim)+"D"
+            s = self.FFT.real_local_slice()
+            if tstep % config.write_result == 0:                
                 for comp, val in self.components.iteritems():
-                    self.f["3D/"+comp].create_dataset(str(tstep), shape=N, dtype=self.dtype)
-                    self.f["3D/%s/%d"%(comp,tstep)][self.rank*Np[0]:(self.rank+1)*Np[0]] = val
+                    self.f[dim+"/"+comp].create_dataset(str(tstep), shape=N, dtype=self.dtype)
+                    self.f[dim+"/%s/%d"%(comp,tstep)][s] = val
 
-            elif tstep % config.write_result == 0 and config.decomposition == 'pencil':
-                
-                x1, x2 = self.x1, self.x2
-                for comp, val in self.components.iteritems():
-                    self.f["3D/"+comp].create_dataset(str(tstep), shape=N, dtype=self.dtype)
-                    self.f["3D/%s/%d"%(comp, tstep)][x1, x2, :] = val
-                    
-            elif tstep % config.write_result == 0 and config.decomposition == 'line':
-                
-                Np =  N / self.comm.Get_size()                
-                for comp, val in self.components.iteritems():
-                    self.f["2D/"+comp].create_dataset(str(tstep), shape=(N[0], N[1]), dtype=self.dtype)
-                    self.f["2D/%s/%d"%(comp,tstep)][self.rank*Np[0]:(self.rank+1)*Np[0]] = val                
-                    
-            if tstep % config.write_yz_slice[1] == 0 and config.decomposition == 'slab':
+            # Write slices
+            if tstep % config.write_yz_slice[1] == 0:
                 i = config.write_yz_slice[0]
-                Np = N / self.comm.Get_size()     
                 for comp in self.components:
-                    self.f["2D/"+comp].create_dataset(str(tstep), shape=(N[1], N[2]), dtype=self.dtype)
-                                    
-                if i >= self.rank*Np[0] and i < (self.rank+1)*Np[0]:
-                    for comp, val in self.components.iteritems():                
-                        self.f["2D/%s/%d"%(comp, tstep)][:] = val[i-self.rank*Np[0]]
+                    self.f["2D/yz/"+comp].create_dataset(str(tstep), shape=(N[1], N[2]), dtype=self.dtype)
 
-            elif tstep % config.write_yz_slice[1] == 0 and config.decomposition == 'pencil':
-                i = config.write_yz_slice[0]
-                x1, x2 = self.x1, self.x2
+                sx = s[0]
+                if i >= sx.start and i < sx.stop:
+                    for comp, val in self.components.iteritems():
+                        self.f["2D/yz/%s/%d"%(comp, tstep)][s[1], s[2]] = val[i-sx.start]
+
+            if tstep % config.write_xz_slice[1] == 0:
+                j = config.write_xz_slice[0]                
                 for comp in self.components:
-                    self.f["2D/"+comp].create_dataset(str(tstep), shape=(N[1], N[2]), dtype=self.dtype)
-                    for comp, val in self.components.iteritems():                                    
-                        self.f["2D/%s/%d"%(comp, tstep)][x1, x2] = val[:, :, i]
+                    self.f["2D/xz/"+comp].create_dataset(str(tstep), shape=(N[0], N[2]), dtype=self.dtype)
+                
+                if config.decomposition == 'slab':
+                    for comp, val in self.components.iteritems():
+                        self.f["2D/xz/%s/%d"%(comp,tstep)][s[0], s[2]] = val[:, j, :]
+                        
+                elif config.decomposition == 'pencil':
+                    sy = s[1]
+                    if j >= sy.start and j < sy.stop:
+                        for comp, val in self.components.iteritems():
+                            self.f["2D/xz/%s/%d"%(comp,tstep)][s[0], s[2]] = val[:, j-sy.start, :]
+
+            if tstep % config.write_xy_slice[1] == 0:
+                k = config.write_xy_slice[0]                
+                for comp in self.components:
+                    self.f["2D/xy/"+comp].create_dataset(str(tstep), shape=(N[0], N[1]), dtype=self.dtype)
+                
+                for comp, val in self.components.iteritems():
+                    self.f["2D/xy/%s/%d"%(comp,tstep)][s[0], s[1]] = val[:, :, k]
+
             self.f.close()
             
         def close(self):
@@ -180,8 +164,8 @@ try:
                             
 except:
     class HDF5Writer(object):
-        def __init__(self, comm, dtype, comps, filename="U.h5", mesh={}, fromfile=None):
-            if comm.Get_rank() == 0:
+        def __init__(self, FFT, dtype, comps, filename="U.h5", mesh={}, fromfile=None):
+            if FFT.comm.Get_rank() == 0:
                 print Warning("Need to install h5py to allow storing results")
         
         def write(self, tstep):
