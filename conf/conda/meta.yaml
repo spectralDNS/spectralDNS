@@ -13,6 +13,7 @@ requirements:
     - python
     - cython
     - numpy
+    - h5py ==2.6.0
 
   run:
     - python
