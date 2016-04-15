@@ -18,7 +18,7 @@ requirements:
     - python
     - numpy
     - scipy
-    - h5py==2.6.0
+    - h5py ==2.6.0
     - mpi4py
     - mpifft4py
     - sympy
