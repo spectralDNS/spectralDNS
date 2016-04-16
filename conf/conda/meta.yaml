@@ -13,6 +13,7 @@ requirements:
     - python
     - cython
     - numpy
+    - gcc
     - hdf5 ==1.8.14
     - h5py ==2.6.0
 
