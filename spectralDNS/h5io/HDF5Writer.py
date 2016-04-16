@@ -7,10 +7,10 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 """
 from spectralDNS import config
 from numpy.linalg import norm
-import h5py
 
 __all__ = ['HDF5Writer']
 try:
+    import h5py
     class HDF5Writer(object):
 
         def __init__(self, FFT, dtype, comps, filename="U.h5", mesh={}, fromfile=None):
