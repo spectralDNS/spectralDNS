@@ -75,7 +75,7 @@ try:
         def checkpoint(self, U, P, U0):
             if self.f is None: self.init_h5file() 
             else:
-                self.f = h5py.File(self.fname, driver="mpio", comm=self.comm)
+                self.f = h5py.File(self.fname, driver="mpio", comm=self.FFT.comm)
             
             if config.decomposition in ("slab", "pencil"):
                 shape = [3] + list(self.N)

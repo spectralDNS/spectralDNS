@@ -173,7 +173,7 @@ def Q(u, rank, comm, N):
 
 beta = zeros(1)    
 def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk, 
-           ST, SB, U_tmp, F_tmp, comm, N, dU, diff0, hv, **kw):
+           ST, SB, F_tmp, comm, N, dU, diff0, hv, **kw):
     global flux
 
     #q = Q(U[1], rank, comm, N)
@@ -192,8 +192,9 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
     #for i in range(3):
         #Sk[i] = FST.fss(Source[i], Sk[i], ST)
         
-    if (hdf5file.check_if_write(tstep) or config.tstep % config.plot_result == 0 or
+    if (hdf5file.check_if_write(config.tstep) or config.tstep % config.plot_result == 0 or
         config.tstep % config.compute_energy == 0):
+        P = FST.ifst(P_hat, P, ST)
         U[0] = FST.ifst(U_hat[0], U[0], SB)
         for i in range(1, 3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)     
@@ -202,7 +203,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
         print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 2))
         print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 1))
     
-    if hdf5file.check_if_write(tstep):
+    if hdf5file.check_if_write(config.tstep):
         hdf5file.write(config.tstep)
         
     if config.tstep % config.checkpoint == 0:
@@ -310,10 +311,10 @@ if __name__ == "__main__":
     config.channel.add_argument("--print_energy0", type=int, default=100)
     solver = get_solver(update=update, mesh="channel")    
     #initialize(**vars(solver))    
-    init_from_file("KMM888t4.h5", **vars(solver))
+    init_from_file("KMM888t2.h5", **vars(solver))
     set_Source(**vars(solver))
-    solver.stats = Stats(solver.U, solver.comm, filename="KMM395stats")
-    solver.hdf5file.fname = "KMM888t2.h5"
+    solver.stats = Stats(solver.U, solver.comm, filename="KMM395stats_1")
+    solver.hdf5file.fname = "KMM888t3.h5"
     solver.solve()
     s = solver.stats.get_stats()
 
