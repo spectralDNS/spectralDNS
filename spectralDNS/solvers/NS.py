@@ -3,7 +3,7 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-import spectralinit
+from spectralinit import *
 
 from ..optimization import optimizer
 import numpy as np
@@ -235,7 +235,7 @@ def solve(context):
             "context":context
             }
     ComputeRHS(context,U,U_hat,dU,0)
-    context.callbacks["additional_callback"](context,dU=dU,**kwargs)
+    context.callbacks["additional_callback"](dU=dU,**kwargs)
 
     timer.final(context.MPI, FFT.rank)
     

@@ -141,6 +141,9 @@ class Context:
             pass
         def default_regression_test(t,tstep,context):
             pass
+        self.callbacks["update"] = default_update
+        self.callbacks["additional_callback"] = default_additional_callback
+        self.callbacks["regression_test"] = default_regression_test
 
 
         

@@ -16,5 +16,4 @@ def get_solver(update=None, regression_test=None, mesh="triplyperiodic",manually
     if regression_test: context.callbacks["regression_test"] = regression_test
     #TODO: what about set_source
 
-    #TODO:uncomment below
     return context
