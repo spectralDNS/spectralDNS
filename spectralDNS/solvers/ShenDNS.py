@@ -9,7 +9,7 @@ from ..shen.la import Helmholtz, TDMA
 from ..shen import SFTc
 
 assert config.precision == "double"
-hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5", 
+hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5", 
                       mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
 
 HelmholtzSolverU = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), ST.quad, False)

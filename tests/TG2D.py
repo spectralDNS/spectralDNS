@@ -8,7 +8,7 @@ def initialize(U, U_hat, X, sin, cos, FFT, **kw):
         U_hat[i] = FFT.fft2(U[i], U_hat[i])
 
 def update(t, tstep, N, U_hat, curl, X, nu, FFT, K, P, P_hat, hdf5file, **kw):
-    if tstep % config.write_result == 0:
+    if hdf5file.check_if_write(tstep):
         P = FFT.ifft2(P_hat*1j, P)
         hdf5file.write(tstep)
         
