@@ -771,7 +771,7 @@ def test_SBBmat(SB):
     c = A.matvec(u1)
     
     #from IPython import embed; embed()
-    assert np.allclose(c, f_hat, 1e-6, 1e-6)
+    assert np.all(abs(c-f_hat)/c.max() < 1e-10)
     
     # Multidimensional
     c2 = (c.repeat(16).reshape((M, 4, 4))+1j*c.repeat(16).reshape((M, 4, 4)))
