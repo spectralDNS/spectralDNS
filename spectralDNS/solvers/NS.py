@@ -3,13 +3,11 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-#TODO:Import spectralinit instead
+import spectralinit
+
 from ..optimization import optimizer
-from spectralDNS.h5io import *
-import spectralDNS.maths.integrators
-from spectralDNS.utilities import *
-from spectralDNS.maths import *
 import numpy as np
+import spectralDNS.maths.integrators
 
 
 def initializeContext(context,args):
@@ -20,7 +18,6 @@ def initializeContext(context,args):
 
     context.hdf5file = HDF5Writer(context, {"U":U[0], "V":U[1], "W":U[2], "P":P}, context.solver_name+".h5")
     # Set up function to perform temporal integration (using config.integrator parameter)
-    #TODO:Consider passing ComputeRHS within context below
     integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS)
     context.time_integrator["integrate"] = integrate
 
@@ -185,9 +182,6 @@ def ComputeRHS(context,U,U_hat,dU, rk):
         
     return dU
 
-def regression_test(context,t, tstep, **kw):
-    pass
-
 
 def solve(context):
     U_hat = context.mesh_vars["U_hat"]
@@ -237,18 +231,18 @@ def solve(context):
             "t":t,
             "dt":dt,
             "tstep": tstep,
-            "T": T,#TODO: Fix the line below
-            "global_vars":globals()
+            "T": T,
+            "context":context
             }
     ComputeRHS(context,U,U_hat,dU,0)
     context.callbacks["additional_callback"](context,dU=dU,**kwargs)
 
     timer.final(context.MPI, FFT.rank)
     
-    ##TODO:Make sure the lineis below work
+    ##TODO:Make sure the lines below work
     if context.make_profile:
         results = create_profile(**globals())
         
-    regression_test(t, tstep, context)
+    context.callbacks["regression_test"](t,tstep,context)
         
     context.hdf5file.close()
