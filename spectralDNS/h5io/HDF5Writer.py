@@ -59,15 +59,15 @@ try:
                 self.f["3D/mesh/"+key][:] = val
             
         def check_if_write(self, tstep):
-            if config.write_result % tstep == 0:
+            if tstep % config.write_result == 0:
                 return True
-            elif config.checkpoint % tstep == 0:
+            elif tstep % config.checkpoint == 0:
                 return True 
-            elif config.write_xy_slice[1] % tstep == 0:
+            elif tstep % config.write_xy_slice[1] == 0:
                 return True
-            elif config.write_yz_slice[1] % tstep == 0:
+            elif tstep % config.write_yz_slice[1] == 0:
                 return True
-            elif config.write_xz_slice[1] % tstep == 0:
+            elif tstep % config.write_xz_slice[1] == 0:
                 return True
             else:
                 return False
