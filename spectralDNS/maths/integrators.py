@@ -23,17 +23,18 @@ def RK4(context,u0, u1, u2, dU, a, b, dt, ComputeRHS,kw):
             u0[:] = u1 + b[rk]*dt*dU
         u2 += a[rk]*dt*dU
     u0[:] = u2
-    return u0
+    return u0,dt
 
 @optimizer
 def ForwardEuler(context,u0, u1, dU, dt, ComputeRHS,kw):
     U = context.mesh_vars["U"]
     dU = ComputeRHS(context,U,u0,dU, 0)        
     u0 += dU*dt
-    return u0
+    return u0,dt
 
 @optimizer
 def AB2(context,u0, u1, dU, dt, tstep, ComputeRHS,kw):
+    #TODO: Implement this.
     raise AssertionError("Not yet implemented") # Need to use u0 and u1 for ComputeRHS
     dU = ComputeRHS(context,U,dU, 0)
     if tstep == 1:

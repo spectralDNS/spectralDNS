@@ -211,7 +211,7 @@ def solve(context):
                 "T": T,
                 "context":context
                 }
-        U_hat[:] = context.time_integrator["integrate"](t, tstep, dt,kwargs)
+        U_hat[:],dt = context.time_integrator["integrate"](t, tstep, dt,kwargs)
 
         for i in range(3):
             U[i] = FFT.ifftn(U_hat[i], U[i])
