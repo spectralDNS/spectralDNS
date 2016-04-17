@@ -27,10 +27,15 @@ def initialize2(U, W, W_hat, X, sin, cos, FFT, F_tmp,
     for i in range(3):
         W[i] = FFT.ifftn(W_hat[i], W[i])        
 
+<<<<<<< Updated upstream
 def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, float64, dx, L, sum, 
            hdf5file, FFT, **kw):
     global k, w
     if tstep % config.write_result == 0 or tstep % config.write_yz_slice[1] == 0:
+=======
+def update(t, tstep, P, P_hat, hdf5file, FFT, **kw):
+    if hdf5file.check_if_write(tstep):
+>>>>>>> Stashed changes
         P = FFT.ifftn(P_hat*1j, P)
         hdf5file.write(tstep)
 

@@ -62,10 +62,24 @@ try:
                 self.f["3D/mesh/"].create_dataset(key, shape=(len(val),), dtype=self.dtype)
                 self.f["3D/mesh/"+key][:] = val
             
+        def check_if_write(self, tstep):
+            if tstep % config.write_result == 0:
+                return True
+            elif tstep % config.checkpoint == 0:
+                return True 
+            elif tstep % config.write_xy_slice[1] == 0:
+                return True
+            elif tstep % config.write_yz_slice[1] == 0:
+                return True
+            elif tstep % config.write_xz_slice[1] == 0:
+                return True
+            else:
+                return False
+            
         def checkpoint(self, U, P, U0):
             if self.f is None: self.init_h5file() 
             else:
-                self.f = h5py.File(self.fname, driver="mpio", comm=self.comm)
+                self.f = h5py.File(self.fname, driver="mpio", comm=self.FFT.comm)
             
             if config.decomposition in ("slab", "pencil"):
                 shape = [3] + list(self.N)
