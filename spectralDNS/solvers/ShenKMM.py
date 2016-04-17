@@ -9,7 +9,7 @@ from ..shen.la import Helmholtz, TDMA, Biharmonic
 from ..shen import SFTc
 
 assert config.precision == "double"
-hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, 
+hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, 
                       filename=config.solver+".h5", mesh={"x": x0, "y": x1, "z": x2})  
 
 K4 = K2**2

@@ -17,8 +17,13 @@ parser.add_argument('--communication', default='alltoall', choices=('alltoall', 
 parser.add_argument('--make_profile', default=0, help='Enable cProfile profiler')
 parser.add_argument('--dt', default=0.01, type=float, help='Time step size')
 parser.add_argument('--T', default=0.1, type=float, help='End time')
-parser.add_argument('--write_result', default=1e8, type=int, help='Write results to HDF5 every...')
-parser.add_argument('--write_yz_slice',  default=[0, 1e8], help='Write 2D slice to HDF5 [x index, every]')
+parser.add_argument('--write_result', default=1e8, metavar=('tstep'), type=int, help='Write results to HDF5 every tstep')
+parser.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'), 
+                    help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
+parser.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'), 
+                    help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
+parser.add_argument('--write_xy_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'), 
+                    help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
 parser.add_argument('--checkpoint',  default=1e8, type=int, help='Save intermediate result every...')
 parser.add_argument('--nu', default=0.000625, type=float, help='Viscosity')
 parser.add_argument('--t', default=0.0, type=float, help='Time')
@@ -28,12 +33,12 @@ parser.add_argument('--tstep', default=0, type=int, help='Time step')
 triplyperiodic = argparse.ArgumentParser(parents=[parser])
 triplyperiodic.add_argument('--convection', default='Vortex', choices=('Standard', 'Divergence', 'Skewed', 'Vortex'))
 triplyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2'))
-triplyperiodic.add_argument('--L', default=[2*pi, 2*pi, 2*pi], nargs=3, help='Physical mesh size')
+triplyperiodic.add_argument('--L', default=[2*pi, 2*pi, 2*pi], metavar=("Lx", "Ly", "Lz"), nargs=3, help='Physical mesh size')
 triplyperiodic.add_argument('--dealias', default='2/3-rule', choices=('2/3-rule', '3/2-rule', 'None'), help='Choose dealiasing method')
 triplyperiodic.add_argument('--Pencil_alignment', default='Y', choices=('X', 'Y'), help='Alignment of the complex data for pencil decomposition')
 triplyperiodic.add_argument('--P1', default=1, type=int, help='pencil decomposition in first direction')
 triplyperiodic.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'), help="Choose 3D decomposition between slab and pencil.")
-triplyperiodic.add_argument('--M', default=[6, 6, 6], nargs=3, help='Mesh size is pow(2, M[i]) in direction i')
+triplyperiodic.add_argument('--M', default=[6, 6, 6], metavar=("Mx", "My", "Mz"), nargs=3, help='Mesh size is pow(2, M[i]) in direction i')
 
 trippelsubparsers = triplyperiodic.add_subparsers(dest='solver')
 

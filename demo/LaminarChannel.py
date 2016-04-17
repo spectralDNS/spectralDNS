@@ -59,6 +59,10 @@ def reference(Re, t, num_terms=200):
 
 def update(rank, X, U, P, N, comm, L, x0, ST, num_processes, **kw):
     global im1
+    
+    if hdf5file.check_if_write(tstep):
+        hdf5file.write(tstep)
+
     if config.tstep == 2 and rank == 0 and config.plot_step > 0:
         plt.figure()
         im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[1,:,:,0], 100)

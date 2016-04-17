@@ -198,7 +198,6 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
         
     if (hdf5file.check_if_write(config.tstep) or config.tstep % config.plot_result == 0 or
         config.tstep % config.compute_energy == 0):
-        
         U[0] = FST.ifst(U_hat[0], U[0], SB)
         for i in range(1, 3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)     

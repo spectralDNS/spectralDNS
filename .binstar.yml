@@ -11,4 +11,5 @@ engine:
 install:
   - conda config --set always_yes true
   - conda config --add channels spectralDNS
+  - conda config --add channels mikaem
   - conda build conf/conda
