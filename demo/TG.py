@@ -33,10 +33,11 @@ k = []
 w = []
 im1 = None
 def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, Curl, float64, dx, L, sum, 
-           hdf5file, FFT, X, **kw):
+           hdf5file, FFT, X, U_hat, **kw):
     global k, w, im1
-    if tstep % config.write_result == 0 or tstep % config.write_yz_slice[1] == 0:
+    if hdf5file.check_if_write(tstep):
         P[:] = FFT.ifftn(P_hat*1j, P)
+        curl = Curl(U_hat, curl)
         hdf5file.write(tstep)
         
     if im1 is None and rank == 0 and config.plot_step > 0:

@@ -37,6 +37,9 @@ def test_single_IPCS():
 def test_mpi_slab_DNS():
     d = subprocess.check_output("mpirun -np 4 python TG.py NS", shell=True)
 
+def test_mpi_DNS2D():
+    d = subprocess.check_output("mpirun -np 4 python TG2D.py NS2D", shell=True)
+
 def test_mpi_dealias_DNS():
     d = subprocess.check_output("mpirun -np 4 python TG.py --dealias '3/2-rule' NS", shell=True)
 

@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
 
-hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "rho":rho, "P":P}, config.solver+".h5")
+hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "rho":rho, "P":P}, config.solver+".h5")
 Ri = float(config.Ri)
 Pr = float(config.Pr)
 

@@ -17,7 +17,7 @@ def update(t, tstep, N, U_hat, curl, X, nu, FFT, K, P, P_hat, hdf5file, **kw):
         plt.colorbar(im)
         plt.draw()
         
-    if tstep % config.write_result == 0:
+    if hdf5file.check_if_write(tstep):    
         P = FFT.ifft2(P_hat*1j, P)
         curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         hdf5file.write(tstep)
