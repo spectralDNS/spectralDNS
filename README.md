@@ -36,10 +36,8 @@ See the demo folder for usage.
     Weak scaling on the Abel cluster.
 </p>
 
-<iframe src='https://gfycat.com/ifr/BlaringRemoteFurseal' frameborder='0' scrolling='no' width='640' height='248' allowfullscreen></iframe>
-
 <p align="center">
-    <img src="https://www.dropbox.com/s/4i3aku6m02j8lvr/channel_smaller_395.gif?dl=1" width="600" height="400" alt="Channel flow"/>
+    <iframe src='https://gfycat.com/ifr/BlaringRemoteFurseal' frameborder='0' scrolling='no' width='640' height='248' allowfullscreen></iframe>
 </p>
 <p align="center">
     Turbulent channel flow at Re_tau = 395. Simulations are performed using 128 cores on Shaheen II with the KMM channel flow solver (solvers/ShenKMM.py) using 256^3 points in real physical space.
