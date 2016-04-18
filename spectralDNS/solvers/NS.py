@@ -3,7 +3,7 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-import spectralinit
+from spectralinit import *
 
 from ..optimization import optimizer
 import numpy as np
@@ -96,6 +96,9 @@ def getConvection(context):
     FFT = context.FFT
     work_shape = context.mesh_vars["work_shape"]
 
+    float = context.types["float"]
+    complex = context.types["complex"]
+
     if convection == "Standard":
         
         def Conv(dU,U_hat):
@@ -130,7 +133,7 @@ def getConvection(context):
         
         def Conv(dU,U_hat):
             U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
-            curl_dealiased = FFT.get_workarray(((3,)+work_shape, float), 1)
+            curl_dealiased = FFT.get_workarray(((3,)+context.mesh_vars["work_shape"], context.types["float"]), 1)
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], context.dealias_name)
             
@@ -196,7 +199,7 @@ def solve(context):
     FFT = context.FFT
 
     while t + dt <= T + 1.e-15: #The 1.e-15 term is for rounding errors
-        
+        dt_prev = dt 
         kwargs = {
                 "additional_callback":context.callbacks["additional_callback"],
                 "t":t,
@@ -205,12 +208,12 @@ def solve(context):
                 "T": T,
                 "context":context
                 }
-        U_hat[:],dt = context.time_integrator["integrate"](t, tstep, dt,kwargs)
+        U_hat[:],dt,dt_took = context.time_integrator["integrate"](t, tstep, dt,kwargs)
 
         for i in range(3):
             U[i] = FFT.ifftn(U_hat[i], U[i])
                  
-        t += dt
+        t += dt_took
         tstep += 1
 
         context.callbacks["update"](t,dt, tstep, context)
@@ -235,7 +238,7 @@ def solve(context):
             "context":context
             }
     ComputeRHS(context,U,U_hat,dU,0)
-    context.callbacks["additional_callback"](context,dU=dU,**kwargs)
+    context.callbacks["additional_callback"](dU=dU,**kwargs)
 
     timer.final(context.MPI, FFT.rank)
     
