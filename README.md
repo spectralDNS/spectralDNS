@@ -37,7 +37,7 @@ See the demo folder for usage.
 </p>
 
 <p align="center">
-    <img src="https://www.dropbox.com/s/pqnxuem0kn09nkr/channel395.gif?dl=1" width="1200" height="400" alt="Channel flow"/>
+    <img src="https://www.dropbox.com/s/pqnxuem0kn09nkr/channel395.gif?dl=1" width="600" height="400" alt="Channel flow"/>
 </p>
 <p align="center">
     Turbulent channel flow at Re_tau = 395. Simulations are performed using 128 cores on Shaheen II with the KMM channel flow solver (solvers/ShenKMM.py) using 256^3 points in real physical space.
