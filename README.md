@@ -36,6 +36,8 @@ See the demo folder for usage.
     Weak scaling on the Abel cluster.
 </p>
 
+<iframe src='https://gfycat.com/ifr/BlaringRemoteFurseal' frameborder='0' scrolling='no' width='640' height='248' allowfullscreen></iframe>
+
 <p align="center">
     <img src="https://www.dropbox.com/s/4i3aku6m02j8lvr/channel_smaller_395.gif?dl=1" width="600" height="400" alt="Channel flow"/>
 </p>
