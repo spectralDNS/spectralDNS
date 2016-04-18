@@ -70,6 +70,7 @@ class Context:
         self.time_integrator = {}
         self.time_integrator["dt"] = self.types["float"](args.dt)
         self.time_integrator["time_integrator_name"] = args.integrator
+        self.time_integrator["TOL"] = args.time_integrator_tol
 
         self.make_profile = args.make_profile
         if args.make_profile: self.profiler = cProfile.Profile()
