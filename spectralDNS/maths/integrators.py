@@ -156,17 +156,22 @@ def RK4(context,u0, u1, u2, dU, a, b, dt, ComputeRHS,kw):
 def ForwardEuler(context,u0, u1, dU, dt, ComputeRHS,kw):
     U = context.mesh_vars["U"]
     dU = ComputeRHS(context,U,u0,dU, 0)        
+    if "additional_callback" in kw:
+        kw["additional_callback"](fU_hat=dU,**kw)
     u0 += dU*dt
     return u0,dt,dt
 
+#TODO: Check whether we are really only doing forward euler at first and
+#last step
 @optimizer
-def AB2(context,u0, u1, dU, dt, tstep, ComputeRHS,kw):
-    #TODO: Implement this.
-    raise AssertionError("Not yet implemented") # Need to use u0 and u1 for ComputeRHS
-    dU = ComputeRHS(context,U,dU, 0)
-    if tstep == 1:
+def AB2(context,u0, u1,multistep_dt, dU, dt, tstep, ComputeRHS,kw):
+    dU = ComputeRHS(context,U,u0,dU, 0)
+    if "additional_callback" in kw:
+        kw["additional_callback"](fU_hat=dU,**kw)
+    if tstep == 0 or multistep_dt[0] != dt:
+        multistep_dt[0] = dt
         u0 += dU*dt
-    else:
+    else
         u0 += (1.5*dU*dt - 0.5*u1)        
     u1[:] = dU*dt    
     return u0,dt,dt
@@ -202,9 +207,10 @@ def getintegrator(context,ComputeRHS):
         TOL = context.time_integrator["TOL"]
         return getAdaptiveBS5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL)
     elif context.time_integrator["time_integrator_name"] == "AB2":
+        multistep_dt = [-1]
         @wraps(AB2)
         def func(t, tstep, dt,additional_args = {}):
-            return AB2(context,u0, u1, dU, dt, tstep, ComputeRHS,additional_args)
+            return AB2(context,u0, u1,multistep_dt, dU, dt, tstep, ComputeRHS,additional_args)
         return func
     else:
         raise AssertionError("Please specifiy a  time integrator")
