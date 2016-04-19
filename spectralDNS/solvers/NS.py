@@ -238,7 +238,7 @@ def solve(context):
             "context":context
             }
     ComputeRHS(context,U,U_hat,dU,0)
-    context.callbacks["additional_callback"](dU=dU,**kwargs)
+    context.callbacks["additional_callback"](fU_hat=dU,**kwargs)
 
     timer.final(context.MPI, FFT.rank)
     

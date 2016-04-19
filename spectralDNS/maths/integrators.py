@@ -53,7 +53,7 @@ def adaptiveRK(context,A,b,bhat,err_order, fY_hat,fY,U_hat_new,sc,err, fsal,offs
                 dU = ComputeRHS(context,fY[(i+offset[0])%s],fY_hat[(i+offset[0])%s],dU,i)
                 fY_hat[(i+offset[0])%s] = dU
             if i == 0 and "additional_callback" in kw:
-                kw["additional_callback"](dU=dU,**kw)
+                kw["additional_callback"](fU_hat=fY_hat[(i+offset[0])],**kw)
  
         #Calculate the new value
         U_hat_new[:] = U_hat
@@ -98,7 +98,7 @@ def adaptiveRK(context,A,b,bhat,err_order, fY_hat,fY,U_hat_new,sc,err, fsal,offs
             dt = dt*factor
             if  est > 1.0:
                 facmax = 1
-                kw["additional_callback"](dU=dU,is_step_rejected_callback=True,dt_rejected=dt_prev,**kw)
+                kw["additional_callback"](is_step_rejected_callback=True,dt_rejected=dt_prev,**kw)
                 #The offset gets decreased in the  next step, which is something we do not want.
                 if fsal:
                     offset[0] += 1
@@ -145,7 +145,7 @@ def RK4(context,u0, u1, u2, dU, a, b, dt, ComputeRHS,kw):
     for rk in range(4):
         dU = ComputeRHS(context,U,u0,dU, rk)
         if rk == 0 and "additional_callback" in kw:
-            kw["additional_callback"](dU=dU,**kw)
+            kw["additional_callback"](fU_hat=dU,**kw)
         if rk < 3:
             u0[:] = u1 + b[rk]*dt*dU
         u2 += a[rk]*dt*dU
