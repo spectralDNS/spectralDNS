@@ -53,7 +53,7 @@ def adaptiveRK(context,A,b,bhat,err_order, fY_hat,fY,U_hat_new,sc,err, fsal,offs
                 dU = ComputeRHS(context,fY[(i+offset[0])%s],fY_hat[(i+offset[0])%s],dU,i)
                 fY_hat[(i+offset[0])%s] = dU
             if i == 0 and "additional_callback" in kw:
-                kw["additional_callback"](fU_hat=fY_hat[(i+offset[0])],**kw)
+                kw["additional_callback"](fU_hat=fY_hat[(0+offset[0]) % s],**kw)
  
         #Calculate the new value
         U_hat_new[:] = U_hat
@@ -110,7 +110,7 @@ def adaptiveRK(context,A,b,bhat,err_order, fY_hat,fY,U_hat_new,sc,err, fsal,offs
     return U_hat,dt,dt_prev
    
 @optimizer
-def getAdaptiveBS5(context,dU,ComputeRHS,aTOL,rTOL):
+def getBS5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True):
     U = context.mesh_vars["U"]
     U_hat = context.mesh_vars["U_hat"]
 
@@ -119,7 +119,6 @@ def getAdaptiveBS5(context,dU,ComputeRHS,aTOL,rTOL):
     bhat = nodepy.rk.loadRKM("BS5").bhat.astype(np.float64)
     err_order = 4
     errnorm = "2"
-    adaptive = True
     fsal = True
 
     #Offset for fsal stuff. #TODO: infer this from tstep
@@ -133,9 +132,9 @@ def getAdaptiveBS5(context,dU,ComputeRHS,aTOL,rTOL):
     U_hat_new = np.zeros(U_hat.shape,dtype=U_hat.dtype)
 
     @wraps(adaptiveRK)
-    def adaptiveBS5(t,tstep,dt,additional_args = {}):
+    def BS5(t,tstep,dt,additional_args = {}):
         return adaptiveRK(context,A,b,bhat,err_order, fY_hat,fY,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,ComputeRHS,dt,tstep,additional_args)
-    return adaptiveBS5
+    return BS5
 
 @optimizer
 def RK4(context,u0, u1, u2, dU, a, b, dt, ComputeRHS,kw):
@@ -171,7 +170,7 @@ def AB2(context,u0, u1,multistep_dt, dU, dt, tstep, ComputeRHS,kw):
     if tstep == 0 or multistep_dt[0] != dt:
         multistep_dt[0] = dt
         u0 += dU*dt
-    else
+    else:
         u0 += (1.5*dU*dt - 0.5*u1)        
     u1[:] = dU*dt    
     return u0,dt,dt
@@ -205,7 +204,10 @@ def getintegrator(context,ComputeRHS):
         return func
     elif context.time_integrator["time_integrator_name"] == "BS5_adaptive": 
         TOL = context.time_integrator["TOL"]
-        return getAdaptiveBS5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL)
+        return getBS5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=True)
+    elif context.time_integrator["time_integrator_name"] == "BS5_fixed":
+        TOL = 100 #This shouldn't get used
+        return getBS5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=False)
     elif context.time_integrator["time_integrator_name"] == "AB2":
         multistep_dt = [-1]
         @wraps(AB2)
