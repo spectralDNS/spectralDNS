@@ -34,8 +34,7 @@ def standardConvection(context,c,U_hat,dealias=None):
     K = context.mesh_vars["K"]
     U_tmp = context.mesh_vars["U_tmp"]
 
-    #TODO: maybe pass U_dealiased to the function so this doesn't cause an error.
-    Uc = FFT.get_workarray(U_dealiased, 2)
+    Uc = FFT.get_workarray((3,)+context.mesh_vars["work_shape"], 2)
 
     for i in range(3):
         for j in range(3):
@@ -148,8 +147,13 @@ def getConvection(context):
 
 
 @optimizer
-def add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu):
+def add_pressure_diffusion(context,dU, U_hat):
     """Add contributions from pressure and diffusion to the rhs"""
+    K = context.mesh_vars["K"]
+    K2 = context.mesh_vars["K2"]
+    K_over_K2 = context.mesh_vars["K_over_K2"]
+    nu = context.model_params["nu"]
+    P_hat = context.mesh_vars["P_hat"]
     
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat = np.sum(dU*K_over_K2, 0, out=P_hat)
@@ -166,22 +170,15 @@ def add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu):
 def ComputeRHS(context,U,U_hat,dU, rk):
     """Compute and return entire rhs contribution"""
     conv = context.NS["conv"]
-    K2 = context.mesh_vars["K2"]
-    K = context.mesh_vars["K"]
-    P_hat = context.mesh_vars["P_hat"]
-    K_over_K2 = context.mesh_vars["K_over_K2"]
-    nu = context.model_params["nu"]
     FFT = context.FFT
 
-
-    
     if rk > 0: # For rk=0 the correct values are already in U
         for i in range(3):
             U[i] = FFT.ifftn(U_hat[i], U[i])
                         
     dU = conv(dU,U_hat)
 
-    dU = add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu)
+    dU = add_pressure_diffusion(context,dU, U_hat)
         
     return dU
 
