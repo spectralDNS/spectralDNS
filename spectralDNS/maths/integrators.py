@@ -12,7 +12,7 @@ import numpy as np
 __all__ = ['getintegrator']
 
 @optimizer
-def adaptiveRK(context,A,b,bhat,err_order, fY_hat,Y,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,ComputeRHS,dt,tstep,kw):
+def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,ComputeRHS,dt,tstep,kw):
     U = context.mesh_vars["U"]
     U_hat = context.mesh_vars["U_hat"]
     N = context.model_params["N"]
@@ -43,11 +43,11 @@ def adaptiveRK(context,A,b,bhat,err_order, fY_hat,Y,U_hat_new,sc,err, fsal,offse
                 fY_hat[(i + offset[0]) % s] =  U_hat
                 for j in range(0,i):
                     fY_hat[(i+offset[0]) % s] += dt*A[i,j]*fY_hat[(j+offset[0]) % s]
-                #Compute iverse Fourier Transform of Y
+                #ComputeRHS does not calculate ifft if i = 0
                 if i==0:
-                    Y[(i+offset[0])%s] = U #As this is an explicit method
+                    U_tmp[:] = U 
                 #Compute F(Y)
-                dU = ComputeRHS(context,Y[(i+offset[0])%s],fY_hat[(i+offset[0])%s],dU,i)
+                dU = ComputeRHS(context,U_tmp,fY_hat[(i+offset[0])%s],dU,i)
                 fY_hat[(i+offset[0])%s] = dU
             if i == 0 and "additional_callback" in kw:
                 kw["additional_callback"](fU_hat=fY_hat[(0+offset[0]) % s],**kw)
@@ -122,7 +122,7 @@ def getBS5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True):
     offset = [0]
 
     s = A.shape[0]
-    Y = np.zeros((s,) + U.shape, dtype=U.dtype)
+    U_tmp = np.zeros(U.shape, dtype=U.dtype)
     fY_hat = np.zeros((s,) + U_hat.shape, dtype = U_hat.dtype)
     sc = np.zeros(U_hat.shape,dtype=U_hat.dtype)
     err = np.zeros(U_hat.shape,dtype=U_hat.dtype)
@@ -130,7 +130,7 @@ def getBS5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True):
 
     @wraps(adaptiveRK)
     def BS5(t,tstep,dt,additional_args = {}):
-        return adaptiveRK(context,A,b,bhat,err_order, fY_hat,Y,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,ComputeRHS,dt,tstep,additional_args)
+        return adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,ComputeRHS,dt,tstep,additional_args)
     return BS5
 
 @optimizer
