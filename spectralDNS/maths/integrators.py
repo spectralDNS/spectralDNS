@@ -11,6 +11,52 @@ import numpy as np
 
 __all__ = ['getintegrator']
 
+def imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,kw):
+    s = A.shape[0] - 1
+    U = context.mesh_vars["U"]
+    U_hat = context.mesh_vars["U_hat"]
+
+    K_hat[0] = f(context,U,U_hat,dU,0)
+
+    for i in range(s):
+        K[i] = U_hat
+        for j in range(i):
+            K[i] += dt*A[i,j]*K[j][:]
+            K[i] += dt*A_hat[i+1,j]*K_hat[j][:]
+        K[i] += dt*A_hat[i+1,i]*K_hat[i]
+        dU = g(context,U_tmp,K[i],dU,i)
+        K[i] = ginv(context,U,dU,K[i],i,A[i,i]*dt)
+
+        #TODO: Does K_hat[i] model anything?
+        if i == 0 and "additional_callback" in kw:
+            kw["additional_callback"](fU_hat=K_hat[i],**kw)
+
+        K_hat[i+1] = f(context,U_tmp,K[i],dU,i+1)
+    for i in range(s):
+       U_hat[:] += dt*b[i]*K[i]
+       U_hat[:] += dt*b_hat[i]*K_hat[i]
+    U_hat[:] += dt*b_hat[i]*K_hat[s]
+    return U_hat,dt,dt
+
+def getIMEXOneStep(context,dU,f,g,ginv):
+    U = context.mesh_vars["U"]
+    U_hat = context.mesh_vars["U_hat"]
+
+    A = np.array([[0,0],[0,1]],dtype=np.float64)
+    b = np.array([0,1],dtype=np.float64)
+    A_hat = np.array([[0,0],[1,0]],dtype=np.float64)
+    b_hat = np.array([1,0],dtype=np.float64)
+
+    s = A.shape[0] - 1
+    K = np.empty((s,) + U_hat.shape, dtype=U_hat.dtype)
+    K_hat = np.empty((s+1,)+U_hat.shape,dtype=U_hat.dtype)
+    U_tmp = np.empty(U.shape,dtype=U.dtype)
+#TODO: Do we need to use @wraps here?
+    def IMEXOneStep(t,tstep,dt,additional_args = {}):
+        return imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,additional_args)
+    return IMEXOneStep
+
+
 @optimizer
 def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,ComputeRHS,dt,tstep,kw):
     U = context.mesh_vars["U"]
@@ -161,6 +207,7 @@ def ForwardEuler(context,u0, u1, dU, dt, ComputeRHS,kw):
 #last step
 @optimizer
 def AB2(context,u0, u1,multistep_dt, dU, dt, tstep, ComputeRHS,kw):
+    U = context.mesh_vars["U"]
     dU = ComputeRHS(context,U,u0,dU, 0)
     if "additional_callback" in kw:
         kw["additional_callback"](fU_hat=dU,**kw)
@@ -172,7 +219,7 @@ def AB2(context,u0, u1,multistep_dt, dU, dt, tstep, ComputeRHS,kw):
     u1[:] = dU*dt    
     return u0,dt,dt
 
-def getintegrator(context,ComputeRHS):
+def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None):
     dU = context.mesh_vars["dU"]
     float = context.types["float"]
     """Return integrator using choice in global parameter integrator.
@@ -184,6 +231,9 @@ def getintegrator(context,ComputeRHS):
     elif context.solver_name == "Bq2D":
         u0 = context.mesh_vars['Ur_hat']
     u1 = u0.copy()    
+
+    if ComputeRHS is None and context.time_integrator["time_integrator_name"] != "IMEX1":
+        raise AssertionError("No ComputeRHS given for fully explicit time integrator")
         
     if context.time_integrator["time_integrator_name"] == "RK4": 
         # RK4 parameters
@@ -211,5 +261,7 @@ def getintegrator(context,ComputeRHS):
         def func(t, tstep, dt,additional_args = {}):
             return AB2(context,u0, u1,multistep_dt, dU, dt, tstep, ComputeRHS,additional_args)
         return func
+    elif context.time_integrator["time_integrator_name"] == "IMEX1":
+        return getIMEXOneStep(context,dU,f,g,ginv)
     else:
         raise AssertionError("Please specifiy a  time integrator")

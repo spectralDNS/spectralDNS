@@ -18,7 +18,10 @@ def initializeContext(context,args):
 
     context.hdf5file = HDF5Writer(context, {"U":U[0], "V":U[1], "W":U[2], "P":P}, context.solver_name+".h5")
     # Set up function to perform temporal integration (using config.integrator parameter)
-    integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS)
+    if not context.time_integrator["time_integrator_name"] in ["IMEX1"]:
+        integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS)
+    else:
+        integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS,f=nonlinearTerm,g=linearTerm,ginv=inverseLinearTerm)
     context.time_integrator["integrate"] = integrate
 
     context.NS["convection"] = args.convection
@@ -147,12 +150,10 @@ def getConvection(context):
 
 
 @optimizer
-def add_pressure_diffusion(context,dU, U_hat):
+def add_pressure(context,dU, U_hat):
     """Add contributions from pressure and diffusion to the rhs"""
     K = context.mesh_vars["K"]
-    K2 = context.mesh_vars["K2"]
     K_over_K2 = context.mesh_vars["K_over_K2"]
-    nu = context.model_params["nu"]
     P_hat = context.mesh_vars["P_hat"]
     
     # Compute pressure (To get actual pressure multiply by 1j)
@@ -161,9 +162,6 @@ def add_pressure_diffusion(context,dU, U_hat):
     # Subtract pressure gradient
     dU -= P_hat*K
     
-    # Subtract contribution from diffusion
-    dU -= nu*K2*U_hat
-    
     return dU
 
 #@profile
@@ -171,6 +169,8 @@ def ComputeRHS(context,U,U_hat,dU, rk):
     """Compute and return entire rhs contribution"""
     conv = context.NS["conv"]
     FFT = context.FFT
+    K2 = context.mesh_vars["K2"]
+    nu = context.model_params["nu"]
 
     if rk > 0: # For rk=0 the correct values are already in U
         for i in range(3):
@@ -178,10 +178,37 @@ def ComputeRHS(context,U,U_hat,dU, rk):
                         
     dU = conv(dU,U_hat)
 
-    dU = add_pressure_diffusion(context,dU, U_hat)
+    dU = add_pressure(context,dU, U_hat)
+    # Subtract contribution from diffusion
+    dU -= nu*K2*U_hat
         
     return dU
 
+
+def nonlinearTerm(context,U,U_hat,dU,rk):
+    conv = context.NS["conv"]
+    FFT = context.FFT
+    if rk > 0: # For rk=0 the correct values are already in U
+        for i in range(3):
+            U[i] = FFT.ifftn(U_hat[i], U[i])
+    dU = conv(dU,U_hat)
+    dU = add_pressure(context,dU, U_hat)
+    return dU
+
+ 
+def linearTerm(context,U,U_hat,dU,rk):
+    K2 = context.mesh_vars["K2"]
+    nu = context.model_params["nu"]
+    dU[:] = -nu*K2*U_hat
+    return dU
+
+def inverseLinearTerm(context,U,U_hat,dU,rk,factor):
+    #We want to calculate (I-factorg)^-1
+    #TODO:Optimize this by a lot
+    nu = context.model_params["nu"]
+    K2 = context.mesh_vars["K2"]
+    dU[:] = (1./(1 + nu*K2*factor))*U_hat
+    return dU
 
 def solve(context):
     U_hat = context.mesh_vars["U_hat"]
@@ -203,7 +230,8 @@ def solve(context):
                 "dt":dt,
                 "tstep": tstep,
                 "T": T,
-                "context":context
+                "context":context,
+                "ComputeRHS":ComputeRHS
                 }
         U_hat[:],dt,dt_took = context.time_integrator["integrate"](t, tstep, dt,kwargs)
 
@@ -232,7 +260,8 @@ def solve(context):
             "dt":dt,
             "tstep": tstep,
             "T": T,
-            "context":context
+            "context":context,
+            "ComputeRHS":ComputeRHS
             }
     ComputeRHS(context,U,U_hat,dU,0)
     context.callbacks["additional_callback"](fU_hat=dU,**kwargs)
