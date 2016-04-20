@@ -125,8 +125,8 @@ def getBS5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True):
     offset = [0]
 
     s = A.shape[0]
-    fY = np.repeat(np.zeros(U.shape,dtype=U.dtype)[np.newaxis],s,axis=0)
-    fY_hat = np.repeat(np.zeros(U_hat.shape,dtype=U_hat.dtype)[np.newaxis],s, axis=0)
+    fY = np.zeros((s,) + U.shape, dtype=U.dtype)
+    fY_hat = np.zeros((s,) + U_hat.shape, dtype = U_hat.dtype)
     sc = np.zeros(U_hat.shape,dtype=U_hat.dtype)
     err = np.zeros(U_hat.shape,dtype=U_hat.dtype)
     U_hat_new = np.zeros(U_hat.shape,dtype=U_hat.dtype)
