@@ -11,8 +11,51 @@ import numpy as np
 
 __all__ = ['getintegrator']
 
+def imexEXP(context,imex_offset,f,gexp,A,b,bhat,err_order,fY_hat,U_tmp,U_hat_new,sc,err,fsal,fsal_offset,dU,dt,tstep,kw):
+    U_hat = context.mesh_vars["U_hat"]
+    U = context.mesh_vars["U"]
+    FFT = context.FFT
+    #Alternate between doing RK step first and Exponential step
+    for i in range(2):
+        if (i != imex_offset[0]):
+            if i == 1:
+                for k in range(3):
+                    U[k] = FFT.ifftn(U_hat[k], U[k])
+            adaptiveRK(context,A,b,bhat,err_order,fY_hat,U_tmp,U_hat_new,sc,err,fsal,fsal_offset,100,100,False,"2",dU,U_hat,f,dt,tstep,kw)
+        else:
+            gexp(context,U,U_hat,dU,0,dt)
+    imex_offset[0] = (imex_offset[0] + 1) % 2
+    return U_hat,dt,dt
+
+def getexpBS5(context,dU,f,gexp):
+    U = context.mesh_vars["U"]
+    U_hat = context.mesh_vars["U_hat"]
+
+    A = nodepy.rk.loadRKM("BS5").A.astype(np.float64)
+    b = nodepy.rk.loadRKM("BS5").b.astype(np.float64)
+    bhat = nodepy.rk.loadRKM("BS5").bhat.astype(np.float64)
+    fsal = True
+
+    #Offset for fsal stuff. #TODO: infer this from tstep
+    imex_offset = [0]
+    fsal_offset = [0]
+
+    s = A.shape[0]
+    U_tmp = np.zeros(U.shape, dtype=U.dtype)
+    fY_hat = np.zeros((s,) + U_hat.shape, dtype = U_hat.dtype)
+    sc = np.zeros(U_hat.shape,dtype=U_hat.dtype)
+    err = np.zeros(U_hat.shape,dtype=U_hat.dtype)
+    U_hat_new = np.zeros(U_hat.shape,dtype=U_hat.dtype)
+
+    def expBS5(t,tstep,dt,additional_args = {}):
+        return imexEXP(context,imex_offset,f,gexp,A,b,bhat,4,fY_hat,U_tmp,U_hat_new,sc,err, fsal,fsal_offset, dU,dt,tstep,additional_args)
+    return expBS5
+
+
+
+
 def imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,kw):
-    s = A.shape[0] - 1
+    s = A.shape[0] 
     U = context.mesh_vars["U"]
     U_hat = context.mesh_vars["U_hat"]
 
@@ -20,10 +63,10 @@ def imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,kw):
 
     for i in range(s):
         K[i] = U_hat
-        for j in range(i):
+        for j in range(i-1):
             K[i] += dt*A[i,j]*K[j][:]
             K[i] += dt*A_hat[i+1,j]*K_hat[j][:]
-        K[i] += dt*A_hat[i+1,i]*K_hat[i]
+        K[i] += dt*A_hat[i,i]*K_hat[i]
         dU = g(context,U_tmp,K[i],dU,i)
         K[i] = ginv(context,U,dU,K[i],i,A[i,i]*dt)
 
@@ -31,23 +74,24 @@ def imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,kw):
         if i == 0 and "additional_callback" in kw:
             kw["additional_callback"](fU_hat=K_hat[i],**kw)
 
-        K_hat[i+1] = f(context,U_tmp,K[i],dU,i+1)
+        if i+1 != s:
+            K_hat[i+1] = f(context,U_tmp,K[i],dU,i+1)
     for i in range(s):
        U_hat[:] += dt*b[i]*K[i]
        U_hat[:] += dt*b_hat[i]*K_hat[i]
-    U_hat[:] += dt*b_hat[i]*K_hat[s]
+    #U_hat[:] += dt*b_hat[i]*K_hat[s]
     return U_hat,dt,dt
 
 def getIMEXOneStep(context,dU,f,g,ginv):
     U = context.mesh_vars["U"]
     U_hat = context.mesh_vars["U_hat"]
 
-    A = np.array([[0,0],[0,1]],dtype=np.float64)
-    b = np.array([0,1],dtype=np.float64)
-    A_hat = np.array([[0,0],[1,0]],dtype=np.float64)
-    b_hat = np.array([1,0],dtype=np.float64)
+    A= np.array([[0,0],[0,1]],dtype=np.float64)
+    b= np.array([0,1],dtype=np.float64)
+    A_hat= np.array([[0,0],[1,0]],dtype=np.float64)
+    b_hat= np.array([1,0],dtype=np.float64)
 
-    s = A.shape[0] - 1
+    s = A.shape[0] 
     K = np.empty((s,) + U_hat.shape, dtype=U_hat.dtype)
     K_hat = np.empty((s+1,)+U_hat.shape,dtype=U_hat.dtype)
     U_tmp = np.empty(U.shape,dtype=U.dtype)
@@ -58,9 +102,8 @@ def getIMEXOneStep(context,dU,f,g,ginv):
 
 
 @optimizer
-def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,ComputeRHS,dt,tstep,kw):
+def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,U_hat,ComputeRHS,dt,tstep,kw):
     U = context.mesh_vars["U"]
-    U_hat = context.mesh_vars["U_hat"]
     N = context.model_params["N"]
 
     FFT = context.FFT
@@ -176,7 +219,8 @@ def getBS5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True):
 
     @wraps(adaptiveRK)
     def BS5(t,tstep,dt,additional_args = {}):
-        return adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,ComputeRHS,dt,tstep,additional_args)
+        U_hat = context.mesh_vars["U_hat"]
+        return adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,U_hat,ComputeRHS,dt,tstep,additional_args)
     return BS5
 
 @optimizer
@@ -219,7 +263,7 @@ def AB2(context,u0, u1,multistep_dt, dU, dt, tstep, ComputeRHS,kw):
     u1[:] = dU*dt    
     return u0,dt,dt
 
-def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None):
+def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None):
     dU = context.mesh_vars["dU"]
     float = context.types["float"]
     """Return integrator using choice in global parameter integrator.
@@ -232,7 +276,7 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None):
         u0 = context.mesh_vars['Ur_hat']
     u1 = u0.copy()    
 
-    if ComputeRHS is None and context.time_integrator["time_integrator_name"] != "IMEX1":
+    if ComputeRHS is None and not (context.time_integrator["time_integrator_name"] in ["IMEX1","EXPBS5"]):
         raise AssertionError("No ComputeRHS given for fully explicit time integrator")
         
     if context.time_integrator["time_integrator_name"] == "RK4": 
@@ -263,5 +307,7 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None):
         return func
     elif context.time_integrator["time_integrator_name"] == "IMEX1":
         return getIMEXOneStep(context,dU,f,g,ginv)
+    elif context.time_integrator["time_integrator_name"] == "EXPBS5":
+        return getexpBS5(context,dU,f,gexp)
     else:
         raise AssertionError("Please specifiy a  time integrator")

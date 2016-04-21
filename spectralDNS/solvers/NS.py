@@ -18,10 +18,13 @@ def initializeContext(context,args):
 
     context.hdf5file = HDF5Writer(context, {"U":U[0], "V":U[1], "W":U[2], "P":P}, context.solver_name+".h5")
     # Set up function to perform temporal integration (using config.integrator parameter)
-    if not context.time_integrator["time_integrator_name"] in ["IMEX1"]:
-        integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS)
-    else:
+    if context.time_integrator["time_integrator_name"] == "IMEX1":
         integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS,f=nonlinearTerm,g=linearTerm,ginv=inverseLinearTerm)
+    elif context.time_integrator["time_integrator_name"] == "EXPBS5":
+        integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS,f=nonlinearTerm,gexp=expLinearTerm)
+    else:
+        integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS)
+
     context.time_integrator["integrate"] = integrate
 
     context.NS["convection"] = args.convection
@@ -204,11 +207,15 @@ def linearTerm(context,U,U_hat,dU,rk):
 
 def inverseLinearTerm(context,U,U_hat,dU,rk,factor):
     #We want to calculate (I-factorg)^-1
-    #TODO:Optimize this by a lot
     nu = context.model_params["nu"]
     K2 = context.mesh_vars["K2"]
-    dU[:] = (1./(1 + nu*K2*factor))*U_hat
+    dU[:] = (1./(1 + nu*factor*K2[:]))*U_hat[:]
     return dU
+
+def expLinearTerm(context,U,U_hat,dU,rk,dt):
+    nu = context.model_params["nu"]
+    K2 = context.mesh_vars["K2"]
+    U_hat[:] = np.exp(-nu*dt*K2[:])*U_hat[:]
 
 def solve(context):
     U_hat = context.mesh_vars["U_hat"]
