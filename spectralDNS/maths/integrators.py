@@ -61,35 +61,35 @@ def imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,kw):
 
     K_hat[0] = f(context,U,U_hat,dU,0)
 
+    U_tmp[:] = U[:]
     for i in range(s):
         K[i] = U_hat
-        for j in range(i-1):
+        for j in range(i):
             K[i] += dt*A[i,j]*K[j][:]
-            K[i] += dt*A_hat[i+1,j]*K_hat[j][:]
-        K[i] += dt*A_hat[i,i]*K_hat[i]
-        dU = g(context,U_tmp,K[i],dU,i)
-        K[i] = ginv(context,U,dU,K[i],i,A[i,i]*dt)
+            K[i] += dt*A_hat[i,j]*K_hat[j][:]
+        dU = ginv(context,U_tmp,K[i],dU,i,A[i,i]*dt)
 
         #TODO: Does K_hat[i] model anything?
         if i == 0 and "additional_callback" in kw:
             kw["additional_callback"](fU_hat=K_hat[i],**kw)
 
-        if i+1 != s:
-            K_hat[i+1] = f(context,U_tmp,K[i],dU,i+1)
+        if i+1 < s:
+            K_hat[i+1] = f(context,U_tmp,dU,K_hat[i+1],i+1)
+        K[i] = g(context,U_tmp,dU,K[i],i)
     for i in range(s):
        U_hat[:] += dt*b[i]*K[i]
        U_hat[:] += dt*b_hat[i]*K_hat[i]
-    #U_hat[:] += dt*b_hat[i]*K_hat[s]
+    #U_hat[:] += dt*b_hat[s]*K_hat[s]
     return U_hat,dt,dt
 
-def getIMEXOneStep(context,dU,f,g,ginv):
+def getIMEX1(context,dU,f,g,ginv):
     U = context.mesh_vars["U"]
     U_hat = context.mesh_vars["U_hat"]
 
-    A= np.array([[0,0],[0,1]],dtype=np.float64)
-    b= np.array([0,1],dtype=np.float64)
-    A_hat= np.array([[0,0],[1,0]],dtype=np.float64)
-    b_hat= np.array([1,0],dtype=np.float64)
+    A = np.array([[1]],dtype=np.float64)
+    b = np.array([1],dtype=np.float64)
+    A_hat = np.array([[0,0],[1,0]],dtype=np.float64)
+    b_hat = np.array([1,0],dtype=np.float64)
 
     s = A.shape[0] 
     K = np.empty((s,) + U_hat.shape, dtype=U_hat.dtype)
@@ -99,6 +99,32 @@ def getIMEXOneStep(context,dU,f,g,ginv):
     def IMEXOneStep(t,tstep,dt,additional_args = {}):
         return imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,additional_args)
     return IMEXOneStep
+
+def getIMEX4(context,dU,f,g,ginv):
+    U = context.mesh_vars["U"]
+    U_hat = context.mesh_vars["U_hat"]
+
+    A = np.array([[0,0,0,0,0],[0,1./2, 0,0,0],[0,1./6,1./2,0,0],[0,-1./2,1./2,1./2,0],[0,3./2,-3./2,1./2,1./2]],dtype=np.float64)
+    b= np.array([0,3./2,-3./2,1./2,1./2],dtype=np.float64)
+
+    A_hat = np.array([[0,0,0,0,0],[1./2,0,0,0,0],[11./18,1./18,0,0,0],[5./6,-5./6,1./2,0,0],[1./4,7./4,3./4,-7./4,0]],dtype=np.float64)
+    b_hat = np.array([1./4,7./4,3./4,-7./4,0],dtype=np.float64)
+    """
+    A = np.array([[0,0],[0,1./2]])
+    b = np.array([0,1])
+    A_hat = np.array([[0,0],[1./2,0]])
+    b_hat = np.array([0,1])
+    """
+
+    s = A.shape[0] 
+    K = np.empty((s,) + U_hat.shape, dtype=U_hat.dtype)
+    K_hat = np.empty((s,)+U_hat.shape,dtype=U_hat.dtype)
+    U_tmp = np.empty(U.shape,dtype=U.dtype)
+#TODO: Do we need to use @wraps here?
+    def IMEXOneStep(t,tstep,dt,additional_args = {}):
+        return imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,additional_args)
+    return IMEXOneStep
+
 
 
 @optimizer
@@ -276,7 +302,7 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None):
         u0 = context.mesh_vars['Ur_hat']
     u1 = u0.copy()    
 
-    if ComputeRHS is None and not (context.time_integrator["time_integrator_name"] in ["IMEX1","EXPBS5"]):
+    if ComputeRHS is None and not (context.time_integrator["time_integrator_name"] in ["IMEX1","EXPBS5","IMEX4"]):
         raise AssertionError("No ComputeRHS given for fully explicit time integrator")
         
     if context.time_integrator["time_integrator_name"] == "RK4": 
@@ -306,7 +332,9 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None):
             return AB2(context,u0, u1,multistep_dt, dU, dt, tstep, ComputeRHS,additional_args)
         return func
     elif context.time_integrator["time_integrator_name"] == "IMEX1":
-        return getIMEXOneStep(context,dU,f,g,ginv)
+        return getIMEX1(context,dU,f,g,ginv)
+    elif context.time_integrator["time_integrator_name"] == "IMEX4":
+        return getIMEX4(context,dU,f,g,ginv)
     elif context.time_integrator["time_integrator_name"] == "EXPBS5":
         return getexpBS5(context,dU,f,gexp)
     else:
