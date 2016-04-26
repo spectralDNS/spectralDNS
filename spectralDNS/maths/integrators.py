@@ -11,6 +11,22 @@ import numpy as np
 
 __all__ = ['getintegrator']
 
+
+def expEuler(context,dU,f,gexp,hphi,t,tstep,dt,kw):
+    U_hat = context.mesh_vars["U_hat"]
+    U = context.mesh_vars["U"]
+    if "additional_callback" in kw:
+        kw["additional_callback"](fU_hat=dU,**kw)
+
+    f(context,U,U_hat,dU,0)
+    hphi(context,1,U,dU,0,dt)
+    gexp(context,U,U_hat,dU,0,dt)
+    U_hat[:] += dU
+    return U_hat,dt,dt
+
+
+
+
 def imexEXP(context,imex_offset,f,gexp,A,b,bhat,err_order,fY_hat,U_tmp,U_hat_new,sc,err,fsal,fsal_offset,dU,dt,tstep,kw):
     U_hat = context.mesh_vars["U_hat"]
     U = context.mesh_vars["U"]
@@ -289,7 +305,7 @@ def AB2(context,u0, u1,multistep_dt, dU, dt, tstep, ComputeRHS,kw):
     u1[:] = dU*dt    
     return u0,dt,dt
 
-def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None):
+def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None,hphi=None):
     dU = context.mesh_vars["dU"]
     float = context.types["float"]
     """Return integrator using choice in global parameter integrator.
@@ -302,6 +318,7 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None):
         u0 = context.mesh_vars['Ur_hat']
     u1 = u0.copy()    
 
+    #TODO: Do I need this line?
     if ComputeRHS is None and not (context.time_integrator["time_integrator_name"] in ["IMEX1","EXPBS5","IMEX4"]):
         raise AssertionError("No ComputeRHS given for fully explicit time integrator")
         
@@ -337,5 +354,9 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None):
         return getIMEX4(context,dU,f,g,ginv)
     elif context.time_integrator["time_integrator_name"] == "EXPBS5":
         return getexpBS5(context,dU,f,gexp)
+    elif context.time_integrator["time_integrator_name"] == "EXPEULER":
+        def func(t,tstep,dt,additional_args = {}):
+            return expEuler(context,dU,f,gexp,hphi,t,tstep,dt,additional_args)
+        return func
     else:
         raise AssertionError("Please specifiy a  time integrator")

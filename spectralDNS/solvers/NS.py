@@ -22,6 +22,8 @@ def initializeContext(context,args):
         integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS,f=nonlinearTerm,g=linearTerm,ginv=inverseLinearTerm)
     elif context.time_integrator["time_integrator_name"] == "EXPBS5":
         integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS,f=nonlinearTerm,gexp=expLinearTerm)
+    elif context.time_integrator["time_integrator_name"] == "EXPEULER":
+        integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS,f=nonlinearTerm,gexp=expLinearTerm,hphi=hphi)
     else:
         integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS)
 
@@ -209,13 +211,32 @@ def inverseLinearTerm(context,U,U_hat,dU,rk,factor):
     #We want to calculate (I-factorg)^-1
     nu = context.model_params["nu"]
     K2 = context.mesh_vars["K2"]
+    #TODO Make this more efficient
     dU[:] = (1./(1 + nu*factor*K2[:]))*U_hat[:]
     return dU
 
+#TODO: Change the function signature here.
 def expLinearTerm(context,U,U_hat,dU,rk,dt):
     nu = context.model_params["nu"]
     K2 = context.mesh_vars["K2"]
+    #TODO:Make this more efficient
     U_hat[:] = np.exp(-nu*dt*K2[:])*U_hat[:]
+
+#TODO: Change the function signature here.
+def hphi(context,k,U,U_hat,rk,dt):
+    K2 = context.mesh_vars["K2"]
+    nu = context.model_params["nu"]
+    FFT = context.FFT
+    if k == 1:
+        if FFT.rank != 0:
+            U_hat[:] = 1/(-nu*K2[:]*dt)(np.exp(-nu*dt*K2[:]) - 1)*U_hat[:]
+        else:
+            k0 = U_hat[:,0,0,0]
+            K2[0,0,0] = -nu
+            U_hat[:] = 1/(-nu*K2[:])*(np.exp(-nu*dt*K2[:]) - 1)*U_hat[:]
+            K2[0,0,0] = 0
+            U_hat[:,0,0,0] = dt*k0
+
 
 def solve(context):
     U_hat = context.mesh_vars["U_hat"]
