@@ -116,6 +116,7 @@ def getIMEX1(context,dU,f,g,ginv):
         return imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,additional_args)
     return IMEXOneStep
 
+
 def getIMEX4(context,dU,f,g,ginv):
     U = context.mesh_vars["U"]
     U_hat = context.mesh_vars["U_hat"]
@@ -125,12 +126,38 @@ def getIMEX4(context,dU,f,g,ginv):
 
     A_hat = np.array([[0,0,0,0,0],[1./2,0,0,0,0],[11./18,1./18,0,0,0],[5./6,-5./6,1./2,0,0],[1./4,7./4,3./4,-7./4,0]],dtype=np.float64)
     b_hat = np.array([1./4,7./4,3./4,-7./4,0],dtype=np.float64)
-    """
-    A = np.array([[0,0],[0,1./2]])
-    b = np.array([0,1])
-    A_hat = np.array([[0,0],[1./2,0]])
-    b_hat = np.array([0,1])
-    """
+
+    s = A.shape[0] 
+    K = np.empty((s,) + U_hat.shape, dtype=U_hat.dtype)
+    K_hat = np.empty((s,)+U_hat.shape,dtype=U_hat.dtype)
+    U_tmp = np.empty(U.shape,dtype=U.dtype)
+#TODO: Do we need to use @wraps here?
+    def IMEXOneStep(t,tstep,dt,additional_args = {}):
+        return imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,additional_args)
+    return IMEXOneStep
+
+def getIMEXTMP(context,dU,f,g,ginv):
+    U = context.mesh_vars["U"]
+    U_hat = context.mesh_vars["U_hat"]
+
+    A_hat = np.array([
+        [0,0,0,0],
+        [1767732205903./2027836641118,0,0,0],
+        [5535828885825./10492691773637,788022342437./10882634858940,0,0],
+        [ 6485989280629./16251701735622,-4246266847089./9704473918619,10755448449292./10357097424841,0]
+        ],dtype=np.float64)
+    b_hat = np.array(
+            [1471266399579./7840856788654,-4482444167858./7529755066697,11266239266428./11593286722821,1767732205903./4055673282236,],
+            dtype=np.float64)
+
+    A = np.array([
+        [0,0,0,0],
+        [ 1767732205903./4055673282236,  1767732205903./4055673282236,0,0],
+        [2746238789719./10658868560708 , -640167445237./6845629431997,1767732205903./4055673282236,0],
+        b_hat
+        ],dtype=np.float64)
+    b = b_hat
+
 
     s = A.shape[0] 
     K = np.empty((s,) + U_hat.shape, dtype=U_hat.dtype)
@@ -318,10 +345,6 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None,hphi=None
         u0 = context.mesh_vars['Ur_hat']
     u1 = u0.copy()    
 
-    #TODO: Do I need this line?
-    if ComputeRHS is None and not (context.time_integrator["time_integrator_name"] in ["IMEX1","EXPBS5","IMEX4"]):
-        raise AssertionError("No ComputeRHS given for fully explicit time integrator")
-        
     if context.time_integrator["time_integrator_name"] == "RK4": 
         # RK4 parameters
         a = array([1./6., 1./3., 1./3., 1./6.], dtype=float)
@@ -352,6 +375,8 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None,hphi=None
         return getIMEX1(context,dU,f,g,ginv)
     elif context.time_integrator["time_integrator_name"] == "IMEX4":
         return getIMEX4(context,dU,f,g,ginv)
+    elif context.time_integrator["time_integrator_name"] == "IMEXTMP":
+        return getIMEXTMP(context,dU,f,g,ginv)
     elif context.time_integrator["time_integrator_name"] == "EXPBS5":
         return getexpBS5(context,dU,f,gexp)
     elif context.time_integrator["time_integrator_name"] == "EXPEULER":
