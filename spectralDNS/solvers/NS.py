@@ -223,7 +223,7 @@ def solve(context):
     dU = context.mesh_vars["dU"]
     dt = context.time_integrator["dt"]
 
-    timer = Timer()
+    timer = Timer(silent=context.silent)
     t = 0.0
     tstep = 0
     T = context.model_params["T"]

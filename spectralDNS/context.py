@@ -27,10 +27,12 @@ class Context:
     make_profile - Whether to profile
     solver - The module of the solver
     callbacks - A dictionary with possible keys update, additional_callback, regression_test
+    silent - Whether to output stuff to stdout
     """
     #TODO:Find out if we need to get precision here or can get it from arsg.
-    def __init__(self,mesh,argv,precision="double"):
+    def __init__(self,mesh,argv,precision="double",silent=False):
         self.mesh = mesh
+        self.silent = silent
 
         comm = self.comm = MPI.COMM_WORLD
         self.comm.barrier()

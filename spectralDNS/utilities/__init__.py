@@ -32,7 +32,7 @@ class Timer(object):
                 comm.reduce(self.slowest_timestep, op=MPI.MAX, root=0))
         
         toc = time() - self.tic
-        if rank == 0 and self.silent==True:
+        if rank == 0 and self.silent==False:
             print "Time = ", toc
             print "Fastest = ", fast
             print "Slowest = ", slow
