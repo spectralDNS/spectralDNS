@@ -9,7 +9,8 @@ from time import time
 
 class Timer(object):
 
-    def __init__(self):
+    def __init__(self,silent=False):
+        self.silent = silent
         self.fastest_timestep = 1e8
         self.slowest_timestep = 0
         self.t0 = time()
@@ -31,7 +32,7 @@ class Timer(object):
                 comm.reduce(self.slowest_timestep, op=MPI.MAX, root=0))
         
         toc = time() - self.tic
-        if rank == 0:
+        if rank == 0 and self.silent==True:
             print "Time = ", toc
             print "Fastest = ", fast
             print "Slowest = ", slow
