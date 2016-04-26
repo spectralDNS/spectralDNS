@@ -136,7 +136,7 @@ def getIMEX4(context,dU,f,g,ginv):
         return imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,additional_args)
     return IMEXOneStep
 
-def getIMEXTMP(context,dU,f,g,ginv):
+def getIMEX3(context,dU,f,g,ginv):
     U = context.mesh_vars["U"]
     U_hat = context.mesh_vars["U_hat"]
 
@@ -157,6 +157,48 @@ def getIMEXTMP(context,dU,f,g,ginv):
         b_hat
         ],dtype=np.float64)
     b = b_hat
+
+
+    s = A.shape[0] 
+    K = np.empty((s,) + U_hat.shape, dtype=U_hat.dtype)
+    K_hat = np.empty((s,)+U_hat.shape,dtype=U_hat.dtype)
+    U_tmp = np.empty(U.shape,dtype=U.dtype)
+#TODO: Do we need to use @wraps here?
+    def IMEXOneStep(t,tstep,dt,additional_args = {}):
+        return imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,additional_args)
+    return IMEXOneStep
+
+def getIMEXTMP(context,dU,f,g,ginv):
+    U = context.mesh_vars["U"]
+    U_hat = context.mesh_vars["U_hat"]
+
+    A_hat = np.array([
+        [0,0,0,0,0,0,0,0],
+        [41./100,0,0,0,0,0,0,0],
+        [367902744464./2072280473677,677623207551./8224143866563,0,0,0,0,0,0],
+        [1268023523408./10340822734521,0,1029933939417./13636558850479,0,0,0,0,0],
+        [14463281900351./6315353703477,0,66114435211212./5879490589093 , -54053170152839./4284798021562,0,0,0,0],
+        [14090043504691./34967701212078,0,15191511035443./11219624916014,-18461159152457./12425892160975,-281667163811./9011619295870,0,0,0],
+        [19230459214898./13134317526959,0,21275331358303./2942455364971,-38145345988419./4862620318723,-1./8,-1./8,0,0],
+        [-19977161125411./11928030595625,0,-40795976796054./6384907823539 ,177454434618887./12078138498510,782672205425./826770190026,
+            -69563011059811./9646580694205,7356628210526./4942186776405,0]
+        ],dtype=np.float64)
+    b_hat = np.array(
+            [-872700587467./9133579230613,0,22348218063261./9555858737531,-1143369518992./8141816002931,-39379526789629./19018526304540,
+                32727382324388./42900044865799,41./200], dtype=np.float64)
+
+    A = np.array([
+        [0,0,0,0,0,0,0,0],
+        [41./200,41./200,0,0,0,0,0,0],
+        [41./400,-567603406766./11931857230679,41./200,0,0,0,0,0],
+        [683785636431./9252920307686,0,-110385047103./1367015193373,41./200,0,0,0,0],
+        [3016520224154./10081342136671,0,30586259806659./12414158314087,-22760509404356./11113319521817,41./200,0,0,0],
+        [218866479029./1489978393911,0,638256894668./5436446318841,-1179710474555./5321154724896,-60928119172./8023461067671,41./200,0,0],
+        [1020004230633./5715676835656,0,25762820946817./25263940353407,-2161375909145./9755907335909,-211217309593./5846859502534,
+            -4269925059573./7827059040749,41./200,0],
+        [-872700587467./9133579230613,0,0,22348218063261./9555858737531,-1143369518992./8141816002931,-39379526789629./19018526304540,
+            32727382324388./42900044865799,41./200]],dtype=np.float64)
+    b = A[-1]
 
 
     s = A.shape[0] 
@@ -375,6 +417,8 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None,hphi=None
         return getIMEX1(context,dU,f,g,ginv)
     elif context.time_integrator["time_integrator_name"] == "IMEX4":
         return getIMEX4(context,dU,f,g,ginv)
+    elif context.time_integrator["time_integrator_name"] == "IMEX3":
+        return getIMEX3(context,dU,f,g,ginv)
     elif context.time_integrator["time_integrator_name"] == "IMEXTMP":
         return getIMEXTMP(context,dU,f,g,ginv)
     elif context.time_integrator["time_integrator_name"] == "EXPBS5":
