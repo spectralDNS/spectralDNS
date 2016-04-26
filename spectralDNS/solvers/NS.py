@@ -18,7 +18,7 @@ def initializeContext(context,args):
 
     context.hdf5file = HDF5Writer(context, {"U":U[0], "V":U[1], "W":U[2], "P":P}, context.solver_name+".h5")
     # Set up function to perform temporal integration (using config.integrator parameter)
-    integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS,f=nonlinearTerm,g=linearTerm,ginv=inverseLinearTerm,hphi=hphi)
+    integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS,f=nonlinearTerm,g=linearTerm,ginv=inverseLinearTerm,hphi=hphi,gexp=expLinearTerm)
 
     context.time_integrator["integrate"] = integrate
 
