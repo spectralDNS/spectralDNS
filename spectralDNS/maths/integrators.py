@@ -75,7 +75,6 @@ def imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,kw):
     U = context.mesh_vars["U"]
     U_hat = context.mesh_vars["U_hat"]
 
-    K_hat[0] = f(context,U,U_hat,dU,0)
 
     U_tmp[:] = U[:]
     for i in range(s):
@@ -85,12 +84,10 @@ def imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,kw):
             K[i] += dt*A_hat[i,j]*K_hat[j][:]
         dU = ginv(context,U_tmp,K[i],dU,i,A[i,i]*dt)
 
-        #TODO: Does K_hat[i] model anything?
         if i == 0 and "additional_callback" in kw:
             kw["additional_callback"](fU_hat=K_hat[i],**kw)
 
-        if i+1 < s:
-            K_hat[i+1] = f(context,U_tmp,dU,K_hat[i+1],i+1)
+        K_hat[i] = f(context,U_tmp,dU,K_hat[i],i+1)
         K[i] = g(context,U_tmp,dU,K[i],i)
     for i in range(s):
        U_hat[:] += dt*b[i]*K[i]
@@ -109,7 +106,7 @@ def getIMEX1(context,dU,f,g,ginv):
 
     s = A.shape[0] 
     K = np.empty((s,) + U_hat.shape, dtype=U_hat.dtype)
-    K_hat = np.empty((s+1,)+U_hat.shape,dtype=U_hat.dtype)
+    K_hat = np.empty((s,)+U_hat.shape,dtype=U_hat.dtype)
     U_tmp = np.empty(U.shape,dtype=U.dtype)
 #TODO: Do we need to use @wraps here?
     def IMEXOneStep(t,tstep,dt,additional_args = {}):
@@ -168,7 +165,7 @@ def getIMEX3(context,dU,f,g,ginv):
         return imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,additional_args)
     return IMEXOneStep
 
-def getIMEXTMP(context,dU,f,g,ginv):
+def getIMEX5(context,dU,f,g,ginv):
     U = context.mesh_vars["U"]
     U_hat = context.mesh_vars["U_hat"]
 
@@ -184,7 +181,7 @@ def getIMEXTMP(context,dU,f,g,ginv):
             -69563011059811./9646580694205,7356628210526./4942186776405,0]
         ],dtype=np.float64)
     b_hat = np.array(
-            [-872700587467./9133579230613,0,22348218063261./9555858737531,-1143369518992./8141816002931,-39379526789629./19018526304540,
+            [-872700587467./9133579230613,0,0,22348218063261./9555858737531,-1143369518992./8141816002931,-39379526789629./19018526304540,
                 32727382324388./42900044865799,41./200], dtype=np.float64)
 
     A = np.array([
@@ -419,8 +416,8 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None,hphi=None
         return getIMEX4(context,dU,f,g,ginv)
     elif context.time_integrator["time_integrator_name"] == "IMEX3":
         return getIMEX3(context,dU,f,g,ginv)
-    elif context.time_integrator["time_integrator_name"] == "IMEXTMP":
-        return getIMEXTMP(context,dU,f,g,ginv)
+    elif context.time_integrator["time_integrator_name"] == "IMEX5":
+        return getIMEX5(context,dU,f,g,ginv)
     elif context.time_integrator["time_integrator_name"] == "EXPBS5":
         return getexpBS5(context,dU,f,gexp)
     elif context.time_integrator["time_integrator_name"] == "EXPEULER":
