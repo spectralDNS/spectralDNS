@@ -222,7 +222,7 @@ def hphi(context,k,U,U_hat,rk,dt):
     FFT = context.FFT
     if k == 1:
         if FFT.rank != 0:
-            U_hat[:] = 1/(-nu*K2[:]*dt)*(np.exp(-nu*dt*K2[:]) - 1)*U_hat[:]
+            U_hat[:] = 1/(-nu*K2[:])*(np.exp(-nu*dt*K2[:]) - 1)*U_hat[:]
         else:
             k0 = U_hat[:,0,0,0]
             K2[0,0,0] = -nu
