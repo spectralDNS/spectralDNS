@@ -6,6 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from spectralinit import *
 
 hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "rho":rho, "P":P}, config.solver+".h5")
+assert config.decomposition == 'line'
 Ri = float(config.Ri)
 Pr = float(config.Pr)
 
@@ -27,7 +28,9 @@ def add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Ri, 
     return dU
 
 def ComputeRHS(dU, rk):
-    Ur_dealiased = FFT.get_workarray(((3,)+FFT.real_shape(), float), 0)
+    Ur_dealiased = work[((3,)+FFT.real_shape(), float, 0)]
+    F_tmp = work[(dU, 0)]
+    
     for i in range(3):
         Ur_dealiased[i] = FFT.ifft2(Ur_hat[i], Ur_dealiased[i], config.dealias)
         

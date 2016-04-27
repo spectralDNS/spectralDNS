@@ -33,7 +33,7 @@ k = []
 w = []
 im1 = None
 def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, Curl, float64, dx, L, sum, 
-           hdf5file, FFT, X, U_hat, K2, K, **kw):
+           hdf5file, FFT, X, U_hat, K2, K, work, **kw):
     global k, w, im1
     if hdf5file.check_if_write(tstep):
         P[:] = FFT.ifftn(P_hat*1j, P)
@@ -56,10 +56,10 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, Curl, float64, dx, L, su
 
     if tstep % config.compute_energy == 0:
         if config.solver == 'NS':
-            curl_pad = FFT.get_workarray((((3,)+FFT.real_shape_padded()), FFT.float), 0)
+            curl_pad = work[(((3,)+FFT.real_shape_padded()), FFT.float, 0)]
             curl_pad = Curl(U_hat, curl_pad, '3/2-rule')
             ww = comm.reduce(sum(curl_pad*curl_pad)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2/1.5**3)            
-            duidxj = FFT.get_workarray((((3,3)+FFT.real_shape_padded()), FFT.float), 0)
+            duidxj = work[(((3,3)+FFT.real_shape_padded()), FFT.float, 0)]
             for i in range(3):
                 for j in range(3):
                     duidxj[i,j] = FFT.ifftn(1j*K[j]*U_hat[i], duidxj[i,j], "3/2-rule")                    

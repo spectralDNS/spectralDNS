@@ -15,11 +15,12 @@ def initialize1(U, U_hat, X, sin, cos, FFT, **kw):
     for i in range(3):
         U_hat[i] = FFT.fftn(U[i], U_hat[i])
         
-def initialize2(U, W, W_hat, X, sin, cos, FFT, F_tmp, 
+def initialize2(U, W, W_hat, X, sin, cos, FFT, work,
                 cross2, K, **kw):
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0         
+    F_tmp = work[(W_hat, 0)]
     for i in range(3):
         F_tmp[i] = FFT.fftn(U[i], F_tmp[i])
 
