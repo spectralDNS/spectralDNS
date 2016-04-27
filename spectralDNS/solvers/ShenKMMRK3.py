@@ -62,7 +62,7 @@ def RKstep(U_hat, g, dU, rk):
     U_hat[0] = BiharmonicSolverU[rk](U_hat[0], dU[0])
     g[:] = HelmholtzSolverG[rk](g, dU[1])
 
-    f_hat = F_tmp[0]
+    f_hat = work[(U_hat[0], 0)]
     f_hat = - CDB.matvec(U_hat[0])
     f_hat = TDMASolverD(f_hat)
 

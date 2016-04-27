@@ -60,3 +60,4 @@ def test_mpi_KMM():
 
 def test_mpi_IPCS():
     d = subprocess.check_output("srun python OrrSommerfeld.py --optimization cython IPCS", shell=True)
+

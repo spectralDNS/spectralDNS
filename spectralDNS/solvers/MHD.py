@@ -9,6 +9,7 @@ hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P,
                                     "Bx": B[0], "By": B[1], "Bz":B[2]}, config.solver+".h5")
 
 eta = float(config.eta)
+work_shape = FFT.real_shape_padded() if config.dealias == '3/2-rule' else FFT.real_shape()
 
 def set_Elsasser(c, F_tmp, K):
     c[:3] = -1j*(K[0]*(F_tmp[:, 0] + F_tmp[0, :])
@@ -20,14 +21,15 @@ def set_Elsasser(c, F_tmp, K):
                 +K[2]*(F_tmp[2, :] - F_tmp[:, 2]))/2.0
     return c
 
-def divergenceConvection(z0, z1, c):
+def divergenceConvection(z0, z1, c, dealias=None):
     """Divergence convection using Elsasser variables
     z0=U+B
     z1=U-B
     """
+    F_tmp = work[((3, 3) + FFT.complex_shape(), complex, 0)]
     for i in range(3):
         for j in range(3):
-            F_tmp[i, j] = FFT.fftn(z0[i]*z1[j], F_tmp[i, j])
+            F_tmp[i, j] = FFT.fftn(z0[i]*z1[j], F_tmp[i, j], dealias)
             
     c = set_Elsasser(c, F_tmp, K)
     #c[:3] = -1j*(K[0]*(F_tmp[:, 0] + F_tmp[0, :])
@@ -45,11 +47,14 @@ def ComputeRHS(dU, rk):
         for i in range(6):
             UB[i] = FFT.ifftn(UB_hat[i], UB[i])
     
-    # Compute convective term and place in dU
-    dU = divergenceConvection(U+B, U-B, dU)
+    UB_dealiased = work[((6,)+work_shape, float, 0)]
+    for i in range(6):
+        UB_dealiased[i] = FFT.ifftn(UB_hat[i], UB_dealiased[i], config.dealias)
     
-    # Dealias the nonlinear convection
-    dU[:] *= dealias
+    U_dealiased = UB_dealiased[:3]
+    B_dealiased = UB_dealiased[3:]
+    # Compute convective term and place in dU
+    dU = divergenceConvection(U_dealiased+B_dealiased, U_dealiased-B_dealiased, dU, config.dealias)
     
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat[:] = sum(dU[:3]*K_over_K2, 0)

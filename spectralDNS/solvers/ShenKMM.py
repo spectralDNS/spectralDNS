@@ -52,16 +52,16 @@ def solvePressure(P_hat, Ni):
     #return P_hat
 
 def Cross(a, b, c, S):
-    Uc = FST.get_workarray(a, 2)
-    Uc[:] = cross1(Uc, a, b)
+    Uc = work[(a, 2)]
+    Uc = cross1(Uc, a, b)
     c[0] = FST.fst(Uc[0], c[0], S, dealias=config.dealias)
     c[1] = FST.fst(Uc[1], c[1], S, dealias=config.dealias)
     c[2] = FST.fst(Uc[2], c[2], S, dealias=config.dealias)
     return c
 
 def Curl(a_hat, c, S):
-    F_tmp[:] = 0
-    Uc = FST.get_workarray(c, 2)
+    F_tmp = work[(a_hat, 0)]
+    Uc = work[(c, 2)]
     SFTc.Mult_CTD_3D(N[0], a_hat[1], a_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], S, dealias=config.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], S, dealias=config.dealias)
@@ -77,8 +77,9 @@ def Curl(a_hat, c, S):
 def standardConvection(c, U_dealiased, U_hat):
     c[:] = 0
     U = U_dealiased
-    Uc = FST.get_workarray(U, 1)
-    Uc2 = FST.get_workarray(U, 2)
+    Uc = work[(U, 1)]
+    Uc2 = work[(U, 2)]
+    F_tmp = work[(c, 0)]
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
@@ -112,6 +113,8 @@ def standardConvection(c, U_dealiased, U_hat):
 def divergenceConvection(c, U, U_hat, add=False):
     """c_i = div(u_i u_j)"""
     if not add: c.fill(0)
+    F_tmp  = work[(c, 0)]
+    F_tmp2 = work[(c, 1)]
     #U_tmp[0] = chebDerivative_3D0(U[0]*U[0], U_tmp[0])
     #U_tmp[1] = chebDerivative_3D0(U[0]*U[1], U_tmp[1])
     #U_tmp[2] = chebDerivative_3D0(U[0]*U[2], U_tmp[2])
@@ -156,7 +159,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = FST.get_workarray(((3,)+work_shape, float), 0)
+            U_dealiased = work[((3,)+work_shape, float, 0)]
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
             for i in range(1, 3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
@@ -169,7 +172,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = FST.get_workarray(((3,)+work_shape, float), 0)
+            U_dealiased = work[((3,)+work_shape, float, 0)]
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
             for i in range(1, 3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
@@ -182,7 +185,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = FST.get_workarray(((3,)+work_shape, float), 0)
+            U_dealiased = work[((3,)+work_shape, float, 0)]
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
             for i in range(1, 3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
@@ -196,8 +199,8 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = FST.get_workarray(((3,)+work_shape, float), 0)
-            curl_dealiased = FST.get_workarray(((3,)+work_shape, float), 1)
+            U_dealiased = work[((3,)+work_shape, float, 0)]
+            curl_dealiased = work[((3,)+work_shape, float, 1)]
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
             for i in range(1, 3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
@@ -267,7 +270,7 @@ def solve():
         U_hat[0] = BiharmonicSolverU(U_hat[0], dU[0])
         g[:] = HelmholtzSolverG(g, dU[1])
         
-        f_hat = F_tmp[0]
+        f_hat = work[(U_hat[0], 0)]
         f_hat[:] = -CDB.matvec(U_hat[0])
         f_hat = TDMASolverD(f_hat)
         
