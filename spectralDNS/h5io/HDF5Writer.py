@@ -177,5 +177,8 @@ except:
         def check_if_write(self, tstep):
             return False
         
+        def checkpoint(self, *args):
+            pass
+        
         def close(self):
             del self
