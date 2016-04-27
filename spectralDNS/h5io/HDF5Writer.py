@@ -57,7 +57,7 @@ try:
             for key,val in self.mesh.iteritems():
                 self.f["3D/mesh/"].create_dataset(key, shape=(len(val),), dtype=self.dtype)
                 self.f["3D/mesh/"+key][:] = val
-            
+        
         def check_if_write(self, tstep):
             if tstep % config.write_result == 0:
                 return True
@@ -72,40 +72,44 @@ try:
             else:
                 return False
             
-        def checkpoint(self, U, P, U0):
+        def checkpoint(self, U, P, U0=None):
             if self.f is None: self.init_h5file() 
             else:
                 self.f = h5py.File(self.fname, driver="mpio", comm=self.FFT.comm)
             
             if config.decomposition in ("slab", "pencil"):
                 shape = [3] + list(self.N)
-                if not "0" in self.f["3D/checkpoint/U"].keys():
-                    self.f["3D/checkpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
+                if not "1" in self.f["3D/checkpoint/U"].keys():
+                    if not U0 is None:
+                        self.f["3D/checkpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
+                        self.f["3D/oldcheckpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
                     self.f["3D/checkpoint/U"].create_dataset("1", shape=shape, dtype=self.dtype)
                     self.f["3D/checkpoint/P"].create_dataset("1", shape=self.N, dtype=self.dtype)
-                    self.f["3D/oldcheckpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
                     self.f["3D/oldcheckpoint/U"].create_dataset("1", shape=shape, dtype=self.dtype)
                     self.f["3D/oldcheckpoint/P"].create_dataset("1", shape=self.N, dtype=self.dtype)
 
             else:
                 shape = [2] + self.N
-                if not "0" in self.f["2D/checkpoint/U"].keys():
-                    self.f["2D/checkpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
+                if not "1" in self.f["2D/checkpoint/U"].keys():
+                    if not U0 is None:
+                        self.f["2D/checkpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
+                        self.f["2D/oldcheckpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
                     self.f["2D/checkpoint/U"].create_dataset("1", shape=shape, dtype=self.dtype)
                     self.f["2D/checkpoint/P"].create_dataset("1", shape=self.N, dtype=self.dtype)
-                    self.f["2D/oldcheckpoint/U"].create_dataset("0", shape=shape, dtype=self.dtype)
                     self.f["2D/oldcheckpoint/U"].create_dataset("1", shape=shape, dtype=self.dtype)
                     self.f["2D/oldcheckpoint/P"].create_dataset("1", shape=self.N, dtype=self.dtype)
                 
             # Backup previous solution
             s = self.FFT.real_local_slice()
-            self.f["3D/oldcheckpoint/U/0"][:, s]  = self.f["3D/checkpoint/U/0"][:, s]
-            self.f["3D/oldcheckpoint/U/1"][:, s] = self.f["3D/checkpoint/U/1"][:, s]
+            if not U0 is None:
+                self.f["3D/oldcheckpoint/U/0"][:, s[0], s[1], s[2]]  = self.f["3D/checkpoint/U/0"][:, s[0], s[1], s[2]]
+            self.f["3D/oldcheckpoint/U/1"][:, s[0], s[1], s[2]] = self.f["3D/checkpoint/U/1"][:, s[0], s[1], s[2]]
             self.f["3D/oldcheckpoint/P/1"][s] = self.f["3D/checkpoint/P/1"][s]
             
             # Get new values
-            self.f["3D/checkpoint/U/0"][:, s] = U0
-            self.f["3D/checkpoint/U/1"][:, s] = U
+            if not U0 is None:
+                self.f["3D/checkpoint/U/0"][:, s[0], s[1], s[2]] = U0
+            self.f["3D/checkpoint/U/1"][:, s[0], s[1], s[2]] = U
             self.f["3D/checkpoint/P/1"][s] = P
             self.f.close()
             
@@ -172,6 +176,9 @@ except:
         
         def check_if_write(self, tstep):
             return False
+        
+        def checkpoint(self, *args):
+            pass
         
         def close(self):
             del self

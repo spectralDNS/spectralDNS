@@ -21,7 +21,6 @@ def setupNS(float, complex, FFT, **kwargs):
     P     = empty(FFT.real_shape(), dtype=float)
     P_hat = empty(FFT.complex_shape(), dtype=complex)
     curl  = empty(FFT.real_shape(), dtype=float)
-    F_tmp = empty((2,) + FFT.complex_shape(), dtype=complex)
     dU     = empty((2,) + FFT.complex_shape(), dtype=complex)
     
     K2 = sum(K*K, 0, dtype=float)
@@ -48,8 +47,6 @@ def setupBoussinesq(float, complex, FFT, **kwargs):
     U       = Ur[:2] 
     U_hat   = Ur_hat[:2]
 
-    F_tmp = empty((2,) + FFT.complex_shape(), dtype=complex)
-    
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
 

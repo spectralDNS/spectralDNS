@@ -91,9 +91,6 @@ def setupShenKMM(N, L, MPI, float, complex, **kwargs):
     H_hat0   = empty((3,)+FST.complex_shape(), dtype=complex)
     H_hat1   = empty((3,)+FST.complex_shape(), dtype=complex)
     
-    F_tmp   = empty((3,)+FST.complex_shape(), dtype=complex)
-    F_tmp2  = empty((3,)+FST.complex_shape(), dtype=complex)
-
     dU      = empty((3,)+FST.complex_shape(), dtype=complex)
     hv      = empty(FST.complex_shape(), dtype=complex)
     hg      = empty(FST.complex_shape(), dtype=complex)
@@ -207,39 +204,35 @@ def setupShenGeneralBCs(N, L, MPI, float, complex, **kwargs):
     del kwargs 
     return locals()
 
-class work_arrays(dict):
-    
-    def __missing__(self, key):
-        shape, dtype, i = key
-        a = zeros(shape, dtype=dtype)
-        self[key] = a
-        return self[key]
-
-_work_arrays = work_arrays()
-
 class FastShenFourierTransform(slab_FFT):
     
-    def __init__(self, N, L, MPI):        
-        slab_FFT.__init__(self, N, L, MPI, "double")
-        # Initialize intermediate MPI work arrays
-        self.U_mpi2  = empty((self.num_processes, self.Np[0], self.Np[1], self.N[2]))
-        self.UT      = empty((3, self.N[0], self.Np[1], self.N[2]))
-        self.Upad_hatT = empty(self.complex_shape_padded_T(), dtype=self.complex)
+    def __init__(self, N, L, MPI, padsize=1.5):
+        slab_FFT.__init__(self, N, L, MPI, "double", padsize=padsize)
         
     def complex_shape_padded_T(self):
         """The local shape of the transposed complex data padded in x and z directions"""
-        return (self.Np[0], 3*self.N[1]/2, 3*self.N[2]/4+1)
+        return (self.Np[0], int(self.padsize*self.N[1]), int(self.padsize*self.N[2]/2+1))
 
     def real_shape_padded(self):
         """The local shape of the real data"""
-        return (self.Np[0], 3*self.N[1]/2, 3*self.N[2]/2)
+        return (self.Np[0], int(self.padsize*self.N[1]), int(self.padsize*self.N[2]))
     
     def complex_shape_padded(self):
-        return (self.N[0], 3*self.Np[1]/2, 3*self.N[2]/4+1)
+        return (self.N[0], int(self.padsize*self.Np[1]), int(self.padsize*self.N[2]/2+1))
     
     def get_mesh_dims(self, ST):
         return [self.get_mesh_dim(ST, i) for i in range(3)]
         
+    def real_local_slice(self, padded=False):
+        if padded:
+            return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
+                    slice(0, int(self.padsize*self.N[1]), 1), 
+                    slice(0, int(self.padsize*self.N[2]), 1))
+        else:
+            return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
+                    slice(0, self.N[1], 1), 
+                    slice(0, self.N[2], 1))
+    
     def get_mesh_dim(self, ST, d):
         if d == 0:
             return ST.points_and_weights(self.N[0])[0]
@@ -282,22 +275,6 @@ class FastShenFourierTransform(slab_FFT):
                         (abs(K[2]) < kmax[2]), dtype=uint8)
         return dealias
     
-    def get_workarray(self, a, i=0):
-        if isinstance(a, ndarray):
-            shape = a.shape
-            dtype = a.dtype
-            
-        elif isinstance(a, tuple):
-            assert len(a) == 2
-            shape, dtype = a
-            
-        else:
-            raise TypeError("Wrong type for get_workarray")
-        
-        a = _work_arrays[(shape, dtype, i)]
-        a[:] = 0
-        return a
-
     def copy_to_padded(self, fu, fp):
         fp[:, :self.N[1]/2, :self.Nf] = fu[:, :self.N[1]/2]
         fp[:, -(self.N[1]/2):, :self.Nf] = fu[:, self.N[1]/2:]
@@ -311,140 +288,183 @@ class FastShenFourierTransform(slab_FFT):
     
     def fss(self, u, fu, S, dealias=None):
         """Fast Shen scalar product of x-direction, Fourier transform of y and z"""
-        self.init_work_arrays()
+        
+        # Intermediate work arrays
+        Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
+        Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
+        Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
+        
         if not dealias == '3/2-rule':
-            self.Uc_hatT[:] = rfft2(u, axes=(1,2))
-            self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-            self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
-            fu = S.fastShenScalar(self.Uc_hat, fu)
+
+            Uc_hatT[:] = rfft2(u, axes=(1,2))
+            Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.complex_shape_I()), 1)
+            self.comm.Alltoall([Uc_mpi, self.mpitype], [Uc_hat, self.mpitype])
+            fu = S.fastShenScalar(Uc_hat, fu)
             
         else:
-            self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
-            self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
-            self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-            self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
-            fu = S.fastShenScalar(self.Uc_hat, fu)
+            Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0)]
+            
+            Upad_hatT[:] = rfft2(u/self.padsize**2, axes=(1,2))
+            Uc_hatT = self.copy_from_padded(Upad_hatT, Uc_hatT)
+            Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.complex_shape_I()), 1)
+            self.comm.Alltoall([Uc_mpi, self.mpitype], [Uc_hat, self.mpitype])
+            fu = S.fastShenScalar(Uc_hat, fu)
             
         return fu
 
     def ifst(self, fu, u, S, dealias=None):
         """Inverse Shen transform of x-direction, Fourier in y and z"""
-        self.init_work_arrays()
+        
+        Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
+        Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
+        Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
+        if dealias == '2/3-rule' and self.dealias.shape == (0,):
+            self.dealias = self.get_dealias_filter()
+
         if not dealias == '3/2-rule':
             if dealias == '2/3-rule':
-                if self.dealias is None:
-                    self.dealias = self.get_dealias_filter()
                 fu *= self.dealias
                 
-            self.Uc_hat[:] = S.ifst(fu, self.Uc_hat)
-            self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.Uc_mpi, self.mpitype])
-            self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())
-            u[:] = irfft2(self.Uc_hatT, axes=(1,2))
+            Uc_hat[:] = S.ifst(fu, Uc_hat)
+            self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
+            Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
+            u[:] = irfft2(Uc_hatT, axes=(1,2))
         
         else:
-            self.Uc_hat[:] = S.ifst(fu, self.Uc_hat)
-            self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.Uc_mpi, self.mpitype])
-            self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())     
-            self.Upad_hatT[:] = 0
-            self.Upad_hatT = self.copy_to_padded(self.Uc_hatT, self.Upad_hatT)
-            u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
+            Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0)]
+            
+            Uc_hat[:] = S.ifst(fu, Uc_hat)
+            self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
+            Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())     
+            Upad_hatT = self.copy_to_padded(Uc_hatT, Upad_hatT)
+            u[:] = irfft2(self.padsize**2*Upad_hatT, axes=(1,2))
 
         return u
 
     def fst(self, u, fu, S, dealias=None):
         """Fast Shen transform of x-direction, Fourier transform of y and z"""
-        self.init_work_arrays()
+        
+        # Intermediate work arrays
+        Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
+        Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
+        Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
+
         if not dealias == '3/2-rule':
-            self.Uc_hatT[:] = rfft2(u, axes=(1,2))
-            self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-            self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
-            fu = S.fst(self.Uc_hat, fu)
+            Uc_hatT[:] = rfft2(u, axes=(1,2))
+            Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.complex_shape_I()), 1)
+            self.comm.Alltoall([Uc_mpi, self.mpitype], [Uc_hat, self.mpitype])
+            fu = S.fst(Uc_hat, fu)
 
         else:
-            self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
-            self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
-            self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-            self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
-            fu = S.fst(self.Uc_hat, fu)
+            Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0)]
+            
+            Upad_hatT[:] = rfft2(u/self.padsize**2, axes=(1,2))
+            Uc_hatT = self.copy_from_padded(Upad_hatT, Uc_hatT)
+            Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.complex_shape_I()), 1)
+            self.comm.Alltoall([Uc_mpi, self.mpitype], [Uc_hat, self.mpitype])
+            fu = S.fst(Uc_hat, fu)
 
         return fu
 
     def fft(self, u, fu):
         """Fast Fourier transform of y and z"""
-        self.init_work_arrays()
-        self.Uc_hatT[:] = rfft2(u, axes=(1,2))
-        self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-        self.comm.Alltoall([self.Uc_mpi, self.mpitype], [fu, self.mpitype])
+        # Intermediate work arrays
+        Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
+        Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]        
+        Uc_hatT[:] = rfft2(u, axes=(1,2))
+        Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.complex_shape_I()), 1)
+        self.comm.Alltoall([Uc_mpi, self.mpitype], [fu, self.mpitype])
         return fu
     
     def ifft(self, fu, u):
         """Inverse Fourier transforms in y and z"""
-        self.init_work_arrays()
-        self.comm.Alltoall([fu, self.mpitype], [self.Uc_mpi, self.mpitype])
-        self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())
-        u[:] = irfft2(self.Uc_hatT, axes=(1,2))
+        Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
+        Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]        
+        self.comm.Alltoall([fu, self.mpitype], [Uc_mpi, self.mpitype])
+        Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
+        u[:] = irfft2(Uc_hatT, axes=(1,2))
         return u
     
     def fct(self, u, fu, S, dealias=None):
         """Fast Cheb transform of x-direction, Fourier transform of y and z"""
-        self.init_work_arrays()
+        
+        # Intermediate work arrays
+        Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
+        Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
+        Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
+
         if not dealias == '3/2-rule':
-            self.Uc_hatT[:] = rfft2(u, axes=(1,2))
-            self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-            self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
-            fu = S.fct(self.Uc_hat, fu)
+            Uc_hatT[:] = rfft2(u, axes=(1,2))
+            Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.complex_shape_I()), 1)
+            self.comm.Alltoall([Uc_mpi, self.mpitype], [Uc_hat, self.mpitype])
+            fu = S.fct(Uc_hat, fu)
         
         else:
-            self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
-            self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
-            self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
-            self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
-            fu = S.fct(self.Uc_hat, fu)
+            Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0)]
+            Upad_hatT[:] = rfft2(u/self.padsize**2, axes=(1,2))
+            Uc_hatT = self.copy_from_padded(Upad_hatT, Uc_hatT)
+            Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.complex_shape_I()), 1)
+            self.comm.Alltoall([Uc_mpi, self.mpitype], [Uc_hat, self.mpitype])
+            fu = S.fct(Uc_hat, fu)
 
         return fu
 
     def ifct(self, fu, u, S, dealias=None):
         """Inverse Cheb transform of x-direction, Fourier in y and z"""
-        self.init_work_arrays()
+        
+        # Intermediate work arrays
+        Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
+        Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
+        Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
+
+        if dealias == '2/3-rule' and self.dealias.shape == (0,):
+            self.dealias = self.get_dealias_filter()
+        
         if not dealias == '3/2-rule':
             if dealias == '2/3-rule':
-                if self.dealias is None:
-                    self.dealias = self.get_dealias_filter()
                 fu *= self.dealias
 
-            self.Uc_hat[:] = S.ifct(fu, self.Uc_hat)
-            self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.Uc_mpi, self.mpitype])
-            self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())
-            u[:] = irfft2(self.Uc_hatT, axes=(1,2))
+            Uc_hat[:] = S.ifct(fu, Uc_hat)
+            self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
+            Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
+            u[:] = irfft2(Uc_hatT, axes=(1,2))
         
         else:
-            self.Uc_hat[:] = S.ifct(fu, self.Uc_hat)
-            self.comm.Alltoall([self.Uc_hat, self.mpitype], [self.Uc_mpi, self.mpitype])
-            self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())    
-            self.Upad_hatT[:] = 0
-            self.Upad_hatT = self.copy_to_padded(self.Uc_hatT, self.Upad_hatT)
-            u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
+            Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0)]
+            Uc_hat[:] = S.ifct(fu, Uc_hat)
+            self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
+            Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())    
+            Upad_hatT = self.copy_to_padded(Uc_hatT, Upad_hatT)
+            u[:] = irfft2(self.padsize**2*Upad_hatT, axes=(1,2))
 
         return u
 
     def fct0(self, u, fu, S):
         """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do fct."""
-        self.U_mpi2[:] = rollaxis(u.reshape(self.Np[0], self.num_processes, self.Np[1], self.N[2]), 1)
-        self.comm.Alltoall([self.U_mpi2, self.mpitype], [self.UT[0], self.mpitype])
-        fu = S.fct(self.UT[0], fu)
+        U_mpi2 = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.N[2]), self.float, 0)]
+        UT = self.work_arrays[((self.N[0], self.Np[1], self.N[2]), self.float, 0)]
+        
+        U_mpi2[:] = rollaxis(u.reshape(self.Np[0], self.num_processes, self.Np[1], self.N[2]), 1)
+        self.comm.Alltoall([U_mpi2, self.mpitype], [UT, self.mpitype])
+        fu = S.fct(UT, fu)
         return fu
 
     def ifct0(self, fu, u, S):
         """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do ifct"""
-        self.UT[0] = S.ifct(fu, self.UT[0])
-        self.comm.Alltoall([self.UT[0], self.mpitype], [self.U_mpi2, self.mpitype])
-        u[:] = rollaxis(self.U_mpi2, 1).reshape(u.shape)
+        U_mpi2 = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.N[2]), self.float, 0)]
+        UT = self.work_arrays[((self.N[0], self.Np[1], self.N[2]), self.float, 0)]
+
+        UT = S.ifct(fu, UT)
+        self.comm.Alltoall([UT, self.mpitype], [U_mpi2, self.mpitype])
+        u[:] = rollaxis(U_mpi2, 1).reshape(u.shape)
         return u
     
     def chebDerivative_3D0(self, fj, u0, S):
-        self.UT[0] = self.fct0(fj, self.UT[0], S)
-        self.UT[1] = SFTc.chebDerivativeCoefficients_3D(self.UT[0], self.UT[1]) 
-        u0[:] = self.ifct0(self.UT[1], u0, S)
+        UT = self.work_arrays[((2, self.N[0], self.Np[1], self.N[2]), self.float, 0)]
+
+        UT[0] = self.fct0(fj, UT[0], S)
+        UT[1] = SFTc.chebDerivativeCoefficients_3D(UT[0], UT[1]) 
+        u0[:] = self.ifct0(UT[1], u0, S)
         return u0
 
 setup = {"IPCS": setupShen,

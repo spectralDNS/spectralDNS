@@ -33,19 +33,20 @@ def pressuregrad(P, P_hat, dU):
     dU[0] -= CDN.matvec(P_hat)
     
     # pressure gradient y-direction
-    F_tmp[0] = BDN.matvec(P_hat)
-    dU[1, :Nu] -= 1j*K[1, :Nu]*F_tmp[0, :Nu]
+    dP = work[(P_hat, 0)]
+    dP = BDN.matvec(P_hat)
+    dU[1, :Nu] -= 1j*K[1, :Nu]*dP[:Nu]
     
     # pressure gradient z-direction
-    dU[2, :Nu] -= 1j*K[2, :Nu]*F_tmp[0, :Nu]    
+    dU[2, :Nu] -= 1j*K[2, :Nu]*dP[:Nu]    
     
     ## Alternatively
     #dpdx[:] = FST.chebDerivative_3D0(P, dpdx, SN)
-    #F_tmp[0] = FST.fss(dpdx, F_tmp[0], ST)
-    #dU[0] -= F_tmp[0]
-    #F_tmp[0] = FST.fss(P, F_tmp[0], ST)
-    #dU[1, :Nu] -= 1j*K[1, :Nu]*F_tmp[0, :Nu]
-    #dU[2, :Nu] -= 1j*K[2, :Nu]*F_tmp[0, :Nu]    
+    #dP = FST.fss(dpdx, dP, ST)
+    #dU[0] -= dP
+    #dP = FST.fss(P, dP, ST)
+    #dU[1, :Nu] -= 1j*K[1, :Nu]*dP[:Nu]
+    #dU[2, :Nu] -= 1j*K[2, :Nu]*dP[:Nu]    
     
     return dU
 
@@ -53,6 +54,8 @@ def pressurerhs(U_hat, dU):
     dU[:] = 0.
     SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], dU[p_slice])    
     
+    #U_tmp2 = work[(U, 0)]
+    #F_tmp2 = work[(U_hat, 0)]
     #U_tmp2[0] = Div(U_hat)
     #F_tmp2[0] = FST.fst(U_tmp2[0], F_tmp2[0], ST)
     #U_tmp2[0] = FST.ifst(F_tmp2[0], U_tmp2[0], ST)
@@ -68,7 +71,7 @@ def body_force(Sk, dU):
     return dU
 
 def Cross(a, b, c, S):
-    Uc = FST.get_workarray(a, 2)
+    Uc = work[(a, 2)]
     Uc[0] = a[1]*b[2]-a[2]*b[1]
     Uc[1] = a[2]*b[0]-a[0]*b[2]
     Uc[2] = a[0]*b[1]-a[1]*b[0]
@@ -78,8 +81,8 @@ def Cross(a, b, c, S):
     return c
 
 def Curl(a, c, S):
-    F_tmp[:] = 0
-    Uc = FST.get_workarray(c, 2)
+    F_tmp = work[(a, 0)]
+    Uc = work[(c, 2)]
     SFTc.Mult_CTD_3D(N[0], a[1], a[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], S, dealias=config.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], S, dealias=config.dealias)
@@ -92,11 +95,11 @@ def Curl(a, c, S):
     return c
 
 def Div(a_hat):
-    F_tmp[:] = 0
-    Uc = FST.get_workarray(U, 2)
-    F_tmp[0] = CDD.matvec(a_hat[0])
-    F_tmp[0] = TDMASolverD(F_tmp[0])    
-    dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], ST) 
+    Uc_hat = work[(a_hat[0], 0)]
+    Uc = work[(U, 2)]
+    Uc_hat = CDD.matvec(a_hat[0])
+    Uc_hat = TDMASolverD(Uc_hat)    
+    dudx = Uc[0] = FST.ifst(Uc_hat, Uc[0], ST) 
     dvdy_h = 1j*K[1]*a_hat[1]
     dvdy = Uc[1] = FST.ifst(dvdy_h, Uc[1], ST)
     dwdz_h = 1j*K[2]*a_hat[2]
@@ -113,8 +116,9 @@ def Divu(U_hat, c):
 #@profile
 def standardConvection(c, U, U_hat):
     c[:] = 0
-    Uc = FST.get_workarray(U, 1)
-    Uc2 = FST.get_workarray(U, 2)
+    Uc = work[(U, 1)]
+    Uc2 = work[(U, 2)]
+    F_tmp = work[(U_hat, 0)]
     
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
@@ -169,6 +173,9 @@ def standardConvection(c, U, U_hat):
 def divergenceConvection(c, U, U_hat, add=False):
     """c_i = div(u_i u_j)"""
     if not add: c.fill(0)
+    F_tmp = work[(U_hat, 0)]
+    F_tmp2 = work[(U_hat, 1)]
+
     #U_tmp[0] = chebDerivative_3D0(U[0]*U[0], U_tmp[0])
     #U_tmp[1] = chebDerivative_3D0(U[0]*U[1], U_tmp[1])
     #U_tmp[2] = chebDerivative_3D0(U[0]*U[2], U_tmp[2])
@@ -206,7 +213,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = FST.get_workarray(((3,)+work_shape, float), 0)
+            U_dealiased = work[((3,)+work_shape, float, 0)]
             for i in range(3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
 
@@ -218,7 +225,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = FST.get_workarray(((3,)+work_shape, float), 0)
+            U_dealiased = work[((3,)+work_shape, float, 0)]
             for i in range(3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
 
@@ -230,7 +237,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = FST.get_workarray(((3,)+work_shape, float), 0)
+            U_dealiased = work[((3,)+work_shape, float, 0)]
             for i in range(3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
 
@@ -243,14 +250,13 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = FST.get_workarray(((3,)+work_shape, float), 0)
-            curl_dealiased = FST.get_workarray(((3,)+work_shape, float), 1)
+            U_dealiased = work[((3,)+work_shape, float, 0)]
+            curl_dealiased = work[((3,)+work_shape, float, 1)]
             for i in range(3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
             
             curl_dealiased[:] = Curl(U_hat, curl_dealiased, ST)
-            H_hat[:] = Cross(U_dealiased, curl_dealiased, H_hat, ST)
-            
+            H_hat[:] = Cross(U_dealiased, curl_dealiased, H_hat, ST)            
             return H_hat
         
     return Conv           
@@ -288,9 +294,9 @@ def ComputeRHS(dU, jj):
 
 def solvePressure(P_hat, Ni):
     """Solve for pressure if Ni is fst of convection"""
-    F_tmp[0] = 0
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])    
-    P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
+    dP = work[(P_hat, 0)]
+    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], dP[p_slice])    
+    P_hat = HelmholtzSolverP(P_hat, dP)
     return P_hat
 
 def regression_test(**kw):
@@ -317,8 +323,9 @@ def solve():
             U_hat[2] = HelmholtzSolverU(U_hat[2], dU[2])
         
             # Pressure correction
-            F_tmp[0] = pressurerhs(U_hat, F_tmp[0]) 
-            Pcorr[:] = HelmholtzSolverP(Pcorr, F_tmp[0])
+            dP = work[(P_hat, 0)]
+            dP = pressurerhs(U_hat, dP) 
+            Pcorr[:] = HelmholtzSolverP(Pcorr, dP)
 
             # Update pressure
             P_hat[p_slice] += Pcorr[p_slice]
@@ -337,8 +344,9 @@ def solve():
                  
         # Update velocity
         dU[:] = 0
-        U_tmp[0] = FST.ifst(Pcorr, U_tmp[0], SN)
-        pressuregrad(U_tmp[0], Pcorr, dU)        
+        Uc = work[(U[0], 0)]
+        Uc = FST.ifst(Pcorr, Uc, SN)
+        pressuregrad(Uc, Pcorr, dU)
         dU[0] = TDMASolverD(dU[0])
         dU[1] = TDMASolverD(dU[1])
         dU[2] = TDMASolverD(dU[2])

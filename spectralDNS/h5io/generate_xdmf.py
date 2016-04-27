@@ -47,7 +47,6 @@ channel =  """
            {4}:/3D/mesh/x
           </DataItem>
         </Geometry>"""
-
         
 def generate_xdmf(h5filename):
     f = h5py.File(h5filename)
