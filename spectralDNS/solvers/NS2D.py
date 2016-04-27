@@ -21,9 +21,11 @@ def add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, nu):
     return dU
 
 def ComputeRHS(dU, rk):
+    F_tmp = work[((2,)+FFT.complex_shape(), complex, 0)]    
+    U_dealiased = work[((2,)+FFT.real_shape(), float, 0)]
+    
     F_tmp[0] = cross2(F_tmp[0], K, U_hat)
     curl[:] = FFT.ifft2(F_tmp[0], curl, config.dealias)
-    U_dealiased = FFT.get_workarray(((2,)+FFT.real_shape(), float), 0)
     U_dealiased[0] = FFT.ifft2(U_hat[0], U_dealiased[0], config.dealias)
     U_dealiased[1] = FFT.ifft2(U_hat[1], U_dealiased[1], config.dealias)
     dU[0] = FFT.fft2(U_dealiased[1]*curl, dU[0], config.dealias)

@@ -29,18 +29,18 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_proce
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
     utau = config.nu * config.Re_tau
-    Um = 46.9091*utau
+    Um = 47*utau #46.9091*utau
     Xplus = Y*config.Re_tau
     Yplus = X[1]*config.Re_tau
     Zplus = X[2]*config.Re_tau
     duplus = Um*0.2/utau  #Um*0.25/utau 
-    alfaplus = config.L[1]/500.
-    betaplus = config.L[2]/200.
+    alfaplus = config.L[1]/2000.
+    betaplus = config.L[2]/800.
     sigma = 0.00055 # 0.00055
     epsilon = Um/200.   #Um/200.
     U[:] = 0
     U[1] = Um*(Y-0.5*Y**2)
-    dev = 1+0.02*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dev = 1+0.005*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
     dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
     U[1] += dd
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
@@ -151,6 +151,42 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K,
         
     f.close()
 
+#def init_from_file_with_refinement(filename, comm, U0, U_hat0, U, U_hat, L, MPI,
+                                   #P, P_hat, H_hat1, K, rank, conv, FST, ST, **kw):
+    #f = h5py.File(filename, driver="mpio", comm=comm)
+    #assert "0" in f["3D/checkpoint/U"]
+    #N = FST.global_real_shape()
+    #s = FST.real_local_slice()
+    #N0 = f.attrs["N"]
+    #x, y, z = False, False, False
+    #if N[0] / N0[0] == 2: x = True
+    #if N[1] / N0[1] == 2: y = True
+    #if N[2] / N0[2] == 2: z = True
+    
+    #FST1 = FastShenFourierTransform(N0, L, MPI)
+    #W0 = FST1.get_workarray(((3,)+FST1.real_shape(), float), 0)
+    #W0[:] = f["3D/checkpoint/U/0"][:, s[0], s[1], s[2]]
+    #W0_hat = FST1.get_workarray(((3,)+FST1.complex_shape(), complex), 0)    
+    #W0_hat[0] = FST2.fst(W0[0], W0_hat[0], SB)
+    #for i in range(1, 3):
+        #W0_hat[i] = FST1.fst(W0[i], W0_hat[i], ST)
+        
+    ## Now use padding
+    #U_hat0[:]
+    
+    
+    #U0[:] = f["3D/checkpoint/U/1"][:, s]
+    #U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB'])
+    #for i in range(1,3):
+        #U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
+    
+    #g = kw['g']
+    #g[:] = 1j*K[1]*U_hat0[2] - 1j*K[2]*U_hat0[1]
+    #U_hat[:] = U_hat0[:]        
+        
+    #f.close()
+
+
 def set_Source(Source, Sk, ST, FST, **kw):
     utau = config.nu * config.Re_tau
     Source[:] = 0
@@ -253,44 +289,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
             print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.t, e0, e1, e2, q, e0+e1+e2, Source[1].mean())
 
     if config.tstep % config.sample_stats == 0:
-        stats(U, P)
-
-def refine(x, y, z, infile, comm):
-    filename, ending = infile.split(".")
-    fin = h5py.File(infile, driver="mpio", comm=comm)    
-    fout = h5py.File(filename+"_refined.h5", "w", driver="mpio", comm=comm)
-    assert "checkpoint" in f["3D"]
-    N0 = Pold.shape
-    N1 = N0.copy()
-    if x: N1[0] *= 2
-    if y: N1[1] *= 2
-    if z: N1[2] *= 2
-    rank = comm.Get_rank()
-    
-    if config.decomposition == 'slab':
-        
-        Np0 = N0 / comm.Get_size()        
-        Np1 = N1 / comm.Get_size()   
-        Nf0 = N0[2]/2+1
-        Nf1 = N1[2]/2+1
-        s = slice(rank*Np0[0], (rank+1)*Np0[0], 1)
-        U0 = f["3D/checkpoint/U/1"][s]
-        P0 = f["3D/checkpoint/P/1"][s]
-        U1 = np.zeros((3, Np1[0], N1[1], N1[2]), dtype=float)
-        P1 = np.zeros((Np1[0], N1[1], N1[2]), dtype=float)
-        U0_hat  = empty((3, N0[0], Np0[1], Nf0), dtype=complex)
-        P0_hat  = empty((N0[0], Np0[1], Nf0), dtype=complex)
-        U1_hat  = empty((3, N1[0], Np1[1], Nf1), dtype=complex)
-        P1_hat  = empty((N1[0], Np1[1], Nf1), dtype=complex)
-
-        U_mpi   = empty((num_processes, Np[0], Np[1], Nf), dtype=complex)
-        U_mpi2  = empty((num_processes, Np[0], Np[1], N[2]))
-        UT      = empty((3, N[0], Np[1], N[2]))
-        Uc_hat  = empty((N[0], Np[1], Nf), dtype=complex)
-        Uc_hatT = empty((Np[0], N[1], Nf), dtype=complex)
-        
-
-    
+        stats(U, P)            
 
 class Stats(object):
     
@@ -369,24 +368,24 @@ class Stats(object):
 if __name__ == "__main__":
     config.update(
         {
-        'nu': 1./180.,                  # Viscosity
-        'Re_tau': 180., 
+        'nu': 1./590.,                  # Viscosity
+        'Re_tau': 590., 
         'dt': 0.001,                  # Time step
         'T': 100.,                    # End time
         'L': [2, 4*pi, 4.*pi/3.],
         'M': [6, 6, 5]
         },  "channel"
     )
-    config.channel.add_argument("--compute_energy", type=int, default=100)
-    config.channel.add_argument("--plot_result", type=int, default=100)
-    config.channel.add_argument("--sample_stats", type=int, default=100)
-    config.channel.add_argument("--print_energy0", type=int, default=100)
+    config.channel.add_argument("--compute_energy", type=int, default=10)
+    config.channel.add_argument("--plot_result", type=int, default=10)
+    config.channel.add_argument("--sample_stats", type=int, default=10)
+    config.channel.add_argument("--print_energy0", type=int, default=10)
     solver = get_solver(update=update, mesh="channel")    
-    initialize(**vars(solver))    
-    #init_from_file("KMM666.h5", **vars(solver))
+    #initialize(**vars(solver))    
+    init_from_file("KMM555_refined.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="KMMstats")
-    solver.hdf5file.fname = "KMM665.h5"
+    solver.hdf5file.fname = "KMM566.h5"
     solver.solve()
     s = solver.stats.get_stats()
 

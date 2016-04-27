@@ -15,12 +15,12 @@ Source = U_hat.copy()*0    # Possible source term initialized to zero
 
 def Curl(a, c, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
-    F_tmp[:] = cross2(F_tmp, K_over_K2, a)
+    F_tmp = work[(a, 0)]
+    F_tmp = cross2(F_tmp, K_over_K2, a)
     c[0] = FFT.ifftn(F_tmp[0], c[0], dealias)
     c[1] = FFT.ifftn(F_tmp[1], c[1], dealias)
     c[2] = FFT.ifftn(F_tmp[2], c[2], dealias)    
     return c
-
 
 #@profile
 def ComputeRHS(dU, rk):
@@ -28,8 +28,10 @@ def ComputeRHS(dU, rk):
         for i in range(3):
             W[i] = FFT.ifftn(W_hat[i], W[i])
             
-    U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
-    W_dealiased = FFT.get_workarray(((3,)+work_shape, float), 1)
+    U_dealiased = work[((3,)+work_shape, float, 0)]
+    W_dealiased = work[((3,)+work_shape, float, 1)]
+    F_tmp = work[(dU, 0)]
+    
     U_dealiased[:] = Curl(W_hat, U_dealiased, config.dealias)
     for i in range(3):
         W_dealiased[i] = FFT.ifftn(W_hat[i], W_dealiased[i], config.dealias)
