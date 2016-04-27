@@ -31,7 +31,7 @@ def update(t, tstep, P, P_hat, hdf5file, FFT, **kw):
     if hdf5file.check_if_write(tstep):
         P = FFT.ifftn(P_hat*1j, P)
         hdf5file.write(tstep)
-
+    
 def regression_test(t, tstep, comm, U_hat, U, curl, float64, dx, L, sum, rank, Curl, **kw):
     if config.solver == 'NS':
         curl[:] = Curl(U_hat, curl)

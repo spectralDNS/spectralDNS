@@ -147,7 +147,7 @@ def update(rank, X, U, P, OS, N, comm, L, e0, F_tmp, FST, ST, U_hat, **kw):
         plt.pause(1e-6)
 
     if config.tstep % config.compute_energy == 0: 
-        U_tmp = FST.get_real_workarray(0, False, 3)
+        U_tmp = FST.get_workarray(U, 3)
         pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
         e1 = 0.5*energy(pert, N, comm, rank, L)
         exact = exp(2*imag(OS.eigval)*(config.t))
@@ -201,3 +201,11 @@ if __name__ == "__main__":
     vars(solver).update(initialize(**vars(solver)))
     set_Source(**vars(solver))	
     solver.solve()
+    #s = solver
+    #s.FST.padsize = 2.0
+    #U0 = s.FST.get_workarray(((3,)+s.FST.real_shape_padded(), s.float), 0)
+    #U0[0] = s.FST.ifst(s.U_hat[0], U0[0], s.SB, dealias="3/2-rule")
+    #U0[1] = s.FST.ifst(s.U_hat[1], U0[1], s.ST, dealias="3/2-rule")
+    #U0[2] = s.FST.ifst(s.U_hat[2], U0[2], s.ST, dealias="3/2-rule")
+    
+    

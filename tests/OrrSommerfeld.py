@@ -98,6 +98,13 @@ def set_Source(Source, Sk, FST, ST, **kw):
     Source[1] = -2./config.Re
     Sk[:] = 0
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
+
+def update(hdf5file, U, P, U0, **kw):    
+    if hdf5file.check_if_write(config.tstep):
+        hdf5file.write(config.tstep)
+        
+    if config.tstep % config.checkpoint == 0:
+        hdf5file.checkpoint(U, P, U0)    
         
 def regression_test(X, OS, N, comm, rank, L, e0, FST, U0, U_hat0, U, U_hat, **kw):
     if "KMM" in config.solver:
@@ -124,8 +131,7 @@ if __name__ == "__main__":
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)
     config.channel.add_argument("--plot_step", type=int, default=1)
-    solver = get_solver(regression_test=regression_test, mesh="channel")    
+    solver = get_solver(update=update, regression_test=regression_test, mesh="channel")    
     vars(solver).update(initialize(**vars(solver)))
     set_Source(**vars(solver))	
     solver.solve()
-    

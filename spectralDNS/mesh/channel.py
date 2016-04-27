@@ -207,39 +207,46 @@ def setupShenGeneralBCs(N, L, MPI, float, complex, **kwargs):
     del kwargs 
     return locals()
 
-class work_arrays(dict):
-    
-    def __missing__(self, key):
-        shape, dtype, i = key
-        a = zeros(shape, dtype=dtype)
-        self[key] = a
-        return self[key]
-
-_work_arrays = work_arrays()
-
 class FastShenFourierTransform(slab_FFT):
     
-    def __init__(self, N, L, MPI):        
-        slab_FFT.__init__(self, N, L, MPI, "double")
-        # Initialize intermediate MPI work arrays
+    def __init__(self, N, L, MPI, padsize=1.5):
+        slab_FFT.__init__(self, N, L, MPI, "double", padsize=padsize)
         self.U_mpi2  = empty((self.num_processes, self.Np[0], self.Np[1], self.N[2]))
         self.UT      = empty((3, self.N[0], self.Np[1], self.N[2]))
-        self.Upad_hatT = empty(self.complex_shape_padded_T(), dtype=self.complex)
+        self.Upad_hatT = empty(0, dtype=self.complex)
+        
+    def init_work_arrays(self):
+        slab_FFT.init_work_arrays(self)
+        # Initialize intermediate MPI work arrays
+        if self.Upad_hatT.shape != self.complex_shape_padded_T():
+            self.Upad_hatT = empty(self.complex_shape_padded_T(), dtype=self.complex)
+        else:
+            self.Upad_hatT[:] = 0
         
     def complex_shape_padded_T(self):
         """The local shape of the transposed complex data padded in x and z directions"""
-        return (self.Np[0], 3*self.N[1]/2, 3*self.N[2]/4+1)
+        return (self.Np[0], int(self.padsize*self.N[1]), int(self.padsize*self.N[2]/2+1))
 
     def real_shape_padded(self):
         """The local shape of the real data"""
-        return (self.Np[0], 3*self.N[1]/2, 3*self.N[2]/2)
+        return (self.Np[0], int(self.padsize*self.N[1]), int(self.padsize*self.N[2]))
     
     def complex_shape_padded(self):
-        return (self.N[0], 3*self.Np[1]/2, 3*self.N[2]/4+1)
+        return (self.N[0], int(self.padsize*self.Np[1]), int(self.padsize*self.N[2]/2+1))
     
     def get_mesh_dims(self, ST):
         return [self.get_mesh_dim(ST, i) for i in range(3)]
         
+    def real_local_slice(self, padded=False):
+        if padded:
+            return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
+                    slice(0, int(self.padsize*self.N[1]), 1), 
+                    slice(0, int(self.padsize*self.N[2]), 1))
+        else:
+            return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
+                    slice(0, self.N[1], 1), 
+                    slice(0, self.N[2], 1))
+    
     def get_mesh_dim(self, ST, d):
         if d == 0:
             return ST.points_and_weights(self.N[0])[0]
@@ -282,22 +289,6 @@ class FastShenFourierTransform(slab_FFT):
                         (abs(K[2]) < kmax[2]), dtype=uint8)
         return dealias
     
-    def get_workarray(self, a, i=0):
-        if isinstance(a, ndarray):
-            shape = a.shape
-            dtype = a.dtype
-            
-        elif isinstance(a, tuple):
-            assert len(a) == 2
-            shape, dtype = a
-            
-        else:
-            raise TypeError("Wrong type for get_workarray")
-        
-        a = _work_arrays[(shape, dtype, i)]
-        a[:] = 0
-        return a
-
     def copy_to_padded(self, fu, fp):
         fp[:, :self.N[1]/2, :self.Nf] = fu[:, :self.N[1]/2]
         fp[:, -(self.N[1]/2):, :self.Nf] = fu[:, self.N[1]/2:]
@@ -319,7 +310,7 @@ class FastShenFourierTransform(slab_FFT):
             fu = S.fastShenScalar(self.Uc_hat, fu)
             
         else:
-            self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
+            self.Upad_hatT[:] = rfft2(u/self.padsize**2, axes=(1,2))
             self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
             self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
             self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
@@ -347,7 +338,7 @@ class FastShenFourierTransform(slab_FFT):
             self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())     
             self.Upad_hatT[:] = 0
             self.Upad_hatT = self.copy_to_padded(self.Uc_hatT, self.Upad_hatT)
-            u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
+            u[:] = irfft2(self.padsize**2*self.Upad_hatT, axes=(1,2))
 
         return u
 
@@ -361,7 +352,7 @@ class FastShenFourierTransform(slab_FFT):
             fu = S.fst(self.Uc_hat, fu)
 
         else:
-            self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
+            self.Upad_hatT[:] = rfft2(u/self.padsize**2, axes=(1,2))
             self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
             self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
             self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
@@ -395,7 +386,7 @@ class FastShenFourierTransform(slab_FFT):
             fu = S.fct(self.Uc_hat, fu)
         
         else:
-            self.Upad_hatT[:] = rfft2(u/1.5**2, axes=(1,2))
+            self.Upad_hatT[:] = rfft2(u/self.padsize**2, axes=(1,2))
             self.Uc_hatT = self.copy_from_padded(self.Upad_hatT, self.Uc_hatT)
             self.Uc_mpi[:] = rollaxis(self.Uc_hatT.reshape(self.complex_shape_I()), 1)
             self.comm.Alltoall([self.Uc_mpi, self.mpitype], [self.Uc_hat, self.mpitype])
@@ -423,7 +414,7 @@ class FastShenFourierTransform(slab_FFT):
             self.Uc_hatT[:] = rollaxis(self.Uc_mpi, 1).reshape(self.complex_shape_T())    
             self.Upad_hatT[:] = 0
             self.Upad_hatT = self.copy_to_padded(self.Uc_hatT, self.Upad_hatT)
-            u[:] = irfft2(1.5**2*self.Upad_hatT, axes=(1,2))
+            u[:] = irfft2(self.padsize**2*self.Upad_hatT, axes=(1,2))
 
         return u
 
