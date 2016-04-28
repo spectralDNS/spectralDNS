@@ -10,7 +10,8 @@ from OrrSommerfeld_eig import OrrSommerfeld
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
 # Use constant flux and adjust pressure gradient dynamically
-flux = array([1645.46])
+#flux = array([1645.46])
+flux = array([736.43])
 
 def initOS(OS, U, X, t=0.):
     for i in range(U.shape[1]):
@@ -29,13 +30,14 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_proce
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
     utau = config.nu * config.Re_tau
-    Um = 47*utau #46.9091*utau
+    #Um = 46.9091*utau
+    Um = 56.*utau 
     Xplus = Y*config.Re_tau
     Yplus = X[1]*config.Re_tau
     Zplus = X[2]*config.Re_tau
     duplus = Um*0.2/utau  #Um*0.25/utau 
-    alfaplus = config.L[1]/2000.
-    betaplus = config.L[2]/800.
+    alfaplus = config.L[1]/500.
+    betaplus = config.L[2]/200.
     sigma = 0.00055 # 0.00055
     epsilon = Um/200.   #Um/200.
     U[:] = 0
@@ -213,7 +215,7 @@ def Q(u, rank, comm, N):
 
 beta = zeros(1)    
 def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk, 
-           ST, SB, F_tmp, comm, N, dU, diff0, hv, **kw):
+           ST, SB, comm, N, dU, diff0, hv, work, **kw):
     global im1, im2, im3, flux
 
     #q = Q(U[1], rank, comm, N)
@@ -232,8 +234,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
     #for i in range(3):
         #Sk[i] = FST.fss(Source[i], Sk[i], ST)
         
-    if (hdf5file.check_if_write(config.tstep) or config.tstep % config.plot_result == 0 or
-        config.tstep % config.compute_energy == 0):
+    if (hdf5file.check_if_write(config.tstep) or config.tstep % config.plot_result == 0):
         U[0] = FST.ifst(U_hat[0], U[0], SB)
         for i in range(1, 3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)     
@@ -281,6 +282,11 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
         plt.pause(1e-6)
     
     if config.tstep % config.compute_energy == 0: 
+        # Skip dealiasing even though nonlinear
+        U[0] = FST.ifst(U_hat[0], U[0], SB)
+        for i in range(1, 3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)     
+
         e0 = Q(U[0]*U[0], rank, comm, N)
         e1 = Q(U[1]*U[1], rank, comm, N)
         e2 = Q(U[2]*U[2], rank, comm, N)
@@ -372,7 +378,7 @@ if __name__ == "__main__":
         'Re_tau': 590., 
         'dt': 0.001,                  # Time step
         'T': 100.,                    # End time
-        'L': [2, 4*pi, 4.*pi/3.],
+        'L': [2, 2*pi, pi],
         'M': [6, 6, 5]
         },  "channel"
     )
@@ -381,11 +387,11 @@ if __name__ == "__main__":
     config.channel.add_argument("--sample_stats", type=int, default=10)
     config.channel.add_argument("--print_energy0", type=int, default=10)
     solver = get_solver(update=update, mesh="channel")    
-    #initialize(**vars(solver))    
-    init_from_file("KMM555_refined.h5", **vars(solver))
+    initialize(**vars(solver))    
+    #init_from_file("KMM666.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="KMMstats")
-    solver.hdf5file.fname = "KMM566.h5"
+    solver.hdf5file.fname = "KMM666d.h5"
     solver.solve()
     s = solver.stats.get_stats()
 
