@@ -238,9 +238,9 @@ def solve(context):
     dt = context.time_integrator["dt"]
 
     timer = Timer(silent=context.silent)
-    t = 0.0
     tstep = 0
     T = context.model_params["T"]
+    t = context.model_params["t"]
     FFT = context.FFT
 
     while t + dt <= T + 1.e-15: #The 1.e-15 term is for rounding errors
