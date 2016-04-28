@@ -57,6 +57,7 @@ class Context:
         dx = self.model_params["dx"] = (L/N).astype(self.types["float"])
         nu = self.model_params["nu"] = self.types["float"](args.nu)
         T = self.model_params["T"] = self.types["float"](args.T)
+        self.model_params["t"] = 0.0
         #TODO: Check that this is working
         self.dealias_name = args.dealias
 
