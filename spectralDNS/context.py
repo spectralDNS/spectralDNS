@@ -66,8 +66,7 @@ class Context:
         kwargs = {}
         if self.decomposition == "pencil":
             kwargs["P1"] = args.P1
-            kwargs["alignment"] = args.alignment
-            self.initialize_mesh_variable(args.decomposition,N,args.precision,**kwargs)
+            kwargs["alignment"] = args.Pencil_alignment
 
         self.initialize_mesh_variables(decomposition=args.decomposition,N=N,precision=args.precision,**kwargs)
         self.time_integrator = {}
@@ -158,7 +157,7 @@ class Context:
             if decomposition == 'slab':
                 FFT = slab_FFT(self.model_params["N"], self.model_params["L"], MPI, precision)
             elif decomposition == 'pencil':
-                FFT = pencil_FFT(self.model_params["N"], self.model_params["L"], MPI, precision, P1=kwargs["P1"], alignment=kwargs["Pencil_alignment"])
+                FFT = pencil_FFT(self.model_params["N"], self.model_params["L"], MPI, precision, P1=kwargs["P1"], alignment=kwargs["alignment"])
             elif decomposition == 'line':
                 FFT = line_FFT(self.model_params["N"], self.model_params["L"], MPI, precision)
 
@@ -171,4 +170,4 @@ class Context:
             self.mesh_info = {"decomposition":decomposition,"N":N,precision:"precision"}
         if decomposition == 'pencil':
             self.mesh_info["P1"] = kwargs["P1"]
-            self.mesh_info["alignment"] = kwargs["Pencil_alignment"]
+            self.mesh_info["alignment"] = kwargs["alignment"]
