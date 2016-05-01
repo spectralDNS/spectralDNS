@@ -22,6 +22,13 @@ attribute2D = """
           </DataItem>
         </Attribute>"""
 
+attribute2Dslice = """
+        <Attribute Name="{0}_{7}" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="{6}" Dimensions="{1} {2}">
+            {3}:/2D/{7}/{4}/{5}
+          </DataItem>
+        </Attribute>"""
+
 isotropic = """
         <Geometry Type="ORIGIN_DXDYDZ">
           <DataItem DataType="UInt" Dimensions="3" Format="XML" Precision="4">0 0 0</DataItem>
@@ -40,7 +47,6 @@ channel =  """
            {4}:/3D/mesh/x
           </DataItem>
         </Geometry>"""
-
         
 def generate_xdmf(h5filename):
     f = h5py.File(h5filename)
@@ -92,44 +98,151 @@ def generate_xdmf(h5filename):
         #f.attrs.create("xdmf_3d", xf3d)
         xf = open(h5filename[:-2]+"xdmf", "w")
         xf.write(xf3d)
-        xf.close()            
-    if len(f["/".join(("2D", comps[0]))]) == 0:   
+        xf.close()    
+    
+    # Return if no 2D data
+    if (len(f["/".join(("2D", comps[0]))]) == 0 
+        and len(f["/".join(("2D/yz", comps[0]))]) == 0
+        and len(f["/".join(("2D/xz", comps[0]))]) == 0
+        and len(f["/".join(("2D/xy", comps[0]))]) == 0):   
         return
     
-    xf2d = copy.copy(xdmffile)
-    timesteps = f["/".join(("2D", comps[0]))].keys()
-    dtype = f["/".join(("2D", comps[0]))].values()[0].dtype
-    tt = ""
-    for i in timesteps:
-        tt += "%s " %i
-    
-    xf2d += timeattr.format(tt, len(timesteps))
+    if len(f["/".join(("2D", comps[0]))]) > 0:
+        xf2d = copy.copy(xdmffile)
+        timesteps = f["/".join(("2D", comps[0]))].keys()
+        dtype = f["/".join(("2D", comps[0]))].values()[0].dtype
+        tt = ""
+        for i in timesteps:
+            tt += "%s " %i
+        
+        xf2d += timeattr.format(tt, len(timesteps))
 
-    for tstep in timesteps:
-        xf2d += """
+        for tstep in timesteps:
+            xf2d += """
       <Grid GridType="Uniform">
         <Geometry Type="ORIGIN_DXDY">
           <DataItem DataType="UInt" Dimensions="2" Format="XML" Precision="4">0 0</DataItem>
           <DataItem DataType="Float" Dimensions="2" Format="XML" Precision="4">{0} {1}</DataItem>
         </Geometry>""".format(L[0]/N[0], L[1]/N[1])
 
-        xf2d += """
+            xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DCoRectMesh"/>""".format(N[0], N[1])
-        prec = 4 if dtype is float32 else 8
-        for comp in f["2D"]:
-            xf2d += attribute2D.format(comp, N[0], N[1], h5filename, comp, tstep, prec)
+            prec = 4 if dtype is float32 else 8
+            for comp in comps:
+                xf2d += attribute2D.format(comp, N[0], N[1], h5filename, comp, tstep, prec)
+            xf2d += """  
+      </Grid>
+"""
         xf2d += """  
+    </Grid>
+  </Domain>
+</Xdmf>"""
+        xf2 = open(h5filename[:-3]+"_2D."+"xdmf", "w")
+        xf2.write(xf2d)
+        xf2.close()
+
+    if len(f["/".join(("2D/yz", comps[0]))]) > 0:                
+        xf2d = copy.copy(xdmffile)
+        timesteps = f["/".join(("2D/yz", comps[0]))].keys()
+        dtype = f["/".join(("2D/yz", comps[0]))].values()[0].dtype
+        tt = ""
+        for i in timesteps:
+            tt += "%s " %i
+        
+        xf2d += timeattr.format(tt, len(timesteps))
+        for tstep in timesteps:    
+            xf2d += """
+      <Grid GridType="Uniform">
+        <Geometry Type="ORIGIN_DXDY">
+          <DataItem DataType="UInt" Dimensions="2" Format="XML" Precision="4">0 0</DataItem>
+          <DataItem DataType="Float" Dimensions="2" Format="XML" Precision="4">{0} {1}</DataItem>
+        </Geometry>""".format(L[1]/N[1], L[2]/N[2])
+
+            xf2d += """
+        <Topology Dimensions="{0} {1}" Type="2DCoRectMesh"/>""".format(N[1], N[2])
+            prec = 4 if dtype is float32 else 8
+            if len(f["/".join(("2D/yz", comps[0]))]) > 0:
+                for comp in f["2D/yz"]:
+                    xf2d += attribute2Dslice.format(comp, N[1], N[2], h5filename, comp, tstep, prec, 'yz')
+            xf2d += """  
       </Grid>
 """
     xf2d += """  
     </Grid>
   </Domain>
 </Xdmf>"""
-    #f.attrs.create("xdmf_2d", xf2d)
-    xf2 = open(h5filename[:-3]+"_2D."+"xdmf", "w")
+    xf2 = open(h5filename[:-3]+"_yz."+"xdmf", "w")
     xf2.write(xf2d)
-    xf2.close()        
-    
+    xf2.close()
+
+    if len(f["/".join(("2D/xz", comps[0]))]) > 0:
+        xf2d = copy.copy(xdmffile)
+        timesteps = f["/".join(("2D/xz", comps[0]))].keys()
+        dtype = f["/".join(("2D/xz", comps[0]))].values()[0].dtype
+        tt = ""
+        for i in timesteps:
+            tt += "%s " %i
+        
+        xf2d += timeattr.format(tt, len(timesteps))
+        for tstep in timesteps:    
+            xf2d += """
+      <Grid GridType="Uniform">
+        <Geometry Type="ORIGIN_DXDY">
+          <DataItem DataType="UInt" Dimensions="2" Format="XML" Precision="4">0 0</DataItem>
+          <DataItem DataType="Float" Dimensions="2" Format="XML" Precision="4">{0} {1}</DataItem>
+        </Geometry>""".format(L[0]/N[0], L[2]/N[2])
+
+            xf2d += """
+        <Topology Dimensions="{0} {1}" Type="2DCoRectMesh"/>""".format(N[0], N[2])
+            prec = 4 if dtype is float32 else 8
+            if len(f["/".join(("2D/xz", comps[0]))]) > 0:
+                for comp in f["2D/xz"]:
+                    xf2d += attribute2Dslice.format(comp, N[0], N[2], h5filename, comp, tstep, prec, 'xz')
+            xf2d += """  
+      </Grid>
+"""
+        xf2d += """  
+    </Grid>
+  </Domain>
+</Xdmf>"""
+        xf2 = open(h5filename[:-3]+"_xz."+"xdmf", "w")
+        xf2.write(xf2d)
+        xf2.close()
+
+    if len(f["/".join(("2D/xy", comps[0]))]) > 0:
+        xf2d = copy.copy(xdmffile)
+        timesteps = f["/".join(("2D/xy", comps[0]))].keys()
+        dtype = f["/".join(("2D/xy", comps[0]))].values()[0].dtype
+        tt = ""
+        for i in timesteps:
+            tt += "%s " %i
+        
+        xf2d += timeattr.format(tt, len(timesteps))
+        for tstep in timesteps:    
+            xf2d += """
+      <Grid GridType="Uniform">
+        <Geometry Type="ORIGIN_DXDY">
+          <DataItem DataType="UInt" Dimensions="2" Format="XML" Precision="4">0 0</DataItem>
+          <DataItem DataType="Float" Dimensions="2" Format="XML" Precision="4">{0} {1}</DataItem>
+        </Geometry>""".format(L[0]/N[0], L[1]/N[1])
+
+            xf2d += """
+        <Topology Dimensions="{0} {1}" Type="2DCoRectMesh"/>""".format(N[0], N[1])
+            prec = 4 if dtype is float32 else 8
+            if len(f["/".join(("2D/xy", comps[0]))]) > 0:
+                for comp in f["2D/xy"]:
+                    xf2d += attribute2Dslice.format(comp, N[0], N[1], h5filename, comp, tstep, prec, 'xy')
+            xf2d += """  
+      </Grid>
+"""
+        xf2d += """  
+    </Grid>
+  </Domain>
+</Xdmf>"""
+        xf2 = open(h5filename[:-3]+"_xy."+"xdmf", "w")
+        xf2.write(xf2d)
+        xf2.close()
+
 if __name__ == "__main__":
     import sys    
     generate_xdmf(sys.argv[-1])

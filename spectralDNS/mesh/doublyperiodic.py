@@ -14,9 +14,6 @@ def setupNS(float, complex, FFT, **kwargs):
         
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()
-    dealias = None
-    if not config.dealias == "3/2-rule":
-        dealias = FFT.get_dealias_filter()
 
     # Solution array and Fourier coefficients
     U     = empty((2,) + FFT.real_shape(), dtype=float)
@@ -24,9 +21,7 @@ def setupNS(float, complex, FFT, **kwargs):
     P     = empty(FFT.real_shape(), dtype=float)
     P_hat = empty(FFT.complex_shape(), dtype=complex)
     curl  = empty(FFT.real_shape(), dtype=float)
-    F_tmp = empty((2,) + FFT.complex_shape(), dtype=complex)
     dU     = empty((2,) + FFT.complex_shape(), dtype=complex)
-    U_dealiased = empty((2,) + FFT.real_shape(), dtype=float)
     
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
@@ -38,9 +33,6 @@ def setupBoussinesq(float, complex, FFT, **kwargs):
     
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()
-    dealias = None
-    if not config.dealias == "3/2-rule":
-        dealias = FFT.get_dealias_filter()
 
     Ur     = empty((3,) + FFT.real_shape(), dtype=float)
     Ur_hat = empty((3,) + FFT.complex_shape(), dtype=complex)
@@ -55,10 +47,6 @@ def setupBoussinesq(float, complex, FFT, **kwargs):
     U       = Ur[:2] 
     U_hat   = Ur_hat[:2]
 
-    U_tmp = empty((2,) + FFT.real_shape(), dtype=float)
-    F_tmp = empty((2,) + FFT.complex_shape(), dtype=complex)
-    U_dealiased = empty((2,) + FFT.real_shape(), dtype=float)
-    
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
 

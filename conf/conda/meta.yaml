@@ -3,22 +3,25 @@ package:
   version: "1.0"
   
 source:
-  git_url: https://github.com/spectralDNS/spectralDNS.git
-  git_tag: master
-
+  git_url: ../../  
+  
 build:
-  number: 2
+  number: 5
 
 requirements:
   build:
     - python
     - cython
     - numpy
+    - gcc
+    - hdf5 ==1.8.14
+    - h5py ==2.6.0
 
   run:
     - python
     - numpy
-    - scipy
+    - hdf5 ==1.8.14
+    - h5py ==2.6.0
     - mpi4py
     - mpifft4py
     - sympy
@@ -26,6 +29,4 @@ requirements:
 test:
     requires:
       - python
-      - numpy
-      - scipy
       - pytest

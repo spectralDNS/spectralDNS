@@ -16,10 +16,6 @@ def setupDNS(context):
 
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()
-    dealias = None
-    if not context.dealias_name == "3/2-rule":
-        dealias = FFT.get_dealias_filter()
-    
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
     
@@ -31,10 +27,7 @@ def setupDNS(context):
     # RHS array
     dU     = empty((3,) + FFT.complex_shape(), dtype=complex)
 
-    # work arrays (Not required by all convection methods)
-    U_tmp  = empty((3,) + FFT.real_shape(), dtype=float)
-    U_dealiased  = empty((3,) + FFT.real_shape(), dtype=float)
-    F_tmp  = empty((3,) + FFT.complex_shape(), dtype=complex)
+    # 
     curl   = empty((3,) + FFT.real_shape(), dtype=float)   
     Source = None
     
@@ -53,12 +46,9 @@ def setupMHD(context):
     
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()
-    dealias = None
-    if not context.dealias_name == "3/2-rule":
-        dealias = FFT.get_dealias_filter()
-    
+
     K2 = sum(K*K, 0, dtype=float)
-    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
     UB     = empty((6,) + FFT.real_shape(), dtype=float)  
     UB_hat = empty((6,) + FFT.complex_shape(), dtype=complex)
@@ -74,9 +64,7 @@ def setupMHD(context):
     # RHS array
     dU = empty((6,) + FFT.complex_shape(), dtype=complex)
 
-    # work arrays (Not required by all convection methods)
-    U_tmp  = empty((3,) + FFT.real_shape(), dtype=float)
-    F_tmp  = empty((3, 3) + FFT.complex_shape(), dtype=complex)
+    # 
     curl   = empty((3,) + FFT.real_shape(), dtype=float)   
     Source = None
     

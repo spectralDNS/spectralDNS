@@ -9,7 +9,6 @@ from ..optimization import optimizer
 import numpy as np
 import spectralDNS.maths.integrators
 
-
 def initializeContext(context,args):
     context.NS = {}
     U = context.mesh_vars["U"]
@@ -28,19 +27,16 @@ def initializeContext(context,args):
 
     # Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved
 
-def standardConvection(context,c,U_hat,dealias=None):
+def standardConvection(context,c,U_hat,U_dealiased,dealias=None):
     """c_i = u_j du_i/dx_j"""
     FFT=context.FFT
-    dealias = context.mesh_vars["dealias"]
     K = context.mesh_vars["K"]
-    U_tmp = context.mesh_vars["U_tmp"]
 
-    Uc = FFT.get_workarray((3,)+context.mesh_vars["work_shape"], 2)
-
+    gradUi = context.work[(U_dealiased, 2)]
     for i in range(3):
         for j in range(3):
-            Uc[j] = FFT.ifftn(1j*K[j]*U_hat[i], Uc[j], dealias)
-        c[i] = FFT.fftn(sum(U_dealiased*Uc, 0), c[i], dealias)
+            gradUi[j] = FFT.ifftn(1j*K[j]*U_hat[i], gradUi[j], dealias)
+        c[i] = FFT.fftn(np.sum(U_dealiased*gradUi, 0), c[i], dealias)
     return c
 
 def divergenceConvection(context,c, U_dealiased, dealias=None,add=False):
@@ -51,26 +47,25 @@ def divergenceConvection(context,c, U_dealiased, dealias=None,add=False):
 
     if not add: c.fill(0)
 
+    UUi_hat = context.work[(c, 0)]
     for i in range(3):
-        F_tmp[i] = FFT.fftn(U_dealiased[0]*U_dealiased[i], F_tmp[i], dealias)
-    c[0] += 1j*sum(K*F_tmp, 0)
-
-    c[1] += 1j*K[0]*F_tmp[1]
-    c[2] += 1j*K[0]*F_tmp[2]
-    F_tmp[0] = FFT.fftn(U_dealiased[1]*U_dealiased[1], F_tmp[0], dealias)
-    F_tmp[1] = FFT.fftn(U_dealiased[1]*U_dealiased[2], F_tmp[1], dealias)
-    F_tmp[2] = FFT.fftn(U_dealiased[2]*U_dealiased[2], F_tmp[2], dealias)
-    c[1] += (1j*K[1]*F_tmp[0] + 1j*K[2]*F_tmp[1])
-    c[2] += (1j*K[1]*F_tmp[1] + 1j*K[2]*F_tmp[2])
+        UUi_hat[i] = FFT.fftn(U_dealiased[0]*U_dealiased[i], UUi_hat[i], dealias)
+    c[0] += 1j*sum(K*UUi_hat, 0)
+    c[1] += 1j*K[0]*UUi_hat[1]
+    c[2] += 1j*K[0]*UUi_hat[2]
+    UUi_hat[0] = FFT.fftn(U_dealiased[1]*U_dealiased[1], UUi_hat[0], dealias)
+    UUi_hat[1] = FFT.fftn(U_dealiased[1]*U_dealiased[2], UUi_hat[1], dealias)
+    UUi_hat[2] = FFT.fftn(U_dealiased[2]*U_dealiased[2], UUi_hat[2], dealias)
+    c[1] += (1j*K[1]*UUi_hat[0] + 1j*K[2]*UUi_hat[1])
+    c[2] += (1j*K[1]*UUi_hat[1] + 1j*K[2]*UUi_hat[2])
     return c
 
 #@profile
 def Cross(context,a, b, c,dealias=None):
     """c_k = F_k(a x b)"""
-    U_tmp = context.mesh_vars["U_tmp"]
     FFT = context.FFT
-    Uc = FFT.get_workarray(a, 2)
-    Uc[:] = cross1(Uc, a, b)
+    Uc = context.work[(a, 2)]
+    Uc = cross1(Uc, a, b)
     c[0] = FFT.fftn(Uc[0], c[0], dealias)
     c[1] = FFT.fftn(Uc[1], c[1], dealias)
     c[2] = FFT.fftn(Uc[2], c[2], dealias)
@@ -79,14 +74,14 @@ def Cross(context,a, b, c,dealias=None):
 #@profile
 def Curl(context,a, c, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
-    F_tmp = context.mesh_vars["F_tmp"]
     K = context.mesh_vars["K"]
     FFT = context.FFT
 
-    F_tmp[:] = cross2(F_tmp, K, a)
-    c[0] = FFT.ifftn(F_tmp[0], c[0], dealias)
-    c[1] = FFT.ifftn(F_tmp[1], c[1], dealias)
-    c[2] = FFT.ifftn(F_tmp[2], c[2], dealias)    
+    curl_hat = context.work[(a, 0)]
+    curl_hat = cross2(curl_hat, K, a)
+    c[0] = FFT.ifftn(curl_hat[0], c[0], dealias)
+    c[1] = FFT.ifftn(curl_hat[1], c[1], dealias)
+    c[2] = FFT.ifftn(curl_hat[2], c[2], dealias)    
     return c
 
 def getConvection(context):
@@ -100,40 +95,38 @@ def getConvection(context):
     complex = context.types["complex"]
 
     if convection == "Standard":
-        
         def Conv(dU,U_hat):
-            U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
+            U_dealiased = context.work[((3,)+work_shape, float, 0)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], context.dealias_name)
-            dU = standardConvection(context,dU, U_hat, context.dealias_name)
+            dU = standardConvection(context,dU, U_hat, U_dealiased, context.dealias_name)
             dU[:] *= -1 
             return dU
         
     elif convection == "Divergence":
         def Conv(dU,U_hat):
-            U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
+            U_dealiased = context.work[((3,)+work_shape, float, 0)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], context.dealias_name)
-            dU = divergenceConvection(context,dU, U_dealiased,U_hat, context.dealias_name, False)
+            dU = divergenceConvection(context,dU, U_dealiased, context.dealias_name, False)
             dU[:] *= -1
             return dU
         
     elif convection == "Skewed":
-        
         def Conv(dU,U_hat):
-            U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
+            U_dealiased = context.work[((3,)+work_shape, float, 0)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], context.dealias_name)
-            dU = standardConvection(context,dU, U_hat, context.dealias_name)
-            dU = divergenceConvection(context,dU, U_dealiased,U_hat,context.dealias_name, True)
+            dU = standardConvection(context,dU,U_hat, U_dealiased, context.dealias_name)
+            dU = divergenceConvection(context,dU, U_dealiased, context.dealias_name, True)
             dU *= -0.5
             return dU
         
     elif convection == "Vortex":
         
         def Conv(dU,U_hat):
-            U_dealiased = FFT.get_workarray(((3,)+work_shape, float), 0)
-            curl_dealiased = FFT.get_workarray(((3,)+context.mesh_vars["work_shape"], context.types["float"]), 1)
+            U_dealiased = context.work[((3,)+work_shape, float, 0)]
+            curl_dealiased = context.work[((3,)+work_shape, float, 1)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], context.dealias_name)
             
@@ -162,6 +155,7 @@ def add_pressure(context,dU, U_hat):
     
     return dU
 
+#TODO:Change the function signature of this function.
 #@profile
 def ComputeRHS(context,U,U_hat,dU, rk):
     """Compute and return entire rhs contribution"""
@@ -170,9 +164,6 @@ def ComputeRHS(context,U,U_hat,dU, rk):
     K2 = context.mesh_vars["K2"]
     nu = context.model_params["nu"]
 
-    if rk > 0: # For rk=0 the correct values are already in U
-        for i in range(3):
-            U[i] = FFT.ifftn(U_hat[i], U[i])
                         
     dU = conv(dU,U_hat)
 
@@ -185,10 +176,7 @@ def ComputeRHS(context,U,U_hat,dU, rk):
 
 def nonlinearTerm(context,U,U_hat,dU,rk):
     conv = context.NS["conv"]
-    FFT = context.FFT
-    if rk > 0: # For rk=0 the correct values are already in U
-        for i in range(3):
-            U[i] = FFT.ifftn(U_hat[i], U[i])
+
     dU = conv(dU,U_hat)
     dU = add_pressure(context,dU, U_hat)
     return dU

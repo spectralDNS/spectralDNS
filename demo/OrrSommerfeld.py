@@ -36,7 +36,7 @@ def energy(u, N, comm, rank, L):
         return 0    
 
 def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
-               ST, X, N, comm, rank, L, conv, TDMASolverD, F_tmp, **kw):        
+               ST, X, N, comm, rank, L, conv, TDMASolverD, **kw):
     OS = OrrSommerfeld(Re=config.Re, N=100)
     initOS(OS, U0, U_hat0, X)
     
@@ -94,7 +94,6 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
         config.t = config.dt
         config.tstep = 1
         kw['g'][:] = 0
-        
     
     return dict(OS=OS, e0=e0)
 
@@ -105,7 +104,7 @@ def set_Source(Source, Sk, FST, ST, **kw):
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
         
 im1, im2, im3, im4 = (None, )*4        
-def update(rank, X, U, P, OS, N, comm, L, e0, F_tmp, FST, ST, U_hat, **kw):
+def update(rank, X, U, P, OS, N, comm, L, e0, FST, ST, U_hat, work, **kw):
     global im1, im2, im3
     if im1 is None and rank == 0 and config.plot_step > 0:
         plt.figure()
@@ -147,7 +146,8 @@ def update(rank, X, U, P, OS, N, comm, L, e0, F_tmp, FST, ST, U_hat, **kw):
         plt.pause(1e-6)
 
     if config.tstep % config.compute_energy == 0: 
-        U_tmp = FST.get_real_workarray(0, False, 3)
+        U_tmp = work[(U, 0)]
+        F_tmp = work[(U_hat, 0)]
         pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
         e1 = 0.5*energy(pert, N, comm, rank, L)
         exact = exp(2*imag(OS.eigval)*(config.t))
@@ -201,3 +201,11 @@ if __name__ == "__main__":
     vars(solver).update(initialize(**vars(solver)))
     set_Source(**vars(solver))	
     solver.solve()
+    #s = solver
+    #s.FST.padsize = 2.0
+    #U0 = s.FST.get_workarray(((3,)+s.FST.real_shape_padded(), s.float), 0)
+    #U0[0] = s.FST.ifst(s.U_hat[0], U0[0], s.SB, dealias="3/2-rule")
+    #U0[1] = s.FST.ifst(s.U_hat[1], U0[1], s.ST, dealias="3/2-rule")
+    #U0[2] = s.FST.ifst(s.U_hat[2], U0[2], s.ST, dealias="3/2-rule")
+    
+    
