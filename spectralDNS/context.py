@@ -28,6 +28,7 @@ class Context:
     solver - The module of the solver
     callbacks - A dictionary with possible keys update, additional_callback, regression_test
     silent - Whether to output stuff to stdout
+    threads - Number of threads to use
     """
     #TODO:Find out if we need to get precision here or can get it from arsg.
     def __init__(self,mesh,argv,precision="double",silent=False):
@@ -46,6 +47,7 @@ class Context:
             raise AssertionError("Not yet implemented")
 
         precision = self.precision = args.precision
+        self.threads = args.threads
         self.types = {}
         self.types["float"], self.types["complex"], self.types["mpitype"] = {"single": (np.float32, np.complex64, MPI.F_FLOAT_COMPLEX),
                                    "double": (np.float64, np.complex128, MPI.F_DOUBLE_COMPLEX)}[precision]
@@ -164,17 +166,18 @@ class Context:
 
         if self.mesh in ('doublyperiodic', 'triplyperiodic'):
             if decomposition == 'slab':
-                FFT = slab_FFT(self.model_params["N"], self.model_params["L"], MPI, precision)
+                FFT = slab_FFT(self.model_params["N"], self.model_params["L"], MPI, precision,threads=self.threads)
             elif decomposition == 'pencil':
-                FFT = pencil_FFT(self.model_params["N"], self.model_params["L"], MPI, precision, P1=kwargs["P1"], alignment=kwargs["alignment"])
+                FFT = pencil_FFT(self.model_params["N"], self.model_params["L"], MPI, precision, P1=kwargs["P1"], alignment=kwargs["alignment"],threads=self.threads)
             elif decomposition == 'line':
-                FFT = line_FFT(self.model_params["N"], self.model_params["L"], MPI, precision)
+                FFT = line_FFT(self.model_params["N"], self.model_params["L"], MPI, precision,threads=self.threads)
 
         self.MPI = MPI
         self.FFT = FFT
 
         if self.mesh == "triplyperiodic":
             #TODO: Include other solvers here too..
+            self.dim = 3
             self.mesh_vars = spectralDNS.mesh.triplyperiodic.setup("NS",context=self)
             self.mesh_info = {"decomposition":decomposition,"N":N,precision:"precision"}
         if decomposition == 'pencil':

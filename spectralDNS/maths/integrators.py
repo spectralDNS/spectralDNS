@@ -35,7 +35,7 @@ def imexEXP(context,imex_offset,f,gexp,A,b,bhat,err_order,fY_hat,U_tmp,U_hat_new
     for i in range(2):
         if (i != imex_offset[0]):
             if i == 1:
-                for k in range(3):
+                for k in range(context.dim):
                     U[k] = FFT.ifftn(U_hat[k], U[k])
             adaptiveRK(context,A,b,bhat,err_order,fY_hat,U_tmp,U_hat_new,sc,err,fsal,fsal_offset,100,100,False,"2",dU,U_hat,f,dt,tstep,kw)
         else:
@@ -215,10 +215,13 @@ def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,o
     N = context.model_params["N"]
 
     FFT = context.FFT
-    fftn = FFT.fftn
-    ifftn = FFT.ifftn
-    #TODO: Set this dynamically.
-    dim = 3
+    dim = context.dim
+    if dim == 3:
+        fftn = FFT.fftn
+        ifftn = FFT.ifftn
+    else:
+        fftn = FFT.fft2
+        ifftn = FFT.ifft2
 
 
     s = A.shape[0]

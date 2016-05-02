@@ -3,14 +3,17 @@ __date__ = "2014-12-30"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
+
 from mpiFFT4py import *
-from spectralDNS import config
-from ..optimization import optimizer
+
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, conj
 
 __all__ = ['setup']
 
-def setupNS(float, complex, FFT, **kwargs):
+def setupNS(context): 
+    float = context.types["float"]
+    complex = context.types["complex"]
+    FFT = context.FFT
         
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()
@@ -26,10 +29,18 @@ def setupNS(float, complex, FFT, **kwargs):
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
 
-    del kwargs
-    return locals()
+    to_return = locals()
+    del to_return["context"]
+    del to_return["float"]
+    del to_return["complex"]
+    del to_return["FFT"]
+    return locals() # Lazy (need only return what is needed)
 
-def setupBoussinesq(float, complex, FFT, **kwargs):
+def setupBoussinesq(context):
+
+    float = context.types["float"]
+    complex = context.types["complex"]
+    FFT = context.FFT
     
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()
@@ -50,8 +61,12 @@ def setupBoussinesq(float, complex, FFT, **kwargs):
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
 
-    del kwargs
-    return locals()
+    to_return = locals()
+    del to_return["context"]
+    del to_return["float"]
+    del to_return["complex"]
+    del to_return["FFT"]
+    return locals() # Lazy (need only return what is needed)
 
-setup = {"NS2D": setupNS,
-         "Bq2D": setupBoussinesq}[config.solver]
+def setup(solver,**kwargs):
+        return { "NS2D": setupNS, "Bq2D":  setupBoussinesq}[solver](**kwargs)

@@ -29,6 +29,7 @@ parser.add_argument('--nu', default=0.000625, type=float, help='Viscosity')
 parser.add_argument('--t', default=0.0, type=float, help='Time')
 parser.add_argument('--tstep', default=0, type=int, help='Time step')
 parser.add_argument("--time_integrator_tol",default=1.e-5,type=float,help="Tolerance for adaptive time-stepping")
+parser.add_argument("--threads",default=1,type=int,help="Number of threads to use")
 
 # Arguments for isotropic DNS solver
 triplyperiodic = argparse.ArgumentParser(parents=[parser])

@@ -22,10 +22,10 @@ def initializeContext(context,args):
     context.time_integrator["integrate"] = integrate
 
     context.NS["convection"] = args.convection
+    # Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved
     context.mesh_vars["work_shape"] = FFT.real_shape_padded() if context.dealias_name == '3/2-rule' else FFT.real_shape()
     context.NS["conv"] = getConvection(context)
 
-    # Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved
 
 def standardConvection(context,c,U_hat,U_dealiased,dealias=None):
     """c_i = u_j du_i/dx_j"""
