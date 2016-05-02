@@ -11,7 +11,7 @@ import spectralDNS.mesh.triplyperiodic
 import spectralDNS.config
 from mpi4py import MPI
 import numpy as np
-from mpiFFT4py import *
+from mpiFFT4py import slab_FFT, pencil_FFT, line_FFT, work_arrays
 
 class Context:
     """
@@ -61,6 +61,7 @@ class Context:
         #TODO: Check that this is working
         self.dealias_name = args.dealias
 
+        
         self.solver_name = args.solver
         self.decomposition = args.decomposition
         kwargs = {}
@@ -76,6 +77,14 @@ class Context:
 
         self.make_profile = args.make_profile
         if args.make_profile: self.profiler = cProfile.Profile()
+
+        self.optimization = args.optimization
+        self.communication = args.communication
+        self.write_result = args.write_result
+        self.write_yz_slice = args.write_yz_slice
+        self.write_xz_slice = args.write_xz_slice
+        self.write_xy_slice = args.write_xy_slice
+        self.checkpoint = args.checkpoint
 
 
         if mesh is "triplyperiodic":
@@ -171,3 +180,4 @@ class Context:
         if decomposition == 'pencil':
             self.mesh_info["P1"] = kwargs["P1"]
             self.mesh_info["alignment"] = kwargs["alignment"]
+        self.work = work_arrays()
