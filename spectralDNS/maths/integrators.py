@@ -24,9 +24,6 @@ def expEuler(context,dU,f,gexp,hphi,t,tstep,dt,kw):
     U_hat[:] += dU
     return U_hat,dt,dt
 
-
-
-
 def imexEXP(context,imex_offset,f,gexp,A,b,bhat,err_order,fY_hat,U_tmp,U_hat_new,sc,err,fsal,fsal_offset,dU,dt,tstep,kw):
     U_hat = context.mesh_vars["U_hat"]
     U = context.mesh_vars["U"]
@@ -375,7 +372,11 @@ def AB2(context,u0, u1,multistep_dt, dU, dt, tstep, ComputeRHS,kw):
     return u0,dt,dt
 
 def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None,hphi=None):
-    dU = context.mesh_vars["dU"]
+    if not (context.solver_name in ["Bq2D","Bq3D"]):
+        dU = context.mesh_vars["dU"]
+    else:
+        dU = context.mesh_vars["dUr"]
+
     float = context.types["float"]
     """Return integrator using choice in global parameter integrator.
     """
@@ -383,8 +384,10 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None,hphi=None
         u0 = context.mesh_vars['U_hat']
     elif context.solver_name == "MHD":
         u0 = context.mesh_vars['UB_hat']
-    elif context.solver_name == "Bq2D":
+    elif context.solver_name in ["Bq2D","Bq3D"]:
         u0 = context.mesh_vars['Ur_hat']
+    else:
+        raise AssertionError("Not implemented")
     u1 = u0.copy()    
 
     if context.time_integrator["time_integrator_name"] == "RK4": 

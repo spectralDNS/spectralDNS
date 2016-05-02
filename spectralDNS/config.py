@@ -44,6 +44,8 @@ triplyperiodic.add_argument('--M', default=[6, 6, 6], metavar=("Mx", "My", "Mz")
 trippelsubparsers = triplyperiodic.add_subparsers(dest='solver')
 
 parser_NS = trippelsubparsers.add_parser('NS', help='Regular Navier Stokes solver')
+parser_Bq3D = trippelsubparsers.add_parser('Bq3D', help='Navier Stokes solver with variable density')
+
 parser_VV = trippelsubparsers.add_parser('VV', help='Velocity-Vorticity formulation')
 parser_MHD = trippelsubparsers.add_parser('MHD', help='Magnetohydrodynamics solver')
 parser_MHD.add_argument('--eta', default=0.01, type=float, help='MHD parameter')

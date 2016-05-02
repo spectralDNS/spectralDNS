@@ -164,10 +164,9 @@ def ComputeRHS(context,U,U_hat,dU, rk):
     K2 = context.mesh_vars["K2"]
     nu = context.model_params["nu"]
 
-                        
-    dU = conv(dU,U_hat)
+    conv(dU,U_hat)
 
-    dU = add_pressure(context,dU, U_hat)
+    add_pressure(context,dU, U_hat)
     # Subtract contribution from diffusion
     dU -= nu*K2*U_hat
         

@@ -4,7 +4,8 @@ __copyright__ = "Copyright (C) 2014 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 """
-This file defines a class for managing everything that was previously done using global variables for the NS solver.
+This file defines a class for managing everything that was previously done using global variables.
+Currently only works for the NS solver
 """
 
 import spectralDNS.mesh.triplyperiodic
@@ -99,7 +100,8 @@ class Context:
 
             elif args.solver == 'MHD':
                 import spectralDNS.solvers.MHD as solver
-                
+            elif args.solver == "Bq3D":
+                import spectralDNS.solvers.NS_Boussinesq as solver
             else:
                 raise AttributeError("Wrong solver!")
 
@@ -176,10 +178,13 @@ class Context:
         self.FFT = FFT
 
         if self.mesh == "triplyperiodic":
-            #TODO: Include other solvers here too..
             self.dim = 3
-            self.mesh_vars = spectralDNS.mesh.triplyperiodic.setup("NS",context=self)
+            self.mesh_vars = spectralDNS.mesh.triplyperiodic.setup(self.solver_name,context=self)
             self.mesh_info = {"decomposition":decomposition,"N":N,precision:"precision"}
+        elif self.mesh == "doublyperiodic":
+            self.dim = 2
+            self.mesh_vars = spectralDNS.mesh.doublyperiodic.setup(self.solver_name,context=self)
+
         if decomposition == 'pencil':
             self.mesh_info["P1"] = kwargs["P1"]
             self.mesh_info["alignment"] = kwargs["alignment"]

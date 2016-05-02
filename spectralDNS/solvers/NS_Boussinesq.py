@@ -13,19 +13,23 @@ def initializeContext(context,args):
     context.NS = {}
     U = context.mesh_vars["U"]
     P = context.mesh_vars["P"]
+    rho = context.mesh_vars["rho"]
     FFT = context.FFT
 
-    context.hdf5file = HDF5Writer(context, {"U":U[0], "V":U[1], "W":U[2], "P":P}, context.solver_name+".h5")
+    context.hdf5file = HDF5Writer(context, {"U":U[0], "V":U[1], "W":U[2], "rho":rho, "P":P}, context.solver_name+".h5")
     # Set up function to perform temporal integration (using config.integrator parameter)
     integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS,f=nonlinearTerm,g=linearTerm,ginv=inverseLinearTerm,hphi=hphi,gexp=expLinearTerm)
 
     context.time_integrator["integrate"] = integrate
 
     context.NS["convection"] = args.convection
+    # Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved
     context.mesh_vars["work_shape"] = FFT.real_shape_padded() if context.dealias_name == '3/2-rule' else FFT.real_shape()
     context.NS["conv"] = getConvection(context)
-
-    # Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved
+    
+    #TODO: Make this user_defined
+    context.model_params["Pr"] = 1.0
+    context.model_params["Ri"] = 1.0
 
 def standardConvection(context,c,U_hat,U_dealiased,dealias=None):
     """c_i = u_j du_i/dx_j"""
@@ -95,61 +99,89 @@ def getConvection(context):
     complex = context.types["complex"]
 
     if convection == "Standard":
-        def Conv(dU,U_hat):
-            U_dealiased = context.work[((3,)+work_shape, float, 0)]
-            for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], context.dealias_name)
-            dU = standardConvection(context,dU, U_hat, U_dealiased, context.dealias_name)
+        def Conv(dUr,Ur_hat):
+            Ur_dealiased = context.work[((4,)+work_shape, float, 0)]
+            for i in range(4):
+                Ur_dealiased[i] = FFT.ifftn(Ur_hat[i], Ur_dealiased[i], context.dealias_name)
+            dU = dUr[:3]
+            U_hat = Ur_hat[:3]
+            U_dealiased = Ur_dealiased[:3]
+            standardConvection(context,dU, U_hat, U_dealiased, context.dealias_name)
             dU[:] *= -1 
-            return dU
+            rho_convection(context,Ur_dealiased,dUr)
         
     elif convection == "Divergence":
-        def Conv(dU,U_hat):
-            U_dealiased = context.work[((3,)+work_shape, float, 0)]
-            for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], context.dealias_name)
-            dU = divergenceConvection(context,dU, U_dealiased, context.dealias_name, False)
+        def Conv(dUr,Ur_hat):
+            Ur_dealiased = context.work[((4,)+work_shape, float, 0)]
+            for i in range(4):
+                Ur_dealiased[i] = FFT.ifftn(Ur_hat[i], Ur_dealiased[i], context.dealias_name)
+            dU = dUr[:3]
+            U_hat = Ur_hat[:3]
+            U_dealiased = Ur_dealiased[:3]
+            divergenceConvection(context,dU, U_dealiased, context.dealias_name, False)
             dU[:] *= -1
-            return dU
+            rho_convection(context,Ur_dealiased,dUr)
         
     elif convection == "Skewed":
-        def Conv(dU,U_hat):
-            U_dealiased = context.work[((3,)+work_shape, float, 0)]
-            for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], context.dealias_name)
-            dU = standardConvection(context,dU,U_hat, U_dealiased, context.dealias_name)
-            dU = divergenceConvection(context,dU, U_dealiased, context.dealias_name, True)
+        def Conv(dUr,Ur_hat):
+            Ur_dealiased = context.work[((4,)+work_shape, float, 0)]
+            for i in range(4):
+                Ur_dealiased[i] = FFT.ifftn(Ur_hat[i], Ur_dealiased[i], context.dealias_name)
+            dU = dUr[:3]
+            U_hat = Ur_hat[:3]
+            U_dealiased = Ur_dealiased[:3]
+            standardConvection(context,dU,U_hat, U_dealiased, context.dealias_name)
+            divergenceConvection(context,dU, U_dealiased, context.dealias_name, True)
             dU *= -0.5
-            return dU
+            rho_convection(context,Ur_dealiased,dUr)
         
     elif convection == "Vortex":
         
-        def Conv(dU,U_hat):
-            U_dealiased = context.work[((3,)+work_shape, float, 0)]
+        def Conv(dUr,Ur_hat):
+            Ur_dealiased = context.work[((4,)+work_shape, float, 0)]
             curl_dealiased = context.work[((3,)+work_shape, float, 1)]
-            for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], context.dealias_name)
-            
+            for i in range(4):
+                Ur_dealiased[i] = FFT.ifftn(Ur_hat[i], Ur_dealiased[i], context.dealias_name)
+            dU = dUr[:3]
+            U_hat = Ur_hat[:3]
+            U_dealiased = Ur_dealiased[:3]
+           
             curl_dealiased[:] = Curl(context,U_hat, curl_dealiased, context.dealias_name)
-            dU = Cross(context,U_dealiased, curl_dealiased, dU, context.dealias_name)
-            return dU
+            Cross(context,U_dealiased, curl_dealiased, dU, context.dealias_name)
+            rho_convection(context,Ur_dealiased,dUr)
     else:
         raise AssertionError("Invalid convection specified")
-
         
     return Conv           
+def rho_convection(context,Ur_dealiased,dUr):
+    FFT = context.FFT
+    K = context.mesh_vars["K"]
+    work_shape = context.mesh_vars["work_shape"]
 
+    rho_dealiased = Ur_dealiased[3]
+    F_tmp = context.work[((3,)+context.mesh_vars["Ur_hat"][0].shape,context.types["complex"],0)]
 
-@optimizer
-def add_pressure(context,dU, U_hat):
+    FFT.fftn(Ur_dealiased[0]*rho_dealiased, F_tmp[0], context.dealias_name)
+    FFT.fftn(Ur_dealiased[1]*rho_dealiased, F_tmp[1], context.dealias_name)
+    FFT.fftn(Ur_dealiased[2]*rho_dealiased, F_tmp[2], context.dealias_name)
+    dUr[2] = -1j*(K[0]*F_tmp[0]+K[1]*F_tmp[1] + K[2]*F_tmp[2])
+ 
+
+#@optimizer
+def add_pressure(context,dUr, Ur_hat):
     """Add contributions from pressure and diffusion to the rhs"""
     K = context.mesh_vars["K"]
     K_over_K2 = context.mesh_vars["K_over_K2"]
     P_hat = context.mesh_vars["P_hat"]
+    Ri = context.model_params["Ri"]
     
+    dU = dUr[:3] 
+    rho_hat = Ur_hat[3]
+
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat = np.sum(dU*K_over_K2, 0, out=P_hat)
-        
+    P_hat -= Ri*rho_hat*K_over_K2[2]#TODO:Is this correct?
+
     # Subtract pressure gradient
     dU -= P_hat*K
     
@@ -157,22 +189,32 @@ def add_pressure(context,dU, U_hat):
 
 #TODO:Change the function signature of this function.
 #@profile
-def ComputeRHS(context,U,U_hat,dU, rk):
+def ComputeRHS(context,Ur,Ur_hat,dUr, rk):
     """Compute and return entire rhs contribution"""
     conv = context.NS["conv"]
     FFT = context.FFT
     K2 = context.mesh_vars["K2"]
     nu = context.model_params["nu"]
+    work_shape = context.mesh_vars["work_shape"]
+    Ri = context.model_params["Ri"]
+    Pr = context.model_params["Pr"]
 
+    U = Ur[:3]
+    dU = dUr[:3]
+    U_hat = Ur_hat[:3]
+    rho_hat = Ur_hat[3]
                         
-    dU = conv(dU,U_hat)
+    conv(dUr,Ur_hat)
 
-    dU = add_pressure(context,dU, U_hat)
+    add_pressure(context,dUr, Ur_hat)
     # Subtract contribution from diffusion
-    dU -= nu*K2*U_hat
-        
-    return dU
+    dU[0] -= nu*K2*U_hat[0]
+    
+    dU[1] -= (nu*K2*U_hat[1] + Ri*rho_hat)
+    dU[2] -= (nu*K2*U_hat[2] + Ri*rho_hat)
 
+    dUr[3] -= nu * K2 * rho_hat/Pr  
+    return dUr
 
 def nonlinearTerm(context,U,U_hat,dU,rk):
     conv = context.NS["conv"]
@@ -220,9 +262,9 @@ def hphi(context,k,U,U_hat,rk,dt):
 
 
 def solve(context):
-    U_hat = context.mesh_vars["U_hat"]
-    U = context.mesh_vars["U"]
-    dU = context.mesh_vars["dU"]
+    Ur_hat = context.mesh_vars["Ur_hat"]
+    Ur = context.mesh_vars["Ur"]
+    dUr = context.mesh_vars["dUr"]
     dt = context.time_integrator["dt"]
 
     timer = Timer(silent=context.silent)
@@ -242,10 +284,10 @@ def solve(context):
                 "context":context,
                 "ComputeRHS":ComputeRHS
                 }
-        U_hat[:],dt,dt_took = context.time_integrator["integrate"](t, tstep, dt,kwargs)
+        Ur_hat[:],dt,dt_took = context.time_integrator["integrate"](t, tstep, dt,kwargs)
 
-        for i in range(3):
-            U[i] = FFT.ifftn(U_hat[i], U[i])
+        for i in range(4):
+            Ur[i] = FFT.ifftn(Ur_hat[i], Ur[i])
                  
         t += dt_took
         tstep += 1
@@ -272,8 +314,8 @@ def solve(context):
             "context":context,
             "ComputeRHS":ComputeRHS
             }
-    ComputeRHS(context,U,U_hat,dU,0)
-    context.callbacks["additional_callback"](fU_hat=dU,**kwargs)
+    ComputeRHS(context,Ur,Ur_hat,dUr,0)
+    context.callbacks["additional_callback"](fU_hat=dUr,**kwargs)
 
     timer.final(context.MPI, FFT.rank)
     

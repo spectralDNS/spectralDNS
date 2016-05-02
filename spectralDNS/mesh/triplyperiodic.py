@@ -7,7 +7,7 @@ from numpy import sum,where
 from mpiFFT4py import *
 
 _all__ = ['setup']
-#TODO Find out why sum, where were included as params here
+
 def setupDNS(context):
    
     float = context.types["float"]
@@ -26,6 +26,40 @@ def setupDNS(context):
 
     # RHS array
     dU     = empty((3,) + FFT.complex_shape(), dtype=complex)
+
+    # 
+    curl   = empty((3,) + FFT.real_shape(), dtype=float)   
+    Source = None
+    
+    to_return = locals()
+    del to_return["context"]
+    del to_return["float"]
+    del to_return["complex"]
+    del to_return["FFT"]
+    return locals() # Lazy (need only return what is needed)
+
+def setupDNS_Boussinesq(context):
+   
+    float = context.types["float"]
+    complex = context.types["complex"]
+    FFT = context.FFT
+
+    X = FFT.get_local_mesh()
+    K = FFT.get_scaled_local_wavenumbermesh()
+    K2 = sum(K*K, 0, dtype=float)
+    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
+    
+    Ur     = empty((4,) + FFT.real_shape(), dtype=float)  
+    Ur_hat = empty((4,) + FFT.complex_shape(), dtype=complex)
+    P     = empty(FFT.real_shape(), dtype=float)
+    P_hat = empty(FFT.complex_shape(), dtype=complex)
+    dUr     = empty((4,) + FFT.complex_shape(), dtype=complex)
+
+    # Create views into large data structures
+    rho     = Ur[3]
+    rho_hat = Ur_hat[3]
+    U       = Ur[:3] 
+    U_hat   = Ur_hat[:3]
 
     # 
     curl   = empty((3,) + FFT.real_shape(), dtype=float)   
@@ -79,4 +113,5 @@ def setupMHD(context):
 def setup(solver,**kwargs):
         return {"MHD": setupMHD,
          "NS":  setupDNS,
-         "VV":  setupDNS}[solver](**kwargs)
+         "VV":  setupDNS,
+         "Bq3D":setupDNS_Boussinesq}[solver](**kwargs)
