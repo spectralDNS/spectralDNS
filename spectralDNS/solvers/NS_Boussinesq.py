@@ -28,8 +28,8 @@ def initializeContext(context,args):
     context.NS["conv"] = getConvection(context)
     
     #TODO: Make this user_defined
-    context.model_params["Pr"] = 1.0
-    context.model_params["Ri"] = 1.0
+    context.model_params["Pr"] = args.Pr
+    context.model_params["Ri"] = args.Ri
 
 def standardConvection(context,c,U_hat,U_dealiased,dealias=None):
     """c_i = u_j du_i/dx_j"""
@@ -164,7 +164,7 @@ def rho_convection(context,Ur_dealiased,dUr):
     FFT.fftn(Ur_dealiased[0]*rho_dealiased, F_tmp[0], context.dealias_name)
     FFT.fftn(Ur_dealiased[1]*rho_dealiased, F_tmp[1], context.dealias_name)
     FFT.fftn(Ur_dealiased[2]*rho_dealiased, F_tmp[2], context.dealias_name)
-    dUr[2] = -1j*(K[0]*F_tmp[0]+K[1]*F_tmp[1] + K[2]*F_tmp[2])
+    dUr[3] = -1j*(K[0]*F_tmp[0]+K[1]*F_tmp[1] + K[2]*F_tmp[2])
  
 
 #@optimizer
@@ -209,8 +209,8 @@ def ComputeRHS(context,Ur,Ur_hat,dUr, rk):
     add_pressure(context,dUr, Ur_hat)
     # Subtract contribution from diffusion
     dU[0] -= nu*K2*U_hat[0]
-    
-    dU[1] -= (nu*K2*U_hat[1] + Ri*rho_hat)
+    dU[1] -= nu*K2*U_hat[1]
+
     dU[2] -= (nu*K2*U_hat[2] + Ri*rho_hat)
 
     dUr[3] -= nu * K2 * rho_hat/Pr  
