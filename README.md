@@ -14,7 +14,7 @@ A channel flow solver is implemented using the Shen basis (Jie Shen, SIAM Journa
 
 See the demo folder for usage.
 
-New simulations of the pencil version of NS solver have been run at KAUST and Shaheen II showing good scaling up to 65k cores!
+The most recent simulations of the pencil version of the NS solver are showing excellent scaling up to 65k cores at KAUST and Shaheen II!
 
 <p align="center">
     <img src="https://www.dropbox.com/s/thkaty8ow6m5xgh/strong_scaling_pencil_col.png?dl=1" width="600" height="400" alt="Strong scaling of Cython optimized NS solver on Shaheen II"/>
