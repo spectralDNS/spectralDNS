@@ -31,7 +31,7 @@ class Context:
     silent - Whether to output stuff to stdout
     threads - Number of threads to use
     """
-    #TODO:Find out if we need to get precision here or can get it from arsg.
+    #TODO:Find out if we need to get precision here or can get it from argv.
     def __init__(self,mesh,argv,precision="double",silent=False):
         self.mesh = mesh
         self.silent = silent

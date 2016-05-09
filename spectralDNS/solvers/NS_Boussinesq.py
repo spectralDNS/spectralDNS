@@ -180,7 +180,7 @@ def add_pressure(context,dUr, Ur_hat):
 
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat = np.sum(dU*K_over_K2, 0, out=P_hat)
-    P_hat -= Ri*rho_hat*K_over_K2[2]#TODO:Is this correct?
+    P_hat += Ri*rho_hat*K_over_K2[2]#TODO:Is this correct?
 
     # Subtract pressure gradient
     dU -= P_hat*K
@@ -211,7 +211,7 @@ def ComputeRHS(context,Ur,Ur_hat,dUr, rk):
     dU[0] -= nu*K2*U_hat[0]
     dU[1] -= nu*K2*U_hat[1]
 
-    dU[2] -= (nu*K2*U_hat[2] + Ri*rho_hat)
+    dU[2] -= (nu*K2*U_hat[2] - Ri*rho_hat)
 
     dUr[3] -= nu * K2 * rho_hat/Pr  
     return dUr

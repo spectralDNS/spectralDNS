@@ -32,7 +32,7 @@ def imexEXP(context,imex_offset,f,gexp,A,b,bhat,err_order,fY_hat,U_tmp,U_hat_new
     for i in range(2):
         if (i != imex_offset[0]):
             if i == 1:
-                for k in range(context.dim):
+                for k in range(U.shape[0]):
                     U[k] = FFT.ifftn(U_hat[k], U[k])
             adaptiveRK(context,A,b,bhat,err_order,fY_hat,U_tmp,U_hat_new,sc,err,fsal,fsal_offset,100,100,False,"2",dU,U_hat,f,dt,tstep,kw)
         else:
@@ -208,12 +208,14 @@ def getIMEX5(context,dU,f,g,ginv):
 
 @optimizer
 def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,U_hat,ComputeRHS,dt,tstep,kw):
-    U = context.mesh_vars["U"]
+    if not (context.solver_name in ["Bq2D","Bq3D"]):
+        U = context.mesh_vars["U"]
+    else:
+        U = context.mesh_vars["Ur"]
     N = context.model_params["N"]
 
     FFT = context.FFT
-    dim = context.dim
-    if dim == 3:
+    if len(N) == 3:
         fftn = FFT.fftn
         ifftn = FFT.ifftn
     else:
@@ -262,8 +264,8 @@ def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,o
         sc[:] = aTOL + np.maximum(np.abs(U_hat),np.abs(U_hat_new))*rTOL
         if errnorm == "2":
             est_to_bcast = None
-            nsquared = np.zeros(dim,dtype=U.dtype)
-            for k in range(dim):
+            nsquared = np.zeros(U.shape[0],dtype=U.dtype)
+            for k in range(U.shape[0]):
                 nsquared[k] = FFT.comm.reduce(np.sum(np.power(np.abs(err[k]/sc[k]),2)))
             if FFT.comm.rank == 0:
                 est_to_bcast = np.zeros(1,dtype=U.dtype)
@@ -305,8 +307,12 @@ def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,o
    
 @optimizer
 def getBS5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True):
-    U = context.mesh_vars["U"]
-    U_hat = context.mesh_vars["U_hat"]
+    if not (context.solver_name in ["Bq2D","Bq3D"]):
+        U = context.mesh_vars["U"]
+        U_hat = context.mesh_vars["U_hat"]
+    else:
+        U = context.mesh_vars["Ur"]
+        U_hat = context.mesh_vars["Ur_hat"]
 
     A = nodepy.rk.loadRKM("BS5").A.astype(np.float64)
     b = nodepy.rk.loadRKM("BS5").b.astype(np.float64)
@@ -327,7 +333,6 @@ def getBS5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True):
 
     @wraps(adaptiveRK)
     def BS5(t,tstep,dt,additional_args = {}):
-        U_hat = context.mesh_vars["U_hat"]
         return adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,U_hat,ComputeRHS,dt,tstep,additional_args)
     return BS5
 
