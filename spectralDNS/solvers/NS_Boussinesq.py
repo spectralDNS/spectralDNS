@@ -27,7 +27,6 @@ def initializeContext(context,args):
     context.mesh_vars["work_shape"] = FFT.real_shape_padded() if context.dealias_name == '3/2-rule' else FFT.real_shape()
     context.NS["conv"] = getConvection(context)
     
-    #TODO: Make this user_defined
     context.model_params["Pr"] = args.Pr
     context.model_params["Ri"] = args.Ri
 
