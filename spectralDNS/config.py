@@ -36,7 +36,7 @@ triplyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'Forw
 triplyperiodic.add_argument('--L', default=[2*pi, 2*pi, 2*pi], metavar=("Lx", "Ly", "Lz"), nargs=3, help='Physical mesh size')
 triplyperiodic.add_argument('--dealias', default='2/3-rule', choices=('2/3-rule', '3/2-rule', 'None'), help='Choose dealiasing method')
 triplyperiodic.add_argument('--Pencil_alignment', default='Y', choices=('X', 'Y'), help='Alignment of the complex data for pencil decomposition')
-triplyperiodic.add_argument('--P1', default=1, type=int, help='pencil decomposition in first direction')
+triplyperiodic.add_argument('--P1', default=2, type=int, help='pencil decomposition in first direction')
 triplyperiodic.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'), help="Choose 3D decomposition between slab and pencil.")
 triplyperiodic.add_argument('--M', default=[6, 6, 6], metavar=("Mx", "My", "Mz"), nargs=3, help='Mesh size is pow(2, M[i]) in direction i')
 

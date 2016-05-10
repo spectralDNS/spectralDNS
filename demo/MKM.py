@@ -42,7 +42,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_proce
     epsilon = Um/200.   #Um/200.
     U[:] = 0
     U[1] = Um*(Y-0.5*Y**2)
-    dev = 1+0.005*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dev = 1+0.0005*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
     dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
     U[1] += dd
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    

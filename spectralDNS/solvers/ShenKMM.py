@@ -61,14 +61,19 @@ def Cross(a, b, c, S):
 
 def Curl(a_hat, c, S):
     F_tmp = work[(a_hat, 0)]
+    F_tmp2 = work[(a_hat, 2)]
     Uc = work[(c, 2)]
     SFTc.Mult_CTD_3D(N[0], a_hat[1], a_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], S, dealias=config.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], S, dealias=config.dealias)
     c[0] = FST.ifst(g, c[0], ST, dealias=config.dealias)
-    c[1] = FST.ifst(1j*K[2]*a_hat[0], c[1], SB, dealias=config.dealias)
+    F_tmp2[0] = 1j*K[2]*a_hat[0]
+    F_tmp2[1] = 1j*K[1]*a_hat[0]
+    #F_tmp2[:, :, -N[1]/2] = 0    
+    #F_tmp2[:, :, -N[1]/2] = 0    
+    c[1] = FST.ifst(F_tmp2[0], c[1], SB, dealias=config.dealias)
     c[1] -= dwdx
-    c[2] = FST.ifst(1j*K[1]*a_hat[0], c[2], SB, dealias=config.dealias)
+    c[2] = FST.ifst(F_tmp2[1], c[2], SB, dealias=config.dealias)
     c[2] *= -1.0
     c[2] += dvdx
     return c

@@ -9,8 +9,8 @@ def create_profile(profiler, comm, MPI, rank, **params):
     #ps.print_stats(1000)
     
     results = {}
-    for item in ['ifftn_mpi', 
-                 'fftn_mpi',
+    for item in ['ifftn', 
+                 'fftn',
                  'irfftn',
                  'irfft2',
                  'ifft',

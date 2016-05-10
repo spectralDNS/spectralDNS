@@ -301,20 +301,27 @@ class FastShenFourierTransform(slab_FFT):
         return dealias
     
     def copy_to_padded(self, fu, fp):
-        fp[:, :self.N[1]/2, :self.Nf] = fu[:, :self.N[1]/2]
-        fp[:, -(self.N[1]/2):, :self.Nf] = fu[:, self.N[1]/2:]
+        fp[:, self.ks, :self.Nf] = fu[:, :]
+        # Make padding symmetrical
+        #fp[:, -self.N[1]/2, 0] *= 0.5
+        #fp[:, -self.N[1]/2, self.N[2]/2] *= 0.5
+        #fp[:, self.N[1]/2, 0] = fp[:, -self.N[1]/2, 0]
+        #fp[:, self.N[1]/2, self.N[2]/2] = fp[:, -self.N[1]/2, self.N[2]/2]
         return fp
     
     def copy_from_padded(self, fp, fu):
-        fu[:] = 0
-        fu[:, :self.N[1]/2] = fp[:, :self.N[1]/2, :self.Nf]
-        fu[:, self.N[1]/2:] = fp[:, -(self.N[1]/2):, :self.Nf]
+        fu[:] = fp[:, self.ks, :self.Nf]
+        #fu[:, self.N[1]/2, 0] *= 2 # Because of symmetrical padding
+        #fu[:, self.N[1]/2, self.N[2]/2] *= 2
+        return fu
+    
+    def copy_from_padded_y(self, fp, fu):
+        fu[:] = fp[:, :, :self.Nf]
         return fu
     
     def copy_to_padded_x(self, fu, fp):
         fp[:self.N[0]] = fu[:self.N[0]]
         return fp
-
     
     def fss(self, u, fu, S, dealias=None):
         """Fast Shen scalar product of x-direction, Fourier transform of y and z"""
@@ -334,9 +341,15 @@ class FastShenFourierTransform(slab_FFT):
         else:
             if not self.dealias_cheb:
                 Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0)]
+                Upad_hat_y = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0)]
                 
-                Upad_hatT[:] = rfft2(u/self.padsize**2, axes=(1,2))
-                Uc_hatT = self.copy_from_padded(Upad_hatT, Uc_hatT)
+                Upad_hatT[:] = rfft(u/self.padsize, axis=2)
+                Upad_hat_y = self.copy_from_padded_y(Upad_hatT, Upad_hat_y)
+                Upad_hat_y[:] = fft(Upad_hat_y/self.padsize, axis=1)                
+                Uc_hatT = self.copy_from_padded(Upad_hat_y, Uc_hatT)                
+                #Upad_hatT[:] = rfft2(u/self.padsize**2, axes=(1,2))                
+                #Uc_hatT = self.copy_from_padded(Upad_hatT, Uc_hatT)
+                
                 Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.complex_shape_I()), 1)
                 self.comm.Alltoall([Uc_mpi, self.mpitype], [Uc_hat, self.mpitype])
                 fu = S.fastShenScalar(Uc_hat, fu)
@@ -392,12 +405,19 @@ class FastShenFourierTransform(slab_FFT):
         else:
             if not self.dealias_cheb:
                 Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0)]
+                Upad_hat_y = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0)]
                 
                 Uc_hat[:] = S.ifst(fu, Uc_hat)
                 self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
                 Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())     
-                Upad_hatT = self.copy_to_padded(Uc_hatT, Upad_hatT)
-                u[:] = irfft2(self.padsize**2*Upad_hatT, axes=(1,2))
+                #Upad_hatT = self.copy_to_padded(Uc_hatT, Upad_hatT)
+                #u[:] = irfft2(self.padsize**2*Upad_hatT, axes=(1,2))
+                
+                Upad_hat_y = self.copy_to_padded_y(Uc_hatT, Upad_hat_y)
+                Upad_hat_y[:] = ifft(self.padsize*Upad_hat_y, axis=1)
+                Upad_hatT = self.copy_to_padded_z(Upad_hat_y, Upad_hatT)
+                u[:] = irfft(self.padsize*Upad_hatT, axis=2)
+                
             else:
                 assert self.num_processes <= self.N[0]/2, "Number of processors cannot be larger than N[0]/2 for 3/2-rule"            
             
@@ -443,9 +463,15 @@ class FastShenFourierTransform(slab_FFT):
         else:
             if not self.dealias_cheb:
                 Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0)]
+                Upad_hat_y = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0)]
                 
-                Upad_hatT[:] = rfft2(u/self.padsize**2, axes=(1,2))
-                Uc_hatT = self.copy_from_padded(Upad_hatT, Uc_hatT)
+                Upad_hatT[:] = rfft(u/self.padsize, axis=2)
+                Upad_hat_y = self.copy_from_padded_y(Upad_hatT, Upad_hat_y)
+                Upad_hat_y[:] = fft(Upad_hat_y/self.padsize, axis=1)                
+                Uc_hatT = self.copy_from_padded(Upad_hat_y, Uc_hatT)
+                #Upad_hatT[:] = rfft2(u/self.padsize**2, axes=(1,2))                
+                #Uc_hatT = self.copy_from_padded(Upad_hatT, Uc_hatT)
+                
                 Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.complex_shape_I()), 1)
                 self.comm.Alltoall([Uc_mpi, self.mpitype], [Uc_hat, self.mpitype])
                 fu = S.fst(Uc_hat, fu)
@@ -496,8 +522,15 @@ class FastShenFourierTransform(slab_FFT):
         else:
             if not self.dealias_cheb:
                 Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0)]
-                Upad_hatT[:] = rfft2(u/self.padsize**2, axes=(1,2))
-                Uc_hatT = self.copy_from_padded(Upad_hatT, Uc_hatT)
+                Upad_hat_y = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0)]
+                
+                Upad_hatT[:] = rfft(u/self.padsize, axis=2)
+                Upad_hat_y = self.copy_from_padded_y(Upad_hatT, Upad_hat_y)
+                Upad_hat_y[:] = fft(Upad_hat_y/self.padsize, axis=1)
+                Uc_hatT = self.copy_from_padded(Upad_hat_y, Uc_hatT)
+                #Upad_hatT[:] = rfft2(u/self.padsize**2, axes=(1,2))
+                #Uc_hatT = self.copy_from_padded(Upad_hatT, Uc_hatT)
+                
                 Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.complex_shape_I()), 1)
                 self.comm.Alltoall([Uc_mpi, self.mpitype], [Uc_hat, self.mpitype])
                 fu = S.fct(Uc_hat, fu)
@@ -555,11 +588,19 @@ class FastShenFourierTransform(slab_FFT):
         else:
             if not self.dealias_cheb:
                 Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0)]
+                Upad_hat_y = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0)]
+                
                 Uc_hat[:] = S.ifct(fu, Uc_hat)
                 self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
-                Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())    
-                Upad_hatT = self.copy_to_padded(Uc_hatT, Upad_hatT)
-                u[:] = irfft2(self.padsize**2*Upad_hatT, axes=(1,2))
+                Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
+                #Upad_hatT = self.copy_to_padded(Uc_hatT, Upad_hatT)
+                #u[:] = irfft2(self.padsize**2*Upad_hatT, axes=(1,2))
+
+                Upad_hat_y = self.copy_to_padded_y(Uc_hatT, Upad_hat_y)
+                Upad_hat_y[:] = ifft(self.padsize*Upad_hat_y, axis=1)
+                Upad_hatT = self.copy_to_padded_z(Upad_hat_y, Upad_hatT)
+                u[:] = irfft(self.padsize*Upad_hatT, axis=2)
+                
             else:
                 assert self.num_processes <= self.N[0]/2, "Number of processors cannot be larger than N[0]/2 for 3/2-rule"            
             

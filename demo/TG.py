@@ -1,6 +1,6 @@
 from spectralDNS import config, get_solver
 import matplotlib.pyplot as plt
-from numpy import array, pi
+from numpy import array, pi, zeros
 from numpy.linalg import norm
 
 def initialize(config, **kw):
@@ -32,8 +32,9 @@ def initialize2(U, W, W_hat, X, sin, cos, FFT, F_tmp,
 k = []
 w = []
 im1 = None
+kold = zeros(1)
 def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, Curl, float64, dx, L, sum, 
-           hdf5file, FFT, X, U_hat, K2, K, work, **kw):
+           hdf5file, FFT, X, U_hat, K2, K, work, dU, ComputeRHS, **kw):
     global k, w, im1
     if hdf5file.check_if_write(tstep):
         P[:] = FFT.ifftn(P_hat*1j, P)
@@ -64,18 +65,33 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, Curl, float64, dx, L, su
                 for j in range(3):
                     duidxj[i,j] = FFT.ifftn(1j*K[j]*U_hat[i], duidxj[i,j], "3/2-rule")                    
             ww2 = comm.reduce(sum(duidxj*duidxj)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2/1.5**3)
+            
+            ddU_pad = work[(((3,)+FFT.real_shape_padded()), FFT.float, 0)]
+            U_pad   = work[(((3,)+FFT.real_shape_padded()), FFT.float, 1)]
+            dU = ComputeRHS(dU, 0)
+            for i in range(3):
+                ddU_pad[i] = FFT.ifftn(dU[i], ddU_pad[i], "3/2-rule")                    
+                U_pad[i] =  FFT.ifftn(U_hat[i], U_pad[i], "3/2-rule")                    
+            ww3 = comm.reduce(sum(ddU_pad*U_pad)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2/1.5**3)
+            
             if rank == 0:
-                print ww, ww2, ww-ww2
+                print ww, config.nu*ww2, ww3, ww-ww2
                 
         elif config.solver == 'VV':
             U = Curl(kw['W_hat'], U)
             ww = comm.reduce(sum(kw['W'].astype(float64)*kw['W'].astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
             
         kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
+        kold[0] = kk
         if rank == 0:
             k.append(kk)
             w.append(ww)
             print t, float(kk), float(ww)
+            
+    if tstep % config.compute_energy == 1:
+        kk2 = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+        if rank == 0:
+            print 0.5*(kk2-kold[0])/config.dt
 
 def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, **kw):    
     if config.solver == 'NS':

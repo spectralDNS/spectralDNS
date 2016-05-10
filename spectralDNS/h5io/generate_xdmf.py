@@ -167,13 +167,13 @@ def generate_xdmf(h5filename):
             xf2d += """  
       </Grid>
 """
-    xf2d += """  
+        xf2d += """  
     </Grid>
   </Domain>
 </Xdmf>"""
-    xf2 = open(h5filename[:-3]+"_yz."+"xdmf", "w")
-    xf2.write(xf2d)
-    xf2.close()
+        xf2 = open(h5filename[:-3]+"_yz."+"xdmf", "w")
+        xf2.write(xf2d)
+        xf2.close()
 
     if len(f["/".join(("2D/xz", comps[0]))]) > 0:
         xf2d = copy.copy(xdmffile)
