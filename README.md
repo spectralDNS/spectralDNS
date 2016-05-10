@@ -14,6 +14,15 @@ A channel flow solver is implemented using the Shen basis (Jie Shen, SIAM Journa
 
 See the demo folder for usage.
 
+The most recent simulations of the pencil version of the NS solver are showing excellent scaling up to 65k cores at KAUST and Shaheen II!
+
+<p align="center">
+    <img src="https://www.dropbox.com/s/thkaty8ow6m5xgh/strong_scaling_pencil_col.png?dl=1" width="600" height="400" alt="Strong scaling of Cython optimized NS solver on Shaheen II"/>
+</p>
+The difference between the red triangles and the blue squares are simply the number of mpi processes sent to each node on Shaheen II. The default version (blue squares) are filling up all nodes with 32 processes on each, whereas the red triangles have only four processes for each node. The green dots have been sampled using the default settings.
+
+Results also from the old Shaheen BlueGene/P:
+
 <p align="center">
     <img src="https://www.dropbox.com/s/pi4f25c0pyluxz0/weak_scaling_shaheen_numpy_noopt.png?dl=1" width="600" height="400" alt="Weak scaling of pure numpy/mpi4py solver on Shaheen BlueGene/P"/>
 </p>
