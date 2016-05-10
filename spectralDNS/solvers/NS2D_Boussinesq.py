@@ -19,7 +19,7 @@ def initializeContext(context,args):
     FFT = context.FFT
     assert context.decomposition == 'line'
 
-    hdf5file = HDF5Writer(context, {"U":U[0], "V":U[1], "rho":rho, "P":P}, context.solver_name+".h5")
+    context.hdf5file = HDF5Writer(context, {"U":U[0], "V":U[1], "rho":rho, "P":P}, context.solver_name+".h5")
 
     integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,hphi=None,gexp=None)
 
