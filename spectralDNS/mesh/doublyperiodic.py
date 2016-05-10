@@ -50,7 +50,7 @@ def setupBoussinesq(context):
     P      = empty(FFT.real_shape(), dtype=float)
     P_hat  = empty(FFT.complex_shape(), dtype=complex)
     curl   = empty(FFT.real_shape(), dtype=float)
-    dU     = empty((3,) + FFT.complex_shape(), dtype=complex)
+    dUr     = empty((3,) + FFT.complex_shape(), dtype=complex)
      
     # Create views into large data structures
     rho     = Ur[2]

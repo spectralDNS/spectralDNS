@@ -19,7 +19,7 @@ def initializeContext(context,args):
     FFT = context.FFT
     assert context.decomposition == 'line'
 
-    hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "rho":rho, "P":P}, context.solver_name+".h5")
+    hdf5file = HDF5Writer(context, {"U":U[0], "V":U[1], "rho":rho, "P":P}, context.solver_name+".h5")
 
     integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,hphi=None,gexp=None)
 
@@ -37,14 +37,14 @@ def add_pressure_diffusion(context,dUr,Ur_hat):
     P_hat = context.mesh_vars["P_hat"]
     nu = context.model_params["nu"]
     Ri = context.model_params["Ri"]
-    Pr = context.model_parms["Pr"]
+    Pr = context.model_params["Pr"]
 
     rho_hat = Ur_hat[2]
 
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat  = np.sum(dUr[:2]*K_over_K2, 0, out=P_hat)
     
-    P_hat -= Ri*rho_hat*K_over_K2[1]
+    P_hat += Ri*rho_hat*K_over_K2[1]
     
     # Add pressure gradient
     dUr[:2] -= P_hat*K
@@ -52,7 +52,7 @@ def add_pressure_diffusion(context,dUr,Ur_hat):
     # Add contribution from diffusion                      
     dUr[0] -= nu*K2*Ur_hat[0]
     
-    dUr[1] -= (nu*K2*Ur_hat[1] + Ri*rho_hat)
+    dUr[1] -= (nu*K2*Ur_hat[1] - Ri*rho_hat)
     dUr[2] -= nu * K2 * rho_hat/Pr  
     return dUr
 
@@ -60,6 +60,9 @@ def ComputeRHS(context,Ur,Ur_hat,dUr, rk):
     float = context.types["float"]
     FFT = context.FFT
     curl = context.mesh_vars["curl"]
+    K = context.mesh_vars["K"]
+    Ur_hat = context.mesh_vars["Ur_hat"]
+    U_hat = Ur_hat[:-1]
 
     Ur_dealiased = context.work[((3,)+FFT.real_shape(), float, 0)]
     F_tmp = context.work[(dUr, 0)]
@@ -72,7 +75,7 @@ def ComputeRHS(context,Ur,Ur_hat,dUr, rk):
 
     F_tmp[0] = cross2(F_tmp[0], K, U_hat)
     curl[:] = FFT.ifft2(F_tmp[0], curl, context.dealias_name)
-    dUr[0] = FFT.fft2(U_dealiased[1]*curl, dUr[r0], context.dealias_name)
+    dUr[0] = FFT.fft2(U_dealiased[1]*curl, dUr[0], context.dealias_name)
     dUr[1] = FFT.fft2(-U_dealiased[0]*curl, dUr[1], context.dealias_name)
    
     F_tmp[0] = FFT.fft2(U_dealiased[0]*rho_dealiased, F_tmp[0], context.dealias_name)

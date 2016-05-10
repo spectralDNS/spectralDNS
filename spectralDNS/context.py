@@ -9,6 +9,7 @@ Currently only works for the NS solver
 """
 
 import spectralDNS.mesh.triplyperiodic
+import spectralDNS.mesh.doublyperiodic
 import spectralDNS.config
 from mpi4py import MPI
 import numpy as np
@@ -44,6 +45,8 @@ class Context:
         if mesh is "triplyperiodic":
             #Get the results from the command-line parsing routine, which may return things as strings.
             args = spectralDNS.config.triplyperiodic.parse_args(argv)
+        elif mesh is "doublyperiodic":
+            args = spectralDNS.config.doublyperiodic.parse_args(argv)
         else:
             raise AssertionError("Not yet implemented")
 
@@ -54,8 +57,8 @@ class Context:
                                    "double": (np.float64, np.complex128, MPI.F_DOUBLE_COMPLEX)}[precision]
         M = self.model_params["M"] = np.array([eval(str(f)) for f in args.M], dtype=int)
         L = self.model_params["L"] = np.array([eval(str(f)) for f in args.L], dtype=self.types["float"])
-        if(np.allclose(L,np.ones(3,dtype=self.types["float"])*2*np.pi)):
-            L = self.model_params["L"] = np.ones(3,dtype=self.types["float"])*2*np.pi
+        if(np.allclose(L,np.ones(len(M),dtype=self.types["float"])*2*np.pi)):
+            L = self.model_params["L"] = np.ones(len(M),dtype=self.types["float"])*2*np.pi
         N = self.model_params["N"] = 2**M
         dx = self.model_params["dx"] = (L/N).astype(self.types["float"])
         nu = self.model_params["nu"] = self.types["float"](args.nu)
@@ -163,7 +166,7 @@ class Context:
     def initialize_mesh_variables(self,decomposition,N,precision,**kwargs):
         if hasattr(self,"mesh_vars"):
            raise AttributeError("Only call this once for a given context") 
-        if self.mesh != "triplyperiodic":
+        if not (self.mesh in ["triplyperiodic","doublyperiodic"]):
             raise AssertionError("Won't work yet as spectralDNS/mesh/* files haven't all been updated yet")
 
         if self.mesh in ('doublyperiodic', 'triplyperiodic'):
@@ -184,6 +187,8 @@ class Context:
         elif self.mesh == "doublyperiodic":
             self.dim = 2
             self.mesh_vars = spectralDNS.mesh.doublyperiodic.setup(self.solver_name,context=self)
+            self.FFT.fftn = self.FFT.fft2
+            self.FFT.ifftn = self.FFT.ifft2
 
         if decomposition == 'pencil':
             self.mesh_info["P1"] = kwargs["P1"]

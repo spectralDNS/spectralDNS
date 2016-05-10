@@ -53,7 +53,7 @@ parser_MHD = trippelsubparsers.add_parser('MHD', help='Magnetohydrodynamics solv
 parser_MHD.add_argument('--eta', default=0.01, type=float, help='MHD parameter')
 
 doublyperiodic = argparse.ArgumentParser(parents=[parser])
-doublyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2'))
+doublyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2',"BS5_adaptive","BS5_fixed","IMEX1","EXPBS5","IMEX4","EXPEULER","IMEX3","IMEX5"))
 doublyperiodic.add_argument('--L', default=[2*pi, 2*pi], nargs=2, help='Physical mesh size')
 doublyperiodic.add_argument('--dealias', default='2/3-rule', choices=('2/3-rule', 'None'), help='Choose dealiasing method')
 doublyperiodic.add_argument('--decomposition', default='line', choices=('line', ), help="For 2D problems line is the only choice.")
@@ -63,6 +63,8 @@ doublesubparsers = doublyperiodic.add_subparsers(dest='solver')
 
 parser_NS2D = doublesubparsers.add_parser('NS2D', help='Regular 2D Navier Stokes solver')
 parser_Bq2D = doublesubparsers.add_parser('Bq2D', help='Regular 2D Navier Stokes solver with Boussinesq model.')
+parser_Bq2D.add_argument('--Pr',default=1.,type=float,help="Prandl number")
+parser_Bq2D.add_argument('--Ri',default=0.2,type=float,help="Richardson number")
 
 # Arguments for Shen based solver with one inhomogeneous direction
 channel = argparse.ArgumentParser(parents=[parser])

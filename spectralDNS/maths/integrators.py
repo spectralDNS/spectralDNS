@@ -270,8 +270,10 @@ def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,o
             if FFT.comm.rank == 0:
                 est_to_bcast = np.zeros(1,dtype=U.dtype)
                 est = np.max(np.sqrt(nsquared))
-                #TODO: Make sure this works for other dimensions too.
-                est /= np.sqrt(N[0]*N[1]*(N[2]/2 + 1))
+                if context.dim == 3:
+                    est /= np.sqrt(N[0]*N[1]*(N[2]/2 + 1))
+                else:
+                    est /= np.sqrt(N[0]*(N[1]/2+1))
                 est_to_bcast[0] = est
             est_to_bcast = FFT.comm.bcast(est_to_bcast,root=0)
             est = est_to_bcast[0]
