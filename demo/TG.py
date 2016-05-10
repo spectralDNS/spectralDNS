@@ -1,5 +1,5 @@
 from spectralDNS import config, get_solver
-from numpy import array, pi
+from numpy import array, pi, zeros
 from numpy.linalg import norm
 
 def initialize(config, **kw):
@@ -34,6 +34,7 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, Curl, float64, dx, L, su
     global k
     if tstep % config.compute_energy == 0:            
         kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
+        kold[0] = kk
         if rank == 0:
             k.append(kk)
             print t, float(kk)

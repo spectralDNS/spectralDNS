@@ -174,7 +174,6 @@ class BDDmat(BaseMatrix):
         BaseMatrix.__init__(self)
         assert len(K.shape) == 1
         self.shape = shape = (K.shape[0]-2, K.shape[0]-2)
-        N = shape[0] 
         ck = ones(K.shape[0], int)
         ck[0] = 2
         if quad == "GL": ck[-1] = 2
