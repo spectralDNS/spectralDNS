@@ -7,7 +7,7 @@ from scipy.sparse import diags
 import scipy.sparse.linalg as la
 from spectralDNS.shen.shentransform import ShenBiharmonicBasis
 from spectralDNS.shen.Matrices import ABBmat, BBBmat, SBBmat
-from spectralDNS.shen.Helmholtz import Biharmonic
+from spectralDNS.shen.la import Biharmonic
 from scipy.linalg import solve
 """
 Solve biharmonic equation on (-1, 1)
@@ -25,9 +25,9 @@ The equation to be solved for is
 
 # Use sympy to compute a rhs, given an analytical solution
 x = Symbol("x")
-u = sin(2*pi*x)**2
+u = (1-x**2)*sin(8*pi*x)**2
 
-a = 1e-3
+a = 1.0
 b = 1.0
 c = 1.0
 f = a*u.diff(x, 4) + b*u.diff(x, 2) + c*u
@@ -45,10 +45,11 @@ solver2 = Biharmonic(N, a, b, c, quad=SD.quad, solver="cython")
 f_hat = np.zeros(N)
 f_hat = SD.fastShenScalar(fj, f_hat)
 u_hat = np.zeros(N)
+u_hat2 = np.zeros(N)
 
 from time import time
 t0 = time()
-u_hat = solver(u_hat, f_hat)
+u_hat2 = solver(u_hat2, f_hat)
 t1 = time()
 u_hat = solver2(u_hat, f_hat)
 t2 = time()
@@ -130,9 +131,9 @@ bk = np.zeros((2, M), float)
 Biharmonic_factor_pr(ak, bk, l0, l1)
 Solve_Biharmonic_1D(fr_hat, uk, u0, u1, u2, l0, l1, ak, bk, a)
 
-ff = fr_hat.copy()
+#ff = fr_hat.copy()
 #ff[:-4] *= d
-u_hat = solver(u_hat, ff)
+#u_hat = solver(u_hat, ff)
 
 #Ae = AA[::2, ::2]
 #u2 =  (Ae.diagonal()[2:] - l0[0, 1:]*u1[0, 1:] - u0[0, 2:])/l1[0, :]

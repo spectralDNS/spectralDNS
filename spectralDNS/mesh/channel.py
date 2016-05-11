@@ -323,6 +323,19 @@ class FastShenFourierTransform(slab_FFT):
         fp[:self.N[0]] = fu[:self.N[0]]
         return fp
     
+    def copy_to_padded_y(self, fu, fp):
+        fp[:, self.ks] = fu[:]
+        #fp[:, -self.N[1]/2, 0] *= 0.5
+        #fp[:, -self.N[1]/2, self.N[2]/2] *= 0.5
+        #fp[:, self.N[1]/2, 0] = fp[:, -self.N[1]/2, 0]
+        #fp[:, self.N[1]/2, self.N[2]/2] = fp[:, -self.N[1]/2, self.N[2]/2]
+        return fp
+    
+    def copy_to_padded_z(self, fu, fp):
+        fp[:, :, :self.Nf] = fu[:]
+        return fp
+
+    
     def fss(self, u, fu, S, dealias=None):
         """Fast Shen scalar product of x-direction, Fourier transform of y and z"""
         
@@ -396,7 +409,7 @@ class FastShenFourierTransform(slab_FFT):
             if dealias == '2/3-rule':
                 fu *= self.dealias
                 
-            Uc_hat[:] = S.ifst(fu, Uc_hat)
+            Uc_hat = S.ifst(fu, Uc_hat)
             self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
             Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
             u[:] = irfft2(Uc_hatT, axes=(1,2))
@@ -406,7 +419,7 @@ class FastShenFourierTransform(slab_FFT):
                 Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0)]
                 Upad_hat_z = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0)]
                 
-                Uc_hat[:] = S.ifst(fu, Uc_hat)
+                Uc_hat = S.ifst(fu, Uc_hat)
                 self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
                 Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())     
                 
