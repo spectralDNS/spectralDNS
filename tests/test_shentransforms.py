@@ -971,8 +971,44 @@ def test_Mult_CTD(SD):
     #from IPython import embed; embed()
     assert np.allclose(cv, bv)
     assert np.allclose(cw, bw)
-
+    
 #test_Mult_CTD(ShenDirichletBasis("GL"))
+
+def test_Mult_CTD_3D(SD):
+    C = CTDmat(np.arange(N).astype(np.float))
+    B = BTTmat(np.arange(N).astype(np.float), SD.quad)
+    
+    uk = np.random.random((N,4,4))+np.random.random((N,4,4))*1j
+    vk = np.random.random((N,4,4))+np.random.random((N,4,4))*1j
+    wk = np.random.random((N,4,4))+np.random.random((N,4,4))*1j
+    
+    bv = np.zeros((N,4,4), dtype=np.complex)
+    bw = np.zeros((N,4,4), dtype=np.complex)
+    vk0 = np.zeros((N,4,4), dtype=np.complex)
+    wk0 = np.zeros((N,4,4), dtype=np.complex)
+    cv = np.zeros((N,4,4), dtype=np.complex)
+    cw = np.zeros((N,4,4), dtype=np.complex)
+    
+    vk0 = SD.fst(vk, vk0)
+    vk  = SD.ifst(vk0, vk)
+    vk0 = SD.fst(vk, vk0)
+    wk0 = SD.fst(wk, wk0)
+    wk  = SD.ifst(wk0, wk)
+    wk0 = SD.fst(wk, wk0)
+
+    #from IPython import embed; embed()
+    SFTc.Mult_CTD_3D_n(N, vk0, wk0, bv, bw)
+    
+    cv[:] = C.matvec(vk0)
+    cw[:] = C.matvec(wk0)
+    cv /= B.dd.repeat(np.array(bv.shape[1:]).prod()).reshape(bv.shape)
+    cw /= B.dd.repeat(np.array(bv.shape[1:]).prod()).reshape(bv.shape)
+    
+    assert np.allclose(cv, bv)
+    assert np.allclose(cw, bw)
+
+test_Mult_CTD_3D(ShenDirichletBasis("GL"))
+
 
 def test_Biharmonic(SB):
     M = 128
