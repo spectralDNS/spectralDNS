@@ -60,7 +60,7 @@ def Cross(a, b, c, S):
     c[2] = FST.fst(Uc[2], c[2], S, dealias=config.dealias)
     return c
 
-@profile
+#@profile
 def Curl(a_hat, c, S):
     F_tmp = work[(a_hat, 0)]
     F_tmp2 = work[(a_hat, 2)]
