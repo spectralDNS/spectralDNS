@@ -206,8 +206,8 @@ def getIMEX5(context,dU,f,g,ginv):
 
 
 
-@optimizer
-def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,U_hat,ComputeRHS,dt,tstep,kw):
+#@optimizer
+def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,U_hat,ComputeRHS,dt,tstep,kw,predictivecontroller=False):
     if not (context.solver_name in ["Bq2D","Bq3D"]):
         U = context.mesh_vars["U"]
     else:
@@ -291,7 +291,18 @@ def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,o
            assert False,"Wrong error norm"
 
         #Check error estimate
-        factor = min(facmax,max(facmin,fac*pow((1/est),1.0/(err_order+1))))
+        exponent = 1.0/(err_order + 1)
+        if not predictivecontroller:
+            factor = min(facmax,max(facmin,fac*pow((1/est),exponent)))
+        else:
+            if not "last_dt" in context.time_integrator:
+                context.time_integrator["last_dt"] = dt
+            if not "last_est" in context.time_integrator:
+                context.time_integrator["last_est"] = est
+
+            last_dt = context.time_integrator["last_dt"]
+            last_est = context.time_integrator["last_est"]
+            factor = min(facmax,max(facmin,fac*pow((1/est),exponent)*dt/last_dt*pow(last_est/est,exponent)))
         if adaptive:
             dt = dt*factor
             if  est > 1.0:
@@ -301,14 +312,19 @@ def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,o
                 if fsal:
                     offset[0] += 1
                 continue
+
+        if predictivecontroller:
+            context.time_integrator["last_dt"] = dt_prev
+            context.time_integrator["last_est"] = est
         break
+
 
     #Update U_hat and U
     U_hat[:] = U_hat_new
     return U_hat,dt,dt_prev
    
 @optimizer
-def getBS5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True):
+def getBS5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True,predictivecontroller=False):
     if not (context.solver_name in ["Bq2D","Bq3D"]):
         U = context.mesh_vars["U"]
         U_hat = context.mesh_vars["U_hat"]
@@ -333,9 +349,9 @@ def getBS5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True):
     err = np.zeros(U_hat.shape,dtype=U_hat.dtype)
     U_hat_new = np.zeros(U_hat.shape,dtype=U_hat.dtype)
 
-    @wraps(adaptiveRK)
+    #@wraps(adaptiveRK)
     def BS5(t,tstep,dt,additional_args = {}):
-        return adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,U_hat,ComputeRHS,dt,tstep,additional_args)
+        return adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,U_hat,ComputeRHS,dt,tstep,additional_args,predictivecontroller=predictivecontroller)
     return BS5
 
 @optimizer
@@ -414,6 +430,9 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None,hphi=None
     elif context.time_integrator["time_integrator_name"] == "BS5_adaptive": 
         TOL = context.time_integrator["TOL"]
         return getBS5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=True)
+    elif context.time_integrator["time_integrator_name"] == "BS5_adaptive_p": 
+        TOL = context.time_integrator["TOL"]
+        return getBS5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=True,predictivecontroller=True)
     elif context.time_integrator["time_integrator_name"] == "BS5_fixed":
         TOL = 100 #This shouldn't get used
         return getBS5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=False)

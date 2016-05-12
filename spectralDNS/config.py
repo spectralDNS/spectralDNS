@@ -34,7 +34,7 @@ parser.add_argument("--threads",default=1,type=int,help="Number of threads to us
 # Arguments for isotropic DNS solver
 triplyperiodic = argparse.ArgumentParser(parents=[parser])
 triplyperiodic.add_argument('--convection', default='Vortex', choices=('Standard', 'Divergence', 'Skewed', 'Vortex'))
-triplyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2',"BS5_adaptive","BS5_fixed","IMEX1","EXPBS5","IMEX4","EXPEULER","IMEX3","IMEX5"))
+triplyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2',"BS5_adaptive","BS5_adaptive_p","BS5_fixed","IMEX1","EXPBS5","IMEX4","EXPEULER","IMEX3","IMEX5"))
 triplyperiodic.add_argument('--dealias', default='2/3-rule', choices=('2/3-rule', '3/2-rule', 'None'), help='Choose dealiasing method')
 triplyperiodic.add_argument('--Pencil_alignment', default='Y', choices=('X', 'Y'), help='Alignment of the complex data for pencil decomposition')
 triplyperiodic.add_argument('--P1', default=1, type=int, help='pencil decomposition in first direction')
@@ -53,7 +53,7 @@ parser_MHD = trippelsubparsers.add_parser('MHD', help='Magnetohydrodynamics solv
 parser_MHD.add_argument('--eta', default=0.01, type=float, help='MHD parameter')
 
 doublyperiodic = argparse.ArgumentParser(parents=[parser])
-doublyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2',"BS5_adaptive","BS5_fixed","IMEX1","EXPBS5","IMEX4","EXPEULER","IMEX3","IMEX5"))
+doublyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2',"BS5_adaptive","BS5_adaptive_p","BS5_fixed","IMEX1","EXPBS5","IMEX4","EXPEULER","IMEX3","IMEX5"))
 doublyperiodic.add_argument('--L', default=[2*pi, 2*pi], nargs=2, help='Physical mesh size')
 doublyperiodic.add_argument('--dealias', default='2/3-rule', choices=('2/3-rule', 'None'), help='Choose dealiasing method')
 doublyperiodic.add_argument('--decomposition', default='line', choices=('line', ), help="For 2D problems line is the only choice.")
