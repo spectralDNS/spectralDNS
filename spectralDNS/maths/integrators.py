@@ -65,8 +65,6 @@ def getexpBS5(context,dU,f,gexp):
     return expBS5
 
 
-
-
 def imexDIRK(context,A,b,A_hat,b_hat,U_tmp,K,K_hat,dU,f,g,ginv,dt,tstep,kw):
     s = A.shape[0] 
     U = context.mesh_vars["U"]
@@ -215,14 +213,6 @@ def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,o
     N = context.model_params["N"]
 
     FFT = context.FFT
-    if len(N) == 3:
-        fftn = FFT.fftn
-        ifftn = FFT.ifftn
-    else:
-        fftn = FFT.fft2
-        ifftn = FFT.ifft2
-
-
     s = A.shape[0]
     
     #Some parameters for adaptive time-stepping. See p167, Hairer, Norsett and Wanner. "Solving Ordinary Differential Equations 1"
@@ -278,6 +268,7 @@ def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,o
             est_to_bcast = FFT.comm.bcast(est_to_bcast,root=0)
             est = est_to_bcast[0]
         elif errnorm == "inf":
+            raise AssertionError("Don't use this, not sure if it works")
             #TODO: Test this error norm
             sc[:] = aTOL + np.maximum(np.abs(U_hat),np.abs(U_hat_new))*rTOL
             err[:] = err[:]/sc[:]
