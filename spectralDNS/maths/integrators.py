@@ -208,6 +208,41 @@ def getIMEX5(context,dU,f,g,ginv):
 
 #@optimizer
 def adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,U_hat,ComputeRHS,dt,tstep,kw,predictivecontroller=False):
+    """
+    Take a step using any Runge-Kutta method.
+
+    Parameters
+    ----------
+    A, b, bhat : arrays
+        Runge-Kutta coefficients
+    err_order : int
+        Order of embedded method
+    fY_hat, U_tmp, U_hat_new, sc, err : work arrays
+    fsal : boolean
+        Whether method is first-same-as-last
+    offset : length-1 array of int
+        Where to find the previous RHS evaluation (for FSAL methods).  This can probably be eliminated.
+    aTOL, rTOL : float
+        Error tolerances
+    adaptive : boolean
+        If true, adapt the step size
+    errnorm : str
+        Which norm to use in computing the error estimate.  One of {"2", "inf"}.
+    dU : array
+        RHS evaluation
+    U_hat : array
+        solution value (returned)
+    ComputeRHS : callable
+        RHS of evolution equation
+    dt : float
+        time step size
+    tstep : int
+        Number of steps taken so far
+    kw : dict
+        Information for callback function
+    predictivecontroller : boolean
+        If True use PI controller
+    """
     if not (context.solver_name in ["Bq2D","Bq3D"]):
         U = context.mesh_vars["U"]
     else:
