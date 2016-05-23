@@ -61,7 +61,6 @@ def ComputeRHS(context,Ur,Ur_hat,dUr, rk):
     FFT = context.FFT
     curl = context.mesh_vars["curl"]
     K = context.mesh_vars["K"]
-    Ur_hat = context.mesh_vars["Ur_hat"]
     U_hat = Ur_hat[:-1]
 
     Ur_dealiased = context.work[((3,)+FFT.real_shape(), float, 0)]

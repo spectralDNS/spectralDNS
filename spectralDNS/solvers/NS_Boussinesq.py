@@ -179,14 +179,13 @@ def add_pressure(context,dUr, Ur_hat):
 
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat = np.sum(dU*K_over_K2, 0, out=P_hat)
-    P_hat += Ri*rho_hat*K_over_K2[2]#TODO:Is this correct?
+    P_hat += Ri*rho_hat*K_over_K2[2]
 
     # Subtract pressure gradient
     dU -= P_hat*K
     
     return dU
 
-#TODO:Change the function signature of this function.
 #@profile
 def ComputeRHS(context,Ur,Ur_hat,dUr, rk):
     """Compute and return entire rhs contribution"""
