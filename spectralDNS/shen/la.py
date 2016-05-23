@@ -1,4 +1,3 @@
-from spectralDNS import config
 from numpy import zeros, ones, arange, pi, float, complex, int, complex128
 from Matrices import BBBmat, SBBmat, ABBmat
 import SFTc

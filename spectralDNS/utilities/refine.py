@@ -1,10 +1,6 @@
 from mpiFFT4py.slab import FastFourierTransform as FFT
 
 ### FIXME Need to move FastShenFourierTransform in its own module, out of spectralDNS
-from spectralDNS import config
-config.mesh = "channel"
-config.solver = "KMM"
-config.dealias = "3/2-rule"
 from spectralDNS.mesh.channel import FastShenFourierTransform as FST
 from spectralDNS.shen.shentransform import ShenDirichletBasis, ShenBiharmonicBasis
 from mpi4py import MPI

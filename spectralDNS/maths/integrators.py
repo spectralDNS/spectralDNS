@@ -3,7 +3,6 @@ __date__ = "2015-04-07"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from spectralDNS import config
 from ..optimization import optimizer, wraps
 
 __all__ = ['getintegrator']
@@ -36,7 +35,7 @@ def AB2(u0, u1, dU, dt, tstep, ComputeRHS):
     u1[:] = dU*dt    
     return u0
 
-def getintegrator(dU, ComputeRHS, float, array, **kw):
+def getintegrator(dU, ComputeRHS, float, array, config, **kw):
     """Return integrator using choice in global parameter integrator.
     """
     if config.solver in ("NS", "VV", "NS2D"):

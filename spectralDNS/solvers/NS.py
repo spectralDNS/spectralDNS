@@ -5,9 +5,9 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
 
-vars().update(setupDNS(**vars()))
+vars().update(setup['NS'](**vars()))
 
-hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5")
+hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "NS.h5")
 
 def standardConvection(c, U_dealiased, dealias=None):
     """c_i = u_j du_i/dx_j"""
@@ -101,8 +101,6 @@ def getConvection(convection):
         
     return Conv           
 
-conv = getConvection(config.convection)
-
 @optimizer
 def add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu):
     """Add contributions from pressure and diffusion to the rhs"""
@@ -131,13 +129,14 @@ def ComputeRHS(dU, rk):
 def regression_test(t, tstep, **kw):
     pass
 
-# Set up function to perform temporal integration (using config.integrator parameter)
-integrate = getintegrator(**vars())
-
 def solve():
     timer = Timer()
     t = 0.0
     tstep = 0
+    # Set up function to perform temporal integration (using config.integrator parameter)
+    integrate = getintegrator(**globals())
+    conv = getConvection(config.convection)
+
     while t < config.T-1e-8:
         t += dt 
         tstep += 1
