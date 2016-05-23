@@ -4,6 +4,9 @@ __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
+from spectralDNS.mesh.doublyperiodic import setup
+
+vars().update(setup['NS2D'](**vars()))
 
 hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "P":P}, config.solver+".h5")
 assert config.decomposition == 'line'
@@ -22,40 +25,41 @@ def add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, nu):
 
 def ComputeRHS(dU, rk):
     curl_hat = work[(FFT.complex_shape(), complex, 0)]    
-    U_dealiased = work[((2,)+FFT.real_shape(), float, 0)]
+    U_dealiased = work[((2,)+FFT.work_shape(config.dealias), float, 0)]
+    curl_dealiased = work[(FFT.work_shape(config.dealias), float, 0)]
     
-    curl_hat = cross2(curl_hat, K, U_hat)
-    curl[:] = FFT.ifft2(curl_hat, curl, config.dealias)
+    curl_hat = cross2(curl_hat, K, U_hat)    
+    curl_dealiased = FFT.ifft2(curl_hat, curl_dealiased, config.dealias)
     U_dealiased[0] = FFT.ifft2(U_hat[0], U_dealiased[0], config.dealias)
     U_dealiased[1] = FFT.ifft2(U_hat[1], U_dealiased[1], config.dealias)
-    dU[0] = FFT.fft2(U_dealiased[1]*curl, dU[0], config.dealias)
-    dU[1] = FFT.fft2(-U_dealiased[0]*curl, dU[1], config.dealias)
-    dU = add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, nu)    
+    dU[0] = FFT.fft2(U_dealiased[1]*curl_dealiased, dU[0], config.dealias)
+    dU[1] = FFT.fft2(-U_dealiased[0]*curl_dealiased, dU[1], config.dealias)
+    dU = add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, config.nu)    
     return dU
 
-integrate = getintegrator(**vars())   
-
-def regression_test(t, tstep, **kw):
+def regression_test(**kw):
     pass
 
 def solve():
     timer = Timer()
-    t = 0.0
-    tstep = 0
-    while t < config.T:        
-        t += dt
-        tstep += 1
+    config.t = 0.0
+    config.tstep = 0
+    integrate = getintegrator(**globals())   
 
-        U_hat[:] = integrate(t, tstep, dt)
+    while config.t < config.T:        
+        config.t += config.dt
+        config.tstep += 1
+
+        U_hat[:] = integrate()
 
         for i in range(2): 
             U[i] = FFT.ifft2(U_hat[i], U[i])
 
-        update(t, tstep, **globals())
+        update(**globals())
 
         timer()
         
-        if tstep == 1 and config.make_profile:
+        if config.tstep == 1 and config.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
                 
@@ -64,6 +68,6 @@ def solve():
     if config.make_profile:
         results = create_profile(**globals())
     
-    regression_test(t, tstep, **globals())
+    regression_test(**globals())
     
     hdf5file.close()

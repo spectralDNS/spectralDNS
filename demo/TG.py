@@ -1,9 +1,9 @@
 from spectralDNS import config, get_solver
 import matplotlib.pyplot as plt
-from numpy import array, pi, zeros
+from numpy import array, pi, zeros, sum
 from numpy.linalg import norm
 
-def initialize(config, **kw):
+def initialize(**kw):
     if config.solver == 'NS':
         initialize1(**kw)
     
@@ -33,15 +33,15 @@ k = []
 w = []
 im1 = None
 kold = zeros(1)
-def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, Curl, float64, dx, L, sum, 
-           hdf5file, FFT, X, U_hat, K2, K, work, dU, ComputeRHS, **kw):
+def update(comm, rank, P, P_hat, U, curl, Curl, float64, dx, L, 
+           hdf5file, FFT, X, U_hat, K, work, dU, ComputeRHS, **kw):
     global k, w, im1
-    if hdf5file.check_if_write(tstep) or tstep % config.compute_energy == 0:
+    if hdf5file.check_if_write(config.tstep) or config.tstep % config.compute_energy == 0:
         P[:] = FFT.ifftn(P_hat*1j, P)
         if config.solver == 'NS':
             curl = Curl(U_hat, curl)
         
-        hdf5file.write(tstep)
+        hdf5file.write(config.tstep)
         
     if im1 is None and rank == 0 and config.plot_step > 0:
         plt.figure()
@@ -51,13 +51,13 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, Curl, float64, dx, L, su
         plt.pause(1e-6)
         globals().update(im1=im1)
         
-    if tstep % config.plot_step == 0 and rank == 0 and config.plot_step > 0:
+    if config.tstep % config.plot_step == 0 and rank == 0 and config.plot_step > 0:
         im1.ax.clear()
         im1.ax.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,10], 100) 
         im1.autoscale()
         plt.pause(1e-6)
 
-    if tstep % config.compute_energy == 0:
+    if config.tstep % config.compute_energy == 0:
         if config.solver == 'NS':
             ww = comm.reduce(sum(curl*curl)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
             
@@ -85,15 +85,15 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, curl, Curl, float64, dx, L, su
         if rank == 0:
             k.append(kk)
             w.append(ww)
-            print t, float(kk), float(ww)
+            print config.t, float(kk), float(ww)
             
-    if tstep % config.compute_energy == 1:
+    if config.tstep % config.compute_energy == 1:
         if config.solver == 'NS':
             kk2 = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)        
             if rank == 0:
                 print 0.5*(kk2-kold[0])/config.dt
 
-def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, **kw):    
+def regression_test(comm, U, curl, float64, dx, L, rank, **kw):    
     if config.solver == 'NS':
         w = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     elif config.solver == 'VV':
@@ -106,7 +106,6 @@ def regression_test(t, tstep, comm, U, curl, float64, dx, L, sum, rank, **kw):
         assert round(w - 0.375249930801, 7) == 0
 
 if __name__ == "__main__":
-    from numpy import allclose, random
     config.update(
         {
         'nu': 0.000625,             # Viscosity

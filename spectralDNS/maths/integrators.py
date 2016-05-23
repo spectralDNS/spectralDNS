@@ -52,18 +52,18 @@ def getintegrator(dU, ComputeRHS, float, array, config, **kw):
         b = array([0.5, 0.5, 1.], dtype=float)
         u2 = u0.copy()
         @wraps(RK4)
-        def func(t, tstep, dt):
-            return RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS)
+        def func():
+            return RK4(u0, u1, u2, dU, a, b, config.dt, ComputeRHS)
         return func
             
     elif config.integrator == "ForwardEuler":  
         @wraps(ForwardEuler)
-        def func(t, tstep, dt):
-            return ForwardEuler(u0, u1, dU, dt, ComputeRHS)
+        def func():
+            return ForwardEuler(u0, u1, dU, config.dt, ComputeRHS)
         return func
     
     else:
         @wraps(AB2)
-        def func(t, tstep, dt):
-            return AB2(u0, u1, dU, dt, tstep, ComputeRHS)
+        def func():
+            return AB2(u0, u1, dU, config.dt, config.tstep, ComputeRHS)
         return func

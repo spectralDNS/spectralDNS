@@ -4,11 +4,12 @@ __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
+from spectralDNS.mesh.triplyperiodic import setup
 
-vars().update(setupMHD(**vars()))
+vars().update(setup['MHD'](**vars()))
 
 hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P, 
-                                    "Bx": B[0], "By": B[1], "Bz":B[2]}, config.solver+".h5")
+                                   "Bx": B[0], "By": B[1], "Bz":B[2]}, "MHD.h5")
 
 eta = float(config.eta)
 
@@ -64,35 +65,35 @@ def ComputeRHS(dU, rk):
     dU[:3] -= P_hat*K
 
     # Add contribution from diffusion
-    dU[:3] -= nu*K2*U_hat
-    dU[3:] -= eta*K2*B_hat
+    dU[:3] -= config.nu*K2*U_hat
+    dU[3:] -= config.eta*K2*B_hat
     
     return dU
 
-def regression_test(t, tstep, **kw):
+def regression_test(**kw):
     pass
-
-# Set up function to perform temporal integration (using config.integrator parameter)
-integrate = getintegrator(**vars())
 
 def solve():
     timer = Timer()
-    t = 0.0
-    tstep = 0
-    while t < config.T-1e-8:
-        t += dt 
-        tstep += 1
+    config.t = 0.0
+    config.tstep = 0
+    # Set up function to perform temporal integration (using config.integrator parameter)
+    integrate = getintegrator(**globals())
+
+    while config.t < config.T-1e-8:
+        config.t += config.dt 
+        config.tstep += 1
         
-        UB_hat[:] = integrate(t, tstep, dt)
+        UB_hat[:] = integrate()
 
         for i in range(6):
             UB[i] = FFT.ifftn(UB_hat[i], UB[i])
                  
-        update(t, tstep, **globals())
+        update(**globals())
         
         timer()
         
-        if tstep == 1 and config.make_profile:
+        if config.tstep == 1 and config.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
 
@@ -101,6 +102,6 @@ def solve():
     if config.make_profile:
         results = create_profile(**vars())
         
-    regression_test(t, tstep, **globals())
+    regression_test(**globals())
     
     hdf5file.close()

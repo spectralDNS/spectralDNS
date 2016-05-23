@@ -6,9 +6,10 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 Velocity-vorticity formulation
 """
 from spectralinit import *
-from NS import Cross, hdf5file, regression_test
 
-vars().update(setupDNS(**vars()))
+from NS import Cross, hdf5file, regression_test, setup
+
+vars().update(setup['VV'](**vars()))
 
 # Rename variable since we are working with a vorticity formulation
 W = U.copy()               # W is vorticity
@@ -39,31 +40,32 @@ def ComputeRHS(dU, rk):
         W_dealiased[i] = FFT.ifftn(W_hat[i], W_dealiased[i], config.dealias)
     F_tmp[:] = Cross(U_dealiased, W_dealiased, F_tmp, config.dealias)
     dU = cross2(dU, K, F_tmp)    
-    dU -= nu*K2*W_hat    
+    dU -= config.nu*K2*W_hat    
     dU += Source    
     return dU
 
-# Set up function to perform temporal integration (using config.integrator)
-integrate = getintegrator(**vars())
 
 def solve():
     timer = Timer()
-    t = 0.0
-    tstep = 0
-    while t < config.T-1e-8:
-        t += dt
-        tstep += 1
+    config.t = 0.0
+    config.tstep = 0
+    # Set up function to perform temporal integration (using config.integrator)
+    integrate = getintegrator(**globals())
+    
+    while config.t < config.T-1e-8:
+        config.t += config.dt
+        config.tstep += 1
         
-        W_hat = integrate(t, tstep, dt)
+        W_hat = integrate()
 
         for i in range(3):
             W[i] = FFT.ifftn(W_hat[i], W[i])
                         
-        update(t, tstep, **globals())
+        update(**globals())
         
         timer()
             
-        if tstep == 1 and config.make_profile:
+        if config.tstep == 1 and config.make_profile:
             profiler.enable()  #Enable profiling after first step is finished
 
     timer.final(MPI, rank)
@@ -71,6 +73,6 @@ def solve():
     if config.make_profile:
         results = create_profile(**vars())
 
-    regression_test(t, tstep, **globals())
+    regression_test(**globals())
         
     hdf5file.close()
