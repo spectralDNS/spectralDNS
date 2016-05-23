@@ -8,8 +8,6 @@ Velocity-vorticity formulation
 from spectralinit import *
 from NS import Cross, hdf5file, regression_test
 
-vars().update(setupDNS(**vars()))
-
 # Rename variable since we are working with a vorticity formulation
 W = U.copy()               # W is vorticity
 W_hat = U_hat              # U is used in setup, rename here for convenience

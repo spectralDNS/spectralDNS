@@ -5,8 +5,6 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
 
-vars().update(setupDNS(**vars()))
-
 hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5")
 
 def standardConvection(c, U_dealiased, dealias=None):
