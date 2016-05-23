@@ -5,6 +5,8 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
 
+vars().update(setupDNS(**vars()))
+
 hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5")
 
 def standardConvection(c, U_dealiased, dealias=None):
@@ -52,15 +54,12 @@ def Curl(a, c, dealias=None):
     c[2] = FFT.ifftn(curl_hat[2], c[2], dealias)    
     return c
 
-# Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved
-work_shape = FFT.real_shape_padded() if config.dealias == '3/2-rule' else FFT.real_shape()
-
 def getConvection(convection):
     """Return function used to compute convection"""
     if convection == "Standard":
         
         def Conv(dU):
-            U_dealiased = work[((3,)+work_shape, float, 0)]
+            U_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 0)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], config.dealias)
             dU = standardConvection(dU, U_dealiased, config.dealias)
@@ -70,7 +69,7 @@ def getConvection(convection):
     elif convection == "Divergence":
         
         def Conv(dU):
-            U_dealiased = work[((3,)+work_shape, float, 0)]
+            U_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 0)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], config.dealias)
             dU = divergenceConvection(dU, U_dealiased, config.dealias, False)
@@ -80,7 +79,7 @@ def getConvection(convection):
     elif convection == "Skewed":
         
         def Conv(dU):
-            U_dealiased = work[((3,)+work_shape, float, 0)]
+            U_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 0)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], config.dealias)
             dU = standardConvection(dU, U_dealiased, config.dealias)
@@ -91,8 +90,8 @@ def getConvection(convection):
     elif convection == "Vortex":
         
         def Conv(dU):
-            U_dealiased = work[((3,)+work_shape, float, 0)]
-            curl_dealiased = work[((3,)+work_shape, float, 1)]
+            U_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 0)]
+            curl_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 1)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], config.dealias)
             

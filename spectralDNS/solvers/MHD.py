@@ -4,12 +4,13 @@ __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
-            
+
+vars().update(setupMHD(**vars()))
+
 hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P, 
                                     "Bx": B[0], "By": B[1], "Bz":B[2]}, config.solver+".h5")
 
 eta = float(config.eta)
-work_shape = FFT.real_shape_padded() if config.dealias == '3/2-rule' else FFT.real_shape()
 
 def set_Elsasser(c, F_tmp, K):
     c[:3] = -1j*(K[0]*(F_tmp[:, 0] + F_tmp[0, :])
@@ -47,7 +48,7 @@ def ComputeRHS(dU, rk):
         for i in range(6):
             UB[i] = FFT.ifftn(UB_hat[i], UB[i])
     
-    UB_dealiased = work[((6,)+work_shape, float, 0)]
+    UB_dealiased = work[((6,)+FFT.work_shape(config.dealias), float, 0)]
     for i in range(6):
         UB_dealiased[i] = FFT.ifftn(UB_hat[i], UB_dealiased[i], config.dealias)
     

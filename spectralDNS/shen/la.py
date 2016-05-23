@@ -188,4 +188,17 @@ class Biharmonic(object):
                 SFTc.Solve_Biharmonic_1D(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
 
         return u
+    
+    def matvec(self, v, c):
+        N = v.shape[0]
+        c[:] = 0
+        if len(v.shape) > 1:
+            SFTc.Biharmonic_matvec3D(v, c, self.a0, self.alfa, self.beta, self.S.dd, self.S.ud[0], 
+                                self.S.ud[1], self.A.ld, self.A.dd, self.A.ud,
+                                self.B.lld, self.B.ld, self.B.dd, self.B.ud, self.B.uud)
+        else:
+            SFTc.Biharmonic_matvec(v, c, self.a0, self.alfa, self.beta, self.S.dd, self.S.ud[0], 
+                                self.S.ud[1], self.A.ld, self.A.dd, self.A.ud,
+                                self.B.lld, self.B.ld, self.B.dd, self.B.ud, self.B.uud)
+        return c
         

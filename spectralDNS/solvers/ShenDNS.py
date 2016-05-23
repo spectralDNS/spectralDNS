@@ -83,7 +83,7 @@ def Cross(a, b, c, S):
 def Curl(a, c, S):
     F_tmp = work[(a, 0)]
     Uc = work[(c, 2)]
-    SFTc.Mult_CTD_3D(N[0], a[1], a[2], F_tmp[1], F_tmp[2])
+    SFTc.Mult_CTD_3D_n(N[0], a[1], a[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], S, dealias=config.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], S, dealias=config.dealias)
     c[0] = FST.ifst((1j*K[1]*a[2] - 1j*K[2]*a[1]), c[0], S, dealias=config.dealias)
@@ -132,7 +132,7 @@ def standardConvection(c, U, U_hat):
     #SN.quad = ST.quad
     #dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], SN, dealias=config.dealias)       
     
-    SFTc.Mult_CTD_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
+    SFTc.Mult_CTD_3D_n(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST, dealias=config.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST, dealias=config.dealias)
     

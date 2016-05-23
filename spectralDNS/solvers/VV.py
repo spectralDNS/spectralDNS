@@ -6,7 +6,9 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 Velocity-vorticity formulation
 """
 from spectralinit import *
-from NS import Cross, hdf5file, regression_test, work_shape
+from NS import Cross, hdf5file, regression_test
+
+vars().update(setupDNS(**vars()))
 
 # Rename variable since we are working with a vorticity formulation
 W = U.copy()               # W is vorticity
@@ -28,8 +30,8 @@ def ComputeRHS(dU, rk):
         for i in range(3):
             W[i] = FFT.ifftn(W_hat[i], W[i])
             
-    U_dealiased = work[((3,)+work_shape, float, 0)]
-    W_dealiased = work[((3,)+work_shape, float, 1)]
+    U_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 0)]
+    W_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 1)]
     F_tmp = work[(dU, 0)]
     
     U_dealiased[:] = Curl(W_hat, U_dealiased, config.dealias)

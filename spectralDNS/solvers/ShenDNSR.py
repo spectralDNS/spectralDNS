@@ -9,7 +9,7 @@ from ..shen.Matrices import CDTmat, CTDmat, BDTmat, BTDmat, BTTmat, BTNmat, CNDm
 
 hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, 
                       config.solver+".h5", 
-                      mesh={"x": points, "xp": pointsp, "y": x1, "z": x2})  
+                      mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
 
 CDT = CDTmat(K[0, :, 0, 0])
 CTD = CTDmat(K[0, :, 0, 0])
@@ -28,13 +28,14 @@ def pressuregrad(P, P_hat, dU):
     dU[0] -= CDT.matvec(P_hat)
     
     # pressure gradient y-direction
-    #F_tmp[0] = FST.fss(P, F_tmp[0], ST)
-    F_tmp[0] = BDT.matvec(P_hat)
+    dP = work[(P_hat, 0)]
+    #dP = FST.fss(P, dP, ST)
+    dP[:] = BDT.matvec(P_hat)
     
-    dU[1, :Nu] -= 1j*K[1, :Nu]*F_tmp[0, :Nu]
+    dU[1, :Nu] -= 1j*K[1, :Nu]*dP[:Nu]
     
     # pressure gradient z-direction
-    dU[2, :Nu] -= 1j*K[2, :Nu]*F_tmp[0, :Nu]    
+    dU[2, :Nu] -= 1j*K[2, :Nu]*dP[:Nu]    
     
     return dU
 
@@ -43,19 +44,20 @@ def pressuregrad2(Pcorr, dU):
     dU[0] -= CDN.matvec(Pcorr)
     
     # pressure gradient y-direction
-    F_tmp[0] = BDN.matvec(Pcorr)
-    dU[1, :Nu] -= 1j*K[1, :Nu]*F_tmp[0, :Nu]
+    dP = work[(P_hat, 0)]
+    dP[:] = BDN.matvec(Pcorr)
+    dU[1, :Nu] -= 1j*K[1, :Nu]*dP[:Nu]
     
     # pressure gradient z-direction
-    dU[2, :Nu] -= 1j*K[2, :Nu]*F_tmp[0, :Nu]    
+    dU[2, :Nu] -= 1j*K[2, :Nu]*dP[:Nu]    
     
     return dU
 
 def solvePressure(P_hat, Ni):
     """Solve for pressure if Ni is fst of convection"""
-    F_tmp[0] = 0
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])    
-    P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
+    F_tmp = work[(P_hat, 0)] 
+    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[p_slice])    
+    P_hat = HelmholtzSolverP(P_hat, F_tmp)
     
     # P in Chebyshev basis for this solver
     P[:] = FST.ifst(P_hat, P, SN)
@@ -65,13 +67,13 @@ def solvePressure(P_hat, Ni):
     return P_hat
 
 def updatepressure(P_hat, Pcorr, U_hat):
-    #F_tmp[2] = 0
-    #F_tmp[2] = CND.matvec(U_hat[0])
-    #F_tmp[2] += 1j*K[1]*BND.matvec(U_hat[1])
-    #F_tmp[2] += 1j*K[2]*BND.matvec(U_hat[2])
-    #F_tmp[2] = TDMASolverN(F_tmp[2])
+    #F_tmp = work[(P_hat, 0)]
+    #F_tmp[:] = CND.matvec(U_hat[0])
+    #F_tmp += 1j*K[1]*BND.matvec(U_hat[1])
+    #F_tmp += 1j*K[2]*BND.matvec(U_hat[2])
+    #F_tmp = TDMASolverN(F_tmp)
     #P_hat += BTN.matvec(Pcorr)/dd
-    #P_hat -= nu*BTN.matvec(F_tmp[2])/dd
+    #P_hat -= nu*BTN.matvec(F_tmp)/dd
     
     P_hat += BTN.matvec(Pcorr)/dd
     P_hat -= nu*CTD.matvec(U_hat[0])/dd
@@ -98,13 +100,14 @@ def solve():
             U_hat[2] = HelmholtzSolverU(U_hat[2], dU[2])
         
             # Pressure correction
-            F_tmp[0] = pressurerhs(U_hat, F_tmp[0]) 
-            Pcorr[:] = HelmholtzSolverP(Pcorr, F_tmp[0])
+            dP = work[(P_hat, 0)]
+            dP = pressurerhs(U_hat, dP) 
+            Pcorr[:] = HelmholtzSolverP(Pcorr, dP)
 
-            # Update pressure
-            F_tmp[1] = P_hat[:]
+            # Update pressure            
+            dP[:] = P_hat
             updatepressure(P_hat, Pcorr, U_hat)
-            F_tmp[1] -= P_hat
+            dP -= P_hat
 
             comm.Allreduce(linalg.norm(Pcorr), pressure_error)
             if jj == 0 and config.print_divergence_progress and rank == 0:
@@ -135,7 +138,6 @@ def solve():
         
         P[:] = FST.ifct(P_hat, P, SN)        
         H_hat1[:] = H_hat
-        H1[:] = H
                 
         timer()
         

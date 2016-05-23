@@ -38,10 +38,6 @@ def setupShen(N, L, MPI, float, complex, **kwargs):
     U_hat0  = empty((3,)+FST.complex_shape(), dtype=complex)
     U_hat1  = empty((3,)+FST.complex_shape(), dtype=complex)
 
-    U_tmp   = empty((3,)+FST.real_shape(), dtype=float)
-    F_tmp   = empty((3,)+FST.complex_shape(), dtype=complex)
-    F_tmp2  = empty((3,)+FST.complex_shape(), dtype=complex)
-
     dU      = empty((3,)+FST.complex_shape(), dtype=complex)
 
     H_hat    = empty((3,)+FST.complex_shape(), dtype=complex)
@@ -120,10 +116,6 @@ def setupShenMHD(N, L, MPI, float, complex, **kwargs):
     FST = FastShenFourierTransform(N, L, MPI, dealias_cheb=config.dealias_cheb)
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
-
-    dealias = None
-    if not config.dealias == "3/2-rule":
-        dealias = FST.get_dealias_filter()
 
     U     = empty((6,)+FST.real_shape(), dtype=float)
     U_hat = empty((6,)+FST.complex_shape(), dtype=complex)
@@ -209,7 +201,6 @@ class FastShenFourierTransform(slab_FFT):
     def __init__(self, N, L, MPI, padsize=1.5, dealias_cheb=False):
         slab_FFT.__init__(self, N, L, MPI, "double", padsize=padsize)
         self.dealias_cheb = dealias_cheb
-        self.Ncp = int(padsize*self.N[0])
         
     def complex_shape_padded_T(self):
         """The local shape of the transposed complex data padded in x and z directions"""
@@ -335,7 +326,6 @@ class FastShenFourierTransform(slab_FFT):
         fp[:, :, :self.Nf] = fu[:]
         return fp
 
-    
     def fss(self, u, fu, S, dealias=None):
         """Fast Shen scalar product of x-direction, Fourier transform of y and z"""
         

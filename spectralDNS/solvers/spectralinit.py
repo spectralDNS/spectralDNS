@@ -48,7 +48,7 @@ if config.mesh in ('doublyperiodic', 'triplyperiodic'):
 if config.make_profile: profiler = cProfile.Profile()
 
 # Set up solver using either slab or pencil decomposition
-vars().update(setup(**vars()))
+#vars().update(setup(**vars()))
 
 def update(t, tstep, **kwargs):
     pass

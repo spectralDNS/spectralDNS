@@ -234,7 +234,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
     #for i in range(3):
         #Sk[i] = FST.fss(Source[i], Sk[i], ST)
         
-    if (hdf5file.check_if_write(config.tstep) or config.tstep % config.plot_result == 0):
+    if (hdf5file.check_if_write(config.tstep) or (config.tstep % config.plot_result == 0 and config.plot_result > 0)):
         U[0] = FST.ifst(U_hat[0], U[0], SB)
         for i in range(1, 3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)     
@@ -321,7 +321,7 @@ class Stats(object):
             
         for i in ("UU", "VV", "WW", "UV", "UW", "VW"):
             self.f0["Reynolds Stress"].create_dataset(i, shape=(2**config.M[0], ), dtype=float)
-    
+
     def __call__(self, U, P):
         self.num_samples += 1
         self.Umean += sum(U, axis=(2,3))
@@ -350,7 +350,9 @@ class Stats(object):
             self.f0["Average/P"][s] = self.Pmean/Nd
             for i, name in enumerate(("UU", "VV", "WW", "UV", "UW", "VW")):
                 self.f0["Reynolds Stress/"+name][s] = self.UU[i]/Nd
+            self.f0.attrs.create("num_samples", self.num_samples)
             self.f0.close()
+            
         if self.comm.Get_size() == 1:
             return self.Umean/Nd, self.Pmean/Nd, self.UU/Nd
     
@@ -362,14 +364,17 @@ class Stats(object):
         
     def fromfile(self, filename="stats"):
         self.fname = filename
-        self.f0 = h5py.File(filename+".h5", "a", driver="mpio", comm=self.comm)
+        self.f0 = h5py.File(filename+".h5", "a", driver="mpio", comm=self.comm)        
         N = self.shape[0]
+        self.num_samples = self.f0.attrs["num_samples"]
+        Nd = self.num_samples*self.shape[1]*self.shape[2]        
         s = slice(self.rank*N, (self.rank+1)*N, 1)
         for i, name in enumerate(("U", "V", "W")):
-            self.Umean[i, :] = self.f0["Average/"+name][s]
-        self.Pmean[:] = self.f0["Average/P"][s]
+            self.Umean[i, :] = self.f0["Average/"+name][s]*Nd
+        self.Pmean[:] = self.f0["Average/P"][s]*Nd
         for i, name in enumerate(("UU", "VV", "WW", "UV", "UW", "VW")):
-            self.UU[i, :] = self.f0["Reynolds Stress/"+name][s]
+            self.UU[i, :] = self.f0["Reynolds Stress/"+name][s]*Nd
+        self.f0.close()
 
 if __name__ == "__main__":
     config.update(
@@ -387,11 +392,11 @@ if __name__ == "__main__":
     config.channel.add_argument("--sample_stats", type=int, default=10)
     config.channel.add_argument("--print_energy0", type=int, default=10)
     solver = get_solver(update=update, mesh="channel")    
-    initialize(**vars(solver))    
-    #init_from_file("KMM666.h5", **vars(solver))
+    #initialize(**vars(solver))    
+    init_from_file("KMM665.h5", **vars(solver))
     set_Source(**vars(solver))
-    solver.stats = Stats(solver.U, solver.comm, filename="KMMstats")
-    solver.hdf5file.fname = "KMM666d.h5"
+    solver.stats = Stats(solver.U, solver.comm, fromstats="KMMstats")
+    solver.hdf5file.fname = "KMM665q.h5"
     solver.solve()
     s = solver.stats.get_stats()
 

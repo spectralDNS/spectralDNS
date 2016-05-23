@@ -3,10 +3,10 @@ __date__ = "2014-12-30"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from spectralDNS import config
+#from spectralDNS import config
 from mpiFFT4py import *
 
-__all__ = ['setup']
+#__all__ = ['setup']
 
 def setupDNS(float, complex, FFT, sum, where, **kwargs):    
     
@@ -58,6 +58,6 @@ def setupMHD(float, complex, FFT, sum, where, **kwargs):
     del kwargs
     return locals() # Lazy (need only return what is needed)
         
-setup = {"MHD": setupMHD,
-         "NS":  setupDNS,
-         "VV":  setupDNS}[config.solver]        
+#setup = {"MHD": setupMHD,
+         #"NS":  setupDNS,
+         #"VV":  setupDNS}[config.solver]        

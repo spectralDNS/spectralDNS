@@ -1007,7 +1007,7 @@ def test_Mult_CTD_3D(SD):
     assert np.allclose(cv, bv)
     assert np.allclose(cw, bw)
 
-test_Mult_CTD_3D(ShenDirichletBasis("GL"))
+#test_Mult_CTD_3D(ShenDirichletBasis("GL"))
 
 
 def test_Biharmonic(SB):

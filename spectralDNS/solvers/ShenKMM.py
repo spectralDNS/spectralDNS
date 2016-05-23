@@ -13,6 +13,7 @@ hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P},
                       filename=config.solver+".h5", mesh={"x": x0, "y": x1, "z": x2})  
 
 K4 = K2**2
+kx = K[0, :, 0, 0]
 HelmholtzSolverG = Helmholtz(N[0], sqrt(K2[0]+2.0/nu/dt), ST.quad, False)
 BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0], -(K2[0] + nu*dt/2.*K4[0]), quad=SB.quad, solver="cython")
 HelmholtzSolverU0 = Helmholtz(N[0], sqrt(2./nu/dt), ST.quad, False)
@@ -23,24 +24,24 @@ h0_hat = zeros((3, N[0]), dtype=complex)
 TDMASolverD = TDMA(ST.quad, False)
 
 alfa = K2[0] - 2.0/nu/dt
-CDD = CDDmat(K[0, :, 0, 0])
+CDD = CDDmat(kx)
 
-AB = HelmholtzCoeff(K[0, :, 0, 0], -1.0, -alfa, ST.quad)
-AC = BiharmonicCoeff(K[0, :, 0, 0], nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad)
+AB = HelmholtzCoeff(kx, -1.0, -alfa, ST.quad)
+AC = BiharmonicCoeff(kx, nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad)
 
-# Matrics for biharmonic equation
-CBD = CBDmat(K[0, :, 0, 0])
-ABB = ABBmat(K[0, :, 0, 0])
-BBB = BBBmat(K[0, :, 0, 0], SB.quad)
-SBB = SBBmat(K[0, :, 0, 0])
+# Matrices for biharmonic equation
+CBD = CBDmat(kx)
+ABB = ABBmat(kx)
+BBB = BBBmat(kx, SB.quad)
+SBB = SBBmat(kx)
 
 # Matrices for Helmholtz equation
-ADD = ADDmat(K[0, :, 0, 0])
-BDD = BDDmat(K[0, :, 0, 0], ST.quad)
+ADD = ADDmat(kx)
+BDD = BDDmat(kx, ST.quad)
 
 # 
-BBD = BBDmat(K[0, :, 0, 0], SB.quad)
-CDB = CDBmat(K[0, :, 0, 0])
+BBD = BBDmat(kx, SB.quad)
+CDB = CDBmat(kx)
 
 def solvePressure(P_hat, Ni):
     """Solve for pressure if Ni is fst of convection"""
@@ -65,6 +66,8 @@ def Curl(a_hat, c, S):
     F_tmp = work[(a_hat, 0)]
     F_tmp2 = work[(a_hat, 2)]
     Uc = work[(c, 2)]
+    # Mult_CTD_3D_n is projection to T of d(a_hat)/dx (for components 1 and 2 of a_hat) 
+    # Corresponds to CTD.matvec(a_hat[1])/BTT.dd, CTD.matvec(a_hat[2])/BTT.dd
     SFTc.Mult_CTD_3D_n(N[0], a_hat[1], a_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], S, dealias=config.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], S, dealias=config.dealias)
@@ -78,6 +81,7 @@ def Curl(a_hat, c, S):
     #elif FST.rank == FST.num_processes / 2:
         #F_tmp2[:, :, 0] = 0
     #F_tmp2[:, :, :, -1] = 0
+    
     c[1] = FST.ifst(F_tmp2[0], c[1], SB, dealias=config.dealias)
     c[1] -= dwdx
     c[2] = FST.ifst(F_tmp2[1], c[2], SB, dealias=config.dealias)
@@ -99,7 +103,7 @@ def standardConvection(c, U_dealiased, U_hat):
     F_tmp[0] = TDMASolverD(F_tmp[0])    
     dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], ST, dealias=config.dealias)   
         
-    SFTc.Mult_CTD_3D(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
+    SFTc.Mult_CTD_3D_n(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST, dealias=config.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST, dealias=config.dealias)
     
