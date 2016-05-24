@@ -63,8 +63,4 @@ def setupMHD(float, complex, FFT, sum, where, **kwargs):
         
 setup = {"MHD": setupMHD,
          "NS":  setupDNS,
-<<<<<<< HEAD
          "VV":  setupDNS}
-=======
-         "VV":  setupDNS}[config.solver]        
->>>>>>> master
