@@ -3,8 +3,7 @@ __date__ = "2014-12-30"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from spectralDNS import config
-from mpiFFT4py import *
+from mpiFFT4py import work_arrays, zeros, empty
 
 __all__ = ['setup']
 
@@ -26,6 +25,8 @@ def setupDNS(float, complex, FFT, sum, where, **kwargs):
     # 
     curl   = empty((3,) + FFT.real_shape(), dtype=float)   
     Source = None
+    
+    work = work_arrays()
     
     del kwargs
     return locals() # Lazy (need only return what is needed)
@@ -54,10 +55,12 @@ def setupMHD(float, complex, FFT, sum, where, **kwargs):
     # 
     curl   = empty((3,) + FFT.real_shape(), dtype=float)   
     Source = None
+
+    work = work_arrays()
     
     del kwargs
     return locals() # Lazy (need only return what is needed)
         
 setup = {"MHD": setupMHD,
          "NS":  setupDNS,
-         "VV":  setupDNS}[config.solver]        
+         "VV":  setupDNS}

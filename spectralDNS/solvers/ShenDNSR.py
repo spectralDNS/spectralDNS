@@ -3,12 +3,13 @@ __date__ = "2015-10-29"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from spectralinit import *
 from ShenDNS import *
 from ..shen.Matrices import CDTmat, CTDmat, BDTmat, BTDmat, BTTmat, BTNmat, CNDmat, BNDmat
 
+vars().update(setup['IPCSR'](**vars()))
+
 hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, 
-                      config.solver+".h5", 
+                      "IPCSR.h5", 
                       mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
 
 CDT = CDTmat(K[0, :, 0, 0])
@@ -89,7 +90,7 @@ def solve():
     timer = Timer()
     
     while config.t < config.T-1e-8:
-        config.t += dt
+        config.t += config.dt
         config.tstep += 1
         # Tentative momentum solve
         for jj in range(config.velocity_pressure_iters):
@@ -124,7 +125,7 @@ def solve():
         dU[0] = TDMASolverD(dU[0])
         dU[1] = TDMASolverD(dU[1])
         dU[2] = TDMASolverD(dU[2])        
-        U_hat[:, u_slice] += dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
+        U_hat[:, u_slice] += config.dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
 
         for i in range(3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)

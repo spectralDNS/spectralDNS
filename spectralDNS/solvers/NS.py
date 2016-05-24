@@ -4,8 +4,11 @@ __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
+from spectralDNS.mesh.triplyperiodic import setup
 
-hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5")
+vars().update(setup['NS'](**vars()))
+
+hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "NS.h5")
 
 def standardConvection(c, U_dealiased, dealias=None):
     """c_i = u_j du_i/dx_j"""
@@ -99,8 +102,6 @@ def getConvection(convection):
         
     return Conv           
 
-conv = getConvection(config.convection)
-
 @optimizer
 def add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu):
     """Add contributions from pressure and diffusion to the rhs"""
@@ -122,34 +123,36 @@ def ComputeRHS(dU, rk):
                             
     dU = conv(dU)
     
-    dU = add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu)
+    dU = add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, config.nu)
         
     return dU
 
-def regression_test(t, tstep, **kw):
+def regression_test(**kw):
     pass
 
-# Set up function to perform temporal integration (using config.integrator parameter)
-integrate = getintegrator(**vars())
+conv = getConvection(config.convection)
 
 def solve():
     timer = Timer()
-    t = 0.0
-    tstep = 0
-    while t < config.T-1e-8:
-        t += dt 
-        tstep += 1
+    config.t = 0.0
+    config.tstep = 0
+    # Set up function to perform temporal integration (using config.integrator parameter)
+    integrate = getintegrator(**globals())
+
+    while config.t < config.T-1e-8:
+        config.t += config.dt 
+        config.tstep += 1
         
-        U_hat[:] = integrate(t, tstep, dt)
+        U_hat[:] = integrate()
 
         for i in range(3):
             U[i] = FFT.ifftn(U_hat[i], U[i])
                  
-        update(t, tstep, **globals())
+        update(**globals())
         
         timer()
         
-        if tstep == 1 and config.make_profile:
+        if config.tstep == 1 and config.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
 
@@ -158,6 +161,6 @@ def solve():
     if config.make_profile:
         results = create_profile(**globals())
         
-    regression_test(t, tstep, **globals())
+    regression_test(**globals())
         
     hdf5file.close()

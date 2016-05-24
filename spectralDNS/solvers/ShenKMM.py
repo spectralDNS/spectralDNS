@@ -4,14 +4,18 @@ __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
+from spectralDNS.mesh.channel import setup
 from ..shen.Matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, ADDmat, BDDmat, CDBmat, BiharmonicCoeff, HelmholtzCoeff
 from ..shen.la import Helmholtz, TDMA, Biharmonic
 from ..shen import SFTc
+
+vars().update(setup['KMM'](**vars()))
 
 assert config.precision == "double"
 hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, 
                       filename=config.solver+".h5", mesh={"x": x0, "y": x1, "z": x2})  
 
+nu, dt = config.nu, config.dt
 K4 = K2**2
 kx = K[0, :, 0, 0]
 HelmholtzSolverG = Helmholtz(N[0], sqrt(K2[0]+2.0/nu/dt), ST.quad, False)
@@ -167,15 +171,12 @@ def divergenceConvection(c, U, U_hat, add=False):
     
     return c
 
-# Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved
-work_shape = FST.real_shape_padded() if config.dealias == '3/2-rule' else FST.real_shape()
-
 def getConvection(convection):
     if convection == "Standard":
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+work_shape, float, 0)]
+            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
             for i in range(1, 3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
@@ -188,7 +189,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+work_shape, float, 0)]
+            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
             for i in range(1, 3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
@@ -201,7 +202,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+work_shape, float, 0)]
+            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
             for i in range(1, 3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
@@ -215,8 +216,8 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+work_shape, float, 0)]
-            curl_dealiased = work[((3,)+work_shape, float, 1)]
+            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
+            curl_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 1)]
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
             for i in range(1, 3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
@@ -277,7 +278,7 @@ def solve():
     timer = Timer()
     
     while config.t < config.T-1e-14:
-        config.t += dt
+        config.t += config.dt
         config.tstep += 1
 
         dU[:] = 0

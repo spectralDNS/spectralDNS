@@ -105,7 +105,7 @@ def solve():
     timer = Timer()
     
     while config.t < config.T-1e-10:
-        config.t += dt
+        config.t += config.dt
         config.tstep += 1
 
         dU[:] = 0

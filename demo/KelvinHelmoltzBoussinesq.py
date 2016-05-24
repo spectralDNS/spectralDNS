@@ -1,6 +1,6 @@
 from spectralDNS import config, get_solver
 import matplotlib.pyplot as plt
-from numpy import zeros, exp
+from numpy import zeros, exp, sum
 
 def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, N, pi, FFT, float, **kwargs):
 
@@ -25,16 +25,16 @@ def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, N, pi, FFT, float, **
         Ur_hat[i] = FFT.fft2(Ur[i], Ur_hat[i]) 
 
 im, im2 = None, None
-def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, FFT, U_hat, U, sum, 
+def update(comm, rank, rho, N, L, dx, curl, K, FFT, U_hat, U, 
            P_hat, P, hdf5file, float64, rho_hat, **kwargs):
     global im, im2
         
-    if (hdf5file.check_if_write(tstep) or (tstep % config.plot_result == 0 
+    if (hdf5file.check_if_write(config.tstep) or (config.tstep % config.plot_result == 0 
         and config.plot_result > 0)):
         P = FFT.ifft2(P_hat*1j, P)
         curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         
-    if tstep == 1 and config.plot_result > 0:
+    if config.tstep == 1 and config.plot_result > 0:
         fig, ax = plt.subplots(1, 1)
         fig.suptitle('Density', fontsize=20)
         ax.set_xlabel('x')
@@ -54,7 +54,7 @@ def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, FFT, U_hat, U, sum,
         plt.draw()
         globals().update(dict(im=im, im2=im2))
 
-    if tstep % config.plot_result == 0 and config.plot_result > 0:
+    if config.tstep % config.plot_result == 0 and config.plot_result > 0:
         im.set_data(rho[:, :].T)
         im.autoscale()
         plt.pause(1e-6)
@@ -62,15 +62,15 @@ def update(t, tstep, comm, rank, rho, N, L, dx, curl, K, FFT, U_hat, U, sum,
         im2.autoscale()
         plt.pause(1e-6)
         if rank == 0:
-            print tstep
+            print config.tstep
 
-    if hdf5file.check_if_write(tstep):
-        hdf5file.write(tstep)           
+    if hdf5file.check_if_write(config.tstep):
+        hdf5file.write(config.tstep)           
 
-    if tstep % config.compute_energy == 0:
+    if config.tstep % config.compute_energy == 0:
         kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
         if rank == 0:
-            print tstep, kk
+            print config.tstep, kk
 
 if __name__ == "__main__":
     config.update(

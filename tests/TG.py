@@ -1,7 +1,7 @@
 from spectralDNS import config, get_solver
 from numpy import array, pi
 
-def initialize(config, **kw):
+def initialize(**kw):
     if config.solver == 'NS':
         initialize1(**kw)
     
@@ -28,12 +28,12 @@ def initialize2(U, W, W_hat, X, sin, cos, FFT, work,
     for i in range(3):
         W[i] = FFT.ifftn(W_hat[i], W[i])        
 
-def update(t, tstep, P, P_hat, hdf5file, FFT, **kw):
-    if hdf5file.check_if_write(tstep):
+def update(P, P_hat, hdf5file, FFT, **kw):
+    if hdf5file.check_if_write(config.tstep):
         P = FFT.ifftn(P_hat*1j, P)
-        hdf5file.write(tstep)
+        hdf5file.write(config.tstep)
     
-def regression_test(t, tstep, comm, U_hat, U, curl, float64, dx, L, sum, rank, Curl, **kw):
+def regression_test(comm, U_hat, U, curl, float64, dx, L, sum, rank, Curl, **kw):
     if config.solver == 'NS':
         curl[:] = Curl(U_hat, curl)
         w = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)

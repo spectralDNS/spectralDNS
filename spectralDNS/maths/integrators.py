@@ -3,7 +3,6 @@ __date__ = "2015-04-07"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from spectralDNS import config
 from ..optimization import optimizer, wraps
 
 __all__ = ['getintegrator']
@@ -36,7 +35,7 @@ def AB2(u0, u1, dU, dt, tstep, ComputeRHS):
     u1[:] = dU*dt    
     return u0
 
-def getintegrator(dU, ComputeRHS, float, array, **kw):
+def getintegrator(dU, ComputeRHS, float, array, config, **kw):
     """Return integrator using choice in global parameter integrator.
     """
     if config.solver in ("NS", "VV", "NS2D"):
@@ -53,18 +52,18 @@ def getintegrator(dU, ComputeRHS, float, array, **kw):
         b = array([0.5, 0.5, 1.], dtype=float)
         u2 = u0.copy()
         @wraps(RK4)
-        def func(t, tstep, dt):
-            return RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS)
+        def func():
+            return RK4(u0, u1, u2, dU, a, b, config.dt, ComputeRHS)
         return func
             
     elif config.integrator == "ForwardEuler":  
         @wraps(ForwardEuler)
-        def func(t, tstep, dt):
-            return ForwardEuler(u0, u1, dU, dt, ComputeRHS)
+        def func():
+            return ForwardEuler(u0, u1, dU, config.dt, ComputeRHS)
         return func
     
     else:
         @wraps(AB2)
-        def func(t, tstep, dt):
-            return AB2(u0, u1, dU, dt, tstep, ComputeRHS)
+        def func():
+            return AB2(u0, u1, dU, config.dt, config.tstep, ComputeRHS)
         return func

@@ -4,20 +4,23 @@ __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
+from spectralDNS.mesh.channel import setup
 from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, CNDmat, HelmholtzCoeff
 from ..shen.la import Helmholtz, TDMA
 from ..shen import SFTc
 
+vars().update(setup['IPCS'](**vars()))
+
 assert config.precision == "double"
-hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, config.solver+".h5", 
+hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "IPCS.h5", 
                       mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
 
-HelmholtzSolverU = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), ST.quad, False)
+HelmholtzSolverU = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/config.nu/config.dt), ST.quad, False)
 HelmholtzSolverP = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2), SN.quad, True)
 TDMASolverD = TDMA(ST.quad, False)
 TDMASolverN = TDMA(SN.quad, True)
 
-alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
+alfa = K[1, 0]**2+K[2, 0]**2-2.0/config.nu/config.dt
 CDN = CDNmat(K[0, :, 0, 0])
 CND = CNDmat(K[0, :, 0, 0])
 BDN = BDNmat(K[0, :, 0, 0], ST.quad)
@@ -61,7 +64,7 @@ def pressurerhs(U_hat, dU):
     #U_tmp2[0] = FST.ifst(F_tmp2[0], U_tmp2[0], ST)
     #dU = FST.fss(U_tmp2[0], dU, SN)
     
-    dU[p_slice] *= -1./dt    
+    dU[p_slice] *= -1./config.dt    
     return dU
 
 def body_force(Sk, dU):
@@ -205,15 +208,12 @@ def divergenceConvection(c, U, U_hat, add=False):
     c[2] += 1j*K[2]*F_tmp[2]  # dwwdz
     return c    
 
-# Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved
-work_shape = FST.real_shape_padded() if config.dealias == '3/2-rule' else FST.real_shape()
-
 def getConvection(convection):
     if convection == "Standard":
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+work_shape, float, 0)]
+            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
             for i in range(3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
 
@@ -225,7 +225,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+work_shape, float, 0)]
+            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
             for i in range(3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
 
@@ -237,7 +237,7 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+work_shape, float, 0)]
+            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
             for i in range(3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
 
@@ -250,8 +250,8 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+work_shape, float, 0)]
-            curl_dealiased = work[((3,)+work_shape, float, 1)]
+            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
+            curl_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 1)]
             for i in range(3):
                 U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
             
@@ -285,7 +285,7 @@ def ComputeRHS(dU, jj):
     dU = body_force(Sk, dU)
     
     # Scale by 2/nu factor
-    dU[:] *= 2./nu
+    dU[:] *= 2./config.nu
     
     # Add diffusion
     dU[:] += diff0
@@ -311,7 +311,7 @@ def solve():
     timer = Timer()
     
     while config.t < config.T-1e-8:
-        config.t += dt
+        config.t += config.dt
         config.tstep += 1
 
         # Tentative momentum solve
@@ -350,7 +350,7 @@ def solve():
         dU[0] = TDMASolverD(dU[0])
         dU[1] = TDMASolverD(dU[1])
         dU[2] = TDMASolverD(dU[2])
-        U_hat[:, u_slice] += dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
+        U_hat[:, u_slice] += config.dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
 
         for i in range(3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)

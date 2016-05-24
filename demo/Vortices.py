@@ -37,10 +37,10 @@ def set_source(U, Source, FFT, N, X, **kwargs):
     return Source
 
 im, im2 = None, None    
-def update(t, tstep, dt, comm, rank, P, P_hat, U, W, W_hat, Curl, hdf5file, 
+def update(comm, rank, P, P_hat, U, W, W_hat, Curl, hdf5file, 
            Source, X, **kw):    
     global im, im2
-    if tstep == 1 and rank == 0:
+    if config.tstep == 1 and rank == 0:
         plt.figure()
         im = plt.quiver(X[1, 0], X[2, 0], 
                         U[1, 0], U[2, 0], pivot='mid', scale=2)    
@@ -53,21 +53,21 @@ def update(t, tstep, dt, comm, rank, P, P_hat, U, W, W_hat, Curl, hdf5file,
         plt.pause(1e-6)
         globals().update(im=im, im2=im2)
     
-    if hdf5file.check_if_write(tstep):    
+    if hdf5file.check_if_write(config.tstep):    
         U = Curl(W_hat, U)
         P[:] = sqrt(W[0]*W[0] + W[1]*W[1] + W[2]*W[2])
-        hdf5file.write(tstep)
+        hdf5file.write(config.tstep)
 
-    if tstep == 10:
+    if config.tstep == 10:
         Source[:] = 0
         
-    if tstep % config.plot_result == 0 and rank == 0:
+    if config.tstep % config.plot_result == 0 and rank == 0:
         im.set_UVC(U[1, 0], U[2, 0])
         im2.set_data(W[0, 0, :, ::-1].T)
         im2.autoscale()
         plt.pause(1e-6)
     
-    print "Time = ", t
+    print "Time = ", config.t
     
 def finalize(rank, Nf, X, U, W_hat, Curl, **soak):
     global im

@@ -3,7 +3,6 @@ __date__ = "2016-02-16"
 __copyright__ = "Copyright (C) 2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from spectralDNS import config
 from mpiFFT4py import *
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ShenBiharmonicBasis, SFTc
 from ..shenGeneralBCs.shentransform import ShenBasis
@@ -11,7 +10,7 @@ from numpy import array, ndarray, sum, meshgrid, mgrid, where, abs, pi, uint8, r
 
 __all__ = ['setup']
 
-def setupShen(N, L, MPI, float, complex, **kwargs):
+def setupShen(N, L, MPI, float, complex, config, **kwargs):
     # Get points and weights for Chebyshev weighted integrals
     ST = ShenDirichletBasis(quad="GL")
     SN = ShenNeumannBasis(quad="GC")
@@ -51,12 +50,14 @@ def setupShen(N, L, MPI, float, complex, **kwargs):
     K = FST.get_scaled_local_wavenumbermesh()
     K2 = K[1]*K[1]+K[2]*K[2]
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+    
+    work = work_arrays()
 
     del kwargs 
     return locals()
 
 
-def setupShenKMM(N, L, MPI, float, complex, **kwargs):
+def setupShenKMM(N, L, MPI, float, complex, config, **kwargs):
 
     # Get points and weights for Chebyshev weighted integrals
     ST = ShenDirichletBasis(quad="GL")
@@ -97,12 +98,14 @@ def setupShenKMM(N, L, MPI, float, complex, **kwargs):
     K = FST.get_scaled_local_wavenumbermesh()
     K2 = K[1]*K[1]+K[2]*K[2]
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
+    work = work_arrays()
                 
     del kwargs 
     return locals()
 
 
-def setupShenMHD(N, L, MPI, float, complex, **kwargs):
+def setupShenMHD(N, L, MPI, float, complex, config, **kwargs):
     # Get points and weights for Chebyshev weighted integrals
     ST = ShenDirichletBasis(quad="GL")
     SN = ShenNeumannBasis(quad="GC")
@@ -146,6 +149,8 @@ def setupShenMHD(N, L, MPI, float, complex, **kwargs):
     K = FST.get_scaled_local_wavenumbermesh()
     K2 = K[1]*K[1]+K[2]*K[2]
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
+    work = work_arrays()
     
     del kwargs 
     return locals()
@@ -192,6 +197,8 @@ def setupShenGeneralBCs(N, L, MPI, float, complex, **kwargs):
     K = FST.get_scaled_local_wavenumbermesh()
     K2 = K[1]*K[1]+K[2]*K[2]
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
+    work = work_arrays()
     
     del kwargs 
     return locals()
@@ -677,4 +684,4 @@ setup = {"IPCS": setupShen,
          "KMM": setupShenKMM,
          "KMMRK3": setupShenKMM,
          "IPCS_MHD": setupShenMHD,
-         "IPCS_GeneralBCs": setupShenGeneralBCs}[config.solver]        
+         "IPCS_GeneralBCs": setupShenGeneralBCs}
