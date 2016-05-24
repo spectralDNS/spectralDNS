@@ -3,7 +3,7 @@ __date__ = "2014-12-30"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from mpiFFT4py import *
+from mpiFFT4py import work_arrays, zeros, empty
 from ..optimization import optimizer
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, conj
 
@@ -24,6 +24,8 @@ def setupNS(float, complex, FFT, **kwargs):
     
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
+    
+    work = work_arrays()
 
     del kwargs
     return locals()
@@ -48,6 +50,8 @@ def setupBoussinesq(float, complex, FFT, **kwargs):
 
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
+
+    work = work_arrays()
 
     del kwargs
     return locals()

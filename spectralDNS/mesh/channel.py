@@ -50,6 +50,8 @@ def setupShen(N, L, MPI, float, complex, config, **kwargs):
     K = FST.get_scaled_local_wavenumbermesh()
     K2 = K[1]*K[1]+K[2]*K[2]
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+    
+    work = work_arrays()
 
     del kwargs 
     return locals()
@@ -96,6 +98,8 @@ def setupShenKMM(N, L, MPI, float, complex, config, **kwargs):
     K = FST.get_scaled_local_wavenumbermesh()
     K2 = K[1]*K[1]+K[2]*K[2]
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
+    work = work_arrays()
                 
     del kwargs 
     return locals()
@@ -145,6 +149,8 @@ def setupShenMHD(N, L, MPI, float, complex, config, **kwargs):
     K = FST.get_scaled_local_wavenumbermesh()
     K2 = K[1]*K[1]+K[2]*K[2]
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
+    work = work_arrays()
     
     del kwargs 
     return locals()
@@ -191,6 +197,8 @@ def setupShenGeneralBCs(N, L, MPI, float, complex, **kwargs):
     K = FST.get_scaled_local_wavenumbermesh()
     K2 = K[1]*K[1]+K[2]*K[2]
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
+
+    work = work_arrays()
     
     del kwargs 
     return locals()

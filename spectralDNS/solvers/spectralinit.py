@@ -7,7 +7,7 @@ from mpi4py import MPI
 from spectralDNS import config
 import sys, cProfile
 from numpy import *
-from mpiFFT4py import slab_FFT, pencil_FFT, line_FFT, work_arrays
+from mpiFFT4py import slab_FFT, pencil_FFT, line_FFT, empty, zeros  # possibly byte-aligned zeros/empty
 from spectralDNS.utilities import *
 from spectralDNS.h5io import *
 from spectralDNS.optimization import *
@@ -29,7 +29,6 @@ M = config.M = array([eval(str(f)) for f in config.M], dtype=int)  # Convert fro
 L = config.L = array([eval(str(f)) for f in config.L], dtype=float)
 N = 2**M
 dx = (L/N).astype(float)
-work = work_arrays()
 
 if config.mesh in ('doublyperiodic', 'triplyperiodic'):
     if config.decomposition == 'slab':
