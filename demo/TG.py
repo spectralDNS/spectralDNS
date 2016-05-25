@@ -2,6 +2,7 @@ from spectralDNS import config, get_solver
 import matplotlib.pyplot as plt
 from numpy import array, pi, zeros, sum
 from numpy.linalg import norm
+import mpi4py
 
 def initialize(**kw):
     if config.solver == 'NS':
@@ -41,7 +42,7 @@ def update(comm, rank, P, P_hat, U, curl, Curl, float64, dx, L,
         if config.solver == 'NS':
             curl = Curl(U_hat, curl)
         
-        hdf5file.write(config.tstep)
+        #hdf5file.write(config.tstep)
         
     if im1 is None and rank == 0 and config.plot_step > 0:
         plt.figure()
@@ -93,7 +94,13 @@ def update(comm, rank, P, P_hat, U, curl, Curl, float64, dx, L,
             if rank == 0:
                 print 0.5*(kk2-kold[0])/config.dt
 
-def regression_test(comm, U, curl, float64, dx, L, rank, **kw):    
+def regression_test(comm, U, curl, float64, dx, L, rank, **kw):
+    import numpy as np
+    import os
+    if os.path.isfile("out2.npy"):
+        U_tmp = np.load("out2.npy")
+        print "Difference is %.2e relative to %.2e"  % (np.linalg.norm(U-U_tmp), np.linalg.norm(U))
+    np.save("out2.npy",U)
     if config.solver == 'NS':
         w = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     elif config.solver == 'VV':
@@ -120,10 +127,26 @@ if __name__ == "__main__":
     )
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=2)
     config.triplyperiodic.add_argument("--plot_step", type=int, default=10)
-    solver = get_solver(update=update, mesh="triplyperiodic")
+    solver = get_solver(update=update, mesh="triplyperiodic",regression_test=regression_test)
+    """
     solver.hdf5file.fname = "NS7.h5"
     solver.hdf5file.components["W0"] = solver.curl[0]
     solver.hdf5file.components["W1"] = solver.curl[1]
     solver.hdf5file.components["W2"] = solver.curl[2]
+    """
     initialize(**vars(solver))
     solver.solve()
+"""
+    from numpy.linalg import norm
+    initialize(**vars(solver))
+    solver.solve()
+
+    U = solver.U.copy()
+    initialize(**vars(solver))
+    solver.solve()
+
+    Uc = solver.U.copy()
+    assert norm(U-Uc) == 0
+    """
+
+
