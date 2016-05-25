@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from numpy import array, pi, zeros, sum
 from numpy.linalg import norm
 import mpi4py
+import h5py
 
 def initialize(**kw):
     if config.solver == 'NS':
@@ -94,13 +95,26 @@ def update(comm, rank, P, P_hat, U, curl, Curl, float64, dx, L,
             if rank == 0:
                 print 0.5*(kk2-kold[0])/config.dt
 
-def regression_test(comm, U, curl, float64, dx, L, rank, **kw):
+def regression_test(comm, U, curl, float64, dx, L, rank,FFT, **kw):
     import numpy as np
     import os
     if os.path.isfile("out2.npy"):
         U_tmp = np.load("out2.npy")
         print "Difference is %.2e relative to %.2e"  % (np.linalg.norm(U-U_tmp), np.linalg.norm(U))
     np.save("out2.npy",U)
+
+
+    if os.path.isfile("out2.h5"):
+        fin = h5py.File("out2.h5", "r", driver="mpio", comm=FFT.comm)
+        U_tmp = fin["U"]
+        print "Difference is %.2e relative to %.2e"  % (norm(U-U_tmp), norm(U))
+        fin.close()
+    
+    f = h5py.File("out2.h5", "w", driver="mpio", comm=FFT.comm)
+    f.create_dataset("U", shape=U.shape, dtype=U.dtype)
+    f["U"][:] = U
+    f.close()
+
     if config.solver == 'NS':
         w = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     elif config.solver == 'VV':
