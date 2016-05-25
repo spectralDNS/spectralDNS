@@ -127,4 +127,3 @@ if __name__ == "__main__":
     solver.hdf5file.components["W2"] = solver.curl[2]
     initialize(**vars(solver))
     solver.solve()
-    
