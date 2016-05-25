@@ -28,6 +28,9 @@ def initializeContext(context,args):
     context.model_params["Pr"] = args.Pr
     context.model_params["Ri"] = args.Ri
 
+    context.mesh_vars["work_shape"] = FFT.real_shape_padded() if context.dealias_name == '3/2-rule' else FFT.real_shape()
+
+
 
 #@optimizer
 def add_pressure_diffusion(context,dUr,Ur_hat):
@@ -59,11 +62,12 @@ def add_pressure_diffusion(context,dUr,Ur_hat):
 def ComputeRHS(context,Ur,Ur_hat,dUr, rk):
     float = context.types["float"]
     FFT = context.FFT
-    curl = context.mesh_vars["curl"]
     K = context.mesh_vars["K"]
     U_hat = Ur_hat[:-1]
+    work_shape = context.mesh_vars["work_shape"]
 
-    Ur_dealiased = context.work[((3,)+FFT.real_shape(), float, 0)]
+    Ur_dealiased = context.work[((3,)+work_shape, float, 0)]
+    curl_dealiased = context.work[(work_shape,float,0)]
     F_tmp = context.work[(dUr, 0)]
     
     for i in range(3):
@@ -73,9 +77,9 @@ def ComputeRHS(context,Ur,Ur_hat,dUr, rk):
     rho_dealiased = Ur_dealiased[2]
 
     F_tmp[0] = cross2(F_tmp[0], K, U_hat)
-    curl[:] = FFT.ifft2(F_tmp[0], curl, context.dealias_name)
-    dUr[0] = FFT.fft2(U_dealiased[1]*curl, dUr[0], context.dealias_name)
-    dUr[1] = FFT.fft2(-U_dealiased[0]*curl, dUr[1], context.dealias_name)
+    curl_dealiased[:] = FFT.ifft2(F_tmp[0], curl_dealiased, context.dealias_name)
+    dUr[0] = FFT.fft2(U_dealiased[1]*curl_dealiased, dUr[0], context.dealias_name)
+    dUr[1] = FFT.fft2(-U_dealiased[0]*curl_dealiased, dUr[1], context.dealias_name)
    
     F_tmp[0] = FFT.fft2(U_dealiased[0]*rho_dealiased, F_tmp[0], context.dealias_name)
     F_tmp[1] = FFT.fft2(U_dealiased[1]*rho_dealiased, F_tmp[1], context.dealias_name)
