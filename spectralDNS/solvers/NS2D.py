@@ -18,7 +18,7 @@ def initializeContext(context,args):
 
     context.hdf5file = HDF5Writer(context, {"U":U[0], "V":U[1], "P":P}, context.solver_name+".h5")
     # Set up function to perform temporal integration (using config.integrator parameter)
-    integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS,f=nonlinearTerm,g=linearTerm,ginv=inverseLinearTerm,hphi=hphi,gexp=expLinearTerm)
+    integrate = spectralDNS.maths.integrators.getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,hphi=None,gexp=None)
 
     context.time_integrator["integrate"] = integrate
 
@@ -26,6 +26,7 @@ def initializeContext(context,args):
     context.mesh_vars["work_shape"] = FFT.real_shape_padded() if context.dealias_name == '3/2-rule' else FFT.real_shape()
 
 def add_pressure_diffusion(context,dU,U_hat):
+    K2 = context.mesh_vars["K2"]
     K = context.mesh_vars["K"]
     K_over_K2 = context.mesh_vars["K_over_K2"]
     P_hat = context.mesh_vars["P_hat"]
@@ -45,17 +46,21 @@ def add_pressure_diffusion(context,dU,U_hat):
 def ComputeRHS(context,U,U_hat,dU, rk):
     float = context.types["float"]
     complex = context.types["complex"]
+    work_shape = context.mesh_vars["work_shape"]
     K = context.mesh_vars["K"]
+    FFT = context.FFT
 
     curl_hat = context.work[(FFT.complex_shape(), complex, 0)]    
-    U_dealiased = context.work[((2,)+FFT.real_shape(), float, 0)]
+
+    U_dealiased = context.work[((2,)+work_shape, float, 0)]
+    curl_dealiased = context.work[(work_shape,float,0)]
     
     curl_hat = cross2(curl_hat, K, U_hat)
-    curl[:] = FFT.ifft2(curl_hat, curl, context.dealias_name)
+    curl_dealiased[:] = FFT.ifft2(curl_hat, curl_dealiased, context.dealias_name)
     U_dealiased[0] = FFT.ifft2(U_hat[0], U_dealiased[0], context.dealias_name)
     U_dealiased[1] = FFT.ifft2(U_hat[1], U_dealiased[1], context.dealias_name)
-    dU[0] = FFT.fft2(U_dealiased[1]*curl, dU[0], context.dealias_name)
-    dU[1] = FFT.fft2(-U_dealiased[0]*curl, dU[1], context.dealias_name)
+    dU[0] = FFT.fft2(U_dealiased[1]*curl_dealiased, dU[0], context.dealias_name)
+    dU[1] = FFT.fft2(-U_dealiased[0]*curl_dealiased, dU[1], context.dealias_name)
     dU = add_pressure_diffusion(context,dU,U_hat)
     return dU
 
@@ -95,7 +100,7 @@ def solve(context):
         
         timer()
  
-        if tstep == 1 and config.make_profile:
+        if tstep == 1 and context.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
         if t + dt >= T:
@@ -116,9 +121,9 @@ def solve(context):
     context.callbacks["additional_callback"](fU_hat=dU,**kwargs)
 
 
-    timer.final(MPI, rank)
+    timer.final(context.MPI, FFT.rank)
 
-    if config.make_profile:
+    if context.make_profile:
         results = create_profile(**globals())
     
     context.callbacks["regression_test"](t,tstep,context)
