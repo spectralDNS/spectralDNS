@@ -10,7 +10,7 @@ vars().update(setup['NS'](**vars()))
 
 hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "NS.h5")
 
-def standardConvection(c, U_dealiased, dealias=None):
+def standardConvection(c, U_dealiased, U_hat, dealias=None):
     """c_i = u_j du_i/dx_j"""
     gradUi = work[(U_dealiased, 2)]
     for i in range(3):
@@ -59,45 +59,45 @@ def getConvection(convection):
     """Return function used to compute convection"""
     if convection == "Standard":
         
-        def Conv(dU):
-            U_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 0)]
+        def Conv(dU, U_hat):
+            U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], config.dealias)
-            dU = standardConvection(dU, U_dealiased, config.dealias)
+                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], params.dealias)
+            dU = standardConvection(dU, U_dealiased, U_hat, params.dealias)
             dU[:] *= -1 
             return dU
         
     elif convection == "Divergence":
         
-        def Conv(dU):
-            U_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 0)]
+        def Conv(dU, U_hat):
+            U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], config.dealias)
-            dU = divergenceConvection(dU, U_dealiased, config.dealias, False)
+                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], params.dealias)
+            dU = divergenceConvection(dU, U_dealiased, params.dealias, False)
             dU[:] *= -1
             return dU
         
     elif convection == "Skewed":
         
-        def Conv(dU):
-            U_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 0)]
+        def Conv(dU, U_hat):
+            U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], config.dealias)
-            dU = standardConvection(dU, U_dealiased, config.dealias)
-            dU = divergenceConvection(dU, U_dealiased, config.dealias, True)
+                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], params.dealias)
+            dU = standardConvection(dU, U_dealiased, U_hat, params.dealias)
+            dU = divergenceConvection(dU, U_dealiased, params.dealias, True)
             dU *= -0.5
             return dU
         
     elif convection == "Vortex":
         
-        def Conv(dU):
-            U_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 0)]
-            curl_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 1)]
+        def Conv(dU, U_hat):
+            U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
+            curl_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
             for i in range(3):
-                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], config.dealias)
+                U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], params.dealias)
             
-            curl_dealiased[:] = Curl(U_hat, curl_dealiased, config.dealias)
-            dU = Cross(U_dealiased, curl_dealiased, dU, config.dealias)
+            curl_dealiased[:] = Curl(U_hat, curl_dealiased, params.dealias)
+            dU = Cross(U_dealiased, curl_dealiased, dU, params.dealias)
             return dU
         
     return Conv           
@@ -118,47 +118,65 @@ def add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu):
     return dU
 
 #@profile
-def ComputeRHS(dU, rk):
-    """Compute and return entire rhs contribution"""
-                            
-    dU = conv(dU)
+def ComputeRHS(dU, U_hat):
+    """Compute and return entire rhs contribution"""                            
+    dU = conv(dU, U_hat)
     
-    dU = add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, config.nu)
+    dU = add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, params.nu)
         
     return dU
 
 def regression_test(**kw):
     pass
 
-conv = getConvection(config.convection)
+conv = getConvection(params.convection)
 
 def solve():
+    global dU, U, U_hat
+    
     timer = Timer()
-    config.t = 0.0
-    config.tstep = 0
-    # Set up function to perform temporal integration (using config.integrator parameter)
+    params.t = 0.0
+    params.tstep = 0
+    # Set up function to perform temporal integration (using params.integrator parameter)
     integrate = getintegrator(**globals())
 
-    while config.t < config.T-1e-8:
-        config.t += config.dt 
-        config.tstep += 1
+    if params.make_profile: profiler = cProfile.Profile()
+    
+    dt_in = params.dt
+
+    while params.t + params.dt <= params.T+1e-15:
         
-        U_hat[:] = integrate()
+        U_hat, params.dt, dt_took = integrate()
 
         for i in range(3):
             U[i] = FFT.ifftn(U_hat[i], U[i])
+
+        params.t += dt_took
+        params.tstep += 1
                  
         update(**globals())
         
         timer()
         
-        if config.tstep == 1 and config.make_profile:
+        if params.tstep == 1 and params.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
 
+        #Make sure that the last step hits T exactly.
+        if params.t + params.dt >= params.T:
+            params.dt = params.T - params.t
+            if params.dt <= 1.e-14:
+                break
+
+    params.dt = dt_in
+    
+    dU = ComputeRHS(dU, U_hat)
+    
+    additional_callback(fU_hat=dU, **globals())
+
     timer.final(MPI, rank)
     
-    if config.make_profile:
+    if params.make_profile:
         results = create_profile(**globals())
         
     regression_test(**globals())

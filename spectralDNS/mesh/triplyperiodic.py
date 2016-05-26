@@ -3,12 +3,16 @@ __date__ = "2014-12-30"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from mpiFFT4py import work_arrays, zeros, empty
+from mpiFFT4py import work_arrays, datatypes, zeros, empty
 
 __all__ = ['setup']
 
-def setupDNS(float, complex, FFT, sum, where, **kwargs):    
+def setupDNS(sum, where, config, get_FFT, **kwargs):
     
+    params = config.params
+    L = params.L
+    FFT = get_FFT(params.N, params.L, params.decomposition, params.precision)
+    float, complex, mpitype = datatypes(params.precision)
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()    
     K2 = sum(K*K, 0, dtype=float)
@@ -31,8 +35,11 @@ def setupDNS(float, complex, FFT, sum, where, **kwargs):
     del kwargs
     return locals() # Lazy (need only return what is needed)
 
-def setupMHD(float, complex, FFT, sum, where, **kwargs):
+def setupMHD(sum, where, config, get_FFT, **kwargs):
     
+    params = config.params
+    FFT = get_FFT(params.N, params.L, params.decomposition, params.precision)
+    float, complex, mpitype = datatypes(params.precision)
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()
     K2 = sum(K*K, 0, dtype=float)
@@ -60,7 +67,15 @@ def setupMHD(float, complex, FFT, sum, where, **kwargs):
     
     del kwargs
     return locals() # Lazy (need only return what is needed)
+
+def setupVV(sum, where, config, get_FFT, **kwargs):
+    d = setupDNS(sum, where, config, get_FFT, **kwargs)
+    # Rename variable since we are working with a vorticity formulation
+    d['W'] = empty((3,) + d['FFT'].real_shape(), dtype=d['float'])  # W is vorticity
+    d['W_hat'] = d['U_hat']                               # U is used in setupDNS, rename here for convenience
+    d['Source'] = zeros((3,) + d['FFT'].complex_shape(), dtype=d['complex']) # Possible source term initialized to zero
+    return d
         
 setup = {"MHD": setupMHD,
          "NS":  setupDNS,
-         "VV":  setupDNS}
+         "VV":  setupVV}

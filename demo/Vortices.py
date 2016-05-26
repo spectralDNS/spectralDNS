@@ -2,9 +2,9 @@ from spectralDNS import config, get_solver
 import matplotlib.pyplot as plt
 from numpy import array, sqrt, random, exp, pi
 
-def initialize(W, W_hat, FFT, X, **kwargs):
+def initialize(W, W_hat, FFT, X, params, **kwargs):
     W[:] = 0
-    if config.init == 'random':
+    if params.init == 'random':
         W[:] = 0.3*random.randn(*W.shape)
         
     else:
@@ -17,9 +17,9 @@ def initialize(W, W_hat, FFT, X, **kwargs):
         
     return W, W_hat
 
-def set_source(U, Source, FFT, N, X, **kwargs):
+def set_source(U, Source, FFT, X, params, **kwargs):
     U[:] = 0
-    if config.init == 'random':
+    if params.init == 'random':
         #U[0, :, N/2, (2*N)/3] = 200
         #U[0, :, N/3, (2*N)/3] = -50
         #U[0, :, N/2, N/3] = -200
@@ -38,9 +38,9 @@ def set_source(U, Source, FFT, N, X, **kwargs):
 
 im, im2 = None, None    
 def update(comm, rank, P, P_hat, U, W, W_hat, Curl, hdf5file, 
-           Source, X, **kw):    
+           Source, X, params, **kw):    
     global im, im2
-    if config.tstep == 1 and rank == 0:
+    if params.tstep == 1 and rank == 0:
         plt.figure()
         im = plt.quiver(X[1, 0], X[2, 0], 
                         U[1, 0], U[2, 0], pivot='mid', scale=2)    
@@ -53,21 +53,21 @@ def update(comm, rank, P, P_hat, U, W, W_hat, Curl, hdf5file,
         plt.pause(1e-6)
         globals().update(im=im, im2=im2)
     
-    if hdf5file.check_if_write(config.tstep):    
+    if hdf5file.check_if_write(params):    
         U = Curl(W_hat, U)
         P[:] = sqrt(W[0]*W[0] + W[1]*W[1] + W[2]*W[2])
-        hdf5file.write(config.tstep)
+        hdf5file.write(params)
 
-    if config.tstep == 10:
+    if params.tstep == 10:
         Source[:] = 0
         
-    if config.tstep % config.plot_result == 0 and rank == 0:
+    if params.tstep % params.plot_result == 0 and rank == 0:
         im.set_UVC(U[1, 0], U[2, 0])
         im2.set_data(W[0, 0, :, ::-1].T)
         im2.autoscale()
         plt.pause(1e-6)
     
-    print "Time = ", config.t
+    print "Time = ", params.t
     
 def finalize(rank, Nf, X, U, W_hat, Curl, **soak):
     global im
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     config.triplyperiodic.add_argument("--init", default='random', choices=('random', 'vortex'))
     config.triplyperiodic.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
     solver = get_solver(update=update, mesh="triplyperiodic")
-    assert config.decomposition == 'slab'
+    assert config.params.decomposition == 'slab'
     solver.W, solver.W_hat = initialize(**vars(solver))
     solver.Source = set_source(**vars(solver))
     solver.solve()

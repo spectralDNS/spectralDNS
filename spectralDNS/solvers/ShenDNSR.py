@@ -89,11 +89,11 @@ pressure_error = zeros(1)
 def solve():
     timer = Timer()
     
-    while config.t < config.T-1e-8:
-        config.t += config.dt
-        config.tstep += 1
+    while params.t < params.T-1e-8:
+        params.t += params.dt
+        params.tstep += 1
         # Tentative momentum solve
-        for jj in range(config.velocity_pressure_iters):
+        for jj in range(params.velocity_pressure_iters):
             dU[:] = 0
             dU[:] = ComputeRHS(dU, jj)                
             U_hat[0] = HelmholtzSolverU(U_hat[0], dU[0])
@@ -111,12 +111,12 @@ def solve():
             dP -= P_hat
 
             comm.Allreduce(linalg.norm(Pcorr), pressure_error)
-            if jj == 0 and config.print_divergence_progress and rank == 0:
+            if jj == 0 and params.print_divergence_progress and rank == 0:
                 print "   Divergence error"
-            if config.print_divergence_progress:
+            if params.print_divergence_progress:
                 if rank == 0:                
                     print "         Pressure correction norm %6d  %2.6e" %(jj, pressure_error[0])
-            if pressure_error[0] < config.divergence_tol:
+            if pressure_error[0] < params.divergence_tol:
                 break
      
         # Update velocity
@@ -125,7 +125,7 @@ def solve():
         dU[0] = TDMASolverD(dU[0])
         dU[1] = TDMASolverD(dU[1])
         dU[2] = TDMASolverD(dU[2])        
-        U_hat[:, u_slice] += config.dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
+        U_hat[:, u_slice] += params.dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
 
         for i in range(3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)
@@ -142,13 +142,13 @@ def solve():
                 
         timer()
         
-        if config.tstep == 1 and config.make_profile:
+        if params.tstep == 1 and params.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
             
     timer.final(MPI, rank)
     
-    if config.make_profile:
+    if params.make_profile:
         results = create_profile(**globals())
                 
     regression_test(**globals())

@@ -2,7 +2,7 @@ from spectralDNS import config, get_solver
 from numpy import array, pi
 
 def initialize(**kw):
-    if config.solver == 'NS':
+    if config.params.solver == 'NS':
         initialize1(**kw)
     
     else:
@@ -15,8 +15,7 @@ def initialize1(U, U_hat, X, sin, cos, FFT, **kw):
     for i in range(3):
         U_hat[i] = FFT.fftn(U[i], U_hat[i])
         
-def initialize2(U, W, W_hat, X, sin, cos, FFT, work,
-                cross2, K, **kw):
+def initialize2(U, W, W_hat, X, sin, cos, FFT, work, cross2, K, **kw):
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0         
@@ -28,16 +27,17 @@ def initialize2(U, W, W_hat, X, sin, cos, FFT, work,
     for i in range(3):
         W[i] = FFT.ifftn(W_hat[i], W[i])        
 
-def update(P, P_hat, hdf5file, FFT, **kw):
-    if hdf5file.check_if_write(config.tstep):
+def update(P, P_hat, hdf5file, FFT, params, **kw):
+    if hdf5file.check_if_write(params):
         P = FFT.ifftn(P_hat*1j, P)
-        hdf5file.write(config.tstep)
+        hdf5file.write(params)
     
-def regression_test(comm, U_hat, U, curl, float64, dx, L, sum, rank, Curl, **kw):
-    if config.solver == 'NS':
+def regression_test(comm, U_hat, U, curl, float64, sum, rank, Curl, params, **kw):
+    dx, L = params.dx, params.L
+    if params.solver == 'NS':
         curl[:] = Curl(U_hat, curl)
         w = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
-    elif config.solver == 'VV':
+    elif params.solver == 'VV':
         U = Curl(kw['W_hat'], U)
         w = comm.reduce(sum(kw['W'].astype(float64)*kw['W'].astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
 

@@ -6,8 +6,132 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 Global run-time configuration that may be overloaded on the commandline
 """
 import argparse
-from numpy import pi
+from numpy import pi, array
 import copy
+import collections
+
+class Params(collections.MutableMapping, dict):
+    """Dictionary to hold parameters for the spectralDNS solvers
+    
+    Items may be accessed as attributes
+    
+    Generic parameters::
+        precision     (str)              ('double', 'single') 
+        optimization  (str)              ('cython', 'numba', None)
+        make_profile  (int)              Whether on not to enable profiling
+        dt            (float)            Time step for fixed time step integrators
+        T             (float)            End time
+        nu            (float)            Viscosity
+        t             (float)            Time
+        tstep         (int)              Time step
+        L        (float, float(, float)) Domain size (2 for 2D, 3 for 3D)
+        M                (int, int, int) Mesh size   (2 for 2D, 3 for 3D)
+        write_result  (int)              Store as HDF5 every (*) time step
+        checkpoint    (int)              Save intermediate result every (*)
+        dealias       (str)              ('3/2-rule', '2/3-rule', 'None')
+        
+    Parameters for 3D solvers in triply periodic domain::
+        convection       (str)           ('Standard', 'Divergence', 'Skewed', 'Vortex')
+        decomposition    (str)           ('slab', 'pencil')
+        communication    (str)           ('alltoall', 'sendrecv_replace')
+        pencil_alignment (str)           ('X', 'Y') Final alignment direction for spectral data 
+        P1               (int)           Pencil decomposition in first direction
+        write_yz_slice   (int, int)      Store yz slice at x index (*0) every (*1) time step
+        write_xz_slice   (int, int)      Store xz slice at y index (*0) every (*1) time step
+        write_xy_slice   (int, int)      Store xy slice at z index (*0) every (*1) time step
+        integrator       (str)           ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
+            
+    Parameters for 3D solvers in channel domain::
+        convection    (str)              ('Standard', 'Divergence', 'Skewed', 'Vortex')
+        dealias_cheb  (bool)             Whether or not to dealias in inhomogeneous direction
+        decomposition (str)              ('slab',)
+        write_yz_slice   (int, int)      Store yz slice at x index (*0) every (*1) time step
+        write_xz_slice   (int, int)      Store xz slice at y index (*0) every (*1) time step
+        write_xy_slice   (int, int)      Store xy slice at z index (*0) every (*1) time step
+        
+    Parameters for 2D solvers in doubly periodic domain::
+        integrator    (str)              ('RK4', 'ForwardEuler', 'AB2')
+        decomposition (str)              ('line')
+            
+    Solver specific parameters triply periodic domain::
+        MHD::
+            eta           (float)        Model parameter
+            
+    Solver specific parameters double periodic domain::
+        Bq2D::
+            Ri            (float)        Model parameter (Richardson number)
+            Pr            (float)        Model parameter (Prandtl number)
+            integrator    (str)          ('RK4', 'ForwardEuler', 'AB2')
+            
+    Solver specifi parameters channel domain::
+        IPCS, IPCSR::
+            velocity_pressure_iters   (int)   Number of inner velocity pressure iterations
+            print_divergence_progress (bool)  Print the norm of the pressure correction on inner iterations
+            divergence_tol            (float) Tolerance on divergence error for pressure velocity coupling
+            
+    """
+    
+    def __init__(self, *args, **kwargs):
+        super(Params, self).__init__(*args, **kwargs)
+        self.__dict__ = self
+        
+    def __getattr__(self, key):
+        if key in ('dx', 'N'):
+            return self.__missing__(key)
+        else:
+            raise KeyError
+
+    def __setattr__(self, key, val):
+        if key in ('M', 'L'):
+            self.__setitem__(key, val)
+        else:
+            dict.__setattr__(self, key, val)
+        
+    def __getitem__(self, key):
+        return dict.__getitem__(self, key)
+    
+    def __setitem__(self, key, val):
+        if key == 'M':
+            val = array([eval(str(f)) for f in val], dtype=int)
+            val.flags.writeable = False
+            dict.__setitem__(self, key, val)
+            
+        elif key == 'L':
+            val = array([eval(str(f)) for f in val], dtype=float)
+            val.flags.writeable = False
+            dict.__setitem__(self, key, val)
+            
+        else:
+            dict.__setitem__(self, key, val)
+         
+    def __delitem__(self, key):
+        dict.__delitem__(self, key)
+        
+    def __iter__(self):
+        return dict.__iter__(self)
+    
+    def __len__(self):
+        return dict.__len__(self)
+    
+    def __contains__(self, x):
+        return dict.__contains__(self, x)
+    
+    def __missing__(self, key):
+        """dx and N are parameters that depend on others. """
+        if key == 'dx':
+            assert self.has_key('M') and self.has_key('L')
+            val = self['L']/2**self['M']
+            return val
+        
+        elif key == 'N':
+            mval = self['M']
+            val = 2**mval
+            return val
+        
+        else:
+            raise KeyError
+
+params = Params()
 
 parser = argparse.ArgumentParser(prog='spectralDNS', add_help=False)
 
@@ -17,30 +141,34 @@ parser.add_argument('--make_profile', default=0, help='Enable cProfile profiler'
 parser.add_argument('--dt', default=0.01, type=float, help='Time step size')
 parser.add_argument('--T', default=0.1, type=float, help='End time')
 parser.add_argument('--write_result', default=1e8, metavar=('tstep'), type=int, help='Write results to HDF5 every tstep')
-parser.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'), 
-                    help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
-parser.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'), 
-                    help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
-parser.add_argument('--write_xy_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'), 
-                    help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
 parser.add_argument('--checkpoint',  default=1e8, type=int, help='Save intermediate result every...')
 parser.add_argument('--nu', default=0.000625, type=float, help='Viscosity')
 parser.add_argument('--t', default=0.0, type=float, help='Time')
 parser.add_argument('--tstep', default=0, type=int, help='Time step')
+parser.add_argument('--dealias', default='2/3-rule', choices=('2/3-rule', '3/2-rule', 'None'), help='Choose dealiasing method')
 
 # Arguments for isotropic DNS solver
 triplyperiodic = argparse.ArgumentParser(parents=[parser])
 triplyperiodic.add_argument('--convection', default='Vortex', choices=('Standard', 'Divergence', 'Skewed', 'Vortex'))
-triplyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2'))
 triplyperiodic.add_argument('--communication', default='alltoall', choices=('alltoall', 'sendrecv_replace'), help='only for slab')
 triplyperiodic.add_argument('--L', default=[2*pi, 2*pi, 2*pi], metavar=("Lx", "Ly", "Lz"), nargs=3, help='Physical mesh size')
-triplyperiodic.add_argument('--dealias', default='2/3-rule', choices=('2/3-rule', '3/2-rule', 'None'), help='Choose dealiasing method')
 triplyperiodic.add_argument('--Pencil_alignment', default='Y', choices=('X', 'Y'), help='Alignment of the complex data for pencil decomposition')
 triplyperiodic.add_argument('--P1', default=2, type=int, help='pencil decomposition in first direction')
 triplyperiodic.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'), help="Choose 3D decomposition between slab and pencil.")
 triplyperiodic.add_argument('--M', default=[6, 6, 6], metavar=("Mx", "My", "Mz"), nargs=3, help='Mesh size is pow(2, M[i]) in direction i')
+triplyperiodic.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'), 
+                    help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
+triplyperiodic.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'), 
+                    help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
+triplyperiodic.add_argument('--write_xy_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'), 
+                    help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
+triplyperiodic.add_argument('--TOL', type=float, default=1e-6, help='Tolerance for adaptive time integrator')
+triplyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed'))
 
 trippelsubparsers = triplyperiodic.add_subparsers(dest='solver')
+
+# Remember! Subparser arguments must be invoked after the positional argument
+# E.g, python TG.py --M 6 6 6 NS --integrator RK4
 
 parser_NS = trippelsubparsers.add_parser('NS', help='Regular Navier Stokes solver')
 parser_VV = trippelsubparsers.add_parser('VV', help='Velocity-Vorticity formulation')
@@ -50,7 +178,6 @@ parser_MHD.add_argument('--eta', default=0.01, type=float, help='MHD parameter')
 doublyperiodic = argparse.ArgumentParser(parents=[parser])
 doublyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2'))
 doublyperiodic.add_argument('--L', default=[2*pi, 2*pi], nargs=2, help='Physical mesh size')
-doublyperiodic.add_argument('--dealias', default='2/3-rule', choices=('3/2-rule', '2/3-rule', 'None'), help='Choose dealiasing method')
 doublyperiodic.add_argument('--decomposition', default='line', choices=('line', ), help="For 2D problems line is the only choice.")
 doublyperiodic.add_argument('--M', default=[6, 6], nargs=2, help='Mesh size is pow(2, M[i]) in direction i')
 
@@ -65,7 +192,6 @@ parser_Bq2D.add_argument('--Pr', default=1.0, type=float, help='Prandtl number')
 channel = argparse.ArgumentParser(parents=[parser])
 channel.add_argument('--convection', default='Vortex', choices=('Standard', 'Divergence', 'Skew', 'Vortex'))
 channel.add_argument('--L', default=[2, 2*pi, 2*pi], nargs=3, help='Physical mesh size')
-channel.add_argument('--dealias', default='3/2-rule', choices=('3/2-rule', '2/3-rule', 'None'), help='Choose dealiasing method')
 dealias_cheb_parser = channel.add_mutually_exclusive_group(required=False)
 dealias_cheb_parser.add_argument('--no-dealias_cheb', dest='dealias_cheb', action='store_false', help='No dealiasing for inhomogeneous direction (default)')
 dealias_cheb_parser.add_argument('--dealias_cheb', dest='dealias_cheb', action='store_true', help='Use dealiasing for inhomogeneous direction. If True, use same rule as for periodic')
@@ -73,6 +199,12 @@ channel.set_defaults(dealias_cheb=False)
 channel.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'), help="Choose 3D decomposition between slab and pencil.")
 channel.add_argument('--Pencil_alignment', default='X', choices=('X',), help='Alignment of the complex data for pencil decomposition')
 channel.add_argument('--M', default=[6, 6, 6], nargs=3, help='Mesh size is pow(2, M[i]) in direction i')
+channel.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'), 
+                    help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
+channel.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'), 
+                    help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
+channel.add_argument('--write_xy_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'), 
+                    help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
 
 channelsubparsers = channel.add_subparsers(dest='solver')
 

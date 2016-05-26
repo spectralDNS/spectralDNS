@@ -8,6 +8,7 @@ from ShenKMM import *
 a = (8./15., 5./12., 3./4.)
 b = (0.0, -17./60., -5./12.)
 
+nu, dt, N = params.nu, params.dt, params.N
 HelmholtzSolverG = [Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[rk]+b[rk])/dt), 
                               ST.quad, False) for rk in range(3)]
 
@@ -97,16 +98,13 @@ def RKstep(U_hat, g, dU, rk):
     
     return U_hat
 
-def regression_test(**kw):
-    pass
-
 #@profile
 def solve():
     timer = Timer()
     
-    while config.t < config.T-1e-10:
-        config.t += config.dt
-        config.tstep += 1
+    while params.t < params.T-1e-10:
+        params.t += params.dt
+        params.tstep += 1
 
         dU[:] = 0
         hv0[:] = 0
@@ -122,13 +120,13 @@ def solve():
                  
         timer()
         
-        if config.tstep == 1 and config.make_profile:
+        if params.tstep == 1 and params.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
             
     timer.final(MPI, rank)
     
-    if config.make_profile:
+    if params.make_profile:
         results = create_profile(**globals())
                 
     regression_test(**globals())

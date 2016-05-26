@@ -10,18 +10,21 @@ from numpy import array, ndarray, sum, meshgrid, mgrid, where, abs, pi, uint8, r
 
 __all__ = ['setup']
 
-def setupShen(N, L, MPI, float, complex, config, **kwargs):
+def setupShen(MPI, config, **kwargs):
     # Get points and weights for Chebyshev weighted integrals
     ST = ShenDirichletBasis(quad="GL")
     SN = ShenNeumannBasis(quad="GC")
+    params = config.params
 
-    Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
-    Nu = N[0]-2   # Number of velocity modes in Shen basis
-    Nq = N[0]-3   # Number of pressure modes in Shen basis
+    Nf = params.N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
+    Nu = params.N[0]-2   # Number of velocity modes in Shen basis
+    Nq = params.N[0]-3   # Number of pressure modes in Shen basis
     u_slice = slice(0, Nu)
     p_slice = slice(1, Nu)
     
-    FST = FastShenFourierTransform(N, L, MPI, dealias_cheb=config.dealias_cheb)
+    FST = FastShenFourierTransform(params.N, params.L, MPI, dealias_cheb=params.dealias_cheb)
+    
+    float, complex, mpitype = datatypes("double")
     
     # Get grid for velocity points
     X = FST.get_local_mesh(ST)
@@ -57,18 +60,21 @@ def setupShen(N, L, MPI, float, complex, config, **kwargs):
     return locals()
 
 
-def setupShenKMM(N, L, MPI, float, complex, config, **kwargs):
+def setupShenKMM(MPI, config, **kwargs):
 
     # Get points and weights for Chebyshev weighted integrals
     ST = ShenDirichletBasis(quad="GL")
     SB = ShenBiharmonicBasis(quad="GL")
-
-    Nu = N[0]-2   # Number of velocity modes in Shen basis
-    Nb = N[0]-4   # Number of velocity modes in Shen biharmonic basis
+    
+    params = config.params
+    Nu = params.N[0]-2   # Number of velocity modes in Shen basis
+    Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
     u_slice = slice(0, Nu)
     v_slice = slice(0, Nb)
     
-    FST = FastShenFourierTransform(N, L, MPI, dealias_cheb=config.dealias_cheb)
+    FST = FastShenFourierTransform(params.N, params.L, MPI, dealias_cheb=params.dealias_cheb)
+    float, complex, mpitype = datatypes("double")
+    
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
 
@@ -105,18 +111,21 @@ def setupShenKMM(N, L, MPI, float, complex, config, **kwargs):
     return locals()
 
 
-def setupShenMHD(N, L, MPI, float, complex, config, **kwargs):
+def setupShenMHD(MPI, config, **kwargs):
     # Get points and weights for Chebyshev weighted integrals
     ST = ShenDirichletBasis(quad="GL")
     SN = ShenNeumannBasis(quad="GC")
 
-    Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
-    Nu = N[0]-2   # Number of velocity modes in Shen basis
-    Nq = N[0]-3   # Number of pressure modes in Shen basis
+    params = config.params
+    Nf = params.N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
+    Nu = params.N[0]-2   # Number of velocity modes in Shen basis
+    Nq = params.N[0]-3   # Number of pressure modes in Shen basis
     u_slice = slice(0, Nu)
     p_slice = slice(1, Nu)
 
-    FST = FastShenFourierTransform(N, L, MPI, dealias_cheb=config.dealias_cheb)
+    FST = FastShenFourierTransform(params.N, params.L, MPI, dealias_cheb=params.dealias_cheb)
+    float, complex, mpitype = datatypes("double")
+    
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
 
@@ -130,7 +139,8 @@ def setupShenMHD(N, L, MPI, float, complex, config, **kwargs):
     U_hat0  = empty((6,)+FST.complex_shape(), dtype=complex)
     U_hat1  = empty((6,)+FST.complex_shape(), dtype=complex)
     UT      = empty((6,)+FST.complex_shape(), dtype=float)
-        
+    
+    # FIXME remove work arrays
     U_tmp   = empty((6,)+FST.real_shape(), dtype=float)
     U_tmp2  = empty((6,)+FST.real_shape(), dtype=float)
     U_tmp3  = empty((6,)+FST.real_shape(), dtype=float)
@@ -155,19 +165,22 @@ def setupShenMHD(N, L, MPI, float, complex, config, **kwargs):
     del kwargs 
     return locals()
 
-def setupShenGeneralBCs(N, L, MPI, float, complex, **kwargs):
+def setupShenGeneralBCs(MPI, config, **kwargs):
     # Get points and weights for Chebyshev weighted integrals
     BC1 = array([1,0,0, 1,0,0])
     BC2 = array([0,1,0, 0,1,0])
     ST = ShenBasis(BC1, quad="GL")
     SN = ShenBasis(BC2, quad="GC")
-    Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
-    Nu = N[0]-2   # Number of velocity modes in Shen basis
-    Nq = N[0]-3   # Number of pressure modes in Shen basis
+    
+    params = config.params
+    Nf = params.N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
+    Nu = params.N[0]-2   # Number of velocity modes in Shen basis
+    Nq = params.N[0]-3   # Number of pressure modes in Shen basis
     u_slice = slice(0, Nu)
     p_slice = slice(1, Nu)
 
-    FST = FastShenFourierTransform(N, L, MPI)
+    FST = FastShenFourierTransform(params.N, params.L, MPI, dealias_cheb=params.dealias_cheb)
+    float, complex, mpitype = datatypes("double")
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
 
@@ -181,6 +194,7 @@ def setupShenGeneralBCs(N, L, MPI, float, complex, **kwargs):
     U_hat0  = empty((3,)+FST.complex_shape(), dtype=complex)
     U_hat1  = empty((3,)+FST.complex_shape(), dtype=complex)
 
+    #FIXME Remove work arrays
     U_tmp   = empty((3,)+FST.real_shape(), dtype=float)
     U_tmp2  = empty((3,)+FST.real_shape(), dtype=float)
     U_tmp3  = empty((3,)+FST.real_shape(), dtype=float)

@@ -11,16 +11,16 @@ from ..shen import SFTc
 
 vars().update(setup['IPCS'](**vars()))
 
-assert config.precision == "double"
+assert params.precision == "double"
 hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "IPCS.h5", 
                       mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
 
-HelmholtzSolverU = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/config.nu/config.dt), ST.quad, False)
-HelmholtzSolverP = Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2), SN.quad, True)
+HelmholtzSolverU = Helmholtz(params.N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/params.nu/params.dt), ST.quad, False)
+HelmholtzSolverP = Helmholtz(params.N[0], sqrt(K[1, 0]**2+K[2, 0]**2), SN.quad, True)
 TDMASolverD = TDMA(ST.quad, False)
 TDMASolverN = TDMA(SN.quad, True)
 
-alfa = K[1, 0]**2+K[2, 0]**2-2.0/config.nu/config.dt
+alfa = K[1, 0]**2+K[2, 0]**2-2.0/params.nu/params.dt
 CDN = CDNmat(K[0, :, 0, 0])
 CND = CNDmat(K[0, :, 0, 0])
 BDN = BDNmat(K[0, :, 0, 0], ST.quad)
@@ -55,7 +55,7 @@ def pressuregrad(P, P_hat, dU):
 
 def pressurerhs(U_hat, dU):
     dU[:] = 0.
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], dU[p_slice])    
+    SFTc.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], U_hat[0, u_slice], U_hat[1, u_slice], U_hat[2, u_slice], dU[p_slice])    
     
     #U_tmp2 = work[(U, 0)]
     #F_tmp2 = work[(U_hat, 0)]
@@ -64,7 +64,7 @@ def pressurerhs(U_hat, dU):
     #U_tmp2[0] = FST.ifst(F_tmp2[0], U_tmp2[0], ST)
     #dU = FST.fss(U_tmp2[0], dU, SN)
     
-    dU[p_slice] *= -1./config.dt    
+    dU[p_slice] *= -1./params.dt    
     return dU
 
 def body_force(Sk, dU):
@@ -78,21 +78,21 @@ def Cross(a, b, c, S):
     Uc[0] = a[1]*b[2]-a[2]*b[1]
     Uc[1] = a[2]*b[0]-a[0]*b[2]
     Uc[2] = a[0]*b[1]-a[1]*b[0]
-    c[0] = FST.fss(Uc[0], c[0], S, dealias=config.dealias)
-    c[1] = FST.fss(Uc[1], c[1], S, dealias=config.dealias)
-    c[2] = FST.fss(Uc[2], c[2], S, dealias=config.dealias)
+    c[0] = FST.fss(Uc[0], c[0], S, dealias=params.dealias)
+    c[1] = FST.fss(Uc[1], c[1], S, dealias=params.dealias)
+    c[2] = FST.fss(Uc[2], c[2], S, dealias=params.dealias)
     return c
 
 def Curl(a, c, S):
     F_tmp = work[(a, 0)]
     Uc = work[(c, 2)]
-    SFTc.Mult_CTD_3D_n(N[0], a[1], a[2], F_tmp[1], F_tmp[2])
-    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], S, dealias=config.dealias)
-    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], S, dealias=config.dealias)
-    c[0] = FST.ifst((1j*K[1]*a[2] - 1j*K[2]*a[1]), c[0], S, dealias=config.dealias)
-    c[1] = FST.ifst(1j*K[2]*a[0], c[1], S, dealias=config.dealias)
+    SFTc.Mult_CTD_3D_n(params.N[0], a[1], a[2], F_tmp[1], F_tmp[2])
+    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], S, dealias=params.dealias)
+    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], S, dealias=params.dealias)
+    c[0] = FST.ifst((1j*K[1]*a[2] - 1j*K[2]*a[1]), c[0], S, dealias=params.dealias)
+    c[1] = FST.ifst(1j*K[2]*a[0], c[1], S, dealias=params.dealias)
     c[1] -= dwdx
-    c[2] = FST.ifst(1j*K[1]*a[0], c[2], S, dealias=config.dealias)
+    c[2] = FST.ifst(1j*K[1]*a[0], c[2], S, dealias=params.dealias)
     c[2] *= -1.0
     c[2] += dvdx
     return c
@@ -111,7 +111,7 @@ def Div(a_hat):
 
 def Divu(U_hat, c):
     c[:] = 0
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], U_hat[0, u_slice], 
+    SFTc.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], U_hat[0, u_slice], 
                      U_hat[1, u_slice], U_hat[2, u_slice], c[p_slice])
     c = TDMASolverN(c)        
     return c
@@ -127,46 +127,46 @@ def standardConvection(c, U, U_hat):
     # Use regular Chebyshev basis for dvdx and dwdx
     F_tmp[0] = CDD.matvec(U_hat[0])
     F_tmp[0] = TDMASolverD(F_tmp[0])    
-    dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], ST, dealias=config.dealias)   
+    dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], ST, dealias=params.dealias)   
     
     #F_tmp[0] = CND.matvec(U_hat[0])
     #F_tmp[0] = TDMASolverN(F_tmp[0])    
     #quad = SN.quad
     #SN.quad = ST.quad
-    #dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], SN, dealias=config.dealias)       
+    #dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], SN, dealias=params.dealias)       
     
-    SFTc.Mult_CTD_3D_n(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST, dealias=config.dealias)
-    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST, dealias=config.dealias)
+    SFTc.Mult_CTD_3D_n(params.N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
+    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST, dealias=params.dealias)
+    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST, dealias=params.dealias)
     
     #dudx = U_tmp[0] = chebDerivative_3D0(U[0], U_tmp[0])
     #dvdx = U_tmp[1] = chebDerivative_3D0(U[1], U_tmp[1])
     #dwdx = U_tmp[2] = chebDerivative_3D0(U[2], U_tmp[2])    
     
-    dudy = Uc2[0] = FST.ifst(1j*K[1]*U_hat[0], Uc2[0], ST, dealias=config.dealias)    
-    dudz = Uc2[1] = FST.ifst(1j*K[2]*U_hat[0], Uc2[1], ST, dealias=config.dealias)
-    c[0] = FST.fss(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST, dealias=config.dealias)
+    dudy = Uc2[0] = FST.ifst(1j*K[1]*U_hat[0], Uc2[0], ST, dealias=params.dealias)    
+    dudz = Uc2[1] = FST.ifst(1j*K[2]*U_hat[0], Uc2[1], ST, dealias=params.dealias)
+    c[0] = FST.fss(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST, dealias=params.dealias)
     
     Uc2[:] = 0    
-    dvdy = Uc2[0] = FST.ifst(1j*K[1]*U_hat[1], Uc2[0], ST, dealias=config.dealias)
+    dvdy = Uc2[0] = FST.ifst(1j*K[1]*U_hat[1], Uc2[0], ST, dealias=params.dealias)
     #F_tmp[0] = FST.fst(U[1], F_tmp[0], SN)
     #dvdy_h = 1j*K[1]*F_tmp[0]    
     #dvdy = U_tmp2[0] = FST.ifst(dvdy_h, U_tmp2[0], SN)
     ##########
     
-    dvdz = Uc2[1] = FST.ifst(1j*K[2]*U_hat[1], Uc2[1], ST, dealias=config.dealias)
-    c[1] = FST.fss(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST, dealias=config.dealias)
+    dvdz = Uc2[1] = FST.ifst(1j*K[2]*U_hat[1], Uc2[1], ST, dealias=params.dealias)
+    c[1] = FST.fss(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST, dealias=params.dealias)
     
     Uc2[:] = 0
-    dwdy = Uc2[0] = FST.ifst(1j*K[1]*U_hat[2], Uc2[0], ST, dealias=config.dealias)
+    dwdy = Uc2[0] = FST.ifst(1j*K[1]*U_hat[2], Uc2[0], ST, dealias=params.dealias)
     
-    dwdz = Uc2[1] = FST.ifst(1j*K[2]*U_hat[2], Uc2[1], ST, dealias=config.dealias)
+    dwdz = Uc2[1] = FST.ifst(1j*K[2]*U_hat[2], Uc2[1], ST, dealias=params.dealias)
     
     #F_tmp[0] = FST.fst(U[2], F_tmp[0], SN)
     #dwdz_h = 1j*K[2]*F_tmp[0]    
     #dwdz = U_tmp2[1] = FST.ifst(dwdz_h, U_tmp2[1], SN)    
     #########
-    c[2] = FST.fss(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST, dealias=config.dealias)
+    c[2] = FST.fss(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST, dealias=params.dealias)
     
     # Reset
     #SN.quad = quad
@@ -186,22 +186,22 @@ def divergenceConvection(c, U, U_hat, add=False):
     #c[1] = fss(U_tmp[1], c[1], ST)
     #c[2] = fss(U_tmp[2], c[2], ST)
     
-    F_tmp[0] = FST.fst(U[0]*U[0], F_tmp[0], ST, dealias=config.dealias)
-    F_tmp[1] = FST.fst(U[0]*U[1], F_tmp[1], ST, dealias=config.dealias)
-    F_tmp[2] = FST.fst(U[0]*U[2], F_tmp[2], ST, dealias=config.dealias)
+    F_tmp[0] = FST.fst(U[0]*U[0], F_tmp[0], ST, dealias=params.dealias)
+    F_tmp[1] = FST.fst(U[0]*U[1], F_tmp[1], ST, dealias=params.dealias)
+    F_tmp[2] = FST.fst(U[0]*U[2], F_tmp[2], ST, dealias=params.dealias)
     
     c[0] += CDD.matvec(F_tmp[0])
     c[1] += CDD.matvec(F_tmp[1])
     c[2] += CDD.matvec(F_tmp[2])
     
-    F_tmp2[0] = FST.fss(U[0]*U[1], F_tmp2[0], ST, dealias=config.dealias)
-    F_tmp2[1] = FST.fss(U[0]*U[2], F_tmp2[1], ST, dealias=config.dealias)    
+    F_tmp2[0] = FST.fss(U[0]*U[1], F_tmp2[0], ST, dealias=params.dealias)
+    F_tmp2[1] = FST.fss(U[0]*U[2], F_tmp2[1], ST, dealias=params.dealias)    
     c[0] += 1j*K[1]*F_tmp2[0] # duvdy
     c[0] += 1j*K[2]*F_tmp2[1] # duwdz
     
-    F_tmp[0] = FST.fss(U[1]*U[1], F_tmp[0], ST, dealias=config.dealias)
-    F_tmp[1] = FST.fss(U[1]*U[2], F_tmp[1], ST, dealias=config.dealias)
-    F_tmp[2] = FST.fss(U[2]*U[2], F_tmp[2], ST, dealias=config.dealias)
+    F_tmp[0] = FST.fss(U[1]*U[1], F_tmp[0], ST, dealias=params.dealias)
+    F_tmp[1] = FST.fss(U[1]*U[2], F_tmp[1], ST, dealias=params.dealias)
+    F_tmp[2] = FST.fss(U[2]*U[2], F_tmp[2], ST, dealias=params.dealias)
     c[1] += 1j*K[1]*F_tmp[0]  # dvvdy
     c[1] += 1j*K[2]*F_tmp[1]  # dvwdz  
     c[2] += 1j*K[1]*F_tmp[1]  # dvwdy
@@ -213,9 +213,9 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
+            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             for i in range(3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
+                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
 
             H_hat = standardConvection(H_hat, U_dealiased, U_hat)
             H_hat[:] *= -1
@@ -225,9 +225,9 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
+            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             for i in range(3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
+                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
 
             H_hat = divergenceConvection(H_hat, U_dealiased, U_hat, False)
             H_hat[:] *= -1
@@ -237,9 +237,9 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
+            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             for i in range(3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
+                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
 
             H_hat = standardConvection(H_hat, U_dealiased, U_hat)
             H_hat = divergenceConvection(H_hat, U_dealiased, U_hat, True)            
@@ -250,10 +250,10 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
-            curl_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 1)]
+            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
+            curl_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 1)]
             for i in range(3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
+                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
             
             curl_dealiased[:] = Curl(U_hat, curl_dealiased, ST)
             H_hat[:] = Cross(U_dealiased, curl_dealiased, H_hat, ST)            
@@ -261,7 +261,7 @@ def getConvection(convection):
         
     return Conv           
 
-conv = getConvection(config.convection)
+conv = getConvection(params.convection)
     
 #@profile
 def ComputeRHS(dU, jj):
@@ -285,7 +285,7 @@ def ComputeRHS(dU, jj):
     dU = body_force(Sk, dU)
     
     # Scale by 2/nu factor
-    dU[:] *= 2./config.nu
+    dU[:] *= 2./params.nu
     
     # Add diffusion
     dU[:] += diff0
@@ -295,27 +295,23 @@ def ComputeRHS(dU, jj):
 def solvePressure(P_hat, Ni):
     """Solve for pressure if Ni is fst of convection"""
     dP = work[(P_hat, 0)]
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], dP[p_slice])    
+    SFTc.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], dP[p_slice])    
     P_hat = HelmholtzSolverP(P_hat, dP)
     return P_hat
-
-def regression_test(**kw):
-    pass
-
-def update(**kwargs):
-    pass
 
 #@profile
 pressure_error = zeros(1)
 def solve():
+    global dU, U_hat
+    
     timer = Timer()
     
-    while config.t < config.T-1e-8:
-        config.t += config.dt
-        config.tstep += 1
+    while params.t < params.T-1e-8:
+        params.t += params.dt
+        params.tstep += 1
 
         # Tentative momentum solve
-        for jj in range(config.velocity_pressure_iters):
+        for jj in range(params.velocity_pressure_iters):
             dU[:] = 0
             dU[:] = ComputeRHS(dU, jj)                
             U_hat[0] = HelmholtzSolverU(U_hat[0], dU[0])
@@ -331,12 +327,12 @@ def solve():
             P_hat[p_slice] += Pcorr[p_slice]
             
             comm.Allreduce(linalg.norm(Pcorr), pressure_error)
-            if jj == 0 and config.print_divergence_progress and rank == 0:
+            if jj == 0 and params.print_divergence_progress and rank == 0:
                 print "   Divergence error"
-            if config.print_divergence_progress:
+            if params.print_divergence_progress:
                 if rank == 0:                
                     print "         Pressure correction norm %6d  %2.6e" %(jj, pressure_error[0])
-            if pressure_error[0] < config.divergence_tol:
+            if pressure_error[0] < params.divergence_tol:
                 break
             
         for i in range(3):
@@ -350,7 +346,7 @@ def solve():
         dU[0] = TDMASolverD(dU[0])
         dU[1] = TDMASolverD(dU[1])
         dU[2] = TDMASolverD(dU[2])
-        U_hat[:, u_slice] += config.dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
+        U_hat[:, u_slice] += params.dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
 
         for i in range(3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)
@@ -367,13 +363,13 @@ def solve():
                 
         timer()
         
-        if config.tstep == 1 and config.make_profile:
+        if params.tstep == 1 and params.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
             
     timer.final(MPI, rank)
     
-    if config.make_profile:
+    if params.make_profile:
         results = create_profile(**globals())
                 
     regression_test(**globals())

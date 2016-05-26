@@ -1,40 +1,42 @@
 from spectralDNS import config, get_solver
 import matplotlib.pyplot as plt
-from numpy import zeros, exp, sum
+from numpy import zeros, exp, sum, pi, exp, sin, cos, tanh
 
-def initialize(X, U, Ur, Ur_hat, exp, sin, cos, tanh, rho, N, pi, FFT, float, **kwargs):
-
-    Um = 0.5*(config.U1 - config.U2)
-    U[1] = config.A*sin(2*X[0])
-    #U[0, :, :N/4] = config.U1 - Um*exp((X[1,:, :N/4] - 0.5*pi)/config.delta) 
-    #U[0, :, N/4:N/2] = config.U2 + Um*exp(-1.0*(X[1, :, N/4:N/2] - 0.5*pi)/config.delta) 
-    #U[0, :, N/2:3*N/4] = config.U2 + Um*exp((X[1, :, N/2:3*N/4] - 1.5*pi)/config.delta) 
-    #U[0, :, 3*N/4:] = config.U1 - Um*exp(-1.0*(X[1, :, 3*N/4:] - 1.5*pi)/config.delta)
+def initialize(X, U, Ur, Ur_hat, rho, FFT, float, params, **kwargs):
     
-    #rho[:, :N/2] = tanh((X[1][:, :N/2]-(0.5*pi))/config.delta)
-    #rho[:, N/2:] =-tanh((X[1][:, N/2:]-(1.5*pi))/config.delta)
+    N = params.N
+    Um = 0.5*(params.U1 - params.U2)
+    U[1] = params.A*sin(2*X[0])
+    #U[0, :, :N/4] = params.U1 - Um*exp((X[1,:, :N/4] - 0.5*pi)/params.delta) 
+    #U[0, :, N/4:N/2] = params.U2 + Um*exp(-1.0*(X[1, :, N/4:N/2] - 0.5*pi)/params.delta) 
+    #U[0, :, N/2:3*N/4] = params.U2 + Um*exp((X[1, :, N/2:3*N/4] - 1.5*pi)/params.delta) 
+    #U[0, :, 3*N/4:] = params.U1 - Um*exp(-1.0*(X[1, :, 3*N/4:] - 1.5*pi)/params.delta)
+    
+    #rho[:, :N/2] = tanh((X[1][:, :N/2]-(0.5*pi))/params.delta)
+    #rho[:, N/2:] =-tanh((X[1][:, N/2:]-(1.5*pi))/params.delta)
                 
-    rho0 = 0.5*(config.rho1 + config.rho2)
-    U[0, :, :N[1]/2] = tanh((X[1, :, :N[1]/2] -0.5*pi)/config.delta)
-    U[0, :, N[1]/2:] = -tanh((X[1, :, N[1]/2:]-1.5*pi)/config.delta)
-    rho[:, :N[1]/2] = 2.0 + tanh((X[1, :, :N[1]/2] -0.5*pi)/config.delta)
-    rho[:, N[1]/2:] = 2.0 -tanh((X[1, :, N[1]/2:]-1.5*pi)/config.delta) 
+    rho0 = 0.5*(params.rho1 + params.rho2)
+    U[0, :, :N[1]/2] = tanh((X[1, :, :N[1]/2] -0.5*pi)/params.delta)
+    U[0, :, N[1]/2:] = -tanh((X[1, :, N[1]/2:]-1.5*pi)/params.delta)
+    rho[:, :N[1]/2] = 2.0 + tanh((X[1, :, :N[1]/2] -0.5*pi)/params.delta)
+    rho[:, N[1]/2:] = 2.0 -tanh((X[1, :, N[1]/2:]-1.5*pi)/params.delta) 
     rho -= rho0
     
     for i in range(3):
         Ur_hat[i] = FFT.fft2(Ur[i], Ur_hat[i]) 
 
 im, im2 = None, None
-def update(comm, rank, rho, N, L, dx, curl, K, FFT, U_hat, U, 
+def update(comm, rank, rho, curl, K, FFT, U_hat, U, params,
            P_hat, P, hdf5file, float64, rho_hat, **kwargs):
     global im, im2
-        
-    if (hdf5file.check_if_write(config.tstep) or (config.tstep % config.plot_result == 0 
-        and config.plot_result > 0)):
+    
+    dx, L, N = params.dx, params.L, params.N
+    if (hdf5file.check_if_write(params) or (params.tstep % params.plot_result == 0 
+        and params.plot_result > 0)):
         P = FFT.ifft2(P_hat*1j, P)
         curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         
-    if config.tstep == 1 and config.plot_result > 0:
+    if params.tstep == 1 and params.plot_result > 0:
         fig, ax = plt.subplots(1, 1)
         fig.suptitle('Density', fontsize=20)
         ax.set_xlabel('x')
@@ -54,7 +56,7 @@ def update(comm, rank, rho, N, L, dx, curl, K, FFT, U_hat, U,
         plt.draw()
         globals().update(dict(im=im, im2=im2))
 
-    if config.tstep % config.plot_result == 0 and config.plot_result > 0:
+    if params.tstep % params.plot_result == 0 and params.plot_result > 0:
         im.set_data(rho[:, :].T)
         im.autoscale()
         plt.pause(1e-6)
@@ -62,15 +64,15 @@ def update(comm, rank, rho, N, L, dx, curl, K, FFT, U_hat, U,
         im2.autoscale()
         plt.pause(1e-6)
         if rank == 0:
-            print config.tstep
+            print params.tstep
 
-    if hdf5file.check_if_write(config.tstep):
-        hdf5file.write(config.tstep)           
+    if hdf5file.check_if_write(params):
+        hdf5file.write(params)           
 
-    if config.tstep % config.compute_energy == 0:
+    if params.tstep % params.compute_energy == 0:
         kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
         if rank == 0:
-            print config.tstep, kk
+            print params.tstep, kk
 
 if __name__ == "__main__":
     config.update(

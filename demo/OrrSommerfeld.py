@@ -36,11 +36,11 @@ def energy(u, N, comm, rank, L):
         return 0    
 
 def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
-               ST, X, N, comm, rank, L, conv, TDMASolverD, **kw):
-    OS = OrrSommerfeld(Re=config.Re, N=100)
+               ST, X, comm, rank, conv, TDMASolverD, params, **kw):
+    OS = OrrSommerfeld(Re=params.Re, N=100)
     initOS(OS, U0, U_hat0, X)
     
-    if not config.solver in ("KMM", "KMMRK3"):
+    if not params.solver in ("KMM", "KMMRK3"):
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
         for i in range(3):
@@ -48,9 +48,9 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
         H_hat1 = conv(H_hat1, U0, U_hat0)
-        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
+        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, params.N, comm, rank, params.L)    
 
-        initOS(OS, U, U_hat, X, t=config.dt)
+        initOS(OS, U, U_hat, X, t=params.dt)
         for i in range(3):
             U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
         for i in range(3):
@@ -68,8 +68,8 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
         P = FST.ifst(P_hat, P, kw['SN'])
         U0[:] = U
         U_hat0[:] = U_hat
-        config.t = config.dt
-        config.tstep = 1
+        params.t = params.dt
+        params.tstep = 1
         
     else:
         U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB']) 
@@ -79,9 +79,9 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
         for i in range(1, 3):
             U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
         H_hat1 = conv(H_hat1, U0, U_hat0)
-        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
+        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, params.N, comm, rank, params.L)    
         
-        initOS(OS, U, U_hat, X, t=config.dt)
+        initOS(OS, U, U_hat, X, t=params.dt)
         U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB']) 
         for i in range(1, 3):
             U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
@@ -91,22 +91,22 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
 
         U0[:] = U
         U_hat0[:] = U_hat
-        config.t = config.dt
-        config.tstep = 1
+        params.t = params.dt
+        params.tstep = 1
         kw['g'][:] = 0
     
     return dict(OS=OS, e0=e0)
 
-def set_Source(Source, Sk, FST, ST, **kw):
+def set_Source(Source, Sk, FST, ST, params, **kw):
     Source[:] = 0
-    Source[1] = -2./config.Re
+    Source[1] = -2./params.Re
     Sk[:] = 0
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
         
 im1, im2, im3, im4 = (None, )*4        
-def update(rank, X, U, P, OS, N, comm, L, e0, FST, ST, U_hat, work, **kw):
+def update(rank, X, U, P, OS, comm, e0, FST, ST, U_hat, work, params, **kw):
     global im1, im2, im3
-    if im1 is None and rank == 0 and config.plot_step > 0:
+    if im1 is None and rank == 0 and params.plot_step > 0:
         plt.figure()
         im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
         plt.colorbar(im1)
@@ -124,10 +124,10 @@ def update(rank, X, U, P, OS, N, comm, L, e0, FST, ST, U_hat, work, **kw):
         plt.pause(1e-6)
         globals().update(im1=im1, im2=im2, im3=im3)
 
-    if (config.tstep % config.plot_step == 0 or
-        config.tstep % config.compute_energy == 0):
+    if (params.tstep % params.plot_step == 0 or
+        params.tstep % params.compute_energy == 0):
         
-        if "KMM" in config.solver:
+        if "KMM" in params.solver:
             U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
             for i in range(1, 3):
                 U[i] = FST.ifst(U_hat[i], U[i], ST)     
@@ -135,7 +135,7 @@ def update(rank, X, U, P, OS, N, comm, L, e0, FST, ST, U_hat, work, **kw):
             for i in range(3):
                 U[i] = FST.ifst(U_hat[i], U[i], ST)
     
-    if config.tstep % config.plot_step == 0 and rank == 0 and config.plot_step > 0:
+    if params.tstep % params.plot_step == 0 and rank == 0 and params.plot_step > 0:
         im1.ax.clear()
         im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100) 
         im1.autoscale()
@@ -145,35 +145,35 @@ def update(rank, X, U, P, OS, N, comm, L, e0, FST, ST, U_hat, work, **kw):
         im3.set_UVC(U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
         plt.pause(1e-6)
 
-    if config.tstep % config.compute_energy == 0: 
+    if params.tstep % params.compute_energy == 0: 
         U_tmp = work[(U, 0)]
         F_tmp = work[(U_hat, 0)]
         pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
-        e1 = 0.5*energy(pert, N, comm, rank, L)
-        exact = exp(2*imag(OS.eigval)*(config.t))
-        initOS(OS, U_tmp, F_tmp, X, t=config.t)
+        e1 = 0.5*energy(pert, params.N, comm, rank, params.L)
+        exact = exp(2*imag(OS.eigval)*(params.t))
+        initOS(OS, U_tmp, F_tmp, X, t=params.t)
         pert = (U[0] - U_tmp[0])**2 + (U[1]-U_tmp[1])**2
-        e2 = 0.5*energy(pert, N, comm, rank, L)
+        e2 = 0.5*energy(pert, params.N, comm, rank, params.L)
         if rank == 0:
-            print "Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(config.t, e1/e0, exact, e1/e0-exact, sqrt(e2))
+            print "Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2))
 
-def regression_test(U, X, OS, N, comm, rank, L, e0, FST, ST, U0, U_hat0,**kw):
+def regression_test(U, X, OS, comm, rank, e0, FST, ST, U0, U_hat0, params, **kw):
     #pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
     #e1 = 0.5*energy(pert, N, comm, rank, L)
-    #exact = exp(2*imag(OS.eigval)*config.t)
+    #exact = exp(2*imag(OS.eigval)*params.t)
     #if rank == 0:
-        #print "Computed error = %2.8e %2.8e " %(sqrt(abs(e1/e0-exact)), config.dt)
+        #print "Computed error = %2.8e %2.8e " %(sqrt(abs(e1/e0-exact)), params.dt)
 
-    initOS(OS, U0, U_hat0, X, t=config.t)
+    initOS(OS, U0, U_hat0, X, t=params.t)
     pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
-    e1 = 0.5*energy(pert, N, comm, rank, L)
-    #exact = exp(2*imag(OS.eigval)*config.t)
+    e1 = 0.5*energy(pert, params.N, comm, rank, params.L)
+    #exact = exp(2*imag(OS.eigval)*params.t)
     if rank == 0:
-        print "Computed error = %2.8e %2.8e " %(sqrt(e1), config.dt)
+        print "Computed error = %2.8e %2.8e " %(sqrt(e1), params.dt)
 
 def initOS_and_project(OS, U0, U_hat0, X, FST, ST, SB, **kw):
-    initOS(OS, U0, U_hat0, X, t=config.t)
-    assert "KMM" in config.solver 
+    initOS(OS, U0, U_hat0, X, t=params.t)
+    assert "KMM" in params.solver 
     U_hat0[0] = FST.fst(U0[0], U_hat0[0], SB)
     for i in range(1,3):
         U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
@@ -189,7 +189,7 @@ if __name__ == "__main__":
         {
         'Re': 8000.,
         'nu': 1./8000.,             # Viscosity
-        'dt': 0.01,                 # Time step
+        'dt': 0.001,                 # Time step
         'T': 0.01,                   # End time
         'L': [2, 2*pi, 4*pi/3.],
         'M': [7, 5, 2]
