@@ -13,7 +13,6 @@ from spectralDNS.optimization import *
 from spectralDNS.maths import *
 
 comm = MPI.COMM_WORLD
-comm.barrier()
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
 

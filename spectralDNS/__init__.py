@@ -25,9 +25,6 @@ def get_solver(update=None, regression_test=None, additional_callback=None,
 
         if config.params.solver == 'NS':
             import spectralDNS.solvers.NS as solver
-
-        elif config.params.solver == 'NS_adaptive':
-            import spectralDNS.solvers.NS_adaptive as solver
             
         elif config.params.solver == 'VV':
             import spectralDNS.solvers.VV as solver

@@ -43,7 +43,7 @@ def RK4(np.ndarray[complex_t, ndim=4] U_hat,
                 for l in xrange(dU.shape[3]):
                     U_hat[i,j,k,l] = U_hat1[i,j,k,l]
                     
-    return U_hat
+    return U_hat, dt, dt
 
 def ForwardEuler(np.ndarray[complex_t, ndim=4] U_hat, 
                  np.ndarray[complex_t, ndim=4] U_hat0, 
@@ -58,7 +58,7 @@ def ForwardEuler(np.ndarray[complex_t, ndim=4] U_hat,
             for k in xrange(dU.shape[2]):
                 for l in xrange(dU.shape[3]):
                     U_hat[i,j,k,l] = U_hat[i,j,k,l] + dU[i,j,k,l]*dt 
-    return U_hat
+    return U_hat, dt, dt
 
 def AB2(np.ndarray[complex_t, ndim=4] U_hat, 
         np.ndarray[complex_t, ndim=4] U_hat0, 
@@ -71,7 +71,7 @@ def AB2(np.ndarray[complex_t, ndim=4] U_hat,
     cdef unsigned int rk, i, j, k, l
     dU = ComputeRHS(dU, U_hat)
     
-    if tstep == 1:
+    if tstep == 0:
         for i in xrange(dU.shape[0]):
             for j in xrange(dU.shape[1]):
                 for k in xrange(dU.shape[2]):
@@ -90,7 +90,7 @@ def AB2(np.ndarray[complex_t, ndim=4] U_hat,
             for k in xrange(dU.shape[2]):
                 for l in xrange(dU.shape[3]):                    
                     U_hat0[i,j,k,l] = dU[i,j,k,l]*dt
-    return U_hat
+    return U_hat, dt, dt
 
 def RK4_2D(np.ndarray[complex_t, ndim=3] U_hat, 
         np.ndarray[complex_t, ndim=3] U_hat0, 

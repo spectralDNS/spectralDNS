@@ -2,77 +2,79 @@ __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2015-04-08"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
+
+"""Parameters for the spectralDNS solvers
+
+The parameters are kept in dictionary 'params'. The items of this 
+dictionary may be accessed as attributes, e.g., 
+
+M = config,params.M  does the same as M = config.params['M']
+
+
+Generic parameters for all solvers::
+    precision     (str)              ('double', 'single') 
+    optimization  (str)              ('cython', 'numba', None)
+    make_profile  (int)              Whether on not to enable profiling
+    dt            (float)            Time step for fixed time step integrators
+    T             (float)            End time
+    nu            (float)            Viscosity
+    t             (float)            Time
+    tstep         (int)              Time step
+    L        (float, float(, float)) Domain size (2 for 2D, 3 for 3D)
+    M             (int, int(, int))  Mesh size   (2 for 2D, 3 for 3D)
+    write_result  (int)              Store results as HDF5 every (*) time step
+    checkpoint    (int)              Save intermediate result every (*)
+    dealias       (str)              ('3/2-rule', '2/3-rule', 'None')
+    ntol          (int)              Tolerance (number of accurate digits used in tests)
+    
+Parameters for 3D solvers in triply periodic domain::
+    convection       (str)           ('Standard', 'Divergence', 'Skewed', 'Vortex')
+    decomposition    (str)           ('slab', 'pencil')
+    communication    (str)           ('alltoall', 'sendrecv_replace')
+    pencil_alignment (str)           ('X', 'Y') Final alignment direction for spectral data 
+    P1               (int)           Pencil decomposition in first direction
+    write_yz_slice   (int, int)      Store yz slice at x index (*0) every (*1) time step
+    write_xz_slice   (int, int)      Store xz slice at y index (*0) every (*1) time step
+    write_xy_slice   (int, int)      Store xy slice at z index (*0) every (*1) time step
+    integrator       (str)           ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
+    TOL              (float)         Accuracy used in BS5_adaptive
+        
+Parameters for 3D solvers in channel domain::
+    convection    (str)              ('Standard', 'Divergence', 'Skewed', 'Vortex')
+    dealias_cheb  (bool)             Whether or not to dealias in inhomogeneous direction
+    decomposition (str)              ('slab',)
+    write_yz_slice   (int, int)      Store yz slice at x index (*0) every (*1) time step
+    write_xz_slice   (int, int)      Store xz slice at y index (*0) every (*1) time step
+    write_xy_slice   (int, int)      Store xy slice at z index (*0) every (*1) time step
+    
+Parameters for 2D solvers in doubly periodic domain::
+    integrator    (str)              ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
+    decomposition (str)              ('line')
+        
+Solver specific parameters triply periodic domain::
+    MHD::
+        eta           (float)        Model parameter
+        
+Solver specific parameters double periodic domain::
+    Bq2D::
+        Ri            (float)        Model parameter (Richardson number)
+        Pr            (float)        Model parameter (Prandtl number)
+        integrator    (str)          ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
+        
+Solver specifi parameters channel domain::
+    IPCS, IPCSR::
+        velocity_pressure_iters   (int)   Number of inner velocity pressure iterations
+        print_divergence_progress (bool)  Print the norm of the pressure correction on inner iterations
+        divergence_tol            (float) Tolerance on divergence error for pressure velocity coupling
+        
 """
-Global run-time configuration that may be overloaded on the commandline
-"""
+
 import argparse
 from numpy import pi, array, float32, float64
 import copy
 import collections
 
-class Params(collections.MutableMapping, dict):
-    """Dictionary to hold parameters for the spectralDNS solvers
-    
-    Items may be accessed as attributes
-    
-    Generic parameters::
-        precision     (str)              ('double', 'single') 
-        optimization  (str)              ('cython', 'numba', None)
-        make_profile  (int)              Whether on not to enable profiling
-        dt            (float)            Time step for fixed time step integrators
-        T             (float)            End time
-        nu            (float)            Viscosity
-        t             (float)            Time
-        tstep         (int)              Time step
-        L        (float, float(, float)) Domain size (2 for 2D, 3 for 3D)
-        M             (int, int, int)    Mesh size   (2 for 2D, 3 for 3D)
-        write_result  (int)              Store as HDF5 every (*) time step
-        checkpoint    (int)              Save intermediate result every (*)
-        dealias       (str)              ('3/2-rule', '2/3-rule', 'None')
-        ntol          (int)              Tolerance (number of accurate digits)
-        
-    Parameters for 3D solvers in triply periodic domain::
-        convection       (str)           ('Standard', 'Divergence', 'Skewed', 'Vortex')
-        decomposition    (str)           ('slab', 'pencil')
-        communication    (str)           ('alltoall', 'sendrecv_replace')
-        pencil_alignment (str)           ('X', 'Y') Final alignment direction for spectral data 
-        P1               (int)           Pencil decomposition in first direction
-        write_yz_slice   (int, int)      Store yz slice at x index (*0) every (*1) time step
-        write_xz_slice   (int, int)      Store xz slice at y index (*0) every (*1) time step
-        write_xy_slice   (int, int)      Store xy slice at z index (*0) every (*1) time step
-        integrator       (str)           ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
-        TOL              (float)         Accuracy used in BS5_adaptive
-            
-    Parameters for 3D solvers in channel domain::
-        convection    (str)              ('Standard', 'Divergence', 'Skewed', 'Vortex')
-        dealias_cheb  (bool)             Whether or not to dealias in inhomogeneous direction
-        decomposition (str)              ('slab',)
-        write_yz_slice   (int, int)      Store yz slice at x index (*0) every (*1) time step
-        write_xz_slice   (int, int)      Store xz slice at y index (*0) every (*1) time step
-        write_xy_slice   (int, int)      Store xy slice at z index (*0) every (*1) time step
-        
-    Parameters for 2D solvers in doubly periodic domain::
-        integrator    (str)              ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
-        decomposition (str)              ('line')
-            
-    Solver specific parameters triply periodic domain::
-        MHD::
-            eta           (float)        Model parameter
-            
-    Solver specific parameters double periodic domain::
-        Bq2D::
-            Ri            (float)        Model parameter (Richardson number)
-            Pr            (float)        Model parameter (Prandtl number)
-            integrator    (str)          ('RK4', 'ForwardEuler', 'AB2')
-            
-    Solver specifi parameters channel domain::
-        IPCS, IPCSR::
-            velocity_pressure_iters   (int)   Number of inner velocity pressure iterations
-            print_divergence_progress (bool)  Print the norm of the pressure correction on inner iterations
-            divergence_tol            (float) Tolerance on divergence error for pressure velocity coupling
-            
-    """
-    
+class Params(collections.MutableMapping, dict):    
     def __init__(self, *args, **kwargs):
         super(Params, self).__init__(*args, **kwargs)
         self.__dict__ = self

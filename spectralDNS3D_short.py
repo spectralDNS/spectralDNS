@@ -96,5 +96,6 @@ while t < T-1e-8:
         U[i] = ifftn_mpi(U_hat[i], U[i])
 
 k = comm.reduce(0.5*sum(U*U)*(1./N)**3)
+print k
 if rank == 0:
     assert round(k - 0.124953117517, 7) == 0

@@ -20,18 +20,18 @@ def optimizer(func):
     """
     
     try: # Look for optimized version of function
-        mod = eval("_".join((config.optimization, config.precision)))
+        mod = eval("_".join((config.params.optimization, config.params.precision)))
             
         # Check for generic implementation first, then solver specific 
         name = func.func_name
-        if config.decomposition == 'line':
+        if config.params.decomposition == 'line':
             fun = getattr(mod, name+"_2D", None)
             
         else:
             fun = getattr(mod, name, None)
             
         if not fun:
-            fun = getattr(mod, name+"_"+config.solver)
+            fun = getattr(mod, name+"_"+config.params.solver)
         
         @wraps(func)
         def wrapped_function(*args, **kwargs): 
