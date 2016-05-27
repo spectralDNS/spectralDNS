@@ -9,9 +9,6 @@ from spectralDNS.mesh.doublyperiodic import setup
 vars().update(setup['Bq2D'](**vars()))
 
 hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "rho":rho, "P":P}, "Bq2D.h5")
-assert config.decomposition == 'line'
-config.Ri = float(config.Ri)   # Get correct precision
-config.Pr = float(config.Pr)
 
 @optimizer
 def add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Ri, Pr):
@@ -31,23 +28,23 @@ def add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Ri, 
     return dU
 
 def ComputeRHS(dU, rk):
-    Ur_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 0)]
-    curl_dealiased = work[(FFT.work_shape(config.dealias), float, 0)]
+    Ur_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
+    curl_dealiased = work[(FFT.work_shape(params.dealias), float, 0)]
     F_tmp = work[(dU, 0)]
     
     for i in range(3):
-        Ur_dealiased[i] = FFT.ifft2(Ur_hat[i], Ur_dealiased[i], config.dealias)
+        Ur_dealiased[i] = FFT.ifft2(Ur_hat[i], Ur_dealiased[i], params.dealias)
         
     U_dealiased = Ur_dealiased[:2]
     rho_dealiased = Ur_dealiased[2]
 
     F_tmp[0] = cross2(F_tmp[0], K, U_hat)
-    curl_dealiased = FFT.ifft2(F_tmp[0], curl_dealiased, config.dealias)
-    dU[0] = FFT.fft2(U_dealiased[1]*curl_dealiased, dU[0], config.dealias)
-    dU[1] = FFT.fft2(-U_dealiased[0]*curl_dealiased, dU[1], config.dealias)
+    curl_dealiased = FFT.ifft2(F_tmp[0], curl_dealiased, params.dealias)
+    dU[0] = FFT.fft2(U_dealiased[1]*curl_dealiased, dU[0], params.dealias)
+    dU[1] = FFT.fft2(-U_dealiased[0]*curl_dealiased, dU[1], params.dealias)
    
-    F_tmp[0] = FFT.fft2(U_dealiased[0]*rho_dealiased, F_tmp[0], config.dealias)
-    F_tmp[1] = FFT.fft2(U_dealiased[1]*rho_dealiased, F_tmp[1], config.dealias)
+    F_tmp[0] = FFT.fft2(U_dealiased[0]*rho_dealiased, F_tmp[0], params.dealias)
+    F_tmp[1] = FFT.fft2(U_dealiased[1]*rho_dealiased, F_tmp[1], params.dealias)
     dU[2] = -1j*(K[0]*F_tmp[0]+K[1]*F_tmp[1])
     
     #U_tmp[0] = FFT.ifft2(1j*K[0]*rho_hat, U_tmp[0])
@@ -56,40 +53,56 @@ def ComputeRHS(dU, rk):
     #F_tmp[1] = FFT.fft2(U[1]*U_tmp[1], F_tmp[1])    
     #dU[2] = -1.0*(F_tmp[0] + F_tmp[1])    
     
-    dU = add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, config.nu, config.Ri, config.Pr)
+    dU = add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, params.nu, params.Ri, params.Pr)
     
     return dU
 
-def regression_test(**kw):
-    pass
-
 def solve():
+    global dU, Ur, Ur_hat
+    
     timer = Timer()
-    config.t = 0.0
-    config.tstep = 0
-    # Set up function to perform temporal integration (using config.integrator parameter)
+    params.t = 0.0
+    params.tstep = 0
+    # Set up function to perform temporal integration (using params.integrator parameter)
     integrate = getintegrator(**globals())
 
-    while config.t < config.T-1e-8:
-        config.t += config.dt 
-        config.tstep += 1
+    if params.make_profile: profiler = cProfile.Profile()
+    
+    dt_in = params.dt    
+
+    while params.t < params.T-1e-8:
         
-        Ur_hat[:] = integrate()
+        Ur_hat, params.dt, dt_took = integrate()
 
         for i in range(3):
             Ur[i] = FFT.ifft2(Ur_hat[i], Ur[i])
+
+        params.t += dt_took
+        params.tstep += 1
                  
         update(**globals())
         
         timer()
         
-        if config.tstep == 1 and config.make_profile:
+        if params.tstep == 1 and params.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
 
+        #Make sure that the last step hits T exactly.
+        if params.t + params.dt >= params.T:
+            params.dt = params.T - params.t
+            if params.dt <= 1.e-14:
+                break
+
+    params.dt = dt_in
+    
+    dU = ComputeRHS(dU, Ur_hat)
+    
+    additional_callback(fU_hat=dU, **globals())
+
     timer.final(MPI, rank)
     
-    if config.make_profile:
+    if params.make_profile:
         results = create_profile(**globals())
         
     regression_test(**globals())        

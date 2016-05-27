@@ -11,11 +11,11 @@ from ..shen import SFTc
 
 vars().update(setup['KMM'](**vars()))
 
-assert config.precision == "double"
+assert params.precision == "double"
 hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, 
-                      filename=config.solver+".h5", mesh={"x": x0, "y": x1, "z": x2})  
+                      filename=params.solver+".h5", mesh={"x": x0, "y": x1, "z": x2})  
 
-nu, dt = config.nu, config.dt
+nu, dt, N = params.nu, params.dt, params.N
 K4 = K2**2
 kx = K[0, :, 0, 0]
 HelmholtzSolverG = Helmholtz(N[0], sqrt(K2[0]+2.0/nu/dt), ST.quad, False)
@@ -60,9 +60,9 @@ def solvePressure(P_hat, Ni):
 def Cross(a, b, c, S):
     Uc = work[(a, 2)]
     Uc = cross1(Uc, a, b)
-    c[0] = FST.fst(Uc[0], c[0], S, dealias=config.dealias)
-    c[1] = FST.fst(Uc[1], c[1], S, dealias=config.dealias)
-    c[2] = FST.fst(Uc[2], c[2], S, dealias=config.dealias)
+    c[0] = FST.fst(Uc[0], c[0], S, dealias=params.dealias)
+    c[1] = FST.fst(Uc[1], c[1], S, dealias=params.dealias)
+    c[2] = FST.fst(Uc[2], c[2], S, dealias=params.dealias)
     return c
 
 #@profile
@@ -73,9 +73,9 @@ def Curl(a_hat, c, S):
     # Mult_CTD_3D_n is projection to T of d(a_hat)/dx (for components 1 and 2 of a_hat) 
     # Corresponds to CTD.matvec(a_hat[1])/BTT.dd, CTD.matvec(a_hat[2])/BTT.dd
     SFTc.Mult_CTD_3D_n(N[0], a_hat[1], a_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], S, dealias=config.dealias)
-    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], S, dealias=config.dealias)
-    c[0] = FST.ifst(g, c[0], ST, dealias=config.dealias)
+    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], S, dealias=params.dealias)
+    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], S, dealias=params.dealias)
+    c[0] = FST.ifst(g, c[0], ST, dealias=params.dealias)
     F_tmp2[0] = 1j*K[2]*a_hat[0]
     F_tmp2[1] = 1j*K[1]*a_hat[0]
     
@@ -86,9 +86,9 @@ def Curl(a_hat, c, S):
         #F_tmp2[:, :, 0] = 0
     #F_tmp2[:, :, :, -1] = 0
     
-    c[1] = FST.ifst(F_tmp2[0], c[1], SB, dealias=config.dealias)
+    c[1] = FST.ifst(F_tmp2[0], c[1], SB, dealias=params.dealias)
     c[1] -= dwdx
-    c[2] = FST.ifst(F_tmp2[1], c[2], SB, dealias=config.dealias)
+    c[2] = FST.ifst(F_tmp2[1], c[2], SB, dealias=params.dealias)
     c[2] *= -1.0
     c[2] += dvdx
     return c
@@ -105,27 +105,27 @@ def standardConvection(c, U_dealiased, U_hat):
     # Use regular Chebyshev basis for dvdx and dwdx
     F_tmp[0] = CDB.matvec(U_hat[0])
     F_tmp[0] = TDMASolverD(F_tmp[0])    
-    dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], ST, dealias=config.dealias)   
+    dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], ST, dealias=params.dealias)   
         
     SFTc.Mult_CTD_3D_n(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST, dealias=config.dealias)
-    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST, dealias=config.dealias)
+    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST, dealias=params.dealias)
+    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST, dealias=params.dealias)
     
-    dudy = Uc2[0] = FST.ifst(1j*K[1]*U_hat[0], Uc2[0], SB, dealias=config.dealias)    
-    dudz = Uc2[1] = FST.ifst(1j*K[2]*U_hat[0], Uc2[1], SB, dealias=config.dealias)
-    c[0] = FST.fst(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST, dealias=config.dealias)
-    
-    Uc2[:] = 0
-    dvdy = Uc2[0] = FST.ifst(1j*K[1]*U_hat[1], Uc2[0], ST, dealias=config.dealias)
-    
-    dvdz = Uc2[1] = FST.ifst(1j*K[2]*U_hat[1], Uc2[1], ST, dealias=config.dealias)
-    c[1] = FST.fst(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST, dealias=config.dealias)
+    dudy = Uc2[0] = FST.ifst(1j*K[1]*U_hat[0], Uc2[0], SB, dealias=params.dealias)    
+    dudz = Uc2[1] = FST.ifst(1j*K[2]*U_hat[0], Uc2[1], SB, dealias=params.dealias)
+    c[0] = FST.fst(U[0]*dudx + U[1]*dudy + U[2]*dudz, c[0], ST, dealias=params.dealias)
     
     Uc2[:] = 0
-    dwdy = Uc2[0] = FST.ifst(1j*K[1]*U_hat[2], Uc2[0], ST, dealias=config.dealias)    
-    dwdz = Uc2[1] = FST.ifst(1j*K[2]*U_hat[2], Uc2[1], ST, dealias=config.dealias)
+    dvdy = Uc2[0] = FST.ifst(1j*K[1]*U_hat[1], Uc2[0], ST, dealias=params.dealias)
     
-    c[2] = FST.fst(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST, dealias=config.dealias)
+    dvdz = Uc2[1] = FST.ifst(1j*K[2]*U_hat[1], Uc2[1], ST, dealias=params.dealias)
+    c[1] = FST.fst(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, c[1], ST, dealias=params.dealias)
+    
+    Uc2[:] = 0
+    dwdy = Uc2[0] = FST.ifst(1j*K[1]*U_hat[2], Uc2[0], ST, dealias=params.dealias)    
+    dwdz = Uc2[1] = FST.ifst(1j*K[2]*U_hat[2], Uc2[1], ST, dealias=params.dealias)
+    
+    c[2] = FST.fst(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, c[2], ST, dealias=params.dealias)
     
     return c
 
@@ -142,9 +142,9 @@ def divergenceConvection(c, U, U_hat, add=False):
     #c[1] = fss(U_tmp[1], c[1], ST)
     #c[2] = fss(U_tmp[2], c[2], ST)
     
-    F_tmp[0] = FST.fst(U[0]*U[0], F_tmp[0], ST, dealias=config.dealias)
-    F_tmp[1] = FST.fst(U[0]*U[1], F_tmp[1], ST, dealias=config.dealias)
-    F_tmp[2] = FST.fst(U[0]*U[2], F_tmp[2], ST, dealias=config.dealias)
+    F_tmp[0] = FST.fst(U[0]*U[0], F_tmp[0], ST, dealias=params.dealias)
+    F_tmp[1] = FST.fst(U[0]*U[1], F_tmp[1], ST, dealias=params.dealias)
+    F_tmp[2] = FST.fst(U[0]*U[2], F_tmp[2], ST, dealias=params.dealias)
     
     F_tmp2[0] = CDD.matvec(F_tmp[0])
     F_tmp2[1] = CDD.matvec(F_tmp[1])
@@ -156,14 +156,14 @@ def divergenceConvection(c, U, U_hat, add=False):
     c[1] += F_tmp2[1]
     c[2] += F_tmp2[2]
     
-    F_tmp2[0] = FST.fst(U[0]*U[1], F_tmp2[0], ST, dealias=config.dealias)
-    F_tmp2[1] = FST.fst(U[0]*U[2], F_tmp2[1], ST, dealias=config.dealias)    
+    F_tmp2[0] = FST.fst(U[0]*U[1], F_tmp2[0], ST, dealias=params.dealias)
+    F_tmp2[1] = FST.fst(U[0]*U[2], F_tmp2[1], ST, dealias=params.dealias)    
     c[0] += 1j*K[1]*F_tmp2[0] # duvdy
     c[0] += 1j*K[2]*F_tmp2[1] # duwdz
     
-    F_tmp[0] = FST.fst(U[1]*U[1], F_tmp[0], ST, dealias=config.dealias)
-    F_tmp[1] = FST.fst(U[1]*U[2], F_tmp[1], ST, dealias=config.dealias)
-    F_tmp[2] = FST.fst(U[2]*U[2], F_tmp[2], ST, dealias=config.dealias)
+    F_tmp[0] = FST.fst(U[1]*U[1], F_tmp[0], ST, dealias=params.dealias)
+    F_tmp[1] = FST.fst(U[1]*U[2], F_tmp[1], ST, dealias=params.dealias)
+    F_tmp[2] = FST.fst(U[2]*U[2], F_tmp[2], ST, dealias=params.dealias)
     c[1] += 1j*K[1]*F_tmp[0]  # dvvdy
     c[1] += 1j*K[2]*F_tmp[1]  # dvwdz  
     c[2] += 1j*K[1]*F_tmp[1]  # dvwdy
@@ -176,10 +176,10 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
-            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
+            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
+            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, params.dealias) 
             for i in range(1, 3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
+                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
 
             H_hat = standardConvection(H_hat, U_dealiased, U_hat)
             H_hat[:] *= -1
@@ -189,10 +189,10 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
-            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
+            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
+            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, params.dealias) 
             for i in range(1, 3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
+                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
 
             H_hat = divergenceConvection(H_hat, U_dealiased, U_hat, False)
             H_hat[:] *= -1
@@ -202,10 +202,10 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
-            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
+            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
+            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, params.dealias) 
             for i in range(1, 3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
+                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
 
             H_hat = standardConvection(H_hat, U_dealiased, U_hat)
             H_hat = divergenceConvection(H_hat, U_dealiased, U_hat, True)            
@@ -216,11 +216,11 @@ def getConvection(convection):
         
         def Conv(H_hat, U, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 0)]
-            curl_dealiased = work[((3,)+FST.work_shape(config.dealias), float, 1)]
-            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, config.dealias) 
+            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
+            curl_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 1)]
+            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, params.dealias) 
             for i in range(1, 3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, config.dealias)
+                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
             
             curl_dealiased[:] = Curl(U_hat, curl_dealiased, ST)
             H_hat[:] = Cross(U_dealiased, curl_dealiased, H_hat, ST)
@@ -229,7 +229,7 @@ def getConvection(convection):
         
     return Conv           
 
-conv = getConvection(config.convection)
+conv = getConvection(params.convection)
 
 @optimizer
 def add_diffusion_u(u, d, AC, SBB, ABB, BBB, nu, dt, K2, K4):
@@ -243,10 +243,10 @@ def assembleAB(H_hat, H_hat0, H_hat1):
     H_hat0[:] = 1.5*H_hat - 0.5*H_hat1
     
 #@profile
-def ComputeRHS(dU):
-    global hv
+def ComputeRHS(dU, U_hat):
+    global hv, H_hat
     
-    H_hat[:] = conv(H_hat, U0, U_hat0)    
+    H_hat = conv(H_hat, U0, U_hat0)    
     diff0[:] = 0
     
     # Compute diffusion for g-equation
@@ -267,22 +267,18 @@ def ComputeRHS(dU):
     dU[1] = hg*2./nu + diff0[1]        
     return dU
 
-def regression_test(**kw):
-    pass
-
-def update(**kwargs):
-    pass
-
 #@profile
 def solve():
+    global dU, U_hat, g, u
+    
     timer = Timer()
     
-    while config.t < config.T-1e-14:
-        config.t += config.dt
-        config.tstep += 1
+    while params.t < params.T-1e-14:
+        params.t += params.dt
+        params.tstep += 1
 
         dU[:] = 0
-        dU[:] = ComputeRHS(dU)
+        dU = ComputeRHS(dU, U_hat)
         
         U_hat[0] = BiharmonicSolverU(U_hat[0], dU[0])
         g[:] = HelmholtzSolverG(g, dU[1])
@@ -324,13 +320,13 @@ def solve():
                 
         timer()
         
-        if config.tstep == 1 and config.make_profile:
+        if params.tstep == 1 and params.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
             
     timer.final(MPI, rank)
     
-    if config.make_profile:
+    if params.make_profile:
         results = create_profile(**globals())
                 
     regression_test(**globals())

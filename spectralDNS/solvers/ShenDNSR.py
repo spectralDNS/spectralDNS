@@ -6,10 +6,13 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from ShenDNS import *
 from ..shen.Matrices import CDTmat, CTDmat, BDTmat, BTDmat, BTTmat, BTNmat, CNDmat, BNDmat
 
-vars().update(setup['IPCSR'](**vars()))
+# Get and update the global namespace of the ShenDNS solver (to avoid having two namespaces filled with arrays)
+# Overload just a few routines
+context = solve.func_globals
+context.update(setup['IPCSR'](**vars()))
+vars().update(context)
 
-hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, 
-                      "IPCSR.h5", 
+hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "IPCSR.h5", 
                       mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
 
 CDT = CDTmat(K[0, :, 0, 0])
@@ -57,7 +60,7 @@ def pressuregrad2(Pcorr, dU):
 def solvePressure(P_hat, Ni):
     """Solve for pressure if Ni is fst of convection"""
     F_tmp = work[(P_hat, 0)] 
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[p_slice])    
+    SFTc.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[p_slice])    
     P_hat = HelmholtzSolverP(P_hat, F_tmp)
     
     # P in Chebyshev basis for this solver
@@ -77,9 +80,9 @@ def updatepressure(P_hat, Pcorr, U_hat):
     #P_hat -= nu*BTN.matvec(F_tmp)/dd
     
     P_hat += BTN.matvec(Pcorr)/dd
-    P_hat -= nu*CTD.matvec(U_hat[0])/dd
-    P_hat -= nu*1j*K[1]*BTD.matvec(U_hat[1])/dd
-    P_hat -= nu*1j*K[2]*BTD.matvec(U_hat[2])/dd
+    P_hat -= params.nu*CTD.matvec(U_hat[0])/dd
+    P_hat -= params.nu*1j*K[1]*BTD.matvec(U_hat[1])/dd
+    P_hat -= params.nu*1j*K[2]*BTD.matvec(U_hat[2])/dd
 
 # Update ComputeRHS to use current pressuregrad
 ComputeRHS.func_globals['pressuregrad'] = pressuregrad
@@ -89,11 +92,11 @@ pressure_error = zeros(1)
 def solve():
     timer = Timer()
     
-    while config.t < config.T-1e-8:
-        config.t += config.dt
-        config.tstep += 1
+    while params.t < params.T-1e-8:
+        params.t += params.dt
+        params.tstep += 1
         # Tentative momentum solve
-        for jj in range(config.velocity_pressure_iters):
+        for jj in range(params.velocity_pressure_iters):
             dU[:] = 0
             dU[:] = ComputeRHS(dU, jj)                
             U_hat[0] = HelmholtzSolverU(U_hat[0], dU[0])
@@ -111,12 +114,12 @@ def solve():
             dP -= P_hat
 
             comm.Allreduce(linalg.norm(Pcorr), pressure_error)
-            if jj == 0 and config.print_divergence_progress and rank == 0:
+            if jj == 0 and params.print_divergence_progress and rank == 0:
                 print "   Divergence error"
-            if config.print_divergence_progress:
+            if params.print_divergence_progress:
                 if rank == 0:                
                     print "         Pressure correction norm %6d  %2.6e" %(jj, pressure_error[0])
-            if pressure_error[0] < config.divergence_tol:
+            if pressure_error[0] < params.divergence_tol:
                 break
      
         # Update velocity
@@ -125,7 +128,7 @@ def solve():
         dU[0] = TDMASolverD(dU[0])
         dU[1] = TDMASolverD(dU[1])
         dU[2] = TDMASolverD(dU[2])        
-        U_hat[:, u_slice] += config.dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
+        U_hat[:, u_slice] += params.dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
 
         for i in range(3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)
@@ -142,13 +145,13 @@ def solve():
                 
         timer()
         
-        if config.tstep == 1 and config.make_profile:
+        if params.tstep == 1 and params.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
             
     timer.final(MPI, rank)
     
-    if config.make_profile:
+    if params.make_profile:
         results = create_profile(**globals())
                 
     regression_test(**globals())

@@ -12,14 +12,15 @@ def initialize(UB_hat, UB, U, B, X, sin, cos, FFT, **kw):
     for i in range(6):
         UB_hat[i] = FFT.fftn(UB[i], UB_hat[i])
         
-def update(comm, rank, P, P_hat, U, B, curl, float64, dx, L, sum, 
-           hdf5file, FFT, **kw):
+def update(comm, rank, P, P_hat, U, B, curl, float64, sum, 
+           hdf5file, FFT, params, **kw):
     
-    if hdf5file.check_if_write(config.tstep):
+    if hdf5file.check_if_write(params):
         P = FFT.ifftn(P_hat*1j, P)
-        hdf5file.write(config.tstep)
+        hdf5file.write(params)
 
-def regression_test(comm, U, B, float64, dx, L, sum,  rank, **kw):
+def regression_test(comm, U, B, float64, sum,  rank, params, **kw):
+    dx, L = params.dx, params.L
     k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
     b = comm.reduce(sum(B.astype(float64)*B.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     if rank == 0:
@@ -41,3 +42,19 @@ if __name__ == "__main__":
     solver = get_solver(update=update, regression_test=regression_test)
     initialize(**vars(solver))
     solver.solve()
+    
+    config.params.dealias = '3/2-rule'
+    initialize(**vars(solver))
+    solver.solve()
+    
+    config.params.dealias = '2/3-rule'
+    config.params.optimization = 'cython'
+    initialize(**vars(solver))
+    solver.solve()    
+
+    config.params.write_result = 1
+    config.params.checkpoint = 1
+    config.dt = 0.01
+    config.T = 0.04
+    solver.regression_test = lambda **kwargs: None
+    solver.solve()    

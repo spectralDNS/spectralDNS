@@ -7,15 +7,16 @@ def initialize(U, U_hat, X, sin, cos, FFT, **kw):
     for i in range(2):
         U_hat[i] = FFT.fft2(U[i], U_hat[i])
 
-def update(FFT, P, P_hat, hdf5file, **kw):
-    if hdf5file.check_if_write(config.tstep):
+def update(FFT, P, P_hat, hdf5file, params, **kw):
+    if hdf5file.check_if_write(params):
         P = FFT.ifft2(P_hat*1j, P)
-        hdf5file.write(config.tstep)
+        hdf5file.write(params)
         
-def regression_test(comm, U, float64, dx, L, sum, rank, X, **kw):
+def regression_test(comm, U, float64, sum, rank, X, params, **kw):
+    dx, L = params.dx, params.L
     k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
-    U[0] = -sin(X[1])*cos(X[0])*exp(-2*config.nu*config.t)
-    U[1] = sin(X[0])*cos(X[1])*exp(-2*config.nu*config.t)    
+    U[0] = -sin(X[1])*cos(X[0])*exp(-2*params.nu*params.t)
+    U[1] = sin(X[0])*cos(X[1])*exp(-2*params.nu*params.t)    
     ke = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)    
     if rank == 0:
         assert round(k - ke, 7) == 0
@@ -26,10 +27,26 @@ if __name__ == '__main__':
       'nu': 0.01,
       'dt': 0.05,
       'T': 10,
-      'write_result': 100,
       'M': [6, 6]}, 'doublyperiodic'
     )
 
     solver = get_solver(update=update, regression_test=regression_test, mesh='doublyperiodic')
     initialize(**vars(solver))
     solver.solve()
+
+    config.params.dealias = '3/2-rule'
+    initialize(**vars(solver))
+    solver.solve()
+    
+    config.params.dealias = '2/3-rule'
+    config.params.optimization = 'cython'
+    initialize(**vars(solver))
+    solver.solve()    
+    
+    config.params.write_result = 1
+    config.params.checkpoint = 1
+    config.dt = 0.01
+    config.T = 0.04
+    solver.regression_test = lambda **kwargs: None
+    solver.solve()    
+    

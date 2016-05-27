@@ -11,7 +11,7 @@ vars().update(setup['MHD'](**vars()))
 hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P, 
                                    "Bx": B[0], "By": B[1], "Bz":B[2]}, "MHD.h5")
 
-eta = float(config.eta)
+eta = float(params.eta)
 
 def set_Elsasser(c, F_tmp, K):
     c[:3] = -1j*(K[0]*(F_tmp[:, 0] + F_tmp[0, :])
@@ -44,19 +44,16 @@ def divergenceConvection(z0, z1, c, dealias=None):
 
     return c    
     
-def ComputeRHS(dU, rk):
-    if rk > 0: # For rk=0 the correct values are already in U, B
-        for i in range(6):
-            UB[i] = FFT.ifftn(UB_hat[i], UB[i])
-    
-    UB_dealiased = work[((6,)+FFT.work_shape(config.dealias), float, 0)]
+def ComputeRHS(dU, UB_hat):
+    """Compute and return entire rhs contribution"""
+    UB_dealiased = work[((6,)+FFT.work_shape(params.dealias), float, 0)]
     for i in range(6):
-        UB_dealiased[i] = FFT.ifftn(UB_hat[i], UB_dealiased[i], config.dealias)
+        UB_dealiased[i] = FFT.ifftn(UB_hat[i], UB_dealiased[i], params.dealias)
     
     U_dealiased = UB_dealiased[:3]
     B_dealiased = UB_dealiased[3:]
     # Compute convective term and place in dU
-    dU = divergenceConvection(U_dealiased+B_dealiased, U_dealiased-B_dealiased, dU, config.dealias)
+    dU = divergenceConvection(U_dealiased+B_dealiased, U_dealiased-B_dealiased, dU, params.dealias)
     
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat[:] = sum(dU[:3]*K_over_K2, 0)
@@ -65,8 +62,8 @@ def ComputeRHS(dU, rk):
     dU[:3] -= P_hat*K
 
     # Add contribution from diffusion
-    dU[:3] -= config.nu*K2*U_hat
-    dU[3:] -= config.eta*K2*B_hat
+    dU[:3] -= params.nu*K2*U_hat
+    dU[3:] -= params.eta*K2*B_hat
     
     return dU
 
@@ -74,32 +71,51 @@ def regression_test(**kw):
     pass
 
 def solve():
+    global dU, UB, UB_hat
+    
     timer = Timer()
-    config.t = 0.0
-    config.tstep = 0
-    # Set up function to perform temporal integration (using config.integrator parameter)
+    params.t = 0.0
+    params.tstep = 0
+    # Set up function to perform temporal integration (using params.integrator parameter)
     integrate = getintegrator(**globals())
 
-    while config.t < config.T-1e-8:
-        config.t += config.dt 
-        config.tstep += 1
+    if params.make_profile: profiler = cProfile.Profile()
+    
+    dt_in = params.dt
+    
+    while params.t + params.dt <= params.T+1e-15:
         
-        UB_hat[:] = integrate()
+        UB_hat, params.dt, dt_took = integrate()
 
         for i in range(6):
             UB[i] = FFT.ifftn(UB_hat[i], UB[i])
+                 
+        params.t += dt_took
+        params.tstep += 1
                  
         update(**globals())
         
         timer()
         
-        if config.tstep == 1 and config.make_profile:
+        if params.tstep == 1 and params.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
+            
+                #Make sure that the last step hits T exactly.
+        if params.t + params.dt >= params.T:
+            params.dt = params.T - params.t
+            if params.dt <= 1.e-14:
+                break
+
+    params.dt = dt_in
+    
+    dU = ComputeRHS(dU, UB_hat)
+    
+    additional_callback(fU_hat=dU, **globals())
 
     timer.final(MPI, rank)
     
-    if config.make_profile:
+    if params.make_profile:
         results = create_profile(**vars())
         
     regression_test(**globals())

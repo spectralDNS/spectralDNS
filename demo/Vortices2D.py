@@ -23,20 +23,20 @@ def regression_test(U, num_processes, loadtxt, allclose, **kwargs):
     assert allclose(U[0], U_ref)
 
 im = None
-def update(N, curl, U_hat, FFT, K, P, P_hat, hdf5file, **kw):
+def update(curl, U_hat, FFT, K, P, P_hat, hdf5file, params, **kw):
     global im
     # initialize plot
-    if config.tstep == 1:
-        im = plt.imshow(zeros((N[0], N[1])))
+    if params.tstep == 1:
+        im = plt.imshow(zeros((params.N[0], params.N[1])))
         plt.colorbar(im)
         plt.draw()
         
-    if hdf5file.check_if_write(config.tstep):
+    if hdf5file.check_if_write(params):
         P = FFT.ifft2(P_hat*1j, P)
         curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
-        hdf5file.write(config.tstep)   
+        hdf5file.write(params)   
         
-    if config.tstep % config.plot_result == 0 and config.plot_result > 0:
+    if params.tstep % params.plot_result == 0 and params.plot_result > 0:
         curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         im.set_data(curl[:, :])
         im.autoscale()

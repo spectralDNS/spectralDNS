@@ -3,14 +3,18 @@ __date__ = "2014-12-30"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from mpiFFT4py import work_arrays, zeros, empty
+from mpiFFT4py import work_arrays, datatypes, zeros, empty
 from ..optimization import optimizer
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, conj
 
 __all__ = ['setup']
 
-def setupNS(float, complex, FFT, **kwargs):
-        
+def setupNS(config, get_FFT, **kwargs):
+    
+    params = config.params
+    FFT = get_FFT(params.N, params.L, params.decomposition, params.precision)
+    float, complex, mpitype = datatypes(params.precision)
+
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()
 
@@ -30,7 +34,11 @@ def setupNS(float, complex, FFT, **kwargs):
     del kwargs
     return locals()
 
-def setupBoussinesq(float, complex, FFT, **kwargs):
+def setupBoussinesq(config, get_FFT, **kwargs):
+
+    params = config.params
+    FFT = get_FFT(params.N, params.L, params.decomposition, params.precision)
+    float, complex, mpitype = datatypes(params.precision)    
     
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()

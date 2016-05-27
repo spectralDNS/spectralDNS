@@ -6,6 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from numpy import *
 from numpy.fft import fftfreq, fft, ifft, irfft2, rfft2
 from mpi4py import MPI
+from pyfftw.interfaces.numpy_fft import fft, ifft, irfft2, rfft2
 
 nu = 0.000625
 T = 0.1

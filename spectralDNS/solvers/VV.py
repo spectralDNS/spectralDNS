@@ -5,16 +5,16 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 """
 Velocity-vorticity formulation
 """
-from spectralinit import *
+from NS import *
 
-from NS import Cross, hdf5file, regression_test, setup
+# Get and update the global namespace of the NS solver (to avoid having two namespaces filled with arrays)
+# Overload just a few routines
 
-vars().update(setup['VV'](**vars()))
+context = solve.func_globals
+context.update(setup['VV'](**vars()))
+vars().update(context)
 
-# Rename variable since we are working with a vorticity formulation
-W = U.copy()               # W is vorticity
-W_hat = U_hat              # U is used in setup, rename here for convenience
-Source = U_hat.copy()*0    # Possible source term initialized to zero
+hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "VV.h5")
 
 def Curl(a, c, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
@@ -26,53 +26,68 @@ def Curl(a, c, dealias=None):
     return c
 
 #@profile
-def ComputeRHS(dU, rk):
-    if rk > 0:
-        for i in range(3):
-            W[i] = FFT.ifftn(W_hat[i], W[i])
-            
-    U_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 0)]
-    W_dealiased = work[((3,)+FFT.work_shape(config.dealias), float, 1)]
+def ComputeRHS(dU, W_hat):
+    U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
+    W_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
     F_tmp = work[(dU, 0)]
     
-    U_dealiased[:] = Curl(W_hat, U_dealiased, config.dealias)
+    U_dealiased[:] = Curl(W_hat, U_dealiased, params.dealias)
     for i in range(3):
-        W_dealiased[i] = FFT.ifftn(W_hat[i], W_dealiased[i], config.dealias)
-    F_tmp[:] = Cross(U_dealiased, W_dealiased, F_tmp, config.dealias)
+        W_dealiased[i] = FFT.ifftn(W_hat[i], W_dealiased[i], params.dealias)
+    F_tmp[:] = Cross(U_dealiased, W_dealiased, F_tmp, params.dealias)
     dU = cross2(dU, K, F_tmp)    
-    dU -= config.nu*K2*W_hat    
+    dU -= params.nu*K2*W_hat    
     dU += Source    
     return dU
 
-
 def solve():
-    timer = Timer()
-    config.t = 0.0
-    config.tstep = 0
-    # Set up function to perform temporal integration (using config.integrator)
-    integrate = getintegrator(**globals())
+    global dU, W, W_hat
     
-    while config.t < config.T-1e-8:
-        config.t += config.dt
-        config.tstep += 1
+    timer = Timer()
+    params.t = 0.0
+    params.tstep = 0
+    # Set up function to perform temporal integration (using params.integrator parameter)
+    integrate = getintegrator(**globals())
+
+    if params.make_profile: profiler = cProfile.Profile()
+
+    dt_in = params.dt
+    
+    while params.t + params.dt <= params.T+1e-15:
         
-        W_hat = integrate()
+        W_hat, params.dt, dt_took = integrate()
 
         for i in range(3):
             W[i] = FFT.ifftn(W_hat[i], W[i])
-                        
+
+        params.t += dt_took
+        params.tstep += 1
+                 
         update(**globals())
         
         timer()
-            
-        if config.tstep == 1 and config.make_profile:
-            profiler.enable()  #Enable profiling after first step is finished
+        
+        if params.tstep == 1 and params.make_profile:
+            #Enable profiling after first step is finished
+            profiler.enable()
+
+        #Make sure that the last step hits T exactly.
+        if params.t + params.dt >= params.T:
+            params.dt = params.T - params.t
+            if params.dt <= 1.e-14:
+                break
+
+    params.dt = dt_in
+    
+    dU = ComputeRHS(dU, W_hat)
+    
+    additional_callback(fU_hat=dU, **globals())
 
     timer.final(MPI, rank)
     
-    if config.make_profile:
-        results = create_profile(**vars())
-
+    if params.make_profile:
+        results = create_profile(**globals())
+        
     regression_test(**globals())
         
     hdf5file.close()

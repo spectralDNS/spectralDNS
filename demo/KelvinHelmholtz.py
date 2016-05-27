@@ -1,37 +1,39 @@
 from spectralDNS import config, get_solver
 import matplotlib.pyplot as plt
-from numpy import zeros
+from numpy import zeros, pi, sum
 
-def initialize(X, U, U_hat, exp, sin, cos, tanh, N, pi, FFT, **kwargs):
-    Um = 0.5*(config.U1 - config.U2)
-    U[1] = config.A*sin(2*X[0])       
-    U[0, :, :N[1]/4] = config.U1 - Um*exp((X[1,:, :N[1]/4] - 0.5*pi)/config.delta)
-    U[0, :, N[1]/4:N[1]/2] = config.U2 + Um*exp(-1.0*(X[1, :, N[1]/4:N[1]/2] - 0.5*pi)/config.delta)
-    U[0, :, N[1]/2:3*N[1]/4] = config.U2 + Um*exp((X[1, :, N[1]/2:3*N[1]/4] - 1.5*pi)/config.delta)
-    U[0, :, 3*N[1]/4:] = config.U1 - Um*exp(-1.0*(X[1, :, 3*N[1]/4:] - 1.5*pi)/config.delta)
+def initialize(X, U, U_hat, exp, sin, cos, tanh, FFT, params, **kwargs):
+    Um = 0.5*(params.U1 - params.U2)
+    N = params.N    
+    U[1] = params.A*sin(2*X[0])       
+    U[0, :, :N[1]/4] = params.U1 - Um*exp((X[1,:, :N[1]/4] - 0.5*pi)/params.delta)
+    U[0, :, N[1]/4:N[1]/2] = params.U2 + Um*exp(-1.0*(X[1, :, N[1]/4:N[1]/2] - 0.5*pi)/params.delta)
+    U[0, :, N[1]/2:3*N[1]/4] = params.U2 + Um*exp((X[1, :, N[1]/2:3*N[1]/4] - 1.5*pi)/params.delta)
+    U[0, :, 3*N[1]/4:] = params.U1 - Um*exp(-1.0*(X[1, :, 3*N[1]/4:] - 1.5*pi)/params.delta)
           
     for i in range(2):
         U_hat[i] = FFT.fft2(U[i], U_hat[i])
 
 im, im2 = None, None
-def update(comm, rank, N, L, dx, FFT, U_hat, U, sum,
+def update(comm, rank, FFT, U_hat, U, params,
            P_hat, P, hdf5file, float64, K, curl, **kwargs):
     global im, im2
     
-    if (hdf5file.check_if_write(config.tstep) or (config.tstep % config.plot_result == 0 
-        and config.plot_result > 0)):
+    dx, L, N = params.dx, params.L, params.N
+    if (hdf5file.check_if_write(params) or (params.tstep % params.plot_result == 0 
+        and params.plot_result > 0)):
         P = FFT.ifft2(P_hat*1j, P)
         curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
 
-    if hdf5file.check_if_write(config.tstep):
-        hdf5file.write(config.tstep)           
+    if hdf5file.check_if_write(params):
+        hdf5file.write(params)           
 
-    if config.tstep % config.compute_energy == 0:
+    if params.tstep % params.compute_energy == 0:
         kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
         if rank == 0:
-            print config.tstep, kk
+            print params.tstep, kk
             
-    if config.tstep == 1 and config.plot_result > 0:
+    if params.tstep == 1 and params.plot_result > 0:
         fig, ax = plt.subplots(1,1)
         fig.suptitle('Pressure', fontsize=20)
         ax.set_xlabel('x')
@@ -51,7 +53,7 @@ def update(comm, rank, N, L, dx, FFT, U_hat, U, sum,
         plt.draw()
         globals().update(dict(im=im, im2=im2))
 
-    if config.tstep % config.plot_result == 0 and config.plot_result > 0:
+    if params.tstep % params.plot_result == 0 and params.plot_result > 0:
         im.set_data(P[:, :].T)
         im.autoscale()
         plt.pause(1e-6)
@@ -59,7 +61,7 @@ def update(comm, rank, N, L, dx, FFT, U_hat, U, sum,
         im2.autoscale()
         plt.pause(1e-6)
         if rank == 0:
-            print config.tstep            
+            print params.tstep            
 
 if __name__ == "__main__":
     config.update(
@@ -79,6 +81,6 @@ if __name__ == "__main__":
     config.doublyperiodic.add_argument('--plot_result', type=int, default=10)    
     config.doublyperiodic.add_argument('--compute_energy', type=int, default=10)
     solver = get_solver(update, mesh='doublyperiodic')
-    assert config.solver == 'NS2D'
+    assert config.params.solver == 'NS2D'
     initialize(**vars(solver))
     solver.solve()

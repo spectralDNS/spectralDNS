@@ -32,11 +32,11 @@ def energy(u, N, comm, rank, L):
         return 0    
 
 def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
-               ST, X, N, comm, rank, L, conv, TDMASolverD, **kw):        
-    OS = OrrSommerfeld(Re=config.Re, N=100)
+               ST, X, comm, rank, conv, TDMASolverD, params, **kw): 
+    OS = OrrSommerfeld(Re=params.Re, N=100)
     initOS(OS, U0, U_hat0, X)
     
-    if not config.solver in ("KMM", "KMMRK3"):
+    if not params.solver in ("KMM", "KMMRK3"):
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
         for i in range(3):
@@ -44,9 +44,9 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
         H_hat1 = conv(H_hat1, U0, U_hat0)
-        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
+        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, params.N, comm, rank, params.L)    
 
-        initOS(OS, U, U_hat, X, t=config.dt)
+        initOS(OS, U, U_hat, X, t=params.dt)
         for i in range(3):
             U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
         for i in range(3):
@@ -64,8 +64,8 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
         P = FST.ifst(P_hat, P, kw['SN'])
         U0[:] = U
         U_hat0[:] = U_hat
-        config.t = config.dt
-        config.tstep = 1
+        params.t = params.dt
+        params.tstep = 1
 
     else:
         U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB']) 
@@ -75,9 +75,9 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
         for i in range(1, 3):
             U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
         H_hat1 = conv(H_hat1, U0, U_hat0)
-        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, N, comm, rank, L)    
+        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, params.N, comm, rank, params.L)    
         
-        initOS(OS, U, U_hat, X, t=config.dt)
+        initOS(OS, U, U_hat, X, t=params.dt)
         U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB']) 
         for i in range(1, 3):
             U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
@@ -87,34 +87,34 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
 
         U0[:] = U
         U_hat0[:] = U_hat
-        config.t = config.dt
-        config.tstep = 1
+        params.t = params.dt
+        params.tstep = 1
         kw['g'][:] = 0
     
     return dict(OS=OS, e0=e0)
 
-def set_Source(Source, Sk, FST, ST, **kw):
+def set_Source(Source, Sk, FST, ST, params, **kw):
     Source[:] = 0
-    Source[1] = -2./config.Re
+    Source[1] = -2./params.Re
     Sk[:] = 0
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
 
-def update(hdf5file, U, P, U0, **kw):    
-    if hdf5file.check_if_write(config.tstep):
-        hdf5file.write(config.tstep)
+def update(hdf5file, U, P, U0, params, **kw):    
+    if hdf5file.check_if_write(params):
+        hdf5file.write(params)
         
-    if config.tstep % config.checkpoint == 0:
-        hdf5file.checkpoint(U, P, U0)    
+    if params.tstep % params.checkpoint == 0:
+        hdf5file.checkpoint(U, P, params, U0)    
         
-def regression_test(X, OS, N, comm, rank, L, e0, FST, U0, U_hat0, U, U_hat, **kw):
-    if "KMM" in config.solver:
+def regression_test(X, OS, comm, rank, e0, FST, U0, U_hat0, U, U_hat, params, **kw):
+    if "KMM" in params.solver:
         U[0] = FST.ifst(U_hat[0], U[0], kw["SB"])
         for i in range(1, 3):
             U[i] = FST.ifst(U_hat[i], U[i], kw["ST"])
     
-    initOS(OS, U0, U_hat0, X, t=config.t)
+    initOS(OS, U0, U_hat0, X, t=params.t)
     pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
-    e1 = 0.5*energy(pert, N, comm, rank, L)
+    e1 = 0.5*energy(pert, params.N, comm, rank, params.L)
     if rank == 0:
         assert sqrt(e1) < 1e-12
 
