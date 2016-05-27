@@ -34,7 +34,10 @@ def get_FFT(N, L, decomposition, precision="double", P1=None, alignment="Y"):
         FFT = line_FFT(N, L, MPI, precision)
     return FFT
 
-def update(**kwargs):
+def regression_test(**kw):
+    pass
+
+def update(**kw):
     pass
 
 def additional_callback(**kw):

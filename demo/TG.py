@@ -131,19 +131,19 @@ if __name__ == "__main__":
     solver = get_solver(update=update, regression_test=regression_test, 
                         additional_callback=additional_callback, 
                         mesh="triplyperiodic")
-    solver.hdf5file.fname = "NS7.h5"
-    solver.hdf5file.components["W0"] = solver.curl[0]
-    solver.hdf5file.components["W1"] = solver.curl[1]
-    solver.hdf5file.components["W2"] = solver.curl[2]
+    #solver.hdf5file.fname = "NS7.h5"
+    #solver.hdf5file.components["W0"] = solver.curl[0]
+    #solver.hdf5file.components["W1"] = solver.curl[1]
+    #solver.hdf5file.components["W2"] = solver.curl[2]
     initialize(**vars(solver))
     solver.solve()
     
     #config.update(dict(M=[4, 4, 4]), 'triplyperiodic')
-    config.params.M = [4, 4, 4]
-    VVsolver = get_solver(update=update, regression_test=regression_test, 
-                          mesh="triplyperiodic", parse_args=sys.argv[1:-1]+['VV'])
-    initialize(**vars(VVsolver))
-    print "VVsolver"
-    VVsolver.solve()
+    ##config.params.M = [4, 4, 4]
+    #VVsolver = get_solver(update=update, regression_test=regression_test, 
+                          #mesh="triplyperiodic", parse_args=sys.argv[1:-1]+['VV'])
+    #initialize(**vars(VVsolver))
+    #print "VVsolver"
+    #VVsolver.solve()
 
     

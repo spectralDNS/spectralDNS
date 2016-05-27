@@ -10,9 +10,6 @@ vars().update(setup['Bq2D'](**vars()))
 
 hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "rho":rho, "P":P}, "Bq2D.h5")
 
-params.Ri = float(params.Ri)   # Get correct precision
-params.Pr = float(params.Pr)
-
 @optimizer
 def add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Ri, Pr):
     # Compute pressure (To get actual pressure multiply by 1j)
@@ -60,11 +57,8 @@ def ComputeRHS(dU, rk):
     
     return dU
 
-def regression_test(**kw):
-    pass
-
 def solve():
-    global Ur, Ur_hat
+    global dU, Ur, Ur_hat
     
     timer = Timer()
     params.t = 0.0
@@ -72,14 +66,19 @@ def solve():
     # Set up function to perform temporal integration (using params.integrator parameter)
     integrate = getintegrator(**globals())
 
+    if params.make_profile: profiler = cProfile.Profile()
+    
+    dt_in = params.dt    
+
     while params.t < params.T-1e-8:
-        params.t += params.dt 
-        params.tstep += 1
         
-        Ur_hat = integrate()
+        Ur_hat, params.dt, dt_took = integrate()
 
         for i in range(3):
             Ur[i] = FFT.ifft2(Ur_hat[i], Ur[i])
+
+        params.t += dt_took
+        params.tstep += 1
                  
         update(**globals())
         
@@ -88,6 +87,18 @@ def solve():
         if params.tstep == 1 and params.make_profile:
             #Enable profiling after first step is finished
             profiler.enable()
+
+        #Make sure that the last step hits T exactly.
+        if params.t + params.dt >= params.T:
+            params.dt = params.T - params.t
+            if params.dt <= 1.e-14:
+                break
+
+    params.dt = dt_in
+    
+    dU = ComputeRHS(dU, Ur_hat)
+    
+    additional_callback(fU_hat=dU, **globals())
 
     timer.final(MPI, rank)
     

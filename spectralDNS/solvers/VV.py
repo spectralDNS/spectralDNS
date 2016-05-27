@@ -5,47 +5,16 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 """
 Velocity-vorticity formulation
 """
-from spectralinit import *
-from spectralDNS.mesh.triplyperiodic import setup
+from NS import *
 
-vars().update(setup['VV'](**vars()))
+# Get and update the global namespace of the NS solver (to avoid having two namespaces filled with arrays)
+# Overload just a few routines
+
+context = solve.func_globals
+context.update(setup['VV'](**vars()))
+vars().update(context)
 
 hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "VV.h5")
-
-def standardConvection(c, U_dealiased, U_hat, dealias=None):
-    """c_i = u_j du_i/dx_j"""
-    gradUi = work[(U_dealiased, 2)]
-    for i in range(3):
-        for j in range(3):
-            gradUi[j] = FFT.ifftn(1j*K[j]*U_hat[i], gradUi[j], dealias)
-        c[i] = FFT.fftn(sum(U_dealiased*gradUi, 0), c[i], dealias)
-    return c
-
-def divergenceConvection(c, U_dealiased, dealias=None, add=False):
-    """c_i = div(u_i u_j)"""
-    if not add: c.fill(0)
-    UUi_hat = work[(c, 0)]
-    for i in range(3):
-        UUi_hat[i] = FFT.fftn(U_dealiased[0]*U_dealiased[i], UUi_hat[i], dealias)
-    c[0] += 1j*sum(K*UUi_hat, 0)
-    c[1] += 1j*K[0]*UUi_hat[1]
-    c[2] += 1j*K[0]*UUi_hat[2]
-    UUi_hat[0] = FFT.fftn(U_dealiased[1]*U_dealiased[1], UUi_hat[0], dealias)
-    UUi_hat[1] = FFT.fftn(U_dealiased[1]*U_dealiased[2], UUi_hat[1], dealias)
-    UUi_hat[2] = FFT.fftn(U_dealiased[2]*U_dealiased[2], UUi_hat[2], dealias)
-    c[1] += (1j*K[1]*UUi_hat[0] + 1j*K[2]*UUi_hat[1])
-    c[2] += (1j*K[1]*UUi_hat[1] + 1j*K[2]*UUi_hat[2])
-    return c
-
-#@profile
-def Cross(a, b, c, dealias=None):
-    """c_k = F_k(a x b)"""
-    Uc = work[(a, 2)]
-    Uc = cross1(Uc, a, b)
-    c[0] = FFT.fftn(Uc[0], c[0], dealias)
-    c[1] = FFT.fftn(Uc[1], c[1], dealias)
-    c[2] = FFT.fftn(Uc[2], c[2], dealias)
-    return c
 
 def Curl(a, c, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
@@ -70,7 +39,6 @@ def ComputeRHS(dU, W_hat):
     dU -= params.nu*K2*W_hat    
     dU += Source    
     return dU
-
 
 def solve():
     global dU, W, W_hat

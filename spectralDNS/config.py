@@ -6,7 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 Global run-time configuration that may be overloaded on the commandline
 """
 import argparse
-from numpy import pi, array
+from numpy import pi, array, float32, float64
 import copy
 import collections
 
@@ -25,10 +25,11 @@ class Params(collections.MutableMapping, dict):
         t             (float)            Time
         tstep         (int)              Time step
         L        (float, float(, float)) Domain size (2 for 2D, 3 for 3D)
-        M                (int, int, int) Mesh size   (2 for 2D, 3 for 3D)
+        M             (int, int, int)    Mesh size   (2 for 2D, 3 for 3D)
         write_result  (int)              Store as HDF5 every (*) time step
         checkpoint    (int)              Save intermediate result every (*)
         dealias       (str)              ('3/2-rule', '2/3-rule', 'None')
+        ntol          (int)              Tolerance (number of accurate digits)
         
     Parameters for 3D solvers in triply periodic domain::
         convection       (str)           ('Standard', 'Divergence', 'Skewed', 'Vortex')
@@ -40,6 +41,7 @@ class Params(collections.MutableMapping, dict):
         write_xz_slice   (int, int)      Store xz slice at y index (*0) every (*1) time step
         write_xy_slice   (int, int)      Store xy slice at z index (*0) every (*1) time step
         integrator       (str)           ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
+        TOL              (float)         Accuracy used in BS5_adaptive
             
     Parameters for 3D solvers in channel domain::
         convection    (str)              ('Standard', 'Divergence', 'Skewed', 'Vortex')
@@ -50,7 +52,7 @@ class Params(collections.MutableMapping, dict):
         write_xy_slice   (int, int)      Store xy slice at z index (*0) every (*1) time step
         
     Parameters for 2D solvers in doubly periodic domain::
-        integrator    (str)              ('RK4', 'ForwardEuler', 'AB2')
+        integrator    (str)              ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
         decomposition (str)              ('line')
             
     Solver specific parameters triply periodic domain::
@@ -76,10 +78,26 @@ class Params(collections.MutableMapping, dict):
         self.__dict__ = self
         
     def __getattr__(self, key):
-        if key in ('dx', 'N'):
-            return self.__missing__(key)
+        # Called if key is missing in __getattribute__
+        if key == 'dx':
+            assert self.has_key('M') and self.has_key('L')
+            val = self['L']/2**self['M']
+            return val
+        
+        elif key == 'N':
+            mval = self['M']
+            val = 2**mval
+            return val
+
         else:
             raise KeyError
+
+    def __getattribute__(self, key):
+        if key in ('nu', 'dt', 'Ri', 'Pr', 'eta'):
+            float = float32 if self['precision'] == 'single' else float64
+            return float(dict.__getattribute__(self, key))
+        else:
+            return dict.__getattribute__(self, key)
 
     def __setattr__(self, key, val):
         if key in ('M', 'L'):
@@ -100,7 +118,7 @@ class Params(collections.MutableMapping, dict):
             val = array([eval(str(f)) for f in val], dtype=float)
             val.flags.writeable = False
             dict.__setitem__(self, key, val)
-            
+        
         else:
             dict.__setitem__(self, key, val)
          
@@ -116,21 +134,6 @@ class Params(collections.MutableMapping, dict):
     def __contains__(self, x):
         return dict.__contains__(self, x)
     
-    def __missing__(self, key):
-        """dx and N are parameters that depend on others. """
-        if key == 'dx':
-            assert self.has_key('M') and self.has_key('L')
-            val = self['L']/2**self['M']
-            return val
-        
-        elif key == 'N':
-            mval = self['M']
-            val = 2**mval
-            return val
-        
-        else:
-            raise KeyError
-
 params = Params()
 
 parser = argparse.ArgumentParser(prog='spectralDNS', add_help=False)
@@ -146,6 +149,7 @@ parser.add_argument('--nu', default=0.000625, type=float, help='Viscosity')
 parser.add_argument('--t', default=0.0, type=float, help='Time')
 parser.add_argument('--tstep', default=0, type=int, help='Time step')
 parser.add_argument('--dealias', default='2/3-rule', choices=('2/3-rule', '3/2-rule', 'None'), help='Choose dealiasing method')
+parser.add_argument('--ntol', default=7, type=int, help='Tolerance - number of accurate digits')
 
 # Arguments for isotropic DNS solver
 triplyperiodic = argparse.ArgumentParser(parents=[parser])

@@ -6,10 +6,13 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from ShenDNS import *
 from ..shen.Matrices import CDTmat, CTDmat, BDTmat, BTDmat, BTTmat, BTNmat, CNDmat, BNDmat
 
-vars().update(setup['IPCSR'](**vars()))
+# Get and update the global namespace of the ShenDNS solver (to avoid having two namespaces filled with arrays)
+# Overload just a few routines
+context = solve.func_globals
+context.update(setup['IPCSR'](**vars()))
+vars().update(context)
 
-hdf5file = HDF5Writer(comm, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, 
-                      "IPCSR.h5", 
+hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "IPCSR.h5", 
                       mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
 
 CDT = CDTmat(K[0, :, 0, 0])
@@ -57,7 +60,7 @@ def pressuregrad2(Pcorr, dU):
 def solvePressure(P_hat, Ni):
     """Solve for pressure if Ni is fst of convection"""
     F_tmp = work[(P_hat, 0)] 
-    SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[p_slice])    
+    SFTc.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[p_slice])    
     P_hat = HelmholtzSolverP(P_hat, F_tmp)
     
     # P in Chebyshev basis for this solver
@@ -77,9 +80,9 @@ def updatepressure(P_hat, Pcorr, U_hat):
     #P_hat -= nu*BTN.matvec(F_tmp)/dd
     
     P_hat += BTN.matvec(Pcorr)/dd
-    P_hat -= nu*CTD.matvec(U_hat[0])/dd
-    P_hat -= nu*1j*K[1]*BTD.matvec(U_hat[1])/dd
-    P_hat -= nu*1j*K[2]*BTD.matvec(U_hat[2])/dd
+    P_hat -= params.nu*CTD.matvec(U_hat[0])/dd
+    P_hat -= params.nu*1j*K[1]*BTD.matvec(U_hat[1])/dd
+    P_hat -= params.nu*1j*K[2]*BTD.matvec(U_hat[2])/dd
 
 # Update ComputeRHS to use current pressuregrad
 ComputeRHS.func_globals['pressuregrad'] = pressuregrad

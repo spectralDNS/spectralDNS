@@ -42,3 +42,19 @@ if __name__ == "__main__":
     solver = get_solver(update=update, regression_test=regression_test)
     initialize(**vars(solver))
     solver.solve()
+    
+    config.params.dealias = '3/2-rule'
+    initialize(**vars(solver))
+    solver.solve()
+    
+    config.params.dealias = '2/3-rule'
+    config.params.optimization = 'cython'
+    initialize(**vars(solver))
+    solver.solve()    
+
+    config.params.write_result = 1
+    config.params.checkpoint = 1
+    config.dt = 0.01
+    config.T = 0.04
+    solver.regression_test = lambda **kwargs: None
+    solver.solve()    

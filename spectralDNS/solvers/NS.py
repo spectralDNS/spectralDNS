@@ -126,9 +126,6 @@ def ComputeRHS(dU, U_hat):
         
     return dU
 
-def regression_test(**kw):
-    pass
-
 conv = getConvection(params.convection)
 
 def solve():

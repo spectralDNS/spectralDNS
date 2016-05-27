@@ -1,4 +1,4 @@
-__author__ = "Mikael Mortensen <mikaem@math.uio.no>"
+__author__ = "Mikael Mortensen <mikaem@math.uio.no> and Nathanael Schilling <nathanael.schilling@in.tum.de>"
 __date__ = "2015-04-07"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
@@ -161,7 +161,7 @@ def ForwardEuler(u0, u1, dU, dt, ComputeRHS):
 @optimizer
 def AB2(u0, u1, dU, dt, tstep, ComputeRHS):
     dU = ComputeRHS(dU, u0)
-    if tstep == 1:
+    if tstep == 0:
         u0 += dU*dt
     else:
         u0 += (1.5*dU*dt - 0.5*u1)        
@@ -171,7 +171,7 @@ def AB2(u0, u1, dU, dt, tstep, ComputeRHS):
 def getintegrator(dU, ComputeRHS, float, array, zeros, zeros_like, FFT, params, **kw):
     """Return integrator using choice in global parameter integrator.
     """
-    if params.solver in ("NS", "VV", "NS2D", "NS_adaptive"):
+    if params.solver in ("NS", "VV", "NS2D"):
         u0 = kw['U_hat']
     elif params.solver == "MHD":
         u0 = kw['UB_hat']
