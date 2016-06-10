@@ -12,7 +12,7 @@ __all__ = ['setup']
 def setupNS(config, get_FFT, **kwargs):
     
     params = config.params
-    FFT = get_FFT(params.N, params.L, params.decomposition, params.precision)
+    FFT = get_FFT(params)
     float, complex, mpitype = datatypes(params.precision)
 
     X = FFT.get_local_mesh()
@@ -37,7 +37,7 @@ def setupNS(config, get_FFT, **kwargs):
 def setupBoussinesq(config, get_FFT, **kwargs):
 
     params = config.params
-    FFT = get_FFT(params.N, params.L, params.decomposition, params.precision)
+    FFT = get_FFT(params)
     float, complex, mpitype = datatypes(params.precision)    
     
     X = FFT.get_local_mesh()

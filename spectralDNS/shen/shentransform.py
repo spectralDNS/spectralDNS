@@ -5,6 +5,7 @@ import SFTc
 import scipy.sparse.linalg as la
 from spectralDNS.shen.la import TDMA, PDMA
 from spectralDNS.shen.Matrices import BBBmat
+import decimal
 """
 Fast transforms for pure Chebyshev basis or 
 Shen's Chebyshev basis: 
@@ -38,8 +39,8 @@ class ChebyshevTransform(object):
     def __init__(self, quad="GL", fast_transform=True): 
         self.quad = quad
         self.fast_transform = fast_transform
-        self.points = None
-        self.weights = None
+        self.points = zeros(0)
+        self.weights = zeros(0)
                 
     def points_and_weights(self, N):
         self.N = N
@@ -103,28 +104,28 @@ class ChebyshevTransform(object):
     def ifct(self, fk, cj):
         """Inverse fast Chebyshev transform."""
         if self.quad == "GC":
-            cj[:] = 0.5*dct(fk, type=3, axis=0)
-            cj += 0.5*fk[0]
+            cj[:] = dct(fk, type=3, axis=0)/2
+            cj += fk[0]/2
         
         elif self.quad == "GL":
-            cj[:] = 0.5*dct(fk, type=1, axis=0)
-            cj += 0.5*fk[0]
-            cj[::2] += 0.5*fk[-1]
-            cj[1::2] -= 0.5*fk[-1]
+            cj[:] = dct(fk, type=1, axis=0)/2
+            cj += fk[0]/2
+            cj[::2] += fk[-1]/2
+            cj[1::2] -= fk[-1]/2
 
         return cj
     
     def fastChebScalar(self, fj, fk):
         """Fast Chebyshev scalar product."""
+        N = fj.shape[0]
         if self.fast_transform:
-            N = fj.shape[0]
             if self.quad == "GC":
                 fk[:] = dct(fj, type=2, axis=0)*(pi/(2*N))
             
             elif self.quad == "GL":
                 fk[:] = dct(fj, type=1, axis=0)*(pi/(2*(N-1)))
         else:
-            if self.points is None: self.init(fj.shape[0])
+            if not self.points.shape == (N,): self.init(N)
             fk[:] = np.dot(self.V, fj*self.weights)
 
         return fk
@@ -163,7 +164,7 @@ class ShenDirichletBasis(ChebyshevTransform):
             fk = self.fastChebScalar(fj, fk)
             fk[:-2] -= fk[2:]
         else:
-            if self.points is None: self.init(fj.shape[0])
+            if not self.points.shape == (fj.shape[0],): self.init(fj.shape[0])
             fk[:-2] = np.dot(self.V, fj*self.weights)
         fk[-2:] = 0     # Last two not used by Shen
         return fk
@@ -175,7 +176,6 @@ class ShenDirichletBasis(ChebyshevTransform):
         fk contains Shen coefficients in the first fk.shape[0]-2 positions
         """
         if self.fast_transform:
-            N = len(fj)
             w_hat = work[(fk, 0)]
             w_hat[:-2] = fk[:-2] 
             w_hat[2:] -= fk[:-2] 
@@ -186,7 +186,7 @@ class ShenDirichletBasis(ChebyshevTransform):
             return fj
         
         else:
-            if self.points is None: self.init(fj.shape[0])
+            if not self.points.shape == (fj.shape[0],): self.init(fj.shape[0])
             return np.dot(self.V.T, fk[:-2])
 
     #@profile
@@ -243,7 +243,7 @@ class ShenNeumannBasis(ShenDirichletBasis):
             fk[0] = 0
 
         else:
-            if self.points is None: self.init(fj.shape[0])
+            if not self.points.shape == (fj.shape[0],): self.init(fj.shape[0])
             fk[1:-2] = np.dot(self.V, fj*self.weights)
             
         fk[-2:] = 0
@@ -266,8 +266,8 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
     
     def __init__(self, quad="GC", fast_transform=True):
         ShenDirichletBasis.__init__(self, quad, fast_transform)
-        self.factor1 = None
-        self.factor2 = None
+        self.factor1 = zeros(0)
+        self.factor2 = zeros(0)
         self.Solver = PDMA(quad)
         
     def init(self, N):
@@ -288,21 +288,15 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
             return kk[0]
         
     def set_factor_arrays(self, v):
-        recreate = False
-        if isinstance(self.factor1, np.ndarray):
-            if not self.factor1.shape == v[:-4].shape:
-                recreate = True
-            
-        if self.factor1 is None:
-            recreate = True
-            
-        if recreate == True:
+        if not self.factor1.shape == v[:-4].shape:
             if len(v.shape)==3:
                 k = self.wavenumbers(v.shape)                
             elif len(v.shape)==1:
                 k = self.wavenumbers(v.shape[0])
-            self.factor1 = -2*(k+2)/(k+3)
-            self.factor2 = (k+1)/(k+3)
+                #k = np.array(map(decimal.Decimal, np.arange(v.shape[0]-4)))
+                
+            self.factor1 = (-2*(k+2)/(k+3)).astype(float)
+            self.factor2 = ((k+1)/(k+3)).astype(float)
 
     def fastShenScalar(self, fj, fk):
         """Fast Shen scalar product.
@@ -316,7 +310,7 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
             fk[:-4] += self.factor2 * Tk[4:]
 
         else:
-            if self.points is None: self.init(fj.shape[0])
+            if not self.points.shape == (fj.shape[0],): self.init(fj.shape[0])
             fk[:-4] = np.dot(self.V, fj*self.weights)
             
         fk[-4:] = 0

@@ -3,7 +3,7 @@ import pprint
 
 __all__ = ['create_profile']
 
-def create_profile(profiler, comm, MPI, rank, **params):
+def create_profile(profiler, comm, MPI, rank, **kw):
     profiler.disable()
     ps = pstats.Stats(profiler).sort_stats('cumulative')
     #ps.print_stats(1000)

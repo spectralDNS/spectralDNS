@@ -25,6 +25,7 @@ requirements:
     - mpi4py
     - mpifft4py
     - sympy
+    - nodepy
 
 test:
     requires:

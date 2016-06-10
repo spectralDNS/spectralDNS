@@ -12,7 +12,7 @@ hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "NS.h5"
 
 def standardConvection(c, U_dealiased, U_hat, dealias=None):
     """c_i = u_j du_i/dx_j"""
-    gradUi = work[(U_dealiased, 2)]
+    gradUi = work[(U_dealiased, 2, False)]
     for i in range(3):
         for j in range(3):
             gradUi[j] = FFT.ifftn(1j*K[j]*U_hat[i], gradUi[j], dealias)
@@ -22,7 +22,7 @@ def standardConvection(c, U_dealiased, U_hat, dealias=None):
 def divergenceConvection(c, U_dealiased, dealias=None, add=False):
     """c_i = div(u_i u_j)"""
     if not add: c.fill(0)
-    UUi_hat = work[(c, 0)]
+    UUi_hat = work[(c, 0, False)]
     for i in range(3):
         UUi_hat[i] = FFT.fftn(U_dealiased[0]*U_dealiased[i], UUi_hat[i], dealias)
     c[0] += 1j*sum(K*UUi_hat, 0)
@@ -38,7 +38,7 @@ def divergenceConvection(c, U_dealiased, dealias=None, add=False):
 #@profile
 def Cross(a, b, c, dealias=None):
     """c_k = F_k(a x b)"""
-    Uc = work[(a, 2)]
+    Uc = work[(a, 2, False)]
     Uc = cross1(Uc, a, b)
     c[0] = FFT.fftn(Uc[0], c[0], dealias)
     c[1] = FFT.fftn(Uc[1], c[1], dealias)
@@ -48,7 +48,7 @@ def Cross(a, b, c, dealias=None):
 #@profile
 def Curl(a, c, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
-    curl_hat = work[(a, 0)]
+    curl_hat = work[(a, 0, False)]
     curl_hat = cross2(curl_hat, K, a)
     c[0] = FFT.ifftn(curl_hat[0], c[0], dealias)
     c[1] = FFT.ifftn(curl_hat[1], c[1], dealias)
@@ -60,7 +60,7 @@ def getConvection(convection):
     if convection == "Standard":
         
         def Conv(dU, U_hat):
-            U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
+            U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0, False)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], params.dealias)
             dU = standardConvection(dU, U_dealiased, U_hat, params.dealias)
@@ -70,7 +70,7 @@ def getConvection(convection):
     elif convection == "Divergence":
         
         def Conv(dU, U_hat):
-            U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
+            U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0, False)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], params.dealias)
             dU = divergenceConvection(dU, U_dealiased, params.dealias, False)
@@ -80,7 +80,7 @@ def getConvection(convection):
     elif convection == "Skewed":
         
         def Conv(dU, U_hat):
-            U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
+            U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0, False)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], params.dealias)
             dU = standardConvection(dU, U_dealiased, U_hat, params.dealias)
@@ -90,9 +90,10 @@ def getConvection(convection):
         
     elif convection == "Vortex":
         
+        #@profile
         def Conv(dU, U_hat):
-            U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
-            curl_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
+            U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0, False)]
+            curl_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 1, False)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], params.dealias)
             
@@ -126,16 +127,15 @@ def ComputeRHS(dU, U_hat):
         
     return dU
 
-conv = getConvection(params.convection)
-
+#@profile
 def solve():
-    global dU, U, U_hat
+    global dU, U, U_hat, conv, integrate, profiler
     
     timer = Timer()
     params.t = 0.0
     params.tstep = 0
-    # Set up function to perform temporal integration (using params.integrator parameter)
     integrate = getintegrator(**globals())
+    conv = getConvection(params.convection)
 
     if params.make_profile: profiler = cProfile.Profile()
     

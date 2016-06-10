@@ -67,9 +67,6 @@ def ComputeRHS(dU, UB_hat):
     
     return dU
 
-def regression_test(**kw):
-    pass
-
 def solve():
     global dU, UB, UB_hat
     

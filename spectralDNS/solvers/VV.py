@@ -41,13 +41,14 @@ def ComputeRHS(dU, W_hat):
     return dU
 
 def solve():
-    global dU, W, W_hat
+    global dU, W, W_hat, conv, integrate, profiler
     
     timer = Timer()
     params.t = 0.0
     params.tstep = 0
     # Set up function to perform temporal integration (using params.integrator parameter)
     integrate = getintegrator(**globals())
+    conv = getConvection(params.convection)
 
     if params.make_profile: profiler = cProfile.Profile()
 

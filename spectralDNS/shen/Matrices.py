@@ -298,6 +298,7 @@ class BTNmat(BaseMatrix):
     def diags(self):
         return diags([self.ld, self.dd], [-3, -1], shape=self.shape)
 
+import decimal
 class BBBmat(BaseMatrix):
     
     def __init__(self, K, quad):
@@ -309,9 +310,34 @@ class BBBmat(BaseMatrix):
         ck[0] = 2
         if quad == "GL": ckp[-1] = 2
         k = K[:N].astype(float)
+        
         self.dd = (ck + 4*((k+2)/(k+3))**2 + ckp*((k+1)/(k+3))**2)*pi/2.
         self.ud = -((k[:-2]+2)/(k[:-2]+3) + (k[:-2]+4)*(k[:-2]+1)/((k[:-2]+5)*(k[:-2]+3)))*pi
         self.uud = (k[:-4]+1)/(k[:-4]+3)*pi/2
+        #kd = array(map(decimal.Decimal, K[:N]))
+        #ckd = array(map(decimal.Decimal, [1,]*N))
+        #ckdp = array(map(decimal.Decimal, [1,]*N))
+        #ckd[0] = decimal.Decimal(2)
+        #if quad == "GL": ckdp[-1] = decimal.Decimal(2)
+        #one = decimal.Decimal(1)
+        #two = decimal.Decimal(2)
+        #three = decimal.Decimal(3)
+        #four = decimal.Decimal(4)
+        #five = decimal.Decimal(5)
+        #PI = decimal.Decimal("3.1415926535897932384626433832795028841971693993751058209749445923078164062862089")
+        
+        ##dd = (ckd + four*((kd+two)/(kd+three))**two + ckdp*((kd+one)/(kd+three))**two)*PI/two
+        #dd = (ckd + four*((kd+two)*(kd+two)/(kd+three)/(kd+three)) + ckdp*((kd+one)*(kd+one)/(kd+three)/(kd+three)))*PI/two
+        #ud = -((kd[:-2]+two)/(kd[:-2]+three) + (kd[:-2]+four)*(kd[:-2]+one)/((kd[:-2]+five)*(kd[:-2]+three)))*PI
+        #uud = (kd[:-4]+one)/(kd[:-4]+three)*PI/two
+        
+        ##self.dd = dd.astype(float)
+        ##self.ud = ud.astype(float)
+        ##self.uud = uud.astype(float)
+        #self.dd = dd
+        #self.ud = ud
+        #self.uud = uud
+        
         self.ld = self.ud
         self.lld = self.uud
         

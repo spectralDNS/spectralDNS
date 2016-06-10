@@ -16,21 +16,23 @@ comm = MPI.COMM_WORLD
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
 
-def get_FFT(N, L, decomposition, precision="double", P1=None, alignment="Y"):
-    if decomposition == 'slab':
-        assert len(N) == 3
-        assert len(L) == 3
-        FFT = slab_FFT(N, L, MPI, precision)
+def get_FFT(params):
+    if params.decomposition == 'slab':
+        assert len(params.N) == 3
+        assert len(params.L) == 3
+        FFT = slab_FFT(params.N, params.L, MPI, params.precision, communication=params.communication, threads=params.threads)
         
-    elif decomposition == 'pencil':
-        assert len(N) == 3
-        assert len(L) == 3
-        FFT = pencil_FFT(N, L, MPI, precision, P1=P1, alignment=alignment)
+    elif params.decomposition == 'pencil':
+        assert len(params.N) == 3
+        assert len(params.L) == 3
+        FFT = pencil_FFT(params.N, params.L, MPI, params.precision, P1=params.Pencil_P1, 
+                         method=params.Pencil_method, threads=params.threads,
+                         alignment=params.Pencil_alignment)
             
-    elif decomposition == 'line':
-        assert len(N) == 2
-        assert len(L) == 2
-        FFT = line_FFT(N, L, MPI, precision)
+    elif params.decomposition == 'line':
+        assert len(params.N) == 2
+        assert len(params.L) == 2
+        FFT = line_FFT(params.N, params.L, MPI, params.precision)
     return FFT
 
 def regression_test(**kw):

@@ -128,15 +128,21 @@ if __name__ == "__main__":
     )
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=2)
     config.triplyperiodic.add_argument("--plot_step", type=int, default=10)
-    solver = get_solver(update=update, regression_test=regression_test, 
-                        additional_callback=additional_callback, 
-                        mesh="triplyperiodic")
+    #solver = get_solver(update=update, regression_test=regression_test, 
+                        #additional_callback=additional_callback, 
+                        #mesh="triplyperiodic")
+    solver = get_solver(update=update, mesh="triplyperiodic")
+    
     #solver.hdf5file.fname = "NS7.h5"
     #solver.hdf5file.components["W0"] = solver.curl[0]
     #solver.hdf5file.components["W1"] = solver.curl[1]
     #solver.hdf5file.components["W2"] = solver.curl[2]
     initialize(**vars(solver))
     solver.solve()
+    
+    #config.params.convection = 'Standard'
+    #initialize(**vars(solver))
+    #solver.solve()
     
     #config.update(dict(M=[4, 4, 4]), 'triplyperiodic')
     ##config.params.M = [4, 4, 4]

@@ -265,7 +265,10 @@ conv = getConvection(params.convection)
     
 #@profile
 def ComputeRHS(dU, jj):
-    global H_hat
+    global H_hat, conv
+    
+    conv = getConvection(params.convection)
+
     # Add convection to rhs
     if jj == 0:
         H_hat = conv(H_hat, U0, U_hat0)

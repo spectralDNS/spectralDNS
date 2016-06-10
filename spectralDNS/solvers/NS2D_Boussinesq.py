@@ -63,7 +63,7 @@ def solve():
     timer = Timer()
     params.t = 0.0
     params.tstep = 0
-    # Set up function to perform temporal integration (using params.integrator parameter)
+    
     integrate = getintegrator(**globals())
 
     if params.make_profile: profiler = cProfile.Profile()

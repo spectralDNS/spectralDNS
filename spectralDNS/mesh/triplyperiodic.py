@@ -11,7 +11,7 @@ def setupDNS(sum, where, config, get_FFT, **kwargs):
     
     params = config.params
     L = params.L
-    FFT = get_FFT(params.N, params.L, params.decomposition, params.precision)
+    FFT = get_FFT(params)
     float, complex, mpitype = datatypes(params.precision)
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()    
@@ -38,7 +38,7 @@ def setupDNS(sum, where, config, get_FFT, **kwargs):
 def setupMHD(sum, where, config, get_FFT, **kwargs):
     
     params = config.params
-    FFT = get_FFT(params.N, params.L, params.decomposition, params.precision)
+    FFT = get_FFT(params)
     float, complex, mpitype = datatypes(params.precision)
     X = FFT.get_local_mesh()
     K = FFT.get_scaled_local_wavenumbermesh()

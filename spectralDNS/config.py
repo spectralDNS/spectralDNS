@@ -26,7 +26,8 @@ Generic parameters for all solvers::
     checkpoint    (int)              Save intermediate result every (*)
     dealias       (str)              ('3/2-rule', '2/3-rule', 'None')
     ntol          (int)              Tolerance (number of accurate digits used in tests)
-    
+    threads       (int)              Number of threads used for FFTs
+
 Parameters for 3D solvers in triply periodic domain::
     convection       (str)           ('Standard', 'Divergence', 'Skewed', 'Vortex')
     decomposition    (str)           ('slab', 'pencil')
@@ -142,7 +143,7 @@ parser = argparse.ArgumentParser(prog='spectralDNS', add_help=False)
 
 parser.add_argument('--precision', default='double', choices=('single', 'double'))
 parser.add_argument('--optimization', default='', choices=('cython', 'weave', 'numba'))
-parser.add_argument('--make_profile', default=0, help='Enable cProfile profiler')
+parser.add_argument('--make_profile', default=0, type=int, help='Enable cProfile profiler')
 parser.add_argument('--dt', default=0.01, type=float, help='Time step size')
 parser.add_argument('--T', default=0.1, type=float, help='End time')
 parser.add_argument('--write_result', default=1e8, metavar=('tstep'), type=int, help='Write results to HDF5 every tstep')
@@ -152,6 +153,7 @@ parser.add_argument('--t', default=0.0, type=float, help='Time')
 parser.add_argument('--tstep', default=0, type=int, help='Time step')
 parser.add_argument('--dealias', default='2/3-rule', choices=('2/3-rule', '3/2-rule', 'None'), help='Choose dealiasing method')
 parser.add_argument('--ntol', default=7, type=int, help='Tolerance - number of accurate digits')
+parser.add_argument('--threads', default=1, type=int, help='Number of threads used for FFTs')
 
 # Arguments for isotropic DNS solver
 triplyperiodic = argparse.ArgumentParser(parents=[parser])
@@ -159,7 +161,8 @@ triplyperiodic.add_argument('--convection', default='Vortex', choices=('Standard
 triplyperiodic.add_argument('--communication', default='alltoall', choices=('alltoall', 'sendrecv_replace'), help='only for slab')
 triplyperiodic.add_argument('--L', default=[2*pi, 2*pi, 2*pi], metavar=("Lx", "Ly", "Lz"), nargs=3, help='Physical mesh size')
 triplyperiodic.add_argument('--Pencil_alignment', default='Y', choices=('X', 'Y'), help='Alignment of the complex data for pencil decomposition')
-triplyperiodic.add_argument('--P1', default=2, type=int, help='pencil decomposition in first direction')
+triplyperiodic.add_argument('--Pencil_P1', default=2, type=int, help='pencil decomposition in first direction')
+triplyperiodic.add_argument('--Pencil_method', default='Swap', choices=('Swap', 'Nyquist'), type=str, help='Type of pencil transform used. Nyquist is slightly faster because it neglects the Nyquist frequency')
 triplyperiodic.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'), help="Choose 3D decomposition between slab and pencil.")
 triplyperiodic.add_argument('--M', default=[6, 6, 6], metavar=("Mx", "My", "Mz"), nargs=3, help='Mesh size is pow(2, M[i]) in direction i')
 triplyperiodic.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'), 
