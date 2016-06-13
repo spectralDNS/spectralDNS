@@ -62,39 +62,39 @@ if __name__ == "__main__":
     initialize(**vars(solver))
     solver.solve()
     
-    config.params.dealias = '3/2-rule'
-    initialize(**vars(solver))
-    solver.solve()
+    #config.params.dealias = '3/2-rule'
+    #initialize(**vars(solver))
+    #solver.solve()
     
-    config.params.dealias = '2/3-rule'
-    config.params.optimization = 'cython'
-    initialize(**vars(solver))
-    solver.solve()    
+    #config.params.dealias = '2/3-rule'
+    #config.params.optimization = 'cython'
+    #initialize(**vars(solver))
+    #solver.solve()    
     
-    config.params.write_result = 1
-    config.params.checkpoint = 1
-    config.dt = 0.01
-    config.T = 0.04
-    solver.regression_test = lambda **kwargs: None
-    solver.solve()    
+    #config.params.write_result = 1
+    #config.params.checkpoint = 1
+    #config.dt = 0.01
+    #config.T = 0.04
+    #solver.regression_test = lambda **kwargs: None
+    #solver.solve()    
     
-    VVsolver = get_solver(update=update, regression_test=regression_test, 
-                          parse_args=sys.argv[1:-1]+['VV'])    
-    initialize(**vars(VVsolver))
-    VVsolver.solve()
+    #VVsolver = get_solver(update=update, regression_test=regression_test, 
+                          #parse_args=sys.argv[1:-1]+['VV'])    
+    #initialize(**vars(VVsolver))
+    #VVsolver.solve()
 
-    config.params.dealias = '3/2-rule'
-    initialize(**vars(VVsolver))
-    VVsolver.solve()
+    #config.params.dealias = '3/2-rule'
+    #initialize(**vars(VVsolver))
+    #VVsolver.solve()
     
-    config.params.dealias = '2/3-rule'
-    config.params.optimization = 'cython'
-    initialize(**vars(VVsolver))
-    VVsolver.solve()    
+    #config.params.dealias = '2/3-rule'
+    #config.params.optimization = 'cython'
+    #initialize(**vars(VVsolver))
+    #VVsolver.solve()    
 
-    config.params.write_result = 1
-    config.params.checkpoint = 1
-    config.dt = 0.01
-    config.T = 0.04
-    VVsolver.regression_test = lambda **kwargs: None
-    VVsolver.solve()    
+    #config.params.write_result = 1
+    #config.params.checkpoint = 1
+    #config.dt = 0.01
+    #config.T = 0.04
+    #VVsolver.regression_test = lambda **kwargs: None
+    #VVsolver.solve()    

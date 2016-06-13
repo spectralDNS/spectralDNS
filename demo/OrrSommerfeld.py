@@ -26,7 +26,9 @@ def energy(u, N, comm, rank, L):
     c = zeros(N[0])
     comm.Gather(uu, c)
     if rank == 0:
-        ak = 1./(N[0]-1)*dct(c, 1, axis=0)
+        ak = zeros_like(c)
+        ak = dct(c, ak, 1, axis=0)
+        ak /= (N[0]-1)
         w = arange(0, N[0], 1, dtype=float)
         w[2:] = 2./(1-w[2:]**2)
         w[0] = 1

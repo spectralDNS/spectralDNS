@@ -58,26 +58,31 @@ def solvePressure(P_hat, Ni):
 
 #@profile
 def Cross(a, b, c, S):
-    Uc = work[(a, 2)]
+    Uc = work[(a, 2, False)]
     Uc = cross1(Uc, a, b)
     c[0] = FST.fst(Uc[0], c[0], S, dealias=params.dealias)
     c[1] = FST.fst(Uc[1], c[1], S, dealias=params.dealias)
     c[2] = FST.fst(Uc[2], c[2], S, dealias=params.dealias)
     return c
 
+@optimizer
+def mult_K1j(K, a, f):
+    f[0] = 1j*K[2]*a
+    f[1] = 1j*K[1]*a
+    return f
+    
 #@profile
 def Curl(a_hat, c, S):
-    F_tmp = work[(a_hat, 0)]
-    F_tmp2 = work[(a_hat, 2)]
-    Uc = work[(c, 2)]
+    F_tmp = work[(a_hat, 0, False)]
+    F_tmp2 = work[(a_hat, 2, False)]
+    Uc = work[(c, 2, False)]
     # Mult_CTD_3D_n is projection to T of d(a_hat)/dx (for components 1 and 2 of a_hat) 
     # Corresponds to CTD.matvec(a_hat[1])/BTT.dd, CTD.matvec(a_hat[2])/BTT.dd
     SFTc.Mult_CTD_3D_n(N[0], a_hat[1], a_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], S, dealias=params.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], S, dealias=params.dealias)
     c[0] = FST.ifst(g, c[0], ST, dealias=params.dealias)
-    F_tmp2[0] = 1j*K[2]*a_hat[0]
-    F_tmp2[1] = 1j*K[1]*a_hat[0]
+    F_tmp2[:2] = mult_K1j(K, a_hat[0], F_tmp2[:2])
     
     ## Set highest wavenumber to zero
     #if FST.num_processes == 1:

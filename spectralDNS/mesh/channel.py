@@ -63,8 +63,8 @@ def setupShen(MPI, config, **kwargs):
 def setupShenKMM(MPI, config, **kwargs):
 
     # Get points and weights for Chebyshev weighted integrals
-    ST = ShenDirichletBasis(quad="GL")
-    SB = ShenBiharmonicBasis(quad="GL")
+    ST = ShenDirichletBasis(quad="GC")
+    SB = ShenBiharmonicBasis(quad="GC")
     
     params = config.params
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
@@ -468,6 +468,7 @@ class FastShenFourierTransform(slab_FFT):
 
         return u
 
+    #@profile
     def fst(self, u, fu, S, dealias=None):
         """Fast Shen transform of x-direction, Fourier transform of y and z"""
         

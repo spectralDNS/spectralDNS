@@ -29,15 +29,15 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_proce
                Curl, conv, TDMASolverD, solvePressure, N, H_hat, H_hat1, K, **kw):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
-    utau = config.nu * config.Re_tau
+    utau = config.params.nu * config.params.Re_tau
     #Um = 46.9091*utau
     Um = 56.*utau 
-    Xplus = Y*config.Re_tau
-    Yplus = X[1]*config.Re_tau
-    Zplus = X[2]*config.Re_tau
+    Xplus = Y*config.params.Re_tau
+    Yplus = X[1]*config.params.Re_tau
+    Zplus = X[2]*config.params.Re_tau
     duplus = Um*0.2/utau  #Um*0.25/utau 
-    alfaplus = config.L[1]/500.
-    betaplus = config.L[2]/200.
+    alfaplus = config.params.L[1]/500.
+    betaplus = config.params.L[2]/200.
     sigma = 0.00055 # 0.00055
     epsilon = Um/200.   #Um/200.
     U[:] = 0
@@ -65,7 +65,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_proce
     #U[1] += 5e-2*U0[1]
     #U[2] += 5e-2*U0[2]
     
-    if "KMM" in config.solver:
+    if "KMM" in config.params.solver:
         U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB'])
         for i in range(1, 3):
             U_hat[i] = FST.fst(U[i], U_hat[i], ST)
@@ -99,7 +99,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_proce
     if rank == 0:
         print "Flux", flux[0]
     
-    if not config.solver in ("KMM", "KMMRK3"):
+    if not config.params.solver in ("KMM", "KMMRK3"):
         conv2 = zeros_like(U_hat)
         conv2 = conv(conv2, U, U_hat)  
         for j in range(3):
@@ -120,7 +120,7 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K,
     s = slice(rank*N, (rank+1)*N, 1)
     U0[:] = f["3D/checkpoint/U/0"][:, s]
     
-    if config.solver in ("IPCS", "IPCSR"):
+    if config.params.solver in ("IPCS", "IPCSR"):
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
         H_hat1[:] = conv(H_hat1, U0, U_hat0)
@@ -136,7 +136,7 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K,
         else:
             P_hat = FST.fst(P, P_hat, kw['SN'])
 
-    elif "KMM" in config.solver:
+    elif "KMM" in config.params.solver:
         U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB'])
         for i in range(1, 3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
@@ -190,7 +190,7 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K,
 
 
 def set_Source(Source, Sk, ST, FST, **kw):
-    utau = config.nu * config.Re_tau
+    utau = config.params.nu * config.params.Re_tau
     Source[:] = 0
     Source[1, :] = -utau**2
     Sk[:] = 0
@@ -199,12 +199,14 @@ def set_Source(Source, Sk, ST, FST, **kw):
 def Q(u, rank, comm, N):
     """Integrate u over entire computational domain
     """
-    L = config.L
+    L = config.params.L
     uu = sum(u, axis=(1,2))
     c = zeros(N[0])
     comm.Gather(uu, c)
     if rank == 0:
-        ak = 1./(N[0]-1)*dct(c, 1, axis=0)
+        ak = zeros_like(c)
+        ak = dct(c, ak, type=1, axis=0)
+        ak /= (N[0]-1)
         w = arange(0, N[0], 1, dtype=float)
         w[2:] = 2./(1-w[2:]**2)
         w[0] = 1
@@ -219,7 +221,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
     global im1, im2, im3, flux
 
     #q = Q(U[1], rank, comm, N)
-    #beta[0] = (flux[0] - q)/(array(config.L).prod())
+    #beta[0] = (flux[0] - q)/(array(config.params.L).prod())
     #comm.Bcast(beta)
     #U_tmp[1] = beta[0]    
     #F_tmp[1] = FST.fst(U_tmp[1], F_tmp[1], ST)
@@ -227,29 +229,29 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
     #U[1] = FST.ifst(U_hat[1], U[1], ST)
     #Source[1] -= beta[0]
     #Sk[1] = FST.fss(Source[1], Sk[1], ST)
-    #utau = config.Re_tau * config.nu
+    #utau = config.params.Re_tau * config.params.nu
     #Source[:] = 0
     #Source[1] = -utau**2
     #Source[:] += 0.05*random.randn(*U.shape)
     #for i in range(3):
         #Sk[i] = FST.fss(Source[i], Sk[i], ST)
         
-    if (hdf5file.check_if_write(config.tstep) or (config.tstep % config.plot_result == 0 and config.plot_result > 0)):
+    if (hdf5file.check_if_write(config.params) or (config.params.tstep % config.params.plot_result == 0 and config.params.plot_result > 0)):
         U[0] = FST.ifst(U_hat[0], U[0], SB)
         for i in range(1, 3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)     
         
-    if config.tstep % config.print_energy0 == 0 and rank == 0:
+    if config.params.tstep % config.params.print_energy0 == 0 and rank == 0:
         print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 2))
         print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 1))
     
-    if hdf5file.check_if_write(config.tstep):
+    if hdf5file.check_if_write(config.params):
         hdf5file.write(config.tstep)
         
-    if config.tstep % config.checkpoint == 0:
+    if config.params.tstep % config.params.checkpoint == 0:
         hdf5file.checkpoint(U, P, U0)
 
-    if config.tstep == 1 and rank == 0 and config.plot_result > 0:
+    if config.params.tstep == 1 and rank == 0 and config.params.plot_result > 0:
         plt.figure()
         im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
         plt.colorbar(im1)
@@ -268,7 +270,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
         plt.pause(1e-6)    
         globals().update(im1=im1, im2=im2, im3=im3)
         
-    if config.tstep % config.plot_result == 0 and rank == 0 and config.plot_result > 0:
+    if config.params.tstep % config.params.plot_result == 0 and rank == 0 and config.params.plot_result > 0:
         im1.ax.clear()
         im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100)         
         im1.autoscale()
@@ -281,7 +283,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
         im3.autoscale()
         plt.pause(1e-6)
     
-    if config.tstep % config.compute_energy == 0: 
+    if config.params.tstep % config.params.compute_energy == 0: 
         # Skip dealiasing even though nonlinear
         U[0] = FST.ifst(U_hat[0], U[0], SB)
         for i in range(1, 3):
@@ -292,9 +294,9 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
         e2 = Q(U[2]*U[2], rank, comm, N)
         q = Q(U[1], rank, comm, N)
         if rank == 0:
-            print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.t, e0, e1, e2, q, e0+e1+e2, Source[1].mean())
+            print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, Source[1].mean())
 
-    if config.tstep % config.sample_stats == 0:
+    if config.params.tstep % config.params.sample_stats == 0:
         stats(U, P)            
 
 class Stats(object):
@@ -317,10 +319,10 @@ class Stats(object):
         self.f0.create_group("Average")
         self.f0.create_group("Reynolds Stress")
         for i in ("U", "V", "W", "P"):
-            self.f0["Average"].create_dataset(i, shape=(2**config.M[0],), dtype=float)
+            self.f0["Average"].create_dataset(i, shape=(2**config.params.M[0],), dtype=float)
             
         for i in ("UU", "VV", "WW", "UV", "UW", "VW"):
-            self.f0["Reynolds Stress"].create_dataset(i, shape=(2**config.M[0], ), dtype=float)
+            self.f0["Reynolds Stress"].create_dataset(i, shape=(2**config.params.M[0], ), dtype=float)
 
     def __call__(self, U, P):
         self.num_samples += 1
@@ -395,16 +397,16 @@ if __name__ == "__main__":
     initialize(**vars(solver))    
     #init_from_file("KMM665.h5", **vars(solver))
     set_Source(**vars(solver))
-    solver.stats = Stats(solver.U, solver.comm, fromstats="KMMstats")
-    solver.hdf5file.fname = "KMM665q.h5"
+    solver.stats = Stats(solver.U, solver.comm, filename="KMMstats")
+    #solver.hdf5file.fname = "KMM665q.h5"
     solver.solve()
     s = solver.stats.get_stats()
 
     #from numpy import meshgrid, float
     #s = solver
     #Np = s.N / s.num_processes
-    #x1 = arange(1.5*s.N[1], dtype=float)*config.L[1]/(1.5*s.N[1])
-    #x2 = arange(1.5*s.N[2], dtype=float)*config.L[2]/(1.5*s.N[2])
+    #x1 = arange(1.5*s.N[1], dtype=float)*config.params.L[1]/(1.5*s.N[1])
+    #x2 = arange(1.5*s.N[2], dtype=float)*config.params.L[2]/(1.5*s.N[2])
     #points, weights = s.ST.points_and_weights(s.N[0])
     ## Get grid for velocity points
     #X = array(meshgrid(points[s.rank*Np[0]:(s.rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)    

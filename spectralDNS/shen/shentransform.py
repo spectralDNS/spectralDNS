@@ -90,12 +90,13 @@ class ChebyshevTransform(object):
         """Fast Chebyshev transform."""
         N = fj.shape[0]
         if self.quad == "GC":
-            cj[:] = dct(fj, type=2, axis=0)            
+            cj = dct(fj, cj, type=2, axis=0)  
             cj /= N
             cj[0] /= 2
                 
         elif self.quad == "GL":
-            cj[:] = dct(fj, type=1, axis=0)/(N-1)
+            cj = dct(fj, cj, type=1, axis=0)
+            cj /= (N-1)
             cj[0] /= 2
             cj[-1] /= 2
             
@@ -104,26 +105,31 @@ class ChebyshevTransform(object):
     def ifct(self, fk, cj):
         """Inverse fast Chebyshev transform."""
         if self.quad == "GC":
-            cj[:] = dct(fk, type=3, axis=0)/2
+            cj = dct(fk, cj, type=3, axis=0)
+            cj *= 0.5
             cj += fk[0]/2
         
         elif self.quad == "GL":
-            cj[:] = dct(fk, type=1, axis=0)/2
+            cj = dct(fk, cj, type=1, axis=0)
+            cj *= 0.5
             cj += fk[0]/2
             cj[::2] += fk[-1]/2
             cj[1::2] -= fk[-1]/2
 
         return cj
     
+    #@profile
     def fastChebScalar(self, fj, fk):
         """Fast Chebyshev scalar product."""
         N = fj.shape[0]
         if self.fast_transform:
             if self.quad == "GC":
-                fk[:] = dct(fj, type=2, axis=0)*(pi/(2*N))
-            
+                fk = dct(fj, fk, type=2, axis=0)
+                fk *= (pi/(2*N))
+                            
             elif self.quad == "GL":
-                fk[:] = dct(fj, type=1, axis=0)*(pi/(2*(N-1)))
+                fk = dct(fj, fk, type=1, axis=0)
+                fk *= (pi/(2*(N-1)))
         else:
             if not self.points.shape == (N,): self.init(N)
             fk[:] = np.dot(self.V, fj*self.weights)
