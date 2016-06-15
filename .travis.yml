@@ -19,7 +19,7 @@ install:
     - conda update -q conda
     # Useful for debugging any issues with conda
     - conda info -a
-    - conda config --add channel anaconda
+    - conda config --add channels anaconda
     - conda config --add channels spectralDNS
     - conda config --add channels mikaem/label/dev
     - conda create -q -n test-environment mpi4py scipy pytest cython mpifft4py sympy h5py nodepy
