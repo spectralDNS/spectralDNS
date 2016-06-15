@@ -36,9 +36,11 @@ work = work_arrays()
 
 class ChebyshevTransform(object):
     
-    def __init__(self, quad="GL", fast_transform=True): 
+    def __init__(self, quad="GL", fast_transform=True, threads=1, planner_effort="FFTW_MEASURE"): 
         self.quad = quad
         self.fast_transform = fast_transform
+        self.threads = threads
+        self.planner_effort = planner_effort
         self.points = zeros(0)
         self.weights = zeros(0)
                 
@@ -90,12 +92,12 @@ class ChebyshevTransform(object):
         """Fast Chebyshev transform."""
         N = fj.shape[0]
         if self.quad == "GC":
-            cj = dct(fj, cj, type=2, axis=0)  
+            cj = dct(fj, cj, type=2, axis=0, threads=self.threads, planner_effort=self.planner_effort)  
             cj /= N
             cj[0] /= 2
                 
         elif self.quad == "GL":
-            cj = dct(fj, cj, type=1, axis=0)
+            cj = dct(fj, cj, type=1, axis=0, threads=self.threads, planner_effort=self.planner_effort)
             cj /= (N-1)
             cj[0] /= 2
             cj[-1] /= 2
@@ -105,12 +107,12 @@ class ChebyshevTransform(object):
     def ifct(self, fk, cj):
         """Inverse fast Chebyshev transform."""
         if self.quad == "GC":
-            cj = dct(fk, cj, type=3, axis=0)
+            cj = dct(fk, cj, type=3, axis=0, threads=self.threads, planner_effort=self.planner_effort)
             cj *= 0.5
             cj += fk[0]/2
         
         elif self.quad == "GL":
-            cj = dct(fk, cj, type=1, axis=0)
+            cj = dct(fk, cj, type=1, axis=0, threads=self.threads, planner_effort=self.planner_effort)
             cj *= 0.5
             cj += fk[0]/2
             cj[::2] += fk[-1]/2
@@ -124,11 +126,11 @@ class ChebyshevTransform(object):
         N = fj.shape[0]
         if self.fast_transform:
             if self.quad == "GC":
-                fk = dct(fj, fk, type=2, axis=0)
+                fk = dct(fj, fk, type=2, axis=0, threads=self.threads, planner_effort=self.planner_effort)
                 fk *= (pi/(2*N))
                             
             elif self.quad == "GL":
-                fk = dct(fj, fk, type=1, axis=0)
+                fk = dct(fj, fk, type=1, axis=0, threads=self.threads, planner_effort=self.planner_effort)
                 fk *= (pi/(2*(N-1)))
         else:
             if not self.points.shape == (N,): self.init(N)
@@ -141,8 +143,9 @@ class ChebyshevTransform(object):
 
 class ShenDirichletBasis(ChebyshevTransform):
     
-    def __init__(self, quad="GL", fast_transform=True):
-        ChebyshevTransform.__init__(self, quad=quad, fast_transform=fast_transform)
+    def __init__(self, quad="GL", fast_transform=True, threads=1, planner_effort="FFTW_MEASURE"):
+        ChebyshevTransform.__init__(self, quad=quad, fast_transform=fast_transform,
+                                    planner_effort=planner_effort)
         self.N = -1
         self.Solver = TDMA(quad, False)
         
@@ -208,8 +211,8 @@ class ShenDirichletBasis(ChebyshevTransform):
 
 class ShenNeumannBasis(ShenDirichletBasis):
     
-    def __init__(self, quad="GC", fast_transform=True): 
-        ShenDirichletBasis.__init__(self, quad, fast_transform)
+    def __init__(self, quad="GC", fast_transform=True, threads=1, planner_effort="FFTW_MEASURE"): 
+        ShenDirichletBasis.__init__(self, quad, fast_transform, threads, planner_effort)
         self.factor = None        
         self.k = None
         self.Solver = TDMA(quad, True)
@@ -270,8 +273,8 @@ class ShenNeumannBasis(ShenDirichletBasis):
 
 class ShenBiharmonicBasis(ShenDirichletBasis):
     
-    def __init__(self, quad="GC", fast_transform=True):
-        ShenDirichletBasis.__init__(self, quad, fast_transform)
+    def __init__(self, quad="GC", fast_transform=True, threads=1, planner_effort="FFTW_MEASURE"):
+        ShenDirichletBasis.__init__(self, quad, fast_transform, threads, planner_effort)
         self.factor1 = zeros(0)
         self.factor2 = zeros(0)
         self.Solver = PDMA(quad)

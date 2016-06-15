@@ -121,6 +121,7 @@ if __name__ == "__main__":
         'T': 0.1,                   # End time
         'L': [2*pi, 2*pi, 2*pi],
         'M': [5, 5, 5],
+        'planner_effort': {'dct': 'FFTW_EXHAUSTIVE'},
         #'decomposition': 'pencil',
         #'Pencil_alignment': 'Y',
         #'P1': 2

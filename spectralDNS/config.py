@@ -74,6 +74,7 @@ import argparse
 from numpy import pi, array, float32, float64
 import copy
 import collections
+import json
 
 class Params(collections.MutableMapping, dict):    
     def __init__(self, *args, **kwargs):
@@ -136,7 +137,15 @@ class Params(collections.MutableMapping, dict):
     
     def __contains__(self, x):
         return dict.__contains__(self, x)
-    
+
+fft_plans = collections.defaultdict(lambda : "FFTW_MEASURE", {'dct': "FFTW_EXHAUSTIVE"})
+
+class PlanAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        global fft_plans
+        fft_plans.update(json.loads(values))
+        setattr(namespace, self.dest, fft_plans)
+
 params = Params()
 
 parser = argparse.ArgumentParser(prog='spectralDNS', add_help=False)
@@ -154,15 +163,16 @@ parser.add_argument('--tstep', default=0, type=int, help='Time step')
 parser.add_argument('--dealias', default='2/3-rule', choices=('2/3-rule', '3/2-rule', 'None'), help='Choose dealiasing method')
 parser.add_argument('--ntol', default=7, type=int, help='Tolerance - number of accurate digits')
 parser.add_argument('--threads', default=1, type=int, help='Number of threads used for FFTs')
+parser.add_argument('--planner_effort', action=PlanAction, default=fft_plans, 
+                    help="""Planning effort for FFTs. Usage, e.g., --planner_effort '{"dct":"FFTW_EXHAUSTIVE"}' """)
 
 # Arguments for isotropic DNS solver
 triplyperiodic = argparse.ArgumentParser(parents=[parser])
 triplyperiodic.add_argument('--convection', default='Vortex', choices=('Standard', 'Divergence', 'Skewed', 'Vortex'))
-triplyperiodic.add_argument('--communication', default='alltoall', choices=('alltoall', 'sendrecv_replace'), help='only for slab')
+triplyperiodic.add_argument('--communication', default='Alltoallw', choices=('Alltoallw', 'alltoall', 'Sendrecv_replace', 'Swap', 'Nyquist'), help='Choose method for communication. sendrecv_replace is only for slab without padding. Swap and Nyquist are only for pencil decomposition.')
 triplyperiodic.add_argument('--L', default=[2*pi, 2*pi, 2*pi], metavar=("Lx", "Ly", "Lz"), nargs=3, help='Physical mesh size')
 triplyperiodic.add_argument('--Pencil_alignment', default='Y', choices=('X', 'Y'), help='Alignment of the complex data for pencil decomposition')
 triplyperiodic.add_argument('--Pencil_P1', default=2, type=int, help='pencil decomposition in first direction')
-triplyperiodic.add_argument('--Pencil_method', default='Swap', choices=('Swap', 'Nyquist'), type=str, help='Type of pencil transform used. Nyquist is slightly faster because it neglects the Nyquist frequency')
 triplyperiodic.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'), help="Choose 3D decomposition between slab and pencil.")
 triplyperiodic.add_argument('--M', default=[6, 6, 6], metavar=("Mx", "My", "Mz"), nargs=3, help='Mesh size is pow(2, M[i]) in direction i')
 triplyperiodic.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'), 
@@ -260,6 +270,11 @@ IPCSR.add_argument('--divergence_tol', default=1e-7, type=float, help='Tolerance
 #ShenMHD.add_argument('--Pencil_alignment', default='X', choices=('X',), help='Alignment of the complex data for pencil decomposition')
 
 def update(new, mesh="triplyperiodic"):
+    global fft_plans
     assert isinstance(new, dict)
+    if 'planner_effort' in new:
+        fft_plans.update(new['planner_effort'])
+        new['planner_effort'] = fft_plans
+        
     exec mesh + ".set_defaults(**new)"
 

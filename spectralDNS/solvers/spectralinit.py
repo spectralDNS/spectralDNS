@@ -20,19 +20,25 @@ def get_FFT(params):
     if params.decomposition == 'slab':
         assert len(params.N) == 3
         assert len(params.L) == 3
-        FFT = slab_FFT(params.N, params.L, MPI, params.precision, communication=params.communication, threads=params.threads)
+        FFT = slab_FFT(params.N, params.L, MPI, params.precision, 
+                       communication=params.communication, 
+                       threads=params.threads,
+                       planner_effort=params.planner_effort)
         
     elif params.decomposition == 'pencil':
         assert len(params.N) == 3
         assert len(params.L) == 3
         FFT = pencil_FFT(params.N, params.L, MPI, params.precision, P1=params.Pencil_P1, 
-                         method=params.Pencil_method, threads=params.threads,
-                         alignment=params.Pencil_alignment)
+                         communication=params.communication, threads=params.threads,
+                         alignment=params.Pencil_alignment,
+                         planner_effort=params.planner_effort)
             
     elif params.decomposition == 'line':
         assert len(params.N) == 2
         assert len(params.L) == 2
-        FFT = line_FFT(params.N, params.L, MPI, params.precision)
+        FFT = line_FFT(params.N, params.L, MPI, params.precision,
+                       threads=params.threads,
+                       planner_effort=params.planner_effort)
     return FFT
 
 def regression_test(**kw):
