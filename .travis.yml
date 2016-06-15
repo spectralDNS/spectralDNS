@@ -21,7 +21,7 @@ install:
     - conda info -a
     - conda config --add channels spectralDNS
     - conda config --add channels mikaem/label/dev
-    - conda create -q -n test-environment Cython mpi4py scipy pytest
+    - conda create -q -n test-environment mpi4py scipy pytest Cython mpifft4py sympy h5py nodepy
     - source activate test-environment
     - python setup.py install
     
