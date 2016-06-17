@@ -1,8 +1,9 @@
 # http://travis-ci.org/spectralDNS/spectralDNS
 
 language: python
+
 python:
-    - "2.7"
+    - 2.7
     
 branches:
   only:

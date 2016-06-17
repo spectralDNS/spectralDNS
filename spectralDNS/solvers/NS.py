@@ -129,7 +129,7 @@ def ComputeRHS(dU, U_hat):
 
 #@profile
 def solve():
-    global dU, U, U_hat, conv, integrate, profiler
+    global dU, U, U_hat, conv, integrate, profiler, timer
     
     timer = Timer()
     params.t = 0.0

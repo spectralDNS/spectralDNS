@@ -274,10 +274,11 @@ def ComputeRHS(dU, U_hat):
 
 #@profile
 def solve():
-    global dU, U_hat, g, u, conv
+    global dU, U_hat, g, u, conv, profiler, timer
     
     timer = Timer()
     conv = getConvection(params.convection)
+    if params.make_profile: profiler = cProfile.Profile()
     
     while params.t < params.T-1e-14:
         params.t += params.dt
