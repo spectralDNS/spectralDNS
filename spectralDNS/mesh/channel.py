@@ -544,6 +544,7 @@ class FastShenFourierTransform(slab_FFT):
             u = irfft2(Uc_hatT, u, axes=(1,2), overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['irfft2'])
         
         else:
+            Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
             if not self.dealias_cheb:
                 Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0, False)]
                 Upad_hat_z = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0, False)]
