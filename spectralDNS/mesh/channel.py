@@ -23,7 +23,8 @@ def setupShen(MPI, config, **kwargs):
     u_slice = slice(0, Nu)
     p_slice = slice(1, Nu)
     
-    FST = FastShenFourierTransform(params.N, params.L, MPI, threads=params.threads, 
+    FST = FastShenFourierTransform(params.N, params.L, MPI, threads=params.threads,
+                                   communication=params.communication,
                                    planner_effort=params.planner_effort,
                                    dealias_cheb=params.dealias_cheb)
     
@@ -76,6 +77,7 @@ def setupShenKMM(MPI, config, **kwargs):
     v_slice = slice(0, Nb)
     
     FST = FastShenFourierTransform(params.N, params.L, MPI, threads=params.threads, 
+                                   communication=params.communication,
                                    planner_effort=params.planner_effort,
                                    dealias_cheb=params.dealias_cheb)
     
@@ -131,6 +133,7 @@ def setupShenMHD(MPI, config, **kwargs):
     p_slice = slice(1, Nu)
 
     FST = FastShenFourierTransform(params.N, params.L, MPI, threads=params.threads, 
+                                   communication=params.communication,
                                    planner_effort=params.planner_effort,
                                    dealias_cheb=params.dealias_cheb)
     
@@ -190,6 +193,7 @@ def setupShenGeneralBCs(MPI, config, **kwargs):
     p_slice = slice(1, Nu)
 
     FST = FastShenFourierTransform(params.N, params.L, MPI, threads=params.threads, 
+                                   communication=params.communication,
                                    planner_effort=params.planner_effort,
                                    dealias_cheb=params.dealias_cheb)
     
@@ -232,10 +236,10 @@ def setupShenGeneralBCs(MPI, config, **kwargs):
 
 class FastShenFourierTransform(slab_FFT):
     
-    def __init__(self, N, L, MPI, padsize=1.5, threads=1, dealias_cheb=False,
+    def __init__(self, N, L, MPI, padsize=1.5, threads=1, communication='Alltoallw', dealias_cheb=False,
                  planner_effort=defaultdict(lambda: "FFTW_MEASURE", {"dct": "FFTW_EXHAUSTIVE"})):
         slab_FFT.__init__(self, N, L, MPI, "double", padsize=padsize, threads=threads,
-                          planner_effort=planner_effort)
+                          communication=communication, planner_effort=planner_effort)
         self.dealias_cheb = dealias_cheb
         
     def complex_shape_padded_T(self):
@@ -550,21 +554,22 @@ class FastShenFourierTransform(slab_FFT):
         # Intermediate work arrays
         Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
         Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
-        
+
         if not dealias == '3/2-rule':
+
             if self.communication == 'alltoall':
                 Uc_mpi  = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
                 Uc_hatT = rfft2(u, Uc_hatT, axes=(1,2), threads=self.threads, planner_effort=self.planner_effort['rfft2'])
                 Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
                 self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
-                
+           
             elif self.communication == 'Alltoallw':
                 if len(self._subarraysA) == 0:
                     self._subarraysA, self._subarraysB, self._counts_displs = self.get_subarrays()
                     
                 # Do 2 ffts in y-z directions on owned data
                 Uc_hatT = rfft2(u, Uc_hatT, axes=(1,2), threads=self.threads, planner_effort=self.planner_effort['rfft2'])
-
+                #from IPython import embed; embed()
                 self.comm.Alltoallw(
                     [Uc_hatT, self._counts_displs, self._subarraysB],
                     [Uc_hat,  self._counts_displs, self._subarraysA])
@@ -572,7 +577,9 @@ class FastShenFourierTransform(slab_FFT):
             fu = S.fst(Uc_hat, fu)
 
         else:
+
             if not self.dealias_cheb:
+                
                 Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0)]
                 Upad_hat_z = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0)]
                 
@@ -582,6 +589,7 @@ class FastShenFourierTransform(slab_FFT):
                 Uc_hatT = self.copy_from_padded(Upad_hat_z, Uc_hatT)
                 
                 if self.communication == 'alltoall':
+                    Uc_mpi  = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
                     Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
                     self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
                 elif self.communication == 'Alltoallw':
@@ -635,7 +643,6 @@ class FastShenFourierTransform(slab_FFT):
         # Intermediate work arrays
         Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
         Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
-        Uc_mpi  = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
         
         if not dealias == '3/2-rule':
             if self.communication == 'alltoall':
@@ -668,6 +675,7 @@ class FastShenFourierTransform(slab_FFT):
                 Uc_hatT = self.copy_from_padded(Upad_hat_z, Uc_hatT)
                 
                 if self.communication == 'alltoall':
+                    Uc_mpi  = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
                     Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
                     self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
                 elif self.communication == 'Alltoallw':
@@ -722,7 +730,6 @@ class FastShenFourierTransform(slab_FFT):
         # Intermediate work arrays
         Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
         Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
-        Uc_mpi  = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
         
         if dealias == '2/3-rule' and self.dealias.shape == (0,):
             self.dealias = self.get_dealias_filter()
@@ -734,6 +741,7 @@ class FastShenFourierTransform(slab_FFT):
             Uc_hat = S.ifct(fu, Uc_hat)
             
             if self.communication == 'alltoall':
+                Uc_mpi  = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
                 self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
                 Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())                
                 #Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0, False)]
@@ -757,6 +765,7 @@ class FastShenFourierTransform(slab_FFT):
                 Uc_hat = S.ifct(fu, Uc_hat)
                 
                 if self.communication == 'alltoall':
+                    Uc_mpi = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
                     self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
                     Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
                     

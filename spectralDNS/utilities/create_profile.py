@@ -23,6 +23,7 @@ def create_profile(profiler, comm, MPI, rank, **kw):
                  'Alltoall',
                  'Alltoallw',
                  'Sendrecv_replace',
+                 'rollaxis',
                  'add_pressure_diffusion',
                  'cross1',
                  'cross2',
