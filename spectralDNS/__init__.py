@@ -4,7 +4,7 @@ __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from mpi4py import MPI
-from mpiFFT4py import slab_FFT, pencil_FFT, line_FFT
+from mpiFFT4py import slab_r2c, pencil_r2c, line_r2c
 from numpy import array
 import config
 import sys

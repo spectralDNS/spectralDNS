@@ -1,7 +1,7 @@
-from mpiFFT4py.slab import FastFourierTransform as FFT
+from mpiFFT4py.slab import R2C as FFT
 
-### FIXME Need to move FastShenFourierTransform in its own module, out of spectralDNS
-from spectralDNS.mesh.channel import FastShenFourierTransform as FST
+### FIXME Need to move slab_shen_r2c in its own module, out of spectralDNS
+from spectralDNS.mesh.channel import slab_shen_r2c as FST
 from spectralDNS.shen.shentransform import ShenDirichletBasis, ShenBiharmonicBasis
 from mpi4py import MPI
 import numpy as np

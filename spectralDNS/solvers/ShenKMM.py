@@ -329,7 +329,7 @@ def solve():
         
         if params.tstep == 1 and params.make_profile:
             #Enable profiling after first step is finished
-            profiler.enable()
+            profiler.enable()     
             
     timer.final(MPI, rank)
     

@@ -88,6 +88,7 @@ class ChebyshevTransform(object):
         fd  = self.ifct(fkd, fd)
         return fd
         
+    #@profile
     def fct(self, fj, cj):
         """Fast Chebyshev transform."""
         N = fj.shape[0]
@@ -104,6 +105,7 @@ class ChebyshevTransform(object):
             
         return cj
 
+    #@profile
     def ifct(self, fk, cj):
         """Inverse fast Chebyshev transform."""
         if self.quad == "GC":

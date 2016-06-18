@@ -166,6 +166,51 @@ def mult_K1j(np.ndarray[np.float64_t, ndim=4] K,
                 f[1,i,j,k] = 1j*K[1,i,j,k]*a[i,j,k]
     return f
 
+def copy_to_padded_channel(np.ndarray[np.complex128_t, ndim=3] fu, 
+                           np.ndarray[np.complex128_t, ndim=3] fp, 
+                           np.ndarray[np.int64_t, ndim=1] N, 
+                           int axis=0):
+    cdef: 
+        int i, j, k, l
     
+    if axis == 0:
+        for i in xrange(N[0]):
+            for j in xrange(fu.shape[1]):
+                for k in xrange(fu.shape[2]):
+                    fp[i, j, k] = fu[i, j, k]
+    elif axis == 1:
+        for i in xrange(fp.shape[0]):
+            for j in xrange(N[1]/2):
+                for k in xrange(fu.shape[2]):
+                    fp[i, j, k] = fu[i, j, k]
+                    fp[i, N[1]+j, k] = fu[i, N[1]//2+j, k]
+
+    elif axis == 2:
+        for i in xrange(fp.shape[0]):
+            for j in xrange(fp.shape[1]):
+                for k in xrange(N[2]/2+1):
+                    fp[i, j, k] = fu[i, j, k]
+    return fp
     
+def copy_from_padded_channel(np.ndarray[np.complex128_t, ndim=3] fp, 
+                             np.ndarray[np.complex128_t, ndim=3] fu, 
+                             np.ndarray[np.int64_t, ndim=1] N, 
+                             int axis=0):
+    cdef: 
+        int i, j, k, l
+    
+    if axis == 1:
+        for i in xrange(fu.shape[0]):
+            for j in xrange(fu.shape[1]):
+                l =  j if (j < N[1]//2) else N[1]//2 + j 
+                for k in xrange(fu.shape[2]):
+                    fu[i, j, k] = fp[i, l, k]
+    elif axis == 2:
+        for i in xrange(fu.shape[0]):
+            for j in xrange(fu.shape[1]):
+                for k in xrange(fu.shape[2]):
+                    fu[i,j,k] = fp[i,j,k]
+    
+    return fu
+        
     

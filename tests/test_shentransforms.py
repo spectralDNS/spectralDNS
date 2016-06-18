@@ -9,7 +9,7 @@ from spectralDNS import config
 config.mesh = "channel"
 config.solver = "IPCS"
 config.dealias = "3/2-rule"
-from spectralDNS.mesh.channel import FastShenFourierTransform
+from spectralDNS.mesh.channel import slab_shen_r2c
 from mpi4py import MPI
 
 from sympy import chebyshevt, Symbol, sin, cos, pi
@@ -275,7 +275,7 @@ def test_BBDmat(SBSD):
     u2 = B.matvec(f_hat)
     assert np.linalg.norm(u2-u0)/(N*N*N) < 1e-12    
     
-    FST = FastShenFourierTransform(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), MPI)
+    FST = slab_shen_r2c(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), MPI)
     f_hat = np.zeros(FST.complex_shape(), dtype=np.complex)
     fj = np.random.random((N, N, N))
     f_hat = FST.fst(fj, f_hat, SD)
@@ -360,7 +360,7 @@ def test_transforms(ST):
 #test_transforms(ShenBiharmonicBasis("GC"))
 
 def test_FST(ST):
-    FST = FastShenFourierTransform(np.array([N, 4, 4]), np.array([2*pi, 2*pi, 2*pi]), MPI)
+    FST = slab_shen_r2c(np.array([N, 4, 4]), np.array([2*pi, 2*pi, 2*pi]), MPI)
     points, weights = ST.points_and_weights(N)
     fj = np.random.random((N,4,4))    
     f_hat = fj.copy()
@@ -385,7 +385,7 @@ def test_FST(ST):
 #test_FST(ShenBiharmonicBasis("GC"))    
 
 def test_FST_padded(ST):
-    FST = FastShenFourierTransform(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), MPI)
+    FST = slab_shen_r2c(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), MPI)
     points, weights = ST.points_and_weights(N)
     
     fj = np.random.random(FST.real_shape())

@@ -35,3 +35,10 @@ class Timer(object):
             print "Time = ", toc
             print "Fastest = ", fast
             print "Slowest = ", slow
+
+def reset_profile(prof):
+    prof.code_map = {}
+    prof.last_time = {}
+    prof.enable_count = 0
+    for func in prof.functions:
+        prof.add_function(func)

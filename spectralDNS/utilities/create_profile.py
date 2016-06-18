@@ -24,6 +24,8 @@ def create_profile(profiler, comm, MPI, rank, **kw):
                  'Alltoallw',
                  'Sendrecv_replace',
                  'rollaxis',
+                 'copy_to_padded',
+                 'copy_from_padded',
                  'add_pressure_diffusion',
                  'cross1',
                  'cross2',
