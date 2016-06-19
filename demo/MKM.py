@@ -8,6 +8,7 @@ import warnings
 import matplotlib.cbook
 from OrrSommerfeld_eig import OrrSommerfeld
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
+from spectralDNS.utilities import reset_profile
 
 # Use constant flux and adjust pressure gradient dynamically
 #flux = array([1645.46])
@@ -165,7 +166,7 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K,
     #if N[1] / N0[1] == 2: y = True
     #if N[2] / N0[2] == 2: z = True
     
-    #FST1 = FastShenFourierTransform(N0, L, MPI)
+    #FST1 = SlabShen_R2C(N0, L, MPI)
     #W0 = FST1.get_workarray(((3,)+FST1.real_shape(), float), 0)
     #W0[:] = f["3D/checkpoint/U/0"][:, s[0], s[1], s[2]]
     #W0_hat = FST1.get_workarray(((3,)+FST1.complex_shape(), complex), 0)    
@@ -297,7 +298,11 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
             print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, Source[1].mean())
 
     if config.params.tstep % config.params.sample_stats == 0:
-        stats(U, P)            
+        stats(U, P)     
+        
+    #if config.params.tstep == 1:
+        #print "Reset profile"
+        #reset_profile(profile)
 
 class Stats(object):
     
@@ -394,7 +399,7 @@ if __name__ == "__main__":
     config.channel.add_argument("--sample_stats", type=int, default=10)
     config.channel.add_argument("--print_energy0", type=int, default=10)
     #solver = get_solver(update=update, mesh="channel")    
-    solver = get_solver(mesh="channel")    
+    solver = get_solver(update=update, mesh="channel")    
     initialize(**vars(solver))    
     #init_from_file("KMM665.h5", **vars(solver))
     set_Source(**vars(solver))

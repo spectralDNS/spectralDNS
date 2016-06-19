@@ -16,6 +16,12 @@ def test_single_NS2D():
 def test_single_KMM():
     d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py --optimization cython KMM", shell=True)
 
+def test_single_KMM2():
+    d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py --optimization cython --dealias 3/2-rule KMM", shell=True)
+
+def test_single_KMM3():
+    d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py --optimization cython --dealias 3/2-rule --dealias_cheb KMM", shell=True)
+
 def test_single_IPCS():
     d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py --optimization cython IPCS", shell=True)
 
@@ -45,6 +51,12 @@ def test_mpi_pencil_MHD():
     
 def test_mpi_KMM():
     d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --optimization cython --checkpoint 5 KMM", shell=True)
+
+def test_mpi_KMM2():
+    d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --optimization cython --checkpoint 5 --dealias 3/2-rule  KMM", shell=True)
+
+def test_mpi_KMM3():
+    d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --optimization cython --checkpoint 5 --dealias 3/2-rule --dealias_cheb KMM", shell=True)
 
 def test_mpi_IPCS():
     d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --optimization cython --checkpoint 5 IPCS", shell=True)

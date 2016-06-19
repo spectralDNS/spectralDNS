@@ -31,7 +31,10 @@ def optimizer(func):
             fun = getattr(mod, name, None)
             
         if not fun:
-            fun = getattr(mod, name+"_"+config.params.solver)
+            fun = getattr(mod, name+"_"+config.params.solver, None)
+
+        if not fun:
+            fun = getattr(mod, name+"_"+config.mesh, None)
         
         @wraps(func)
         def wrapped_function(*args, **kwargs): 
@@ -39,7 +42,7 @@ def optimizer(func):
             return u0
         
     except: # Otherwise revert to default numpy implementation
-        #print func.func_name + ' not optimized'
+        print func.func_name + ' not optimized'
         @wraps(func)
         def wrapped_function(*args, **kwargs):
             u0 = func(*args, **kwargs)

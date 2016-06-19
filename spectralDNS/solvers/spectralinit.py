@@ -6,7 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from mpi4py import MPI
 import sys, cProfile
 from numpy import *
-from mpiFFT4py import slab_FFT, pencil_FFT, line_FFT, empty, zeros    # possibly byte-aligned zeros/empty
+from mpiFFT4py import Slab_R2C, Pencil_R2C, Line_R2C, empty, zeros    # possibly byte-aligned zeros/empty
 from spectralDNS.utilities import *
 from spectralDNS.h5io import *
 from spectralDNS.optimization import *
@@ -20,7 +20,7 @@ def get_FFT(params):
     if params.decomposition == 'slab':
         assert len(params.N) == 3
         assert len(params.L) == 3
-        FFT = slab_FFT(params.N, params.L, MPI, params.precision, 
+        FFT = Slab_R2C(params.N, params.L, MPI, params.precision, 
                        communication=params.communication, 
                        threads=params.threads,
                        planner_effort=params.planner_effort)
@@ -28,7 +28,7 @@ def get_FFT(params):
     elif params.decomposition == 'pencil':
         assert len(params.N) == 3
         assert len(params.L) == 3
-        FFT = pencil_FFT(params.N, params.L, MPI, params.precision, P1=params.Pencil_P1, 
+        FFT = Pencil_R2C(params.N, params.L, MPI, params.precision, P1=params.Pencil_P1, 
                          communication=params.communication, threads=params.threads,
                          alignment=params.Pencil_alignment,
                          planner_effort=params.planner_effort)
@@ -36,7 +36,7 @@ def get_FFT(params):
     elif params.decomposition == 'line':
         assert len(params.N) == 2
         assert len(params.L) == 2
-        FFT = line_FFT(params.N, params.L, MPI, params.precision,
+        FFT = Line_R2C(params.N, params.L, MPI, params.precision,
                        threads=params.threads,
                        planner_effort=params.planner_effort)
     return FFT

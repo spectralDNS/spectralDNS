@@ -216,6 +216,7 @@ dealias_cheb_parser.add_argument('--no-dealias_cheb', dest='dealias_cheb', actio
 dealias_cheb_parser.add_argument('--dealias_cheb', dest='dealias_cheb', action='store_true', help='Use dealiasing for inhomogeneous direction. If True, use same rule as for periodic')
 channel.set_defaults(dealias_cheb=False)
 channel.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'), help="Choose 3D decomposition between slab and pencil.")
+channel.add_argument('--communication', default='Alltoallw', choices=('Alltoallw', 'alltoall'), help='Choose method for communication.')
 channel.add_argument('--Pencil_alignment', default='X', choices=('X',), help='Alignment of the complex data for pencil decomposition')
 channel.add_argument('--M', default=[6, 6, 6], nargs=3, help='Mesh size is pow(2, M[i]) in direction i')
 channel.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'), 
