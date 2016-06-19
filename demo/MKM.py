@@ -166,7 +166,7 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K,
     #if N[1] / N0[1] == 2: y = True
     #if N[2] / N0[2] == 2: z = True
     
-    #FST1 = slab_shen_r2c(N0, L, MPI)
+    #FST1 = SlabShen_R2C(N0, L, MPI)
     #W0 = FST1.get_workarray(((3,)+FST1.real_shape(), float), 0)
     #W0[:] = f["3D/checkpoint/U/0"][:, s[0], s[1], s[2]]
     #W0_hat = FST1.get_workarray(((3,)+FST1.complex_shape(), complex), 0)    
