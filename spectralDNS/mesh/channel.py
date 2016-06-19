@@ -425,6 +425,7 @@ class SlabShen_R2C(Slab_R2C):
             
         else:
             Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
+            Uc_mpi  = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
             if not self.dealias_cheb:
                 Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0, False)]
                 Upad_hat_z = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0, False)]
