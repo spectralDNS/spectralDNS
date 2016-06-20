@@ -94,7 +94,8 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_proce
             U_hat[i] = FST.fst(U[i], U_hat[i], ST)
 
     # Set the flux
-    flux[0] = Q(U[1], rank, comm, N)
+    
+    flux[0] = FST.dx(U[1], ST.quad)
     comm.Bcast(flux)
     
     if rank == 0:
@@ -197,31 +198,12 @@ def set_Source(Source, Sk, ST, FST, **kw):
     Sk[:] = 0
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
     
-def Q(u, rank, comm, N):
-    """Integrate u over entire computational domain
-    """
-    L = config.params.L
-    uu = sum(u, axis=(1,2))
-    c = zeros(N[0])
-    comm.Gather(uu, c)
-    if rank == 0:
-        ak = zeros_like(c)
-        ak = dct(c, ak, type=1, axis=0)
-        ak /= (N[0]-1)
-        w = arange(0, N[0], 1, dtype=float)
-        w[2:] = 2./(1-w[2:]**2)
-        w[0] = 1
-        w[1::2] = 0
-        return sum(ak*w)*L[1]*L[2]/N[1]/N[2]
-    else:
-        return 0
-
 beta = zeros(1)    
 def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk, 
            ST, SB, comm, N, dU, diff0, hv, work, **kw):
     global im1, im2, im3, flux
 
-    #q = Q(U[1], rank, comm, N)
+    #q = FST.dx(U[1], ST.quad)
     #beta[0] = (flux[0] - q)/(array(config.params.L).prod())
     #comm.Bcast(beta)
     #U_tmp[1] = beta[0]    
@@ -290,19 +272,19 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
         for i in range(1, 3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)     
 
-        e0 = Q(U[0]*U[0], rank, comm, N)
-        e1 = Q(U[1]*U[1], rank, comm, N)
-        e2 = Q(U[2]*U[2], rank, comm, N)
-        q = Q(U[1], rank, comm, N)
+        e0 = FST.dx(U[0]*U[0], ST.quad)
+        e1 = FST.dx(U[1]*U[1], ST.quad)
+        e2 = FST.dx(U[2]*U[2], ST.quad)
+        q = FST.dx(U[1], ST.quad)
         if rank == 0:
             print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, Source[1].mean())
 
     if config.params.tstep % config.params.sample_stats == 0:
         stats(U, P)     
         
-    #if config.params.tstep == 1:
-        #print "Reset profile"
-        #reset_profile(profile)
+    if config.params.tstep == 1:
+        print "Reset profile"
+        reset_profile(profile)
 
 class Stats(object):
     

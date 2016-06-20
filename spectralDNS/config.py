@@ -225,7 +225,9 @@ channel.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, m
                     help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
 channel.add_argument('--write_xy_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'), 
                     help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
-
+channel.add_argument('--Dquad', default='GC', choices=('GC', 'GL'), help="Choose quadrature scheme for Dirichlet space. GC = Chebyshev-Gauss (x_k=cos((2k+1)/(2N+2)*pi)) and GL = Gauss-Lobatto (x_k=cos(k*pi/N))")
+channel.add_argument('--Bquad', default='GC', choices=('GC', 'GL'), help="Choose quadrature scheme for Biharmonic space. GC = Chebyshev-Gauss (x_k=cos((2k+1)/(2N+2)*pi)) and GL = Gauss-Lobatto (x_k=cos(k*pi/N))")
+channel.add_argument('--Nquad', default='GC', choices=('GC', 'GL'), help="Choose quadrature scheme for Neumann space. GC = Chebyshev-Gauss (x_k=cos((2k+1)/(2N+2)*pi)) and GL = Gauss-Lobatto (x_k=cos(k*pi/N))")
 channelsubparsers = channel.add_subparsers(dest='solver')
 
 KMM = channelsubparsers.add_parser('KMM', help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')

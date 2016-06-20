@@ -6,7 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from mpiFFT4py import *
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ShenBiharmonicBasis, SFTc
 from ..shenGeneralBCs.shentransform import ShenBasis
-from numpy import array, ndarray, sum, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange, conj
+from numpy import array, zeros_like, ndarray, sum, hstack, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange, conj
 from collections import defaultdict
 from ..optimization import *
 
@@ -15,8 +15,8 @@ __all__ = ['setup']
 def setupShen(MPI, config, **kwargs):
     # Get points and weights for Chebyshev weighted integrals
     params = config.params
-    ST = ShenDirichletBasis(quad="GL", threads=params.threads, planner_effort=params.planner_effort["dct"])
-    SN = ShenNeumannBasis(quad="GC", threads=params.threads, planner_effort=params.planner_effort["dct"])
+    ST = ShenDirichletBasis(quad=params.Dquad, threads=params.threads, planner_effort=params.planner_effort["dct"])
+    SN = ShenNeumannBasis(quad=params.Nquad, threads=params.threads, planner_effort=params.planner_effort["dct"])
 
     Nf = params.N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
@@ -69,8 +69,8 @@ def setupShenKMM(MPI, config, **kwargs):
     params = config.params
 
     # Get points and weights for Chebyshev weighted integrals
-    ST = ShenDirichletBasis(quad="GC", threads=params.threads, planner_effort=params.planner_effort["dct"])
-    SB = ShenBiharmonicBasis(quad="GC", threads=params.threads, planner_effort=params.planner_effort["dct"])
+    ST = ShenDirichletBasis(quad=params.Dquad, threads=params.threads, planner_effort=params.planner_effort["dct"])
+    SB = ShenBiharmonicBasis(quad=params.Bquad, threads=params.threads, planner_effort=params.planner_effort["dct"])
     
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
     Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
@@ -124,8 +124,8 @@ def setupShenMHD(MPI, config, **kwargs):
     params = config.params
 
     # Get points and weights for Chebyshev weighted integrals
-    ST = ShenDirichletBasis(quad="GL", threads=params.threads, planner_effort=params.planner_effort["dct"])
-    SN = ShenNeumannBasis(quad="GC", threads=params.threads, planner_effort=params.planner_effort["dct"])
+    ST = ShenDirichletBasis(quad=params.Dquad, threads=params.threads, planner_effort=params.planner_effort["dct"])
+    SN = ShenNeumannBasis(quad=params.Nquad, threads=params.threads, planner_effort=params.planner_effort["dct"])
 
     Nf = params.N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
@@ -357,7 +357,7 @@ class SlabShen_R2C(Slab_R2C):
             fp[:, :, :(N[2]/2+1)] = fu[:]        
         return fp
     
-    #@profile
+    @profile
     def forward(self, u, fu, fun, dealias=None):
         
         # Intermediate work arrays
@@ -376,11 +376,11 @@ class SlabShen_R2C(Slab_R2C):
                     Upad_hat = self.work_arrays[(self.complex_shape_padded(), self.complex, 0, False)]
                     Upad_hat_z = self.work_arrays[((self.N[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0, False)]
                 
-                    Upad_hat = rfft(u/self.padsize, Upad_hat, overwrite_input=True, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
+                    Upad_hat = rfft(u, Upad_hat, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
                     Upad_hat_z = SlabShen_R2C.copy_from_padded(Upad_hat, Upad_hat_z, self.N, 2)
-                    Upad_hat_z = fft(Upad_hat_z/self.padsize, Upad_hat_z, axis=1, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['fft'])   
+                    Upad_hat_z[:] = fft(Upad_hat_z, axis=1, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['fft'])   
                     Uc_hat = SlabShen_R2C.copy_from_padded(Upad_hat_z, Uc_hat, self.N, 1)
-                    fu = fun(Uc_hat, fu)
+                    fu = fun(Uc_hat/self.padsize**2, fu)
                 else:
                     # Intermediate work arrays required for transform
                     Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0, False)]
@@ -389,13 +389,13 @@ class SlabShen_R2C(Slab_R2C):
                     Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0, False)]
 
                     # Do ffts and truncation in the padded y and z directions
-                    Upad_hat3 = rfft(u/self.padsize, Upad_hat3, axis=2, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['rfft'])
+                    Upad_hat3 = rfft(u, Upad_hat3, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
                     Upad_hat2 = SlabShen_R2C.copy_from_padded(Upad_hat3, Upad_hat2, self.N, 2)
-                    Upad_hat2 = fft(Upad_hat2/self.padsize, Upad_hat2, axis=1, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                    Upad_hat2[:] = fft(Upad_hat2, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
                     Upad_hat = SlabShen_R2C.copy_from_padded(Upad_hat2, Upad_hat, self.N, 1)
                     
                     # Perform fst of data in x-direction
-                    Upad_hat0 = fun(Upad_hat, Upad_hat0)
+                    Upad_hat0 = fun(Upad_hat/self.padsize**2, Upad_hat0)
                     
                     # Truncate to original complex shape
                     fu[:] = Upad_hat0[:self.N[0]]
@@ -430,9 +430,9 @@ class SlabShen_R2C(Slab_R2C):
                 Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0, False)]
                 Upad_hat_z = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0, False)]
                 
-                Upad_hatT = rfft(u/self.padsize, Upad_hatT, overwrite_input=True, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
+                Upad_hatT = rfft(u, Upad_hatT, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
                 Upad_hat_z = SlabShen_R2C.copy_from_padded(Upad_hatT, Upad_hat_z, self.N, 2)
-                Upad_hat_z = fft(Upad_hat_z/self.padsize, Upad_hat_z, axis=1, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['fft'])   
+                Upad_hat_z[:] = fft(Upad_hat_z, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])   
                 Uc_hatT = SlabShen_R2C.copy_from_padded(Upad_hat_z, Uc_hatT, self.N, 1)                
                 
                 if self.communication == 'alltoall':
@@ -443,7 +443,7 @@ class SlabShen_R2C(Slab_R2C):
                         [Uc_hatT, self._counts_displs, self._subarraysB],
                         [Uc_hat,  self._counts_displs, self._subarraysA])
                     
-                fu = fun(Uc_hat, fu)
+                fu = fun(Uc_hat/self.padsize**2, fu)
             
             else:
                 assert self.num_processes <= self.N[0]/2, "Number of processors cannot be larger than N[0]/2 for 3/2-rule"
@@ -457,9 +457,9 @@ class SlabShen_R2C(Slab_R2C):
                 Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0, False)]
 
                 # Do ffts and truncation in the padded y and z directions
-                Upad_hat3 = rfft(u/self.padsize, Upad_hat3, axis=2, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['rfft'])
+                Upad_hat3 = rfft(u, Upad_hat3, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
                 Upad_hat2 = SlabShen_R2C.copy_from_padded(Upad_hat3, Upad_hat2, self.N, 2)
-                Upad_hat2 = fft(Upad_hat2/self.padsize, Upad_hat2, axis=1, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                Upad_hat2[:] = fft(Upad_hat2, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 Upad_hat1 = SlabShen_R2C.copy_from_padded(Upad_hat2, Upad_hat1, self.N, 1)
                 
                 if self.communication == 'alltoall':
@@ -477,7 +477,7 @@ class SlabShen_R2C(Slab_R2C):
                         [Upad_hat,  self._counts_displs, self._subarraysA_pad])
                     
                 # Perform fst of data in x-direction
-                Upad_hat0 = fun(Upad_hat, Upad_hat0)
+                Upad_hat0 = fun(Upad_hat/self.padsize**2, Upad_hat0)
                 
                 # Truncate to original complex shape
                 fu[:] = Upad_hat0[:self.N[0]]
@@ -506,11 +506,11 @@ class SlabShen_R2C(Slab_R2C):
                     Upad_hat = self.work_arrays[(self.complex_shape_padded(), self.complex, 0)]
                     Upad_hat_z = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0)]
                     
-                    Uc_hat = fun(fu, Uc_hat)
+                    Uc_hat = fun(fu*self.padsize**2, Uc_hat)
                     Upad_hat_z = SlabShen_R2C.copy_to_padded(Uc_hat, Upad_hat_z, self.N, 1)
-                    Upad_hat_z = ifft(self.padsize*Upad_hat_z, Upad_hat_z, axis=1, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                    Upad_hat_z[:] = ifft(Upad_hat_z, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
                     Upad_hat = SlabShen_R2C.copy_to_padded(Upad_hat_z, Upad_hat, self.N, 2)
-                    u = irfft(self.padsize*Upad_hat, u, axis=2, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['irfft']) 
+                    u = irfft(Upad_hat, u, axis=2, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['irfft']) 
                     
                 else:
                     # Intermediate work arrays required for transform
@@ -521,15 +521,15 @@ class SlabShen_R2C(Slab_R2C):
                     Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0)]
                     
                     # Expand in x-direction and perform ifst
-                    Upad_hat0 = SlabShen_R2C.copy_to_padded(fu, Upad_hat0, self.N, 0)
+                    Upad_hat0 = SlabShen_R2C.copy_to_padded(fu*self.padsize**2, Upad_hat0, self.N, 0)
                     Upad_hat = fun(Upad_hat0, Upad_hat) 
                     
                     Upad_hat2 = SlabShen_R2C.copy_to_padded(Upad_hat, Upad_hat2, self.N, 1)
-                    Upad_hat2 = ifft(Upad_hat2*self.padsize, Upad_hat2, axis=1, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                    Upad_hat2[:] = ifft(Upad_hat2, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
                     
                     # pad in z-direction and perform final irfft
                     Upad_hat3 = SlabShen_R2C.copy_to_padded(Upad_hat2, Upad_hat3, self.N, 2)
-                    u = irfft(Upad_hat3*self.padsize, u, axis=2, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['irfft'])
+                    u = irfft(Upad_hat3, u, axis=2, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['irfft'])
                     
             return u
 
@@ -563,7 +563,7 @@ class SlabShen_R2C(Slab_R2C):
                 Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0)]
                 Upad_hat_z = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0)]
                 
-                Uc_hat = fun(fu, Uc_hat)
+                Uc_hat = fun(fu*self.padsize**2, Uc_hat)
                 if self.communication == 'alltoall':
                     self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
                     Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
@@ -577,9 +577,9 @@ class SlabShen_R2C(Slab_R2C):
                         [Uc_hatT,  self._counts_displs, self._subarraysB])
                 
                 Upad_hat_z = SlabShen_R2C.copy_to_padded(Uc_hatT, Upad_hat_z, self.N, 1)
-                Upad_hat_z = ifft(self.padsize*Upad_hat_z, Upad_hat_z, axis=1, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                Upad_hat_z[:] = ifft(Upad_hat_z, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
                 Upad_hatT = SlabShen_R2C.copy_to_padded(Upad_hat_z, Upad_hatT, self.N, 2)
-                u = irfft(self.padsize*Upad_hatT, u, axis=2, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['irfft'])
+                u = irfft(Upad_hatT, u, axis=2, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['irfft'])
                 
             else:
                 assert self.num_processes <= self.N[0]/2, "Number of processors cannot be larger than N[0]/2 for 3/2-rule"            
@@ -592,7 +592,7 @@ class SlabShen_R2C(Slab_R2C):
                 Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0)]
                 
                 # Expand in x-direction and perform ifst
-                Upad_hat0 = SlabShen_R2C.copy_to_padded(fu, Upad_hat0, self.N, 0)
+                Upad_hat0 = SlabShen_R2C.copy_to_padded(fu*self.padsize**2, Upad_hat0, self.N, 0)
                 Upad_hat = fun(Upad_hat0, Upad_hat) 
                 
                 if self.communication == 'alltoall':
@@ -611,11 +611,11 @@ class SlabShen_R2C(Slab_R2C):
                         [Upad_hat1, self._counts_displs, self._subarraysB_pad])
                 
                 Upad_hat2 = SlabShen_R2C.copy_to_padded(Upad_hat1, Upad_hat2, self.N, 1)
-                Upad_hat2 = ifft(Upad_hat2*self.padsize, Upad_hat2, axis=1, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                Upad_hat2[:] = ifft(Upad_hat2, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
                 
                 # pad in z-direction and perform final irfft
                 Upad_hat3 = SlabShen_R2C.copy_to_padded(Upad_hat2, Upad_hat3, self.N, 2)
-                u = irfft(Upad_hat3*self.padsize, u, axis=2, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['irfft'])
+                u = irfft(Upad_hat3, u, axis=2, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['irfft'])
 
         return u        
 
@@ -690,6 +690,32 @@ class SlabShen_R2C(Slab_R2C):
         UT[1] = SFTc.chebDerivativeCoefficients_3D(UT[0], UT[1]) 
         u0 = self.ifct0(UT[1], u0, S)
         return u0
+    
+    def dx(self, u, quad):
+        """Compute integral of u over domain"""
+        uu = sum(u, axis=(1,2))
+        c = zeros(self.N[0])
+        self.comm.Gather(uu, c)
+        if self.rank == 0:
+            if quad == 'GL':
+                ak = zeros_like(c)
+                ak = dct(c, ak, 1, axis=0)
+                ak /= (self.N[0]-1)
+                w = arange(0, self.N[0], 1, dtype=float)
+                w[2:] = 2./(1-w[2:]**2)
+                w[0] = 1
+                w[1::2] = 0
+                return sum(ak*w)*self.L[1]*self.L[2]/self.N[1]/self.N[2]
+            
+            elif quad == 'GC':
+                d = zeros(self.N[0])
+                k = 2*(1 + arange((self.N[0]-1)//2))
+                d[::2] = (2./self.N[0])/hstack((1., 1.-k*k))
+                w = zeros_like(d)
+                w = dct(d, w, type=3, axis=0)
+                return sum(c*w)*self.L[1]*self.L[2]/self.N[1]/self.N[2]                
+        else:
+            return 0    
 
 setup = {"IPCS": setupShen,
          "IPCSR": setupShen,

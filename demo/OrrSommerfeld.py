@@ -1,8 +1,9 @@
 """Orr-Sommerfeld"""
 from spectralDNS import config, get_solver
 from OrrSommerfeld_eig import OrrSommerfeld
-from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose
+from numpy import dot, real, pi, cos, vstack, flipud, hstack, floor, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose
 from mpiFFT4py import dct
+from scipy.fftpack import ifft
 import matplotlib.pyplot as plt
 import warnings
 import matplotlib.cbook
@@ -21,22 +22,6 @@ def initOS(OS, U, U_hat, X, t=0.):
             U[1, i, j, :] = v
     U[2] = 0
 
-def energy(u, N, comm, rank, L):
-    uu = sum(u, axis=(1,2))
-    c = zeros(N[0])
-    comm.Gather(uu, c)
-    if rank == 0:
-        ak = zeros_like(c)
-        ak = dct(c, ak, 1, axis=0)
-        ak /= (N[0]-1)
-        w = arange(0, N[0], 1, dtype=float)
-        w[2:] = 2./(1-w[2:]**2)
-        w[0] = 1
-        w[1::2] = 0
-        return sum(ak*w)*L[1]*L[2]/N[1]/N[2]
-    else:
-        return 0    
-
 def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
                ST, X, comm, rank, conv, TDMASolverD, params, **kw):
     OS = OrrSommerfeld(Re=params.Re, N=100)
@@ -50,7 +35,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
         H_hat1 = conv(H_hat1, U0, U_hat0)
-        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, params.N, comm, rank, params.L)    
+        e0 = 0.5*FST.dx(U0[0]**2+(U0[1]-(1-X[0]**2))**2, ST.quad)    
 
         initOS(OS, U, U_hat, X, t=params.dt)
         for i in range(3):
@@ -81,7 +66,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
         for i in range(1, 3):
             U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
         H_hat1 = conv(H_hat1, U0, U_hat0)
-        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, params.N, comm, rank, params.L)    
+        e0 = 0.5*FST.dx(U0[0]**2+(U0[1]-(1-X[0]**2))**2, ST.quad) 
         
         initOS(OS, U, U_hat, X, t=params.dt)
         U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB']) 
@@ -107,6 +92,8 @@ def set_Source(Source, Sk, FST, ST, params, **kw):
         
 im1, im2, im3, im4 = (None, )*4        
 def update(rank, X, U, P, OS, comm, e0, FST, ST, U_hat, work, params, **kw):
+    
+    # Use GL for postprocessing
     global im1, im2, im3
     if im1 is None and rank == 0 and params.plot_step > 0:
         plt.figure()
@@ -150,14 +137,38 @@ def update(rank, X, U, P, OS, comm, e0, FST, ST, U_hat, work, params, **kw):
     if params.tstep % params.compute_energy == 0: 
         U_tmp = work[(U, 0)]
         F_tmp = work[(U_hat, 0)]
+        U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
+        for i in range(1, 3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)     
+
         pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
-        e1 = 0.5*energy(pert, params.N, comm, rank, params.L)
+        e1 = 0.5*FST.dx(pert, ST.quad)
         exact = exp(2*imag(OS.eigval)*(params.t))
         initOS(OS, U_tmp, F_tmp, X, t=params.t)
         pert = (U[0] - U_tmp[0])**2 + (U[1]-U_tmp[1])**2
-        e2 = 0.5*energy(pert, params.N, comm, rank, params.L)
+        e2 = 0.5*FST.dx(pert, ST.quad)
+        
+        #ST.quad = 'GL'
+        #kw['SB'].quad = 'GL'
+        #X[:] = FST.get_local_mesh(ST)
+        #initOS(OS, U_tmp, F_tmp, X, t=0)
+        #e00 = 0.5*energy(U_tmp[0]**2+(U_tmp[1]-(1-X[0]**2))**2, params.N, comm, rank, params.L)
+        
+        #U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
+        #for i in range(1, 3):
+            #U[i] = FST.ifst(U_hat[i], U[i], ST)             
+        #pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
+        #e11 = 0.5*energy(pert, params.N, comm, rank, params.L, X[0,:,0,0])
+        #initOS(OS, U_tmp, F_tmp, X, t=params.t)
+        #pert = (U[0] - U_tmp[0])**2 + (U[1]-U_tmp[1])**2
+        #e22 = 0.5*energy(pert, params.N, comm, rank, params.L, X[0,:,0,0])
+        #ST.quad = 'GC'
+        #kw['SB'].quad = 'GC'
+        #X[:] = FST.get_local_mesh(ST)
+        
         if rank == 0:
             print "Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2))
+
 
 def regression_test(U, X, OS, comm, rank, e0, FST, ST, U0, U_hat0, params, **kw):
     #pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
@@ -168,7 +179,7 @@ def regression_test(U, X, OS, comm, rank, e0, FST, ST, U0, U_hat0, params, **kw)
 
     initOS(OS, U0, U_hat0, X, t=params.t)
     pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
-    e1 = 0.5*energy(pert, params.N, comm, rank, params.L)
+    e1 = 0.5*FST.dx(pert, ST.quad)
     #exact = exp(2*imag(OS.eigval)*params.t)
     if rank == 0:
         print "Computed error = %2.8e %2.8e " %(sqrt(e1), params.dt)
