@@ -213,4 +213,109 @@ def copy_from_padded_channel(np.ndarray[np.complex128_t, ndim=3] fp,
     
     return fu
         
+def set_w_hat_channel(w_hat, fk, factor1, factor2):
+    if len(w_hat.shape) == 3:
+        return set_w_hat_channel_3D(w_hat, fk, factor1, factor2)
+    elif len(w_hat.shape) == 1:
+        return set_w_hat_channel_1D(w_hat, fk, factor1, factor2)
+
+def set_w_hat_channel_1D(np.ndarray[np.float64_t, ndim=1, mode='c'] w_hat, 
+                         np.ndarray[np.float64_t, ndim=1, mode='c'] fk, 
+                         np.ndarray[np.float64_t, ndim=1, mode='c'] factor1, 
+                         np.ndarray[np.float64_t, ndim=1, mode='c'] factor2):
+    cdef unsigned int i, N=w_hat.shape[0]
     
+    for i in range(4, N-4):
+        w_hat[i] = fk[i] + (factor1[i-2]*fk[i-2]+factor2[i-4]*fk[i-4])
+    
+    for i in range(2):
+        w_hat[i] = fk[i]
+                
+    for i in range(2,4):
+        w_hat[i] = fk[i] + factor1[i-2]*fk[i-2]
+                
+    for i in range(N-2, N):
+        w_hat[i] = factor2[i-4]*fk[i-4]
+    
+    for i in range(N-4, N-2):
+        w_hat[i] = factor1[i-2]*fk[i-2] + factor2[i-4]*fk[i-4]
+    
+    return w_hat        
+
+def set_w_hat_channel_3D(np.ndarray[np.complex128_t, ndim=3, mode='c'] w_hat, 
+                         np.ndarray[np.complex128_t, ndim=3, mode='c'] fk, 
+                         np.ndarray[np.float64_t, ndim=3, mode='c'] factor1, 
+                         np.ndarray[np.float64_t, ndim=3, mode='c'] factor2):
+    cdef unsigned int i, j, k, N=w_hat.shape[0]
+    
+    for i in range(4, N-4):
+        for j in range(w_hat.shape[1]):
+            for k in range(w_hat.shape[2]):
+                w_hat[i,j,k] = fk[i,j,k] + (factor1[i-2,j,k]*fk[i-2,j,k]+factor2[i-4,j,k]*fk[i-4,j,k])
+    
+    for i in range(2):
+        for j in range(w_hat.shape[1]):
+            for k in range(w_hat.shape[2]):
+                w_hat[i,j,k] = fk[i,j,k]
+                
+    for i in range(2,4):
+        for j in range(w_hat.shape[1]):
+            for k in range(w_hat.shape[2]):
+                w_hat[i,j,k] = fk[i,j,k] + factor1[i-2,j,k]*fk[i-2,j,k]
+                
+    for i in range(N-2, N):
+        for j in range(w_hat.shape[1]):
+            for k in range(w_hat.shape[2]):
+                w_hat[i,j,k] = factor2[i-4,j,k]*fk[i-4,j,k]
+    
+    for i in range(N-4, N-2):
+        for j in range(w_hat.shape[1]):
+            for k in range(w_hat.shape[2]):
+                w_hat[i,j,k] = factor1[i-2,j,k]*fk[i-2,j,k] + factor2[i-4,j,k]*fk[i-4,j,k]
+    
+    return w_hat
+
+def scale_ifct(cj,fk, quad):
+    if len(cj.shape) == 3:
+        return scale_ifct_3D(cj, fk, quad)
+    elif len(cj.shape) == 1:
+        return scale_ifct_1D(cj, fk, quad)
+    
+def scale_ifct_1D(np.ndarray[np.float64_t, ndim=1, mode='c'] cj, 
+                  np.ndarray[np.float64_t, ndim=1, mode='c'] fk, 
+                  str quad):
+    cdef:
+        unsigned int i, N=cj.shape[0]
+        int sign
+    
+    if quad == 'GC':
+        for i in range(cj.shape[0]):
+            cj[i] = 0.5*(cj[i] + fk[0])
+                    
+    elif quad == 'GL':
+        for i in range(cj.shape[0]):
+            sign = 1 if i % 2 == 0 else -1
+            cj[i] = 0.5*(cj[i] + fk[0]) + sign*0.5*fk[N-1]
+                    
+    return cj    
+    
+def scale_ifct_3D(np.ndarray[np.complex128_t, ndim=3, mode='c'] cj, 
+                  np.ndarray[np.complex128_t, ndim=3, mode='c'] fk, 
+                  str quad):
+    cdef:
+        unsigned int i,j,k, N=cj.shape[0]
+        int sign
+    
+    if quad == 'GC':
+        for i in range(cj.shape[0]):
+            for j in range(cj.shape[1]):
+                for k in range(cj.shape[2]):
+                    cj[i,j,k] = 0.5*(cj[i,j,k] + fk[0,j,k])
+                    
+    elif quad == 'GL':
+        for i in range(cj.shape[0]):
+            sign = 1 if i % 2 == 0 else -1
+            for j in range(cj.shape[1]):
+                for k in range(cj.shape[2]):
+                    cj[i,j,k] = 0.5*(cj[i,j,k] + fk[0,j,k] + sign*fk[N-1,j,k])
+    return cj    

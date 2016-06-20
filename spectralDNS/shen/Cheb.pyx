@@ -28,4 +28,4 @@ def chebDerivativeCoefficients_3D(np.ndarray[T, ndim=3] fk, np.ndarray[T, ndim=3
         for j in xrange(fk.shape[2]):
             chebDerivativeCoefficients(fk[:, i, j], fl[:, i, j])
     return fl    
-    
+

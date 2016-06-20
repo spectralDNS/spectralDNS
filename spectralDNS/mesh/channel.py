@@ -357,7 +357,7 @@ class SlabShen_R2C(Slab_R2C):
             fp[:, :, :(N[2]/2+1)] = fu[:]        
         return fp
     
-    @profile
+    #@profile
     def forward(self, u, fu, fun, dealias=None):
         
         # Intermediate work arrays
@@ -395,10 +395,10 @@ class SlabShen_R2C(Slab_R2C):
                     Upad_hat = SlabShen_R2C.copy_from_padded(Upad_hat2, Upad_hat, self.N, 1)
                     
                     # Perform fst of data in x-direction
-                    Upad_hat0 = fun(Upad_hat/self.padsize**2, Upad_hat0)
+                    Upad_hat0 = fun(Upad_hat, Upad_hat0)
                     
                     # Truncate to original complex shape
-                    fu[:] = Upad_hat0[:self.N[0]]
+                    fu[:] = Upad_hat0[:self.N[0]]/self.padsize**2
             return fu
 
         if not dealias == '3/2-rule':
@@ -477,10 +477,10 @@ class SlabShen_R2C(Slab_R2C):
                         [Upad_hat,  self._counts_displs, self._subarraysA_pad])
                     
                 # Perform fst of data in x-direction
-                Upad_hat0 = fun(Upad_hat/self.padsize**2, Upad_hat0)
+                Upad_hat0 = fun(Upad_hat, Upad_hat0)
                 
                 # Truncate to original complex shape
-                fu[:] = Upad_hat0[:self.N[0]]
+                fu[:] = Upad_hat0[:self.N[0]]/self.padsize**2
             
         return fu
 

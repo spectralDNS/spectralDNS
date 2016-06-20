@@ -5,7 +5,9 @@ import SFTc
 import scipy.sparse.linalg as la
 from spectralDNS.shen.la import TDMA, PDMA
 from spectralDNS.shen.Matrices import BBBmat
+from spectralDNS.optimization import optimizer
 import decimal
+
 """
 Fast transforms for pure Chebyshev basis or 
 Shen's Chebyshev basis: 
@@ -105,21 +107,29 @@ class ChebyshevTransform(object):
             
         return cj
 
+    @staticmethod
+    @optimizer
+    def scale_ifct(cj, fk, quad):
+        if quad == 'GC':
+            cj *= 0.5
+            cj += fk[0]/2
+        elif quad == 'GL':
+            cj *= 0.5
+            cj += fk[0]/2
+            cj[::2] += fk[-1]/2
+            cj[1::2] -= fk[-1]/2
+        return cj
+    
     #@profile
     def ifct(self, fk, cj):
         """Inverse fast Chebyshev transform."""
         if self.quad == "GC":
             cj = dct(fk, cj, type=3, axis=0, threads=self.threads, planner_effort=self.planner_effort)
-            cj *= 0.5
-            cj += fk[0]/2
         
         elif self.quad == "GL":
             cj = dct(fk, cj, type=1, axis=0, threads=self.threads, planner_effort=self.planner_effort)
-            cj *= 0.5
-            cj += fk[0]/2
-            cj[::2] += fk[-1]/2
-            cj[1::2] -= fk[-1]/2
-
+        
+        cj = ChebyshevTransform.scale_ifct(cj, fk, self.quad)
         return cj
     
     #@profile
@@ -326,16 +336,22 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
             
         fk[-4:] = 0
         return fk
-
+    
+    @staticmethod
+    @optimizer
+    def set_w_hat(w_hat, fk, f1, f2):
+        w_hat[:-4] = fk[:-4]
+        w_hat[2:-2] += f1*fk[:-4]
+        w_hat[4:]   += f2*fk[:-4]
+        return w_hat
+    
     #@profile
     def ifst(self, fk, fj):
         """Fast inverse Shen scalar transform
         """
         w_hat = work[(fk, 0)]
         self.set_factor_arrays(fk)
-        w_hat[:-4] = fk[:-4]
-        w_hat[2:-2] += self.factor1*fk[:-4]
-        w_hat[4:]   += self.factor2*fk[:-4]
+        w_hat = ShenBiharmonicBasis.set_w_hat(w_hat, fk, self.factor1, self.factor2)
         fj = self.ifct(w_hat, fj)
         return fj
         
@@ -355,7 +371,7 @@ if __name__ == "__main__":
     #a[-1] = 0
     x = Symbol("x")
     f = (1-x**2)*cos(pi*x)    
-    CT = ChebyshevTransform(quad="GC")
+    CT = ChebyshevTransform(quad="GL")
     points, weights = CT.points_and_weights(N)
     fj = np.array([f.subs(x, j) for j in points], dtype=float)    
     u0 = zeros(N, dtype=float)
