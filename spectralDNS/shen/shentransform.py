@@ -90,21 +90,31 @@ class ChebyshevTransform(object):
         fd  = self.ifct(fkd, fd)
         return fd
         
-    #@profile
-    def fct(self, fj, cj):
-        """Fast Chebyshev transform."""
-        N = fj.shape[0]
-        if self.quad == "GC":
-            cj = dct(fj, cj, type=2, axis=0, threads=self.threads, planner_effort=self.planner_effort)  
+    @staticmethod
+    @optimizer
+    def scale_fct(cj, quad):
+        N = cj.shape[0]
+        if quad == 'GC':
             cj /= N
             cj[0] /= 2
-                
-        elif self.quad == "GL":
-            cj = dct(fj, cj, type=1, axis=0, threads=self.threads, planner_effort=self.planner_effort)
+
+        elif quad == 'GL':
             cj /= (N-1)
             cj[0] /= 2
             cj[-1] /= 2
-            
+
+        return cj
+        
+    #@profile
+    def fct(self, fj, cj):
+        """Fast Chebyshev transform."""
+        if self.quad == "GC":
+            cj = dct(fj, cj, type=2, axis=0, threads=self.threads, planner_effort=self.planner_effort)  
+                
+        elif self.quad == "GL":
+            cj = dct(fj, cj, type=1, axis=0, threads=self.threads, planner_effort=self.planner_effort)
+        
+        cj = ChebyshevTransform.scale_fct(cj, self.quad)
         return cj
 
     @staticmethod
@@ -354,7 +364,7 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
         w_hat = ShenBiharmonicBasis.set_w_hat(w_hat, fk, self.factor1, self.factor2)
         fj = self.ifct(w_hat, fj)
         return fj
-        
+    
     def slice(self, N):
         return slice(0, N-4)
     

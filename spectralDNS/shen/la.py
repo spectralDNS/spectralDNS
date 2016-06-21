@@ -1,5 +1,5 @@
 from numpy import zeros, ones, arange, pi, float, complex, int, complex128, array
-from Matrices import BBBmat, SBBmat, ABBmat
+from Matrices import BBBmat, SBBmat, ABBmat, BDDmat, BNNmat
 import SFTc
 from scipy.linalg import lu_factor, lu_solve, solve, solve_banded, decomp_cholesky
 import scipy.sparse.linalg as la_solve
@@ -45,42 +45,38 @@ class TDMA(object):
     def __init__(self, quad="GL", neumann=False):
         self.quad = quad
         self.neumann = neumann
-        self.a0 = zeros(0)
-        self.b0 = zeros(0)
-        self.c0 = zeros(0)
-        self.bc = zeros(0)
-        self.s = zeros(0)
+        self.dd = zeros(0)
+        self.ud = zeros(0)
         
     def init(self, N):
-        if self.neumann:
-            kk = arange(N-2).astype(float)
-            ck = ones(N-3, int)
-            if self.quad == "GL": ck[-1] = 2
-            self.a0 = ones(N-5, float)*(-pi/2)*(kk[1:-2]/(kk[1:-2]+2))**2
-            self.b0 = pi/2*(1+ck*(kk[1:]/(kk[1:]+2))**4)
-            self.c0 = self.a0.copy()
-            self.bc = self.b0.copy()
+        kk = arange(N).astype(float)
+        if self.neumann:            
+            self.M = BNNmat(kk, self.quad)
+            self.dd = self.M.dd
+            self.ud = self.M.ud
+            self.L = zeros(N-4)
+            SFTc.TDMA_SymLU(self.dd, self.ud, self.L)
             self.s = slice(1, N-2)
             
         else:
-            ck = ones(N-2, int)
-            ck[0] = 2
-            if self.quad == "GL":
-                ck[-1] = 2
-            self.a0 = ones(N-4, float)*(-pi/2)
-            self.b0 = (pi/2*(ck+1)).astype(float)
-            self.c0 = self.a0.copy()
-            self.bc = self.b0.copy()
+            self.M = BDDmat(kk, self.quad)
+            self.dd = self.M.dd
+            self.ud = ones(N-4)*self.M.ud
+            self.L = zeros(N-4)
             self.s = slice(0, N-2) 
-        
+            SFTc.TDMA_SymLU(self.dd, self.ud, self.L)
+    
+    #@profile
     def __call__(self, u):
         N = u.shape[0]
-        if not self.a0.shape[0] == u.shape[0]:
+        if not self.dd.shape[0] == u.shape[0]:
             self.init(N)
         if len(u.shape) == 3:
-            SFTc.TDMA_3D(self.a0, self.b0, self.bc, self.c0, u[self.s])
+            #SFTc.TDMA_3D(self.ud, self.dd, self.dd.copy(), self.ud.copy(), u[self.s])
+            SFTc.TDMA_SymSolve3D(self.dd, self.ud, self.L, u[self.s])
         elif len(u.shape) == 1:
-            SFTc.TDMA_1D(self.a0, self.b0, self.bc, self.c0, u[self.s])
+            #SFTc.TDMA_1D(self.ud, self.dd, self.dd.copy(), self.ud.copy(), u[self.s])
+            SFTc.TDMA_SymSolve(self.dd, self.ud, self.L, u[self.s])
         else:
             raise NotImplementedError
         return u

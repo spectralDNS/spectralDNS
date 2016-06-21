@@ -68,7 +68,7 @@ def Cross(a, b, c, S):
 @optimizer
 def mult_K1j(K, a, f):
     f[0] = 1j*K[2]*a
-    f[1] = 1j*K[1]*a
+    f[1] = -1j*K[1]*a
     return f
     
 #@profile
@@ -94,7 +94,6 @@ def Curl(a_hat, c, S):
     c[1] = FST.ifst(F_tmp2[0], c[1], SB, dealias=params.dealias)
     c[1] -= dwdx
     c[2] = FST.ifst(F_tmp2[1], c[2], SB, dealias=params.dealias)
-    c[2] *= -1.0
     c[2] += dvdx
     return c
 

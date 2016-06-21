@@ -112,8 +112,11 @@ def test_scalarproduct(ST):
         u1 = ST.fastShenScalar(fj, u1)
     assert np.allclose(u1, u0)
 
+#@profile
 def test_TDMA(T):
     from scipy.linalg import solve
+    from numpy import zeros_like
+    N = 128
     if T.neumann == True:
         B = BNNmat(np.arange(N).astype(np.float), T.quad)
         s = slice(1, N-2)
@@ -126,20 +129,22 @@ def test_TDMA(T):
 
     u0 = f.copy()
     u0 = T(u0)
+    #from IPython import embed;embed()
+    
     assert np.allclose(u0[s], u)
     # Again
     u0 = f.copy()
     u0 = T(u0)
     assert np.allclose(u0[s], u)
-    
-    
+        
     # Multidimensional version
-    fc = f.repeat(16).reshape((N, 4, 4))
-    fc = T(fc)    
-    assert np.allclose(fc[s, 2, 2], u)
-    fc = f.repeat(16).reshape((N, 4, 4))
-    fc = T(fc)    
-    assert np.allclose(fc[s, 2, 2], u)
+    fc = f.repeat(N*N).reshape((N, N, N))+f.repeat(N*N).reshape((N, N, N))*1j
+    u0 = fc.copy()
+    u0 = T(u0)    
+    assert np.allclose(u0[s, 2, 2].real, u)
+    assert np.allclose(u0[s, 2, 2].imag, u)
+    
+#test_TDMA(TDMA("GC", True))    
     
 def test_BNNmat(ST):
     points, weights = ST.points_and_weights(N)

@@ -9,8 +9,9 @@ ctypedef fused T:
     np.complex128_t
 
 
-def PDMA_SymLU(np.ndarray[np.float64_t, ndim=1] d, np.ndarray[np.float64_t, ndim=1] e,
-               np.ndarray[np.float64_t, ndim=1] f):
+def PDMA_SymLU(np.ndarray[np.float64_t, ndim=1, mode='c'] d, 
+               np.ndarray[np.float64_t, ndim=1, mode='c'] e,
+               np.ndarray[np.float64_t, ndim=1, mode='c'] f):
     cdef:
         unsigned int n = d.shape[0]
         unsigned int m = e.shape[0]
@@ -34,8 +35,10 @@ def PDMA_SymLU(np.ndarray[np.float64_t, ndim=1] d, np.ndarray[np.float64_t, ndim
     d[n-1] -= lam*e[n-3]
     e[n-3] = lam
  
-def PDMA_Symsolve(np.ndarray[np.float64_t, ndim=1] d, np.ndarray[np.float64_t, ndim=1] e, 
-                  np.ndarray[np.float64_t, ndim=1] f, np.ndarray[T, ndim=1] b):
+def PDMA_Symsolve(np.ndarray[np.float64_t, ndim=1, mode='c'] d, 
+                  np.ndarray[np.float64_t, ndim=1, mode='c'] e, 
+                  np.ndarray[np.float64_t, ndim=1, mode='c'] f, 
+                  np.ndarray[T, ndim=1, mode='c'] b):
     cdef:
         unsigned int n = d.shape[0]
         int k
@@ -55,8 +58,10 @@ def PDMA_Symsolve(np.ndarray[np.float64_t, ndim=1] d, np.ndarray[np.float64_t, n
         b[k] /= d[k] 
         b[k] -= (e[k]*b[k+2] + f[k]*b[k+4])
 
-def PDMA_Symsolve3D(np.ndarray[np.float64_t, ndim=1] d, np.ndarray[np.float64_t, ndim=1] e, 
-                    np.ndarray[np.float64_t, ndim=1] f, np.ndarray[T, ndim=3] b):
+def PDMA_Symsolve3D(np.ndarray[np.float64_t, ndim=1, mode='c'] d, 
+                    np.ndarray[np.float64_t, ndim=1, mode='c'] e, 
+                    np.ndarray[np.float64_t, ndim=1, mode='c'] f, 
+                    np.ndarray[T, ndim=3, mode='c'] b):
     cdef:
         int i, j, k
         int n = d.shape[0]

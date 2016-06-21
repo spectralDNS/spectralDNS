@@ -200,7 +200,7 @@ def set_Source(Source, Sk, ST, FST, **kw):
     
 beta = zeros(1)    
 def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk, 
-           ST, SB, comm, N, dU, diff0, hv, work, **kw):
+           ST, SB, comm, N, dU, diff0, hv, work, params, **kw):
     global im1, im2, im3, flux
 
     #q = FST.dx(U[1], ST.quad)
@@ -219,22 +219,22 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
     #for i in range(3):
         #Sk[i] = FST.fss(Source[i], Sk[i], ST)
         
-    if (hdf5file.check_if_write(config.params) or (config.params.tstep % config.params.plot_result == 0 and config.params.plot_result > 0)):
+    if (hdf5file.check_if_write(params) or (params.tstep % params.plot_result == 0 and params.plot_result > 0)):
         U[0] = FST.ifst(U_hat[0], U[0], SB)
         for i in range(1, 3):
             U[i] = FST.ifst(U_hat[i], U[i], ST)     
         
-    if config.params.tstep % config.params.print_energy0 == 0 and rank == 0:
+    if params.tstep % params.print_energy0 == 0 and rank == 0:
         print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 2))
         print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 1))
     
-    if hdf5file.check_if_write(config.params):
-        hdf5file.write(config.tstep)
+    if hdf5file.check_if_write(params):
+        hdf5file.write(params)
         
-    if config.params.tstep % config.params.checkpoint == 0:
-        hdf5file.checkpoint(U, P, U0)
+    if params.tstep % params.checkpoint == 0:
+        hdf5file.checkpoint(U, P, params, U0)
 
-    if config.params.tstep == 1 and rank == 0 and config.params.plot_result > 0:
+    if params.tstep == 1 and rank == 0 and params.plot_result > 0:
         plt.figure()
         im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
         plt.colorbar(im1)
@@ -253,7 +253,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
         plt.pause(1e-6)    
         globals().update(im1=im1, im2=im2, im3=im3)
         
-    if config.params.tstep % config.params.plot_result == 0 and rank == 0 and config.params.plot_result > 0:
+    if params.tstep % params.plot_result == 0 and rank == 0 and params.plot_result > 0:
         im1.ax.clear()
         im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100)         
         im1.autoscale()
@@ -266,7 +266,7 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
         im3.autoscale()
         plt.pause(1e-6)
     
-    if config.params.tstep % config.params.compute_energy == 0: 
+    if params.tstep % params.compute_energy == 0: 
         # Skip dealiasing even though nonlinear
         U[0] = FST.ifst(U_hat[0], U[0], SB)
         for i in range(1, 3):
@@ -279,10 +279,10 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
         if rank == 0:
             print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, Source[1].mean())
 
-    if config.params.tstep % config.params.sample_stats == 0:
+    if params.tstep % params.sample_stats == 0:
         stats(U, P)     
         
-    if config.params.tstep == 1:
+    if params.tstep == 1:
         print "Reset profile"
         reset_profile(profile)
 

@@ -163,7 +163,7 @@ def mult_K1j(np.ndarray[np.float64_t, ndim=4] K,
         for j in xrange(a.shape[1]):
             for k in xrange(a.shape[2]):
                 f[0,i,j,k] = 1j*K[2,i,j,k]*a[i,j,k]
-                f[1,i,j,k] = 1j*K[1,i,j,k]*a[i,j,k]
+                f[1,i,j,k] = -1j*K[1,i,j,k]*a[i,j,k]
     return f
 
 def copy_to_padded_channel(np.ndarray[np.complex128_t, ndim=3] fu, 
@@ -318,4 +318,57 @@ def scale_ifct_3D(np.ndarray[np.complex128_t, ndim=3, mode='c'] cj,
             for j in range(cj.shape[1]):
                 for k in range(cj.shape[2]):
                     cj[i,j,k] = 0.5*(cj[i,j,k] + fk[0,j,k] + sign*fk[N-1,j,k])
+    return cj 
+    
+def scale_fct(cj, quad):
+    if len(cj.shape) == 3:
+        return scale_fct_3D(cj, quad)
+    elif len(cj.shape) == 1:
+        return scale_fct_1D(cj, quad)
+    
+def scale_fct_1D(np.ndarray[np.float64_t, ndim=1, mode='c'] cj,
+                 str quad):
+    cdef:
+        unsigned int i, N=cj.shape[0]
+        int sign
+    
+    if quad == 'GC':
+        for i in range(cj.shape[0]):
+            cj[i] = cj[i]/N
+        cj[0] /= 2
+                    
+    elif quad == 'GL':
+        for i in range(cj.shape[0]):
+            cj[i] = cj[i]/(N-1)
+        cj[0] /= 2
+        cj[N-1] /= 2
+                    
     return cj    
+    
+def scale_fct_3D(np.ndarray[np.complex128_t, ndim=3, mode='c'] cj,  
+                 str quad):
+    cdef:
+        unsigned int i,j,k, N=cj.shape[0]
+        int sign
+    
+    if quad == 'GC':
+        for i in range(cj.shape[0]):
+            for j in range(cj.shape[1]):
+                for k in range(cj.shape[2]):
+                    cj[i,j,k] = cj[i,j,k]/N
+                    
+        for j in range(cj.shape[1]):
+            for k in range(cj.shape[2]):
+                cj[0,j,k] = cj[0,j,k]/2
+                
+    elif quad == 'GL':
+        for i in range(cj.shape[0]):
+            for j in range(cj.shape[1]):
+                for k in range(cj.shape[2]):
+                    cj[i,j,k] = cj[i,j,k]/(N-1)
+        for j in range(cj.shape[1]):
+            for k in range(cj.shape[2]):
+                cj[0,j,k] = cj[0,j,k]/2
+                cj[N-1,j,k] = cj[N-1,j,k]/2
+                    
+    return cj

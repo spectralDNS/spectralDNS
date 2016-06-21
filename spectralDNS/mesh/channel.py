@@ -633,7 +633,7 @@ class SlabShen_R2C(Slab_R2C):
         """Fast Cheb transform of x-direction, Fourier transform of y and z"""
         fu = self.forward(u, fu, S.fct, dealias=dealias)            
         return fu
-        
+    
     def ifst(self, fu, u, S, dealias=None):
         """Inverse Shen transform of x-direction, Fourier in y and z"""
         u = self.backward(fu, u, S.ifst, dealias=dealias)
