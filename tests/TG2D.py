@@ -7,11 +7,6 @@ def initialize(U, U_hat, X, sin, cos, FFT, **kw):
     for i in range(2):
         U_hat[i] = FFT.fft2(U[i], U_hat[i])
 
-def update(FFT, P, P_hat, hdf5file, params, **kw):
-    if hdf5file.check_if_write(params):
-        P = FFT.ifft2(P_hat*1j, P)
-        hdf5file.write(params)
-        
 def regression_test(comm, U, float64, sum, rank, X, params, **kw):
     dx, L = params.dx, params.L
     k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
@@ -30,7 +25,7 @@ if __name__ == '__main__':
       'M': [6, 6]}, 'doublyperiodic'
     )
 
-    solver = get_solver(update=update, regression_test=regression_test, mesh='doublyperiodic')
+    solver = get_solver(regression_test=regression_test, mesh='doublyperiodic')
     initialize(**vars(solver))
     solver.solve()
 

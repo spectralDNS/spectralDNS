@@ -12,8 +12,23 @@ from ..shen import SFTc
 vars().update(setup['IPCS'](**vars()))
 
 assert params.precision == "double"
-hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "IPCS.h5", 
+hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, 
+                      chkpoint={'current':{'U':U, 'P':P}, 'previous':{'U':U0}},
+                      filename=params.solver+".h5", 
                       mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
+
+def update_components(U, U0, U_hat, U_hat0, P, P_hat, FST, SN, ST, params, **kw):
+    """Transform to real data when storing the solution"""
+    if hdf5file.check_if_write(params) or params.tstep % params.checkpoint == 0:
+        for i in range(3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)
+        P = FST.ifst(P_hat, P, SN)
+
+    if params.tstep % params.checkpoint == 0:
+        for i in range(3):
+            U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
+
+hdf5file.update_components = update_components
 
 HelmholtzSolverU = Helmholtz(params.N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/params.nu/params.dt), ST.quad, False)
 HelmholtzSolverP = Helmholtz(params.N[0], sqrt(K[1, 0]**2+K[2, 0]**2), SN.quad, True)
@@ -211,7 +226,7 @@ def divergenceConvection(c, U, U_hat, add=False):
 def getConvection(convection):
     if convection == "Standard":
         
-        def Conv(H_hat, U, U_hat):
+        def Conv(H_hat, U_hat):
             
             U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             for i in range(3):
@@ -223,7 +238,7 @@ def getConvection(convection):
         
     elif convection == "Divergence":
         
-        def Conv(H_hat, U, U_hat):
+        def Conv(H_hat, U_hat):
             
             U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             for i in range(3):
@@ -235,7 +250,7 @@ def getConvection(convection):
         
     elif convection == "Skew":
         
-        def Conv(H_hat, U, U_hat):
+        def Conv(H_hat, U_hat):
             
             U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             for i in range(3):
@@ -248,7 +263,7 @@ def getConvection(convection):
 
     elif convection == "Vortex":
         
-        def Conv(H_hat, U, U_hat):
+        def Conv(H_hat, U_hat):
             
             U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             curl_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 1)]
@@ -271,7 +286,7 @@ def ComputeRHS(dU, jj):
 
     # Add convection to rhs
     if jj == 0:
-        H_hat = conv(H_hat, U0, U_hat0)
+        H_hat = conv(H_hat, U_hat0)
         
         # Compute diffusion
         diff0[:] = 0
@@ -351,15 +366,13 @@ def solve():
         dU[2] = TDMASolverD(dU[2])
         U_hat[:, u_slice] += params.dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
 
-        for i in range(3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
-
         update(**globals())
+
+        hdf5file.update(**globals())
  
         # Rotate velocities
         U_hat1[:] = U_hat0
         U_hat0[:] = U_hat
-        U0[:] = U
         
         P[:] = FST.ifst(P_hat, P, SN)        
         H_hat1[:] = H_hat

@@ -8,7 +8,18 @@ from spectralDNS.mesh.triplyperiodic import setup
 
 vars().update(setup['NS'](**vars()))
 
-hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "NS.h5")
+hdf5file = HDF5Writer(FFT, float, {'U':U[0], 'V':U[1], 'W':U[2], 'P':P}, 
+                      chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
+                      filename=params.solver+'.h5')
+
+def update_components(U, U_hat, P, P_hat, FFT, params, **kw):
+    """Transform to real data when storing the solution"""
+    if hdf5file.check_if_write(params) or params.tstep % params.checkpoint == 0:
+        for i in range(3):
+            U[i] = FFT.ifftn(U_hat[i], U[i])
+        P = FFT.ifftn(P_hat, P)
+
+hdf5file.update_components = update_components
 
 def standardConvection(c, U_dealiased, U_hat, dealias=None):
     """c_i = u_j du_i/dx_j"""
@@ -145,13 +156,12 @@ def solve():
         
         U_hat, params.dt, dt_took = integrate()
 
-        for i in range(3):
-            U[i] = FFT.ifftn(U_hat[i], U[i])
-
         params.t += dt_took
         params.tstep += 1
                  
         update(**globals())
+
+        hdf5file.update(**globals())
         
         timer()
         

@@ -12,8 +12,10 @@ context = solve.func_globals
 context.update(setup['IPCSR'](**vars()))
 vars().update(context)
 
-hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "IPCSR.h5", 
-                      mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
+hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, 
+                      chkpoint={'current':{'U':U, 'P':P}, 'previous':{'U':U0}},
+                      filename=params.solver+".h5", 
+                      mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})
 
 CDT = CDTmat(K[0, :, 0, 0])
 CTD = CTDmat(K[0, :, 0, 0])
@@ -130,17 +132,15 @@ def solve():
         dU[2] = TDMASolverD(dU[2])        
         U_hat[:, u_slice] += params.dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
 
-        for i in range(3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
-         
         update(**globals())
- 
+
+        hdf5file.update(**globals())
+          
         # Rotate velocities
         U_hat1[:] = U_hat0
         U_hat0[:] = U_hat
-        U0[:] = U
         
-        P[:] = FST.ifct(P_hat, P, SN)        
+        #P[:] = FST.ifct(P_hat, P, SN)        
         H_hat1[:] = H_hat
                 
         timer()

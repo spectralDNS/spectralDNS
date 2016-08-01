@@ -8,7 +8,18 @@ from spectralDNS.mesh.doublyperiodic import setup
 
 vars().update(setup['Bq2D'](**vars()))
 
-hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "rho":rho, "P":P}, "Bq2D.h5")
+hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "rho":rho, "P":P}, 
+                      chkpoint={'current':{'U':Ur, 'P':P}, 'previous':{}},
+                      filename="Bq2D.h5")
+
+def update_components(Ur, Ur_hat, P, P_hat, FFT, params, **kw):
+    """Transform to real data when storing the solution"""
+    if hdf5file.check_if_write(params) or params.tstep % params.checkpoint == 0:
+        for i in range(3):
+            Ur[i] = FFT.ifft2(Ur_hat[i], Ur[i])
+        P = FFT.ifft2(P_hat, P)
+
+hdf5file.update_components = update_components
 
 @optimizer
 def add_pressure_diffusion(dU, P_hat, U_hat, rho_hat, K_over_K2, K, K2, nu, Ri, Pr):
@@ -79,8 +90,10 @@ def solve():
 
         params.t += dt_took
         params.tstep += 1
-                 
+                                  
         update(**globals())
+
+        hdf5file.update(**globals())
         
         timer()
         

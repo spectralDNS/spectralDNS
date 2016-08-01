@@ -26,7 +26,7 @@ def initOS(OS, U, X, t=0.):
             U[1, i, j, :] = v
     U[2] = 0
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_processes, 
+def initialize(U, U_hat, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_processes, 
                Curl, conv, TDMASolverD, solvePressure, N, H_hat, H_hat1, K, **kw):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
@@ -61,10 +61,6 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_proce
     #U[0] += 0.1*(1-X[0]**2)*sin(4*pi*X[0])*cos(2*pi*X[1])
     #U[1] += 0.1*((1-X[0]**2)*sin(2*pi*X[1])+2*X[0]*sin(4*pi*X[0])*sin(2*pi*X[1])/2./pi)
     
-    #OS = OrrSommerfeld(Re=6000, N=80)
-    #initOS(OS, U0, X)
-    #U[1] += 5e-2*U0[1]
-    #U[2] += 5e-2*U0[2]
     
     if "KMM" in config.params.solver:
         U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB'])
@@ -110,28 +106,27 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_proce
         P_hat = solvePressure(P_hat, conv2)
         P = FST.ifst(P_hat, P, kw['SN'])
         
-    U0[:] = U[:]
     U_hat0[:] = U_hat[:]
-    H_hat1 = conv(H_hat1, U0, U_hat0)
+    H_hat1 = conv(H_hat1, U_hat0)
  
-def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K,
+def init_from_file(filename, comm, U_hat0, U, U_hat, P, P_hat, H_hat1, K,
                    rank, conv, FST, ST, **kw):
     f = h5py.File(filename, driver="mpio", comm=comm)
     assert "0" in f["3D/checkpoint/U"]
-    N = U0.shape[1]
+    N = U.shape[1]
     s = slice(rank*N, (rank+1)*N, 1)
-    U0[:] = f["3D/checkpoint/U/0"][:, s]
+    U[:] = f["3D/checkpoint/U/0"][:, s]
     
     if config.params.solver in ("IPCS", "IPCSR"):
         for i in range(3):
-            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
-        H_hat1[:] = conv(H_hat1, U0, U_hat0)
+            U_hat0[i] = FST.fst(U[i], U_hat0[i], ST)
+        H_hat1[:] = conv(H_hat1, U_hat0)
         
-        U0[:] = f["3D/checkpoint/U/1"][:, s]
-        P [:] = f["3D/checkpoint/P/1"][s]
+        U[:] = f["3D/checkpoint/U/1"][:, s]
+        P[:] = f["3D/checkpoint/P/1"][s]
 
         for i in range(3):
-            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
+            U_hat0[i] = FST.fst(U[i], U_hat0[i], ST)
         
         if config.solver == "IPCSR":
             P_hat = FST.fct(P, P_hat, kw['SN'])
@@ -139,57 +134,21 @@ def init_from_file(filename, comm, U0, U_hat0, U, U_hat, P, P_hat, H_hat1, K,
             P_hat = FST.fst(P, P_hat, kw['SN'])
 
     elif "KMM" in config.params.solver:
-        U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB'])
+        U_hat0[0] = FST.fst(U[0], U_hat0[0], kw['SB'])
         for i in range(1, 3):
-            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
-        H_hat1[:] = conv(H_hat1, U0, U_hat0)
+            U_hat0[i] = FST.fst(U[i], U_hat0[i], ST)
+        H_hat1[:] = conv(H_hat1, U_hat0)
         
-        U0[:] = f["3D/checkpoint/U/1"][:, s]
-        U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB'])
+        U[:] = f["3D/checkpoint/U/1"][:, s]
+        U_hat0[0] = FST.fst(U[0], U_hat0[0], kw['SB'])
         for i in range(1,3):
-            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
+            U_hat0[i] = FST.fst(U[i], U_hat0[i], ST)
         
         g = kw['g']
         g[:] = 1j*K[1]*U_hat0[2] - 1j*K[2]*U_hat0[1]
         U_hat[:] = U_hat0[:]        
         
     f.close()
-
-#def init_from_file_with_refinement(filename, comm, U0, U_hat0, U, U_hat, L, MPI,
-                                   #P, P_hat, H_hat1, K, rank, conv, FST, ST, **kw):
-    #f = h5py.File(filename, driver="mpio", comm=comm)
-    #assert "0" in f["3D/checkpoint/U"]
-    #N = FST.global_real_shape()
-    #s = FST.real_local_slice()
-    #N0 = f.attrs["N"]
-    #x, y, z = False, False, False
-    #if N[0] / N0[0] == 2: x = True
-    #if N[1] / N0[1] == 2: y = True
-    #if N[2] / N0[2] == 2: z = True
-    
-    #FST1 = SlabShen_R2C(N0, L, MPI)
-    #W0 = FST1.get_workarray(((3,)+FST1.real_shape(), float), 0)
-    #W0[:] = f["3D/checkpoint/U/0"][:, s[0], s[1], s[2]]
-    #W0_hat = FST1.get_workarray(((3,)+FST1.complex_shape(), complex), 0)    
-    #W0_hat[0] = FST2.fst(W0[0], W0_hat[0], SB)
-    #for i in range(1, 3):
-        #W0_hat[i] = FST1.fst(W0[i], W0_hat[i], ST)
-        
-    ## Now use padding
-    #U_hat0[:]
-    
-    
-    #U0[:] = f["3D/checkpoint/U/1"][:, s]
-    #U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB'])
-    #for i in range(1,3):
-        #U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)
-    
-    #g = kw['g']
-    #g[:] = 1j*K[1]*U_hat0[2] - 1j*K[2]*U_hat0[1]
-    #U_hat[:] = U_hat0[:]        
-        
-    #f.close()
-
 
 def set_Source(Source, Sk, ST, FST, **kw):
     utau = config.params.nu * config.params.Re_tau
@@ -199,8 +158,8 @@ def set_Source(Source, Sk, ST, FST, **kw):
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
     
 beta = zeros(1)    
-def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk, 
-           ST, SB, comm, N, dU, diff0, hv, work, params, **kw):
+def update(U, U_hat, P, rank, X, stats, FST, Source, Sk, 
+           ST, SB, comm, params, **kw):
     global im1, im2, im3, flux
 
     #q = FST.dx(U[1], ST.quad)
@@ -219,22 +178,19 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
     #for i in range(3):
         #Sk[i] = FST.fss(Source[i], Sk[i], ST)
         
-    if (hdf5file.check_if_write(params) or (params.tstep % params.plot_result == 0 and params.plot_result > 0)):
-        U[0] = FST.ifst(U_hat[0], U[0], SB)
-        for i in range(1, 3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)     
-        
-    if params.tstep % params.print_energy0 == 0 and rank == 0:
+    if params.tstep % params.print_energy0 == 0 and rank == 0:        
         print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 2))
         print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 1))
-    
-    if hdf5file.check_if_write(params):
-        hdf5file.write(params)
         
-    if params.tstep % params.checkpoint == 0:
-        hdf5file.checkpoint(U, P, params, U0)
-
+    if (params.tstep % params.compute_energy == 0 or 
+        params.tstep % params.plot_result == 0 and params.plot_result > 0 or
+        params.tstep % params.sample_stats == 0):
+        U[0] = FST.ifst(U_hat[0], U[0], SB)
+        for i in range(1, 3):
+            U[i] = FST.ifst(U_hat[i], U[i], ST)
+    
     if params.tstep == 1 and rank == 0 and params.plot_result > 0:
+        # Initialize figures
         plt.figure()
         im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
         plt.colorbar(im1)
@@ -267,11 +223,6 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
         plt.pause(1e-6)
     
     if params.tstep % params.compute_energy == 0: 
-        # Skip dealiasing even though nonlinear
-        U[0] = FST.ifst(U_hat[0], U[0], SB)
-        for i in range(1, 3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)     
-
         e0 = FST.dx(U[0]*U[0], ST.quad)
         e1 = FST.dx(U[1]*U[1], ST.quad)
         e2 = FST.dx(U[2]*U[2], ST.quad)
@@ -282,9 +233,9 @@ def update(U, U_hat, P, U0, P_hat, rank, X, stats, FST, hdf5file, Source, Sk,
     if params.tstep % params.sample_stats == 0:
         stats(U, P)     
         
-    if params.tstep == 1:
-        print "Reset profile"
-        reset_profile(profile)
+    #if params.tstep == 1:
+        #print "Reset profile"
+        #reset_profile(profile)
 
 class Stats(object):
     
@@ -385,8 +336,8 @@ if __name__ == "__main__":
     initialize(**vars(solver))    
     #init_from_file("KMM665.h5", **vars(solver))
     set_Source(**vars(solver))
-    solver.stats = Stats(solver.U, solver.comm, filename="KMMstats")
-    #solver.hdf5file.fname = "KMM665q.h5"
+    solver.stats = Stats(solver.U, solver.comm, filename="KMMstatsq")
+    solver.hdf5file.fname = "KMM665c.h5"
     solver.solve()
     #s = solver.stats.get_stats()
 

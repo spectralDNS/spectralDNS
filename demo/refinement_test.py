@@ -11,7 +11,7 @@ number= "([0-9]+.[0-9]+e[+-][0-9]+)"
 dt = array([ 1./20., 1./30., 1./40., 1./50., 1./60.])
 
 for i in range(len(dt)):
-    output = subprocess.check_output("python OrrSommerfeld.py --M 7 5 2 --dt %s --T %s --compute_energy 1000 --plot_step -1 --convection Vortex KMM"%(str(dt[i]),str(4.0)), shell=True)    
+    output = subprocess.check_output("python OrrSommerfeld.py --M 7 5 2 --dt %s --T %s --compute_energy 1000 --plot_step -1 --convection Vortex KMM"%(str(dt[i]),str(2.0)), shell=True)    
     match = re.search("Computed error = "+number+" "+number, output)
     err, h1 = [eval(j) for j in match.groups(0)]
     error.append(err)

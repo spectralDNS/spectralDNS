@@ -10,7 +10,7 @@ config.update(
     'integrator': 'RK4'
     }
 )
-solver = get_solver(update=update, regression_test=regression_test)
+solver = get_solver(regression_test=regression_test)
 initialize(**vars(solver))
 solver.solve()
 

@@ -27,12 +27,11 @@ def initialize(X, U, Ur, Ur_hat, rho, FFT, float, params, **kwargs):
 
 im, im2 = None, None
 def update(comm, rank, rho, curl, K, FFT, U_hat, U, params,
-           P_hat, P, hdf5file, float64, rho_hat, **kwargs):
+           P_hat, P, float64, rho_hat, **kwargs):
     global im, im2
     
     dx, L, N = params.dx, params.L, params.N
-    if (hdf5file.check_if_write(params) or (params.tstep % params.plot_result == 0 
-        and params.plot_result > 0)):
+    if (params.tstep % params.plot_result == 0 and params.plot_result > 0):
         P = FFT.ifft2(P_hat*1j, P)
         curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
         
@@ -65,9 +64,6 @@ def update(comm, rank, rho, curl, K, FFT, U_hat, U, params,
         plt.pause(1e-6)
         if rank == 0:
             print params.tstep
-
-    if hdf5file.check_if_write(params):
-        hdf5file.write(params)           
 
     if params.tstep % params.compute_energy == 0:
         kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)

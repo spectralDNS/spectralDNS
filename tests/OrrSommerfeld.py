@@ -5,7 +5,7 @@ from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array, zer
 from mpiFFT4py import dct
 
 eps = 1e-6
-def initOS(OS, U, U_hat, X, t=0.):
+def initOS(OS, U, X, t=0.):
     for i in range(U.shape[1]):
         x = X[0, i, 0, 0]
         OS.interp(x)
@@ -17,26 +17,12 @@ def initOS(OS, U, U_hat, X, t=0.):
             U[1, i, j, :] = v
     U[2] = 0
 
-def energy(u, N, comm, rank, L):
-    uu = sum(u, axis=(1,2))
-    c = zeros(N[0])
-    comm.Gather(uu, c)
-    if rank == 0:
-        ak = zeros_like(c)
-        ak = dct(c, ak, 1, axis=0)
-        ak /= (N[0]-1)
-        w = arange(0, N[0], 1, dtype=float)
-        w[2:] = 2./(1-w[2:]**2)
-        w[0] = 1
-        w[1::2] = 0
-        return sum(ak*w)*L[1]*L[2]/N[1]/N[2]
-    else:
-        return 0    
-
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
+OS, e0 = None, None
+def initialize(U, U_hat, U0, U_hat0, solvePressure, H_hat1, FST,
                ST, X, comm, rank, conv, TDMASolverD, params, **kw): 
+    global OS, e0
     OS = OrrSommerfeld(Re=params.Re, N=100)
-    initOS(OS, U0, U_hat0, X)
+    initOS(OS, U0, X)
     
     if not params.solver in ("KMM", "KMMRK3"):
         for i in range(3):
@@ -45,10 +31,10 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
             U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
         for i in range(3):
             U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
-        H_hat1 = conv(H_hat1, U0, U_hat0)
-        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, params.N, comm, rank, params.L)    
+        H_hat1 = conv(H_hat1, U_hat0)
+        e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, ST.quad)
 
-        initOS(OS, U, U_hat, X, t=params.dt)
+        initOS(OS, U, X, t=params.dt)
         for i in range(3):
             U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
         for i in range(3):
@@ -57,13 +43,13 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
             U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
 
         conv2 = zeros_like(H_hat1)
-        conv2 = conv(conv2, U0, 0.5*(U_hat0+U_hat))  
+        conv2 = conv(conv2, 0.5*(U_hat0+U_hat))  
         for j in range(3):
             conv2[j] = TDMASolverD(conv2[j])
         conv2 *= -1
-        P_hat = solvePressure(P_hat, conv2)
+        kw['P_hat'] = solvePressure(kw['P_hat'], conv2)
+        kw['P'] = FST.ifst(kw['P_hat'], kw['P'], kw['SN'])
 
-        P = FST.ifst(P_hat, P, kw['SN'])
         U0[:] = U
         U_hat0[:] = U_hat
         params.t = params.dt
@@ -76,10 +62,10 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
         U0[0] = FST.ifst(U_hat0[0], U0[0], kw['SB'])
         for i in range(1, 3):
             U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
-        H_hat1 = conv(H_hat1, U0, U_hat0)
-        e0 = 0.5*energy(U0[0]**2+(U0[1]-(1-X[0]**2))**2, params.N, comm, rank, params.L)    
+        H_hat1 = conv(H_hat1, U_hat0)
+        e0 = 0.5*FST.dx(U0[0]**2+(U0[1]-(1-X[0]**2))**2, ST.quad)    
         
-        initOS(OS, U, U_hat, X, t=params.dt)
+        initOS(OS, U, X, t=params.dt)
         U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB']) 
         for i in range(1, 3):
             U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
@@ -93,30 +79,25 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, solvePressure, H_hat1, FST,
         params.tstep = 1
         kw['g'][:] = 0
     
-    return dict(OS=OS, e0=e0)
-
 def set_Source(Source, Sk, FST, ST, params, **kw):
     Source[:] = 0
     Source[1] = -2./params.Re
     Sk[:] = 0
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
-
-def update(hdf5file, U, P, U0, params, **kw):    
-    if hdf5file.check_if_write(params):
-        hdf5file.write(params)
         
-    if params.tstep % params.checkpoint == 0:
-        hdf5file.checkpoint(U, P, params, U0)    
-        
-def regression_test(X, OS, comm, rank, e0, FST, U0, U_hat0, U, U_hat, params, **kw):
+def regression_test(X, comm, rank, FST, U0, U_hat0, U, U_hat, params, **kw):
+    global OS, e0
     if "KMM" in params.solver:
         U[0] = FST.ifst(U_hat[0], U[0], kw["SB"])
         for i in range(1, 3):
             U[i] = FST.ifst(U_hat[i], U[i], kw["ST"])
-    
-    initOS(OS, U0, U_hat0, X, t=params.t)
+    else:
+        for i in range(3):
+            U[i] = FST.ifst(U_hat[i], U[i], kw["ST"])
+            
+    initOS(OS, U0, X, t=params.t)
     pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
-    e1 = 0.5*energy(pert, params.N, comm, rank, params.L)
+    e1 = 0.5*FST.dx(pert, kw['ST'].quad)
     if rank == 0:
         assert sqrt(e1) < 1e-12
 
@@ -133,7 +114,7 @@ if __name__ == "__main__":
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)
     config.channel.add_argument("--plot_step", type=int, default=1)
-    solver = get_solver(update=update, regression_test=regression_test, mesh="channel")    
-    vars(solver).update(initialize(**vars(solver)))
+    solver = get_solver(regression_test=regression_test, mesh="channel")    
+    initialize(**vars(solver))
     set_Source(**vars(solver))	
     solver.solve()

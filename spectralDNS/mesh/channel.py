@@ -6,12 +6,12 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from mpiFFT4py import *
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ShenBiharmonicBasis, SFTc
 from ..shenGeneralBCs.shentransform import ShenBasis
-from numpy import array, zeros_like, ndarray, sum, hstack, meshgrid, mgrid, where, abs, pi, uint8, rollaxis, arange, conj
+from numpy import array, zeros_like, sum, hstack, meshgrid, where, abs, pi, uint8, rollaxis, arange
 from collections import defaultdict
 from ..optimization import *
 
 __all__ = ['setup']
-
+    
 def setupShen(MPI, config, **kwargs):
     # Get points and weights for Chebyshev weighted integrals
     params = config.params
@@ -35,25 +35,25 @@ def setupShen(MPI, config, **kwargs):
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
 
-    U     = empty((3,)+FST.real_shape(), dtype=float)
-    U_hat = empty((3,)+FST.complex_shape(), dtype=complex)
-    P     = empty(FST.real_shape(), dtype=float)
-    P_hat = empty(FST.complex_shape(), dtype=complex)
-    Pcorr = empty(FST.complex_shape(), dtype=complex)
+    U     = zeros((3,)+FST.real_shape(), dtype=float)
+    U_hat = zeros((3,)+FST.complex_shape(), dtype=complex)
+    P     = zeros(FST.real_shape(), dtype=float)
+    P_hat = zeros(FST.complex_shape(), dtype=complex)
+    Pcorr = zeros(FST.complex_shape(), dtype=complex)
 
-    U0      = empty((3,)+FST.real_shape(), dtype=float)
-    U_hat0  = empty((3,)+FST.complex_shape(), dtype=complex)
-    U_hat1  = empty((3,)+FST.complex_shape(), dtype=complex)
+    U0      = zeros((3,)+FST.real_shape(), dtype=float)
+    U_hat0  = zeros((3,)+FST.complex_shape(), dtype=complex)
+    U_hat1  = zeros((3,)+FST.complex_shape(), dtype=complex)
 
-    dU      = empty((3,)+FST.complex_shape(), dtype=complex)
+    dU      = zeros((3,)+FST.complex_shape(), dtype=complex)
 
-    H_hat    = empty((3,)+FST.complex_shape(), dtype=complex)
-    H_hat0   = empty((3,)+FST.complex_shape(), dtype=complex)
-    H_hat1   = empty((3,)+FST.complex_shape(), dtype=complex)
+    H_hat    = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat0   = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat1   = zeros((3,)+FST.complex_shape(), dtype=complex)
 
-    diff0   = empty((3,)+FST.complex_shape(), dtype=complex)
-    Source  = empty((3,)+FST.real_shape(), dtype=float) 
-    Sk      = empty((3,)+FST.complex_shape(), dtype=complex) 
+    diff0   = zeros((3,)+FST.complex_shape(), dtype=complex)
+    Source  = zeros((3,)+FST.real_shape(), dtype=float) 
+    Sk      = zeros((3,)+FST.complex_shape(), dtype=complex) 
     
     K = FST.get_scaled_local_wavenumbermesh()
     K2 = K[1]*K[1]+K[2]*K[2]
@@ -87,28 +87,25 @@ def setupShenKMM(MPI, config, **kwargs):
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
 
-    U     = empty((3,)+FST.real_shape(), dtype=float)
-    U_hat = empty((3,)+FST.complex_shape(), dtype=complex)
-    P     = empty(FST.real_shape(), dtype=float)
-    P_hat = empty(FST.complex_shape(), dtype=complex)
-
-    U0      = empty((3,)+FST.real_shape(), dtype=float)
-    U_hat0  = empty((3,)+FST.complex_shape(), dtype=complex)
+    U      = zeros((3,)+FST.real_shape(), dtype=float)
+    U0     = zeros((3,)+FST.real_shape(), dtype=float)
+    U_hat  = zeros((3,)+FST.complex_shape(), dtype=complex)
+    U_hat0 = zeros((3,)+FST.complex_shape(), dtype=complex)
     
     # We're solving for:
     u = U_hat0[0]
-    g = empty(FST.complex_shape(), dtype=complex)
+    g = zeros(FST.complex_shape(), dtype=complex)
 
-    H_hat    = empty((3,)+FST.complex_shape(), dtype=complex)
-    H_hat0   = empty((3,)+FST.complex_shape(), dtype=complex)
-    H_hat1   = empty((3,)+FST.complex_shape(), dtype=complex)
+    H_hat    = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat0   = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat1   = zeros((3,)+FST.complex_shape(), dtype=complex)
     
-    dU      = empty((3,)+FST.complex_shape(), dtype=complex)
-    hv      = empty(FST.complex_shape(), dtype=complex)
-    hg      = empty(FST.complex_shape(), dtype=complex)
-    diff0   = empty((3,)+FST.complex_shape(), dtype=complex)
-    Source  = empty((3,)+FST.real_shape(), dtype=float) 
-    Sk      = empty((3,)+FST.complex_shape(), dtype=complex)         
+    dU      = zeros((3,)+FST.complex_shape(), dtype=complex)
+    hv      = zeros(FST.complex_shape(), dtype=complex)
+    hg      = zeros(FST.complex_shape(), dtype=complex)
+    diff0   = zeros((3,)+FST.complex_shape(), dtype=complex)
+    Source  = zeros((3,)+FST.real_shape(), dtype=float) 
+    Sk      = zeros((3,)+FST.complex_shape(), dtype=complex)         
 
     K = FST.get_scaled_local_wavenumbermesh()
     K2 = K[1]*K[1]+K[2]*K[2]
@@ -266,21 +263,15 @@ class SlabShen_R2C(Slab_R2C):
     def get_mesh_dims(self, ST):
         return [self.get_mesh_dim(ST, i) for i in range(3)]
         
-    def real_local_slice(self, padded=False):
-        if padded:
-            if self.dealias_cheb:
-                return (slice(self.rank*self.padsize*self.Np[0], (self.rank+1)*self.padsize*self.Np[0], 1),
-                        slice(0, int(self.padsize*self.N[1]), 1), 
-                        slice(0, int(self.padsize*self.N[2]), 1))
-            else:
-                return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
-                        slice(0, int(self.padsize*self.N[1]), 1), 
-                        slice(0, int(self.padsize*self.N[2]), 1))
-            
+    def real_local_slice(self, padsize=1):
+        if self.dealias_cheb:
+            return (slice(self.rank*padsize*self.Np[0], (self.rank+1)*padsize*self.Np[0], 1),
+                    slice(0, int(padsize*self.N[1]), 1), 
+                    slice(0, int(padsize*self.N[2]), 1))
         else:
             return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
-                    slice(0, self.N[1], 1), 
-                    slice(0, self.N[2], 1))
+                    slice(0, int(padsize*self.N[1]), 1), 
+                    slice(0, int(padsize*self.N[2]), 1))
     
     def global_complex_shape_padded(self):
         """Global size of problem in complex wavenumber space"""

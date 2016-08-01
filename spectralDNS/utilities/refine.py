@@ -41,7 +41,7 @@ def refine(infile, mesh):
     rank = comm.Get_rank()
     U0 = np.empty((3,)+FFT0.real_shape(), dtype=FFT0.float)
     s = FFT0.real_local_slice()
-    s1 = FFT0.real_local_slice(True)
+    s1 = FFT0.real_local_slice(padsize=2)
     
     U0[:] = fin["3D/checkpoint/U/0"][:, s[0], s[1], s[2]]
     U0_hat = np.empty((3,)+FFT0.complex_shape(), FFT0.complex)

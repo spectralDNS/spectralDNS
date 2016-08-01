@@ -8,7 +8,18 @@ from spectralDNS.mesh.doublyperiodic import setup
 
 vars().update(setup['NS2D'](**vars()))
 
-hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "P":P}, params.solver+".h5")
+hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "P":P}, 
+                      filename=params.solver+".h5",
+                      chkpoint={'current':{'U':U, 'P':P}, 'previous':{}})
+
+def update_components(U, U_hat, P, P_hat, FFT, params, **kw):
+    """Transform to real data when storing the solution"""
+    if hdf5file.check_if_write(params) or params.tstep % params.checkpoint == 0:
+        for i in range(2):
+            U[i] = FFT.ifft2(U_hat[i], U[i])
+        P = FFT.ifft2(P_hat, P)
+
+hdf5file.update_components = update_components
 
 def add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, nu):
     # Compute pressure (To get actual pressure multiply by 1j)
@@ -62,6 +73,8 @@ def solve():
         params.tstep += 1
 
         update(**globals())
+
+        hdf5file.update(**globals())
 
         timer()
         

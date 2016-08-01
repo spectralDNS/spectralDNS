@@ -1,5 +1,5 @@
 from numpy import zeros, ones, arange, pi, float, complex, int, complex128, array
-from Matrices import BBBmat, SBBmat, ABBmat, BDDmat, BNNmat
+from Matrices import BBBmat, SBBmat, ABBmat, BDDmat, BNNmat, ADDmat
 import SFTc
 from scipy.linalg import lu_factor, lu_solve, solve, solve_banded, decomp_cholesky
 import scipy.sparse.linalg as la_solve
@@ -28,6 +28,9 @@ class Helmholtz(object):
             self.L  = zeros((2, M), float)     # The single nonzero row of L 
             self.s = slice(1, N-2) if neumann else slice(0, N-2) 
             SFTc.LU_Helmholtz_1D(N, neumann, quad=="GL", self.alfa, self.u0, self.u1, self.u2, self.L)  
+        if not neumann:
+            self.B = BDDmat(arange(N), quad)
+            self.A = ADDmat(arange(N))
 
     def __call__(self, u, b):
         if len(u.shape) > 1:
@@ -39,6 +42,16 @@ class Helmholtz(object):
             else:
                 SFTc.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s], u[self.s], self.u0, self.u1, self.u2, self.L)
         return u
+    
+    def matvec(self, v, c):
+        assert self.neumann is False
+        c[:] = 0
+        if len(v.shape) > 1:
+            SFTc.Helmholtz_matvec3D(v, c, 1.0, self.alfa**2, self.A.dd, self.A.ud[0], self.B.dd)
+        else:
+            SFTc.Helmholtz_matvec(v, c, 1.0, self.alfa**2, self.A.dd, self.A.ud[0], self.B.dd)
+        return c
+    
 
 class TDMA(object):
     

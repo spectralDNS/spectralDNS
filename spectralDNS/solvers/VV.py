@@ -14,7 +14,9 @@ context = solve.func_globals
 context.update(setup['VV'](**vars()))
 vars().update(context)
 
-hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, "VV.h5")
+hdf5file = HDF5Writer(FFT, float, {'U':U[0], 'V':U[1], 'W':U[2], 'P':P}, 
+                      chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
+                      filename=params.solver+'.h5')
 
 def Curl(a, c, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
@@ -58,12 +60,14 @@ def solve():
         
         W_hat, params.dt, dt_took = integrate()
 
-        for i in range(3):
-            W[i] = FFT.ifftn(W_hat[i], W[i])
+        #for i in range(3):
+            #W[i] = FFT.ifftn(W_hat[i], W[i])
 
         params.t += dt_took
         params.tstep += 1
                  
+        hdf5file.update(**globals())
+        
         update(**globals())
         
         timer()

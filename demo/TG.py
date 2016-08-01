@@ -35,17 +35,18 @@ w = []
 im1 = None
 kold = zeros(1)
 def update(comm, rank, P, P_hat, U, curl, Curl, float64, params,
-           hdf5file, FFT, X, U_hat, K, work, dU, ComputeRHS, **kw):
+           FFT, X, U_hat, K, work, dU, ComputeRHS, **kw):
     global k, w, im1
-    if hdf5file.check_if_write(params) or params.tstep % params.compute_energy == 0:
-        P[:] = FFT.ifftn(P_hat*1j, P)
+    if params.tstep % params.compute_energy == 0:
+        P = FFT.ifftn(P_hat*1j, P)
         if 'NS' in params.solver:
+            for i in range(3):
+                U[i] = FFT.ifftn(U_hat[i], U[i])
+
             curl = Curl(U_hat, curl)
         if params.solver == 'VV':
             U = Curl(kw['W_hat'], U)
-        
-        hdf5file.write(params)
-        
+                
     if im1 is None and rank == 0 and params.plot_step > 0:
         plt.figure()
         im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,10], 100)
@@ -128,29 +129,27 @@ if __name__ == "__main__":
         },  "triplyperiodic"
     )
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=2)
-    config.triplyperiodic.add_argument("--plot_step", type=int, default=10)
-    #solver = get_solver(update=update, regression_test=regression_test, 
-                        #additional_callback=additional_callback, 
-                        #mesh="triplyperiodic")
-    solver = get_solver(update=update, mesh="triplyperiodic")
-    
-    #solver.hdf5file.fname = "NS7.h5"
-    #solver.hdf5file.components["W0"] = solver.curl[0]
-    #solver.hdf5file.components["W1"] = solver.curl[1]
-    #solver.hdf5file.components["W2"] = solver.curl[2]
+    config.triplyperiodic.add_argument("--plot_step", type=int, default=2)
+    solver = get_solver(update=update, regression_test=regression_test, 
+                        additional_callback=additional_callback, 
+                        mesh="triplyperiodic")
+
+    # Add curl to the stored results. For this we need to update the update_components
+    # method used by the HDF5Writer class to compute the real fields that are stored
+    solver.hdf5file.fname = "NS7.h5"
+    solver.hdf5file.components["W0"] = solver.curl[0]
+    solver.hdf5file.components["W1"] = solver.curl[1]
+    solver.hdf5file.components["W2"] = solver.curl[2]    
+    def update_components(hdf5file, U, U_hat, P, P_hat, FFT, params, curl, Curl, **kw):
+        """Transform to real data when storing the solution"""
+        if hdf5file.check_if_write(params) or params.tstep % params.checkpoint == 0:
+            for i in range(3):
+                U[i] = FFT.ifftn(U_hat[i], U[i])
+            P = FFT.ifftn(P_hat, P)
+            curl = Curl(U_hat, curl)
+            
+    solver.hdf5file.update_components = update_components
     initialize(**vars(solver))
     solver.solve()
-    
-    #config.params.convection = 'Standard'
-    #initialize(**vars(solver))
-    #solver.solve()
-    
-    #config.update(dict(M=[4, 4, 4]), 'triplyperiodic')
-    ##config.params.M = [4, 4, 4]
-    #VVsolver = get_solver(update=update, regression_test=regression_test, 
-                          #mesh="triplyperiodic", parse_args=sys.argv[1:-1]+['VV'])
-    #initialize(**vars(VVsolver))
-    #print "VVsolver"
-    #VVsolver.solve()
 
     

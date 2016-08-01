@@ -16,6 +16,8 @@ comm = MPI.COMM_WORLD
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
 
+transformed_arrays = []
+
 def get_FFT(params):
     if params.decomposition == 'slab':
         assert len(params.N) == 3

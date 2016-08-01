@@ -12,8 +12,38 @@ from ..shen import SFTc
 vars().update(setup['KMM'](**vars()))
 
 assert params.precision == "double"
-hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, 
-                      filename=params.solver+".h5", mesh={"x": x0, "y": x1, "z": x2})  
+
+class KMMWriter(HDF5Writer):
+    
+    def update_components(self, U, U0, U_hat, U_hat0, FST, SB, ST, params, **kw):
+        """Transform to real data when storing the solution"""
+        if self.check_if_write(params) or params.tstep % params.checkpoint == 0:
+            U[0] = FST.ifst(U_hat[0], U[0], SB)
+            for i in range(1, 3):
+                U[i] = FST.ifst(U_hat[i], U[i], ST)
+
+        if params.tstep % params.checkpoint == 0:
+            U0[0] = FST.ifst(U_hat0[0], U0[0], SB)
+            for i in range(1, 3):
+                U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
+
+hdf5file = KMMWriter(FST, float, {"U":U[0], "V":U[1], "W":U[2]}, 
+                     chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
+                     filename=params.solver+".h5", mesh={"x": x0, "y": x1, "z": x2})
+
+#def update_components(U, U0, U_hat, U_hat0, FST, SB, ST, params, **kw):
+    #"""Transform to real data when storing the solution"""
+    #if hdf5file.check_if_write(params) or params.tstep % params.checkpoint == 0:
+        #U[0] = FST.ifst(U_hat[0], U[0], SB)
+        #for i in range(1, 3):
+            #U[i] = FST.ifst(U_hat[i], U[i], ST)
+
+    #if params.tstep % params.checkpoint == 0:
+        #U0[0] = FST.ifst(U_hat0[0], U0[0], SB)
+        #for i in range(1, 3):
+            #U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
+
+#hdf5file.update_components = update_components
 
 nu, dt, N = params.nu, params.dt, params.N
 K4 = K2**2
@@ -178,7 +208,7 @@ def divergenceConvection(c, U, U_hat, add=False):
 def getConvection(convection):
     if convection == "Standard":
         
-        def Conv(H_hat, U, U_hat):
+        def Conv(H_hat, U_hat):
             
             U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, params.dealias) 
@@ -191,7 +221,7 @@ def getConvection(convection):
         
     elif convection == "Divergence":
         
-        def Conv(H_hat, U, U_hat):
+        def Conv(H_hat, U_hat):
             
             U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, params.dealias) 
@@ -204,7 +234,7 @@ def getConvection(convection):
         
     elif convection == "Skew":
         
-        def Conv(H_hat, U, U_hat):
+        def Conv(H_hat, U_hat):
             
             U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, params.dealias) 
@@ -218,7 +248,7 @@ def getConvection(convection):
 
     elif convection == "Vortex":
         
-        def Conv(H_hat, U, U_hat):
+        def Conv(H_hat, U_hat):
             
             U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             curl_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 1)]
@@ -250,7 +280,7 @@ def assembleAB(H_hat, H_hat0, H_hat1):
 def ComputeRHS(dU, U_hat):
     global hv, H_hat
     
-    H_hat = conv(H_hat, U0, U_hat0)    
+    H_hat = conv(H_hat, U_hat0)    
     diff0[:] = 0
     
     # Compute diffusion for g-equation
@@ -319,9 +349,10 @@ def solve():
         
         update(**globals())
  
-        # Rotate velocities
+        hdf5file.update(**globals())
+
+        # Rotate solutions
         U_hat0[:] = U_hat
-        U0[:] = U
         H_hat1[:] = H_hat
                 
         timer()

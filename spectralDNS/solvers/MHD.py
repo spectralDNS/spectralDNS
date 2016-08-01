@@ -8,8 +8,19 @@ from spectralDNS.mesh.triplyperiodic import setup
 
 vars().update(setup['MHD'](**vars()))
 
-hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P, 
-                                   "Bx": B[0], "By": B[1], "Bz":B[2]}, "MHD.h5")
+class MHDWriter(HDF5Writer):
+    
+    def update_components(self, UB, UB_hat, P, P_hat, FFT, params, **kw):
+        """Transform to real data when storing the solution"""
+        if self.check_if_write(params) or params.tstep % params.checkpoint == 0:
+            for i in range(6):
+                UB[i] = FFT.ifftn(UB_hat[i], UB[i])
+            P = FFT.ifftn(P_hat, P)
+
+hdf5file = MHDWriter(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P, 
+                                  "Bx": B[0], "By": B[1], "Bz":B[2]}, 
+                     chkpoint={'current':{'UB':UB, 'P':P}, 'previous':{}},
+                     filename="MHD.h5")
 
 eta = float(params.eta)
 
@@ -84,13 +95,16 @@ def solve():
         
         UB_hat, params.dt, dt_took = integrate()
 
-        for i in range(6):
-            UB[i] = FFT.ifftn(UB_hat[i], UB[i])
+        # Should no be needed
+        #for i in range(6):
+            #UB[i] = FFT.ifftn(UB_hat[i], UB[i])
                  
         params.t += dt_took
         params.tstep += 1
-                 
+                         
         update(**globals())
+
+        hdf5file.update(**globals())
         
         timer()
         
