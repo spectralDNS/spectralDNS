@@ -1,0 +1,30 @@
+## Customize the test machine
+machine:
+  # Add some environment variables
+  environment:
+    CONDA_ROOT: /home/ubuntu/miniconda
+    PATH: ${CONDA_ROOT}/bin:${PATH}
+
+## Customize dependencies
+dependencies:
+  cache_directories:
+    - /home/ubuntu/miniconda
+
+  override:
+    - >
+      if [[ ! -d ${CONDA_ROOT} ]]; then
+          echo "Installing Miniconda...";
+          wget --quiet https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh &&
+          bash Miniconda-latest-Linux-x86_64.sh -b -p ${CONDA_ROOT};
+      else
+          echo "Using cached Miniconda install";
+      fi
+    - conda config --set always_yes yes
+    - conda update -q conda
+    - conda info -a
+    - conda install -y mpi4py scipy pytest cython mpifft4py sympy h5py nodepy conda-build
+
+## Customize test commands
+test:
+  override:
+    - conda build conf/conda
