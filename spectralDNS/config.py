@@ -1,15 +1,9 @@
-__author__ = "Mikael Mortensen <mikaem@math.uio.no>"
-__date__ = "2015-04-08"
-__copyright__ = "Copyright (C) 2015-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
-
 """Parameters for the spectralDNS solvers
 
 The parameters are kept in dictionary 'params'. The items of this 
 dictionary may be accessed as attributes, e.g., 
 
-M = config,params.M  does the same as M = config.params['M']
-
+M = config,params.M  does the same thing as M = config.params['M']
 
 Generic parameters for all solvers::
     precision     (str)              ('double', 'single') 
@@ -56,7 +50,7 @@ Solver specific parameters triply periodic domain::
     MHD::
         eta           (float)        Model parameter
         
-Solver specific parameters double periodic domain::
+Solver specific parameters doubly periodic domain::
     Bq2D::
         Ri            (float)        Model parameter (Richardson number)
         Pr            (float)        Model parameter (Prandtl number)
@@ -69,6 +63,10 @@ Solver specifi parameters channel domain::
         divergence_tol            (float) Tolerance on divergence error for pressure velocity coupling
         
 """
+__author__ = "Mikael Mortensen <mikaem@math.uio.no>"
+__date__ = "2015-04-08"
+__copyright__ = "Copyright (C) 2015-2016 " + __author__
+__license__  = "GNU Lesser GPL version 3 or any later version"
 
 import argparse
 from numpy import pi, array, float32, float64
@@ -176,11 +174,11 @@ triplyperiodic.add_argument('--Pencil_P1', default=2, type=int, help='pencil dec
 triplyperiodic.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'), help="Choose 3D decomposition between slab and pencil.")
 triplyperiodic.add_argument('--M', default=[6, 6, 6], metavar=("Mx", "My", "Mz"), nargs=3, help='Mesh size is pow(2, M[i]) in direction i')
 triplyperiodic.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'), 
-                    help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
+                            help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
 triplyperiodic.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'), 
-                    help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
+                            help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
 triplyperiodic.add_argument('--write_xy_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'), 
-                    help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
+                            help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
 triplyperiodic.add_argument('--TOL', type=float, default=1e-6, help='Tolerance for adaptive time integrator')
 triplyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed'))
 
@@ -220,11 +218,11 @@ channel.add_argument('--communication', default='Alltoallw', choices=('Alltoallw
 channel.add_argument('--Pencil_alignment', default='X', choices=('X',), help='Alignment of the complex data for pencil decomposition')
 channel.add_argument('--M', default=[6, 6, 6], nargs=3, help='Mesh size is pow(2, M[i]) in direction i')
 channel.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'), 
-                    help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
+                     help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
 channel.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'), 
-                    help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
+                     help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
 channel.add_argument('--write_xy_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'), 
-                    help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
+                     help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
 channel.add_argument('--Dquad', default='GC', choices=('GC', 'GL'), help="Choose quadrature scheme for Dirichlet space. GC = Chebyshev-Gauss (x_k=cos((2k+1)/(2N+2)*pi)) and GL = Gauss-Lobatto (x_k=cos(k*pi/N))")
 channel.add_argument('--Bquad', default='GC', choices=('GC', 'GL'), help="Choose quadrature scheme for Biharmonic space. GC = Chebyshev-Gauss (x_k=cos((2k+1)/(2N+2)*pi)) and GL = Gauss-Lobatto (x_k=cos(k*pi/N))")
 channel.add_argument('--Nquad', default='GC', choices=('GC', 'GL'), help="Choose quadrature scheme for Neumann space. GC = Chebyshev-Gauss (x_k=cos((2k+1)/(2N+2)*pi)) and GL = Gauss-Lobatto (x_k=cos(k*pi/N))")

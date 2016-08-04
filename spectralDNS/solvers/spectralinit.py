@@ -7,16 +7,15 @@ from mpi4py import MPI
 import sys, cProfile
 from numpy import *
 from mpiFFT4py import Slab_R2C, Pencil_R2C, Line_R2C, empty, zeros    # possibly byte-aligned zeros/empty
-from spectralDNS.utilities import *
-from spectralDNS.h5io import *
-from spectralDNS.optimization import *
-from spectralDNS.maths import *
+from spectralDNS import config
+from spectralDNS.utilities import create_profile, MemoryUsage, Timer, reset_profile
+from spectralDNS.h5io import HDF5Writer
+from spectralDNS.optimization import optimizer
+from spectralDNS.maths import cross1, cross2, project, getintegrator
 
 comm = MPI.COMM_WORLD
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
-
-transformed_arrays = []
 
 def get_FFT(params):
     if params.decomposition == 'slab':

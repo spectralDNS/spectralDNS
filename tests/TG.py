@@ -67,6 +67,7 @@ if __name__ == "__main__":
     
     config.params.dealias = '2/3-rule'
     config.params.optimization = 'cython'
+    config.params.make_profile = 1
     initialize(**vars(solver))
     solver.solve()    
     
@@ -75,13 +76,14 @@ if __name__ == "__main__":
     config.dt = 0.01
     config.T = 0.04
     solver.regression_test = lambda **kwargs: None
-    solver.solve()    
+    solver.solve()
     
     VVsolver = get_solver(regression_test=regression_test, 
                           parse_args=sys.argv[1:-1]+['VV'])    
     initialize(**vars(VVsolver))
     VVsolver.solve()
 
+    config.params.make_profile = 1
     config.params.dealias = '3/2-rule'
     initialize(**vars(VVsolver))
     VVsolver.solve()

@@ -26,7 +26,6 @@ def setupDNS(sum, where, config, get_FFT, **kwargs):
     # RHS array
     dU     = empty((3,) + FFT.complex_shape(), dtype=complex)
 
-    # 
     curl   = empty((3,) + FFT.real_shape(), dtype=float)   
     Source = None
     
@@ -59,7 +58,6 @@ def setupMHD(sum, where, config, get_FFT, **kwargs):
     # RHS array
     dU = empty((6,) + FFT.complex_shape(), dtype=complex)
 
-    # 
     curl   = empty((3,) + FFT.real_shape(), dtype=float)   
     Source = None
 

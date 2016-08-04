@@ -3,7 +3,7 @@ from os import getpid
 
 __all__ = ['MemoryUsage']
 
-def getMemoryUsage(rss=True):
+def _getMemoryUsage(rss=True):
     mypid = getpid()
     if rss:
         mymemory = subprocess.check_output(["ps -o rss %s" % mypid], shell=True).split()[1]
@@ -22,8 +22,8 @@ class MemoryUsage:
     def __call__(self, s, verbose=True):
         self.prev = self.memory
         self.prev_vm = self.memory_vm
-        self.memory = self.comm.reduce(getMemoryUsage())
-        self.memory_vm = self.comm.reduce(getMemoryUsage(False))
+        self.memory = self.comm.reduce(_getMemoryUsage())
+        self.memory_vm = self.comm.reduce(_getMemoryUsage(False))
         if self.comm.Get_rank() == 0 and verbose:
             if self.first:
                 print 'Memory usage                    RSS accum     RSS total   Virtual  Virtual total'
