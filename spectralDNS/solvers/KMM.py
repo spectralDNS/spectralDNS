@@ -3,7 +3,7 @@ __date__ = "2015-10-29"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from spectralinit import *
+from .spectralinit import *
 from spectralDNS.mesh.channel import setup
 from ..shen.Matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, ADDmat, BDDmat, CDBmat, BiharmonicCoeff, HelmholtzCoeff
 from ..shen.la import Helmholtz, TDMA, Biharmonic
@@ -30,20 +30,6 @@ class KMMWriter(HDF5Writer):
 hdf5file = KMMWriter(FST, float, {"U":U[0], "V":U[1], "W":U[2]}, 
                      chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
                      filename=params.solver+".h5", mesh={"x": x0, "y": x1, "z": x2})
-
-#def update_components(U, U0, U_hat, U_hat0, FST, SB, ST, params, **kw):
-    #"""Transform to real data when storing the solution"""
-    #if hdf5file.check_if_write(params) or params.tstep % params.checkpoint == 0:
-        #U[0] = FST.ifst(U_hat[0], U[0], SB)
-        #for i in range(1, 3):
-            #U[i] = FST.ifst(U_hat[i], U[i], ST)
-
-    #if params.tstep % params.checkpoint == 0:
-        #U0[0] = FST.ifst(U_hat0[0], U0[0], SB)
-        #for i in range(1, 3):
-            #U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
-
-#hdf5file.update_components = update_components
 
 nu, dt, N = params.nu, params.dt, params.N
 K4 = K2**2

@@ -205,7 +205,7 @@ def Solve_Helmholtz_3D_n(np.int_t N,
                        np.ndarray[real_t, ndim=4] d2,
                        np.ndarray[real_t, ndim=4] L):
     cdef:
-        int i, j, k, M, ke, ko, ii
+        int i, j, k, M, ke, ko, ii, im1, kem2, kom2, kep2, kop2, kep4, kop4
         np.ndarray[complex_t, ndim=3] y = np.zeros((uk.shape[0], uk.shape[1], uk.shape[2]), dtype=uk.dtype)
         np.ndarray[complex_t, ndim=2] s1 = np.zeros((uk.shape[1], uk.shape[2]), dtype=uk.dtype)
         np.ndarray[complex_t, ndim=2] s2 = np.zeros((uk.shape[1], uk.shape[2]), dtype=uk.dtype)
@@ -261,36 +261,43 @@ def Solve_Helmholtz_3D_n(np.int_t N,
         
     else:
         for i in xrange(1, M):
+            ke = 2*i
+            ko = ke+1
+            kem2 = ke-2
+            kom2 = ko-2
+            im1 = i-1
             for j in xrange(uk.shape[1]):
                 for k in xrange(uk.shape[2]):
-                    ke = 2*i
-                    ko = ke+1
-                    y[ke, j, k] = fk[ke, j, k] - L[0, i-1, j, k]*y[ke-2, j, k]
-                    y[ko, j, k] = fk[ko, j, k] - L[1, i-1, j, k]*y[ko-2, j, k]
+                    y[ke, j, k] = fk[ke, j, k] - L[0, im1, j, k]*y[kem2, j, k]
+                    y[ko, j, k] = fk[ko, j, k] - L[1, im1, j, k]*y[kom2, j, k]
             
+        ke = 2*(M-1)
+        ko = ke+1
+        ii = M-1
         for j in xrange(uk.shape[1]):
             for k in xrange(uk.shape[2]):        
-                ke = 2*(M-1)
-                ko = ke+1            
-                uk[ke, j, k] = y[ke, j, k] / d0[0, M-1, j, k]    
-                uk[ko, j, k] = y[ko, j, k] / d0[1, M-1, j, k]    
+                uk[ke, j, k] = y[ke, j, k] / d0[0, ii, j, k]    
+                uk[ko, j, k] = y[ko, j, k] / d0[1, ii, j, k]    
         
         for i in xrange(M-2, -1, -1):
+            ke = 2*i
+            ko = ke+1
+            kep2 = ke+2
+            kop2 = ko+2
+            kep4 = ke+4
+            kop4 = ko+4
             for j in xrange(uk.shape[1]):
                 for k in xrange(uk.shape[2]):
-                    ke = 2*i
-                    ko = ke+1
-                    uk[ke, j, k] = y[ke, j, k] - d1[0, i, j, k]*uk[ke+2, j, k]
-                    uk[ko, j, k] = y[ko, j, k] - d1[1, i, j, k]*uk[ko+2, j, k]
+                    uk[ke, j, k] = y[ke, j, k] - d1[0, i, j, k]*uk[kep2, j, k]
+                    uk[ko, j, k] = y[ko, j, k] - d1[1, i, j, k]*uk[kop2, j, k]
                     
                     if i < M-2:
-                        s1[j, k] += uk[ke+4, j, k]
-                        s2[j, k] += uk[ko+4, j, k]
+                        s1[j, k] += uk[kep4, j, k]
+                        s2[j, k] += uk[kop4, j, k]
                         uk[ke, j, k] -= s1[j, k]*d2[0, i, j, k]
                         uk[ko, j, k] -= s2[j, k]*d2[1, i, j, k]
                     uk[ke, j, k] /= d0[0, i, j, k]
                     uk[ko, j, k] /= d0[1, i, j, k]
-
 
 
 # This version slow due to slices. Could be vastly improved using memoryviews
@@ -1350,7 +1357,7 @@ def Solve_Biharmonic_3D_n(np.ndarray[T, ndim=3] fk,
                         np.float_t ac):
     
     cdef:
-        int i, j, k, kk, m, M, ke, ko, jj
+        int i, j, k, kk, m, M, ke, ko, jj, je, jo
         np.ndarray[T, ndim=2] s1 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
         np.ndarray[T, ndim=2] s2 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
         np.ndarray[T, ndim=2] o1 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
@@ -1367,39 +1374,44 @@ def Solve_Biharmonic_3D_n(np.ndarray[T, ndim=3] fk,
             y[3, j, k] = fk[3, j, k] - l0[1, 0, j, k]*y[1, j, k]
             
     for i in xrange(2, M):
+        ke = 2*i
+        ko = ke+1
         for j in range(fk.shape[1]):
             for k in range(fk.shape[2]): 
-                ke = 2*i
-                ko = ke+1
                 y[ko, j, k] = fk[ko, j, k] - l0[1, i-1, j, k]*y[ko-2, j, k] - l1[1, i-2, j, k]*y[ko-4, j, k]
                 y[ke, j, k] = fk[ke, j, k] - l0[0, i-1, j, k]*y[ke-2, j, k] - l1[0, i-2, j, k]*y[ke-4, j, k]
     
+    ke = 2*(M-1)
+    ko = ke+1
     for j in range(fk.shape[1]):
         for k in range(fk.shape[2]):
-            ke = 2*(M-1)
-            ko = ke+1
             uk[ke, j, k] = y[ke, j, k] / u0[0, M-1, j, k]
             uk[ko, j, k] = y[ko, j, k] / u0[1, M-1, j, k]
-            ke = 2*(M-2)
-            ko = ke+1
+
+    ke = 2*(M-2)
+    ko = ke+1
+    for j in range(fk.shape[1]):
+        for k in range(fk.shape[2]):
             uk[ke, j, k] = (y[ke, j, k] - u1[0, M-2, j, k]*uk[ke+2, j, k]) / u0[0, M-2, j, k]
             uk[ko, j, k] = (y[ko, j, k] - u1[1, M-2, j, k]*uk[ko+2, j, k]) / u0[1, M-2, j, k]
-            ke = 2*(M-3)
-            ko = ke+1
+            
+    ke = 2*(M-3)
+    ko = ke+1
+    for j in range(fk.shape[1]):
+        for k in range(fk.shape[2]):
             uk[ke, j, k] = (y[ke, j, k] - u1[0, M-3, j, k]*uk[ke+2, j, k] - u2[0, M-3, j, k]*uk[ke+4, j, k]) / u0[0, M-3, j, k]
             uk[ko, j, k] = (y[ko, j, k] - u1[1, M-3, j, k]*uk[ko+2, j, k] - u2[1, M-3, j, k]*uk[ko+4, j, k]) / u0[1, M-3, j, k]
-            
-    
+
     for kk in xrange(M-4, -1, -1):
+        ke = 2*kk
+        ko = ke+1
+        je = ke+6
+        jo = ko+6
         for j in range(fk.shape[1]):
             for k in range(fk.shape[2]):
-                ke = 2*kk
-                ko = ke+1
-                jj = ke+6
-                s1[j, k] += uk[jj, j, k]/(jj+3.)
-                s2[j, k] += (uk[jj, j, k]/(jj+3.))*((jj+2.)*(jj+2.))
+                s1[j, k] += uk[je, j, k]/(je+3.)
+                s2[j, k] += (uk[je, j, k]/(je+3.))*((je+2.)*(je+2.))
                 uk[ke, j, k] = (y[ke, j, k] - u1[0, kk, j, k]*uk[ke+2, j, k] - u2[0, kk, j, k]*uk[ke+4, j, k] - a[0, kk, j, k]*ac*s1[j, k] - b[0, kk, j, k]*ac*s2[j, k]) / u0[0, kk, j, k]
-                jj = ko+6
-                o1[j, k] += uk[jj, j, k]/(jj+3.)
-                o2[j, k] += (uk[jj, j, k]/(jj+3.))*((jj+2.)*(jj+2.))
+                o1[j, k] += uk[jo, j, k]/(jo+3.)
+                o2[j, k] += (uk[jo, j, k]/(jo+3.))*((jo+2.)*(jo+2.))
                 uk[ko, j, k] = (y[ko, j, k] - u1[1, kk, j, k]*uk[ko+2, j, k] - u2[1, kk, j, k]*uk[ko+4, j, k] - a[1, kk, j, k]*ac*o1[j, k] - b[1, kk, j, k]*ac*o2[j, k]) / u0[1, kk, j, k]

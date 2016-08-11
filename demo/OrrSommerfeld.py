@@ -9,7 +9,7 @@ import warnings
 import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
-eps = 1e-6
+eps = 1e-5
 def initOS(OS, U, X, t=0.):
     for i in range(U.shape[1]):
         x = X[0, i, 0, 0]
@@ -166,22 +166,22 @@ def update(rank, X, U, comm, FST, ST, U_hat, work, params, **kw):
         if rank == 0:
             print "Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2))
 
-def regression_test(U, U0, X, comm, rank, FST, U_hat, U_hat0, params, **kw):
+def regression_test(U, U0, X, comm, rank, FST, U_hat, U_hat0, params, ST, **kw):
     global OS, e0
-    #pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
-    #e1 = 0.5*energy(pert, N, comm, rank, L)
-    #exact = exp(2*imag(OS.eigval)*params.t)
-    #if rank == 0:
-        #print "Computed error = %2.8e %2.8e " %(sqrt(abs(e1/e0-exact)), params.dt)
-    U0[:] = 0
-    initOS(OS, U0, X, t=params.t)
-    U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
-    for i in range(1, 3):
-        U[i] = FST.ifst(U_hat[i], U[i], kw['ST'])
-    pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
-    e1 = 0.5*FST.dx(pert, kw['ST'].quad)
+    pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
+    e1 = 0.5*FST.dx(pert, ST.quad)
+    exact = exp(2*imag(OS.eigval)*params.t)
     if rank == 0:
-        print "Computed error = %2.8e %2.8e " %(sqrt(e1), params.dt)
+        print "Computed error = %2.8e %2.8e " %(sqrt(abs(e1/e0-exact)), params.dt)
+    #U0[:] = 0
+    #initOS(OS, U0, X, t=params.t)
+    #U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
+    #for i in range(1, 3):
+        #U[i] = FST.ifst(U_hat[i], U[i], kw['ST'])
+    #pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
+    #e1 = 0.5*FST.dx(pert, kw['ST'].quad)
+    #if rank == 0:
+        #print "Computed error = %2.8e %2.8e " %(sqrt(e1), params.dt)
 
 if __name__ == "__main__":
     config.update(

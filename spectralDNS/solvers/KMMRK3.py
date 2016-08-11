@@ -42,7 +42,7 @@ def RKstep(U_hat, g, dU, rk):
     global conv1, hv, hg, hv0, hg0, a, b, h0, h1
     
     # Compute convection
-    H_hat[:] = conv(H_hat, U, U_hat)    
+    H_hat[:] = conv(H_hat, U_hat)    
     
     # Compute diffusion for g and u-equation
     diff0[1] = AB[rk].matvec(g, diff0[1])
@@ -50,9 +50,9 @@ def RKstep(U_hat, g, dU, rk):
     # Compute diffusion++ for u-equation
     diff0[0] = add_diffusion_u(U_hat[0], diff0[0], AC[rk], SBB, ABB, BBB, nu, dt, K2, K4, a[rk], b[rk])
     
-    #hv[:] = -K2*BBD.matvec(H_hat[0])
-    hv[:] = FST.fss(H[0], hv, SB)
-    hv *= -K2
+    hv[:] = -K2*BBD.matvec(H_hat[0])
+    #hv[:] = FST.fss(H[0], hv, SB)
+    #hv *= -K2
     hv -= 1j*K[1]*CBD.matvec(H_hat[1])
     hv -= 1j*K[2]*CBD.matvec(H_hat[2])    
     hg[:] = 1j*K[1]*BDD.matvec(H_hat[2]) - 1j*K[2]*BDD.matvec(H_hat[1])
