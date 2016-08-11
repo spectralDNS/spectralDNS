@@ -104,6 +104,8 @@ def regression_test(comm, U, U_hat, curl, Curl, float64, rank, FFT, params, **kw
         w = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     elif params.solver == 'VV':
         U = Curl(kw['W_hat'], U)
+        for i in range(3):
+            kw['W'][i] = FFT.ifftn(kw['W_hat'][i], kw['W'][i])        
         w = comm.reduce(sum(kw['W'].astype(float64)*kw['W'].astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
 
     k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision

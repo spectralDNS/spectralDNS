@@ -19,13 +19,27 @@ hdf5file = HDF5Writer(FFT, float, {'U':U[0], 'V':U[1], 'W':U[2], 'P':P},
                       filename=params.solver+'.h5')
 
 def Curl(a, c, dealias=None):
-    """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
+    """Compute u from curl(u)
+    
+    Follows from
+    w = [curl(u)=] \nabla \times u
+    curl(w) = \nabla^2(u) (since div(u)=0)
+    FFT(curl(w)) = FFT(\nabla^2(u))
+    ik \times w_hat = k^2 u_hat
+    u_hat = (ik \times w_hat) / k^2
+    u = iFFT(u_hat)
+    """
     F_tmp = work[(a, 0)]
     F_tmp = cross2(F_tmp, K_over_K2, a)
     c[0] = FFT.ifftn(F_tmp[0], c[0], dealias)
     c[1] = FFT.ifftn(F_tmp[1], c[1], dealias)
     c[2] = FFT.ifftn(F_tmp[2], c[2], dealias)    
     return c
+
+def backward_velocity(U, W_hat):
+    """Compute velocity from curl coefficients"""
+    U = Curl(W_hat, U)
+    return U
 
 #@profile
 def ComputeRHS(dU, W_hat):

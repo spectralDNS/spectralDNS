@@ -30,6 +30,7 @@ def initialize2(U, W, W_hat, X, sin, cos, FFT, work, cross2, K, **kw):
 
 def regression_test(comm, U_hat, U, curl, float64, sum, rank, Curl, FFT, params, **kw):
     dx, L = params.dx, params.L
+    U = backward_velocity(U, U_hat)
     if params.solver == 'NS':
         for i in range(3):
             U[i] = FFT.ifftn(U_hat[i], U[i])

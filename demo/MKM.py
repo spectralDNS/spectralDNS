@@ -26,8 +26,9 @@ def initOS(OS, U, X, t=0.):
             U[1, i, j, :] = v
     U[2] = 0
 
-def initialize(U, U_hat, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_processes, 
-               Curl, conv, TDMASolverD, solvePressure, N, H_hat, H_hat1, K, **kw):
+def initialize(U, U_hat, U_hat0, FST, ST, X, comm, rank, 
+               Curl, conv, TDMASolverD, solvePressure, H_hat1, K,
+               forward_velocity, backward_velocity, **kw):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     Y = where(X[0]<0, 1+X[0], 1-X[0])
     utau = config.params.nu * config.params.Re_tau
@@ -61,33 +62,13 @@ def initialize(U, U_hat, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_processes
     #U[0] += 0.1*(1-X[0]**2)*sin(4*pi*X[0])*cos(2*pi*X[1])
     #U[1] += 0.1*((1-X[0]**2)*sin(2*pi*X[1])+2*X[0]*sin(4*pi*X[0])*sin(2*pi*X[1])/2./pi)
     
+    U_hat = forward_velocity(U_hat, U, FST)
+    U = backward_velocity(U, U_hat, FST)
+    U_hat = forward_velocity(U_hat, U, FST)
     
     if "KMM" in config.params.solver:
-        U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB'])
-        for i in range(1, 3):
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
-            
-        U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
-        for i in range(1, 3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
-
-        U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB'])
-        for i in range(1, 3):
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
-
         g = kw['g']
         g[:] = 1j*K[1]*U_hat[2] - 1j*K[2]*U_hat[1]
-
-    else:
-        # project to Dirichlet space and back
-        for i in range(3):
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
-            
-        for i in range(3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
-
-        for i in range(3):
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
 
     # Set the flux
     
@@ -103,47 +84,33 @@ def initialize(U, U_hat, U_hat0, P, P_hat, FST, ST, X, comm, rank, num_processes
         for j in range(3):
             conv2[j] = TDMASolverD(conv2[j])
         conv2 *= -1
-        P_hat = solvePressure(P_hat, conv2)
-        P = FST.ifst(P_hat, P, kw['SN'])
+        kw['P_hat'] = solvePressure(kw['P_hat'], conv2)
+        kw['P'] = FST.ifst(kw['P_hat'], kw['P'], kw['SN'])
         
     U_hat0[:] = U_hat[:]
     H_hat1 = conv(H_hat1, U_hat0)
  
-def init_from_file(filename, comm, U_hat0, U, U_hat, P, P_hat, H_hat1, K,
-                   rank, conv, FST, ST, **kw):
+def init_from_file(filename, comm, U_hat0, U, U_hat, H_hat1, K,
+                   rank, conv, FST, ST, forward_velocity, **kw):
     f = h5py.File(filename, driver="mpio", comm=comm)
     assert "0" in f["3D/checkpoint/U"]
     N = U.shape[1]
     s = slice(rank*N, (rank+1)*N, 1)
     U[:] = f["3D/checkpoint/U/0"][:, s]
+    U_hat0 = forward_velocity(U_hat0, U, FST)
+    H_hat1[:] = conv(H_hat1, U_hat0)
+    U[:] = f["3D/checkpoint/U/1"][:, s]
+    U_hat0 = forward_velocity(U_hat0, U, FST)
     
     if config.params.solver in ("IPCS", "IPCSR"):
-        for i in range(3):
-            U_hat0[i] = FST.fst(U[i], U_hat0[i], ST)
-        H_hat1[:] = conv(H_hat1, U_hat0)
-        
-        U[:] = f["3D/checkpoint/U/1"][:, s]
-        P[:] = f["3D/checkpoint/P/1"][s]
+        kw['P'][:] = f["3D/checkpoint/P/1"][s]
 
-        for i in range(3):
-            U_hat0[i] = FST.fst(U[i], U_hat0[i], ST)
-        
         if config.solver == "IPCSR":
-            P_hat = FST.fct(P, P_hat, kw['SN'])
+            kw['P_hat'] = FST.fct(kw['P'], kw['P_hat'], kw['SN'])
         else:
-            P_hat = FST.fst(P, P_hat, kw['SN'])
+            kw['P_hat'] = FST.fst(kw['P'], kw['P_hat'], kw['SN'])
 
-    elif "KMM" in config.params.solver:
-        U_hat0[0] = FST.fst(U[0], U_hat0[0], kw['SB'])
-        for i in range(1, 3):
-            U_hat0[i] = FST.fst(U[i], U_hat0[i], ST)
-        H_hat1[:] = conv(H_hat1, U_hat0)
-        
-        U[:] = f["3D/checkpoint/U/1"][:, s]
-        U_hat0[0] = FST.fst(U[0], U_hat0[0], kw['SB'])
-        for i in range(1,3):
-            U_hat0[i] = FST.fst(U[i], U_hat0[i], ST)
-        
+    elif "KMM" in config.params.solver:        
         g = kw['g']
         g[:] = 1j*K[1]*U_hat0[2] - 1j*K[2]*U_hat0[1]
         U_hat[:] = U_hat0[:]        
@@ -158,8 +125,8 @@ def set_Source(Source, Sk, ST, FST, **kw):
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
     
 beta = zeros(1)    
-def update(U, U_hat, P, rank, X, stats, FST, Source, Sk, 
-           ST, SB, comm, params, **kw):
+def update(U, U_hat, rank, X, stats, FST, Source, Sk, 
+           ST, SB, comm, params, backward_velocity, **kw):
     global im1, im2, im3, flux
 
     #q = FST.dx(U[1], ST.quad)
@@ -185,9 +152,7 @@ def update(U, U_hat, P, rank, X, stats, FST, Source, Sk,
     if (params.tstep % params.compute_energy == 0 or 
         params.tstep % params.plot_result == 0 and params.plot_result > 0 or
         params.tstep % params.sample_stats == 0):
-        U[0] = FST.ifst(U_hat[0], U[0], SB)
-        for i in range(1, 3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
+        U = backward_velocity(U, U_hat, FST)
     
     if params.tstep == 1 and rank == 0 and params.plot_result > 0:
         # Initialize figures
@@ -231,7 +196,7 @@ def update(U, U_hat, P, rank, X, stats, FST, Source, Sk,
             print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, Source[1].mean())
 
     if params.tstep % params.sample_stats == 0:
-        stats(U, P)     
+        stats(U)     
         
     #if params.tstep == 1:
         #print "Reset profile"
@@ -262,10 +227,11 @@ class Stats(object):
         for i in ("UU", "VV", "WW", "UV", "UW", "VW"):
             self.f0["Reynolds Stress"].create_dataset(i, shape=(2**config.params.M[0], ), dtype=float)
 
-    def __call__(self, U, P):
+    def __call__(self, U, P=None):
         self.num_samples += 1
         self.Umean += sum(U, axis=(2,3))
-        self.Pmean += sum(P, axis=(1,2))
+        if not P is None:
+            self.Pmean += sum(P, axis=(1,2))
         self.UU[0] += sum(U[0]*U[0], axis=(1,2))
         self.UU[1] += sum(U[1]*U[1], axis=(1,2))
         self.UU[2] += sum(U[2]*U[2], axis=(1,2))
@@ -333,11 +299,11 @@ if __name__ == "__main__":
     config.channel.add_argument("--print_energy0", type=int, default=10)
     #solver = get_solver(update=update, mesh="channel")    
     solver = get_solver(update=update, mesh="channel")    
-    initialize(**vars(solver))    
-    #init_from_file("KMM665.h5", **vars(solver))
+    #initialize(**vars(solver))    
+    init_from_file("KMM665.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="KMMstatsq")
-    solver.hdf5file.fname = "KMM665c.h5"
+    solver.hdf5file.fname = "KMM665b.h5"
     solver.solve()
     #s = solver.stats.get_stats()
 

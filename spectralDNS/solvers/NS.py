@@ -8,6 +8,16 @@ from spectralDNS.mesh.triplyperiodic import setup
 
 vars().update(setup['NS'](**vars()))
 
+def forward_velocity(U_hat, U):
+    for i in range(3):
+        U_hat[i] = FFT.fftn(U[i], U_hat[i])
+    return U_hat
+    
+def backward_velocity(U, U_hat):
+    for i in range(3):
+        U[i] = FFT.ifftn(U_hat[i], U[i])
+    return U
+
 hdf5file = HDF5Writer(FFT, float, {'U':U[0], 'V':U[1], 'W':U[2], 'P':P}, 
                       chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
                       filename=params.solver+'.h5')

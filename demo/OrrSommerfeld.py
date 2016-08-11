@@ -31,15 +31,13 @@ def initialize(U, U_hat, U_hat0, solvePressure, H_hat1, FST, ST, X, comm, rank,
     
     U_hat0 = forward_velocity(U_hat0, U, FST)
     U = backward_velocity(U, U_hat0, FST)
+    H_hat1 = conv(H_hat1, U_hat0)
+    e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, ST.quad)
+    initOS(OS, U, X, t=params.dt)
+    U_hat = forward_velocity(U_hat, U, FST)
+    U = backward_velocity(U, U_hat, FST)
     
-    if not params.solver in ("KMM", "KMMRK3"):
-        H_hat1 = conv(H_hat1, U_hat0)
-        e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, ST.quad)    
-
-        initOS(OS, U, X, t=params.dt)
-        U_hat = forward_velocity(U_hat, U, FST)
-        U = backward_velocity(U, U_hat, FST)
-
+    if not params.solver in ("KMM", "KMMRK3"):    
         conv2 = zeros_like(H_hat1)
         conv2 = conv(conv2, 0.5*(U_hat0+U_hat))  
         for j in range(3):
@@ -53,11 +51,6 @@ def initialize(U, U_hat, U_hat0, solvePressure, H_hat1, FST, ST, X, comm, rank,
         params.tstep = 1
         
     else:
-        H_hat1 = conv(H_hat1, U_hat0)
-        e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, ST.quad)
-        initOS(OS, U, X, t=params.dt)
-        U_hat = forward_velocity(U_hat, U, FST)
-        U = backward_velocity(U, U_hat, FST)
         U_hat0[:] = U_hat
         params.t = params.dt
         params.tstep = 1
@@ -120,11 +113,7 @@ def update(rank, X, U, comm, FST, ST, U_hat, work, params, backward_velocity, **
         #kw['SB'].quad = 'GL'
         #X[:] = FST.get_local_mesh(ST)
         #initOS(OS, U_tmp, F_tmp, X, t=0)
-        #e00 = 0.5*energy(U_tmp[0]**2+(U_tmp[1]-(1-X[0]**2))**2, params.N, comm, rank, params.L)
-        
-        #U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
-        #for i in range(1, 3):
-            #U[i] = FST.ifst(U_hat[i], U[i], ST)             
+        #e00 = 0.5*energy(U_tmp[0]**2+(U_tmp[1]-(1-X[0]**2))**2, params.N, comm, rank, params.L)        
         #pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
         #e11 = 0.5*energy(pert, params.N, comm, rank, params.L, X[0,:,0,0])
         #initOS(OS, U_tmp, F_tmp, X, t=params.t)

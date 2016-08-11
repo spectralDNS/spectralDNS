@@ -19,29 +19,20 @@ def initOS(OS, U, X, t=0.):
 
 OS, e0 = None, None
 def initialize(U, U_hat, U0, U_hat0, solvePressure, H_hat1, FST,
-               ST, X, comm, rank, conv, TDMASolverD, params, **kw): 
+               ST, X, comm, rank, conv, TDMASolverD, params, 
+               forward_velocity, backward_velocity, **kw): 
     global OS, e0
     OS = OrrSommerfeld(Re=params.Re, N=100)
     initOS(OS, U0, X)
+    U_hat0 = forward_velocity(U_hat0, U, FST)
+    U = backward_velocity(U, U_hat0, FST)
+    H_hat1 = conv(H_hat1, U_hat0)
+    e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, ST.quad)
+    initOS(OS, U, X, t=params.dt)
+    U_hat = forward_velocity(U_hat, U, FST)
+    U = backward_velocity(U, U_hat, FST)
     
     if not params.solver in ("KMM", "KMMRK3"):
-        for i in range(3):
-            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
-        for i in range(3):
-            U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
-        for i in range(3):
-            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
-        H_hat1 = conv(H_hat1, U_hat0)
-        e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, ST.quad)
-
-        initOS(OS, U, X, t=params.dt)
-        for i in range(3):
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
-        for i in range(3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
-        for i in range(3):
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
-
         conv2 = zeros_like(H_hat1)
         conv2 = conv(conv2, 0.5*(U_hat0+U_hat))  
         for j in range(3):
@@ -56,23 +47,6 @@ def initialize(U, U_hat, U0, U_hat0, solvePressure, H_hat1, FST,
         params.tstep = 1
 
     else:
-        U_hat0[0] = FST.fst(U0[0], U_hat0[0], kw['SB']) 
-        for i in range(1, 3):
-            U_hat0[i] = FST.fst(U0[i], U_hat0[i], ST)        
-        U0[0] = FST.ifst(U_hat0[0], U0[0], kw['SB'])
-        for i in range(1, 3):
-            U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
-        H_hat1 = conv(H_hat1, U_hat0)
-        e0 = 0.5*FST.dx(U0[0]**2+(U0[1]-(1-X[0]**2))**2, ST.quad)    
-        
-        initOS(OS, U, X, t=params.dt)
-        U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB']) 
-        for i in range(1, 3):
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
-        U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
-        for i in range(1, 3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
-
         U0[:] = U
         U_hat0[:] = U_hat
         params.t = params.dt
@@ -85,16 +59,10 @@ def set_Source(Source, Sk, FST, ST, params, **kw):
     Sk[:] = 0
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
         
-def regression_test(X, comm, rank, FST, U0, U_hat0, U, U_hat, params, **kw):
+def regression_test(X, rank, FST, U0, U, U_hat, params, 
+                    backward_velocity, **kw):
     global OS, e0
-    if "KMM" in params.solver:
-        U[0] = FST.ifst(U_hat[0], U[0], kw["SB"])
-        for i in range(1, 3):
-            U[i] = FST.ifst(U_hat[i], U[i], kw["ST"])
-    else:
-        for i in range(3):
-            U[i] = FST.ifst(U_hat[i], U[i], kw["ST"])
-            
+    U = backward_velocity(U, U_hat, FST)
     initOS(OS, U0, X, t=params.t)
     pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
     e1 = 0.5*FST.dx(pert, kw['ST'].quad)
