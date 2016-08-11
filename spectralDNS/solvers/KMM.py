@@ -13,19 +13,27 @@ vars().update(setup['KMM'](**vars()))
 
 assert params.precision == "double"
 
+def backward_velocity(U, U_hat, FST):
+    U[0] = FST.ifst(U_hat[0], U[0], SB)
+    for i in range(1, 3):
+        U[i] = FST.ifst(U_hat[i], U[i], ST)
+    return U
+
+def forward_velocity(U_hat, U, FST):
+    U_hat[0] = FST.fst(U[0], U_hat[0], SB)
+    for i in range(1, 3):
+        U_hat[i] = FST.fst(U[i], U_hat[i], ST)
+    return U_hat
+
 class KMMWriter(HDF5Writer):
     
     def update_components(self, U, U0, U_hat, U_hat0, FST, SB, ST, params, **kw):
         """Transform to real data when storing the solution"""
         if self.check_if_write(params) or params.tstep % params.checkpoint == 0:
-            U[0] = FST.ifst(U_hat[0], U[0], SB)
-            for i in range(1, 3):
-                U[i] = FST.ifst(U_hat[i], U[i], ST)
+            U = backward_velocity(U, U_hat, FST)
 
         if params.tstep % params.checkpoint == 0:
-            U0[0] = FST.ifst(U_hat0[0], U0[0], SB)
-            for i in range(1, 3):
-                U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
+            U0 = backward_velocity(U0, U_hat0, FST)
 
 hdf5file = KMMWriter(FST, float, {"U":U[0], "V":U[1], "W":U[2]}, 
                      chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
@@ -149,7 +157,6 @@ def standardConvection(c, U_dealiased, U_hat):
     
     return c
 
-
 def divergenceConvection(c, U, U_hat, add=False):
     """c_i = div(u_i u_j)"""
     if not add: c.fill(0)
@@ -250,6 +257,26 @@ def getConvection(convection):
     return Conv           
 
 conv = getConvection(params.convection)
+
+def compute_derivatives(duidxj, U_hat):
+    duidxj[:] = 0
+    F_tmp = work[(U_hat, 0)]
+    
+    # dudx = 0 from continuity equation. Use Shen Dirichlet basis
+    # Use regular Chebyshev basis for dvdx and dwdx
+    F_tmp[0] = CDB.matvec(U_hat[0])
+    F_tmp[0] = TDMASolverD(F_tmp[0])    
+    duidxj[0, 0] = FST.ifst(F_tmp[0], duidxj[0, 0], ST)
+    SFTc.Mult_CTD_3D_n(N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
+    duidxj[1, 0] = dvdx = FST.ifct(F_tmp[1], duidxj[1, 0], ST)  # proj to Cheb
+    duidxj[2, 0] = dwdx = FST.ifct(F_tmp[2], duidxj[2, 0], ST)  # proj to Cheb
+    duidxj[0, 1] = dudy = FST.ifst(1j*K[1]*U_hat[0], duidxj[0, 1], SB) # ShenB
+    duidxj[0, 2] = dudz = FST.ifst(1j*K[2]*U_hat[0], duidxj[0, 2], SB)
+    duidxj[1, 1] = dvdy = FST.ifst(1j*K[1]*U_hat[1], duidxj[1, 1], ST)
+    duidxj[1, 2] = dvdz = FST.ifst(1j*K[2]*U_hat[1], duidxj[1, 2], ST)    
+    duidxj[2, 1] = dwdy = FST.ifst(1j*K[1]*U_hat[2], duidxj[2, 1], ST)
+    duidxj[2, 2] = dwdz = FST.ifst(1j*K[2]*U_hat[2], duidxj[2, 2], ST)
+    return duidxj
 
 @optimizer
 def add_diffusion_u(u, d, AC, SBB, ABB, BBB, nu, dt, K2, K4):

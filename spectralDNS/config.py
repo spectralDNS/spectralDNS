@@ -1,6 +1,6 @@
 """Parameters for the spectralDNS solvers
 
-The parameters are kept in dictionary 'params'. The items of this 
+The parameters are kept in dictionary 'params'. The values of this 
 dictionary may be accessed as attributes, e.g., 
 
 M = config.params.M  does the same thing as M = config.params['M']

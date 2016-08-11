@@ -3,7 +3,7 @@ __date__ = "2015-10-29"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from ShenKMM import *
+from KMM import *
 
 a = (8./15., 5./12., 3./4.)
 b = (0.0, -17./60., -5./12.)

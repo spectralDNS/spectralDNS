@@ -17,16 +17,24 @@ hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P},
                       filename=params.solver+".h5", 
                       mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
 
+def backward_velocity(U, U_hat, FST):
+    for i in range(3):
+        U[i] = FST.ifst(U_hat[i], U[i], ST)
+    return U
+
+def forward_velocity(U_hat, U, FST):
+    for i in range(3):
+        U_hat[i] = FST.fst(U[i], U_hat[i], ST)
+    return U_hat
+
 def update_components(U, U0, U_hat, U_hat0, P, P_hat, FST, SN, ST, params, **kw):
     """Transform to real data when storing the solution"""
     if hdf5file.check_if_write(params) or params.tstep % params.checkpoint == 0:
-        for i in range(3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
+        U = backward_velocity(U, U_hat, FST)
         P = FST.ifst(P_hat, P, SN)
 
     if params.tstep % params.checkpoint == 0:
-        for i in range(3):
-            U0[i] = FST.ifst(U_hat0[i], U0[i], ST)
+        U0 = backward_velocity(U0, U_hat0, FST)
 
 hdf5file.update_components = update_components
 
@@ -90,9 +98,7 @@ def body_force(Sk, dU):
 
 def Cross(a, b, c, S):
     Uc = work[(a, 2)]
-    Uc[0] = a[1]*b[2]-a[2]*b[1]
-    Uc[1] = a[2]*b[0]-a[0]*b[2]
-    Uc[2] = a[0]*b[1]-a[1]*b[0]
+    Uc = cross1(Uc, a, b)
     c[0] = FST.fss(Uc[0], c[0], S, dealias=params.dealias)
     c[1] = FST.fss(Uc[1], c[1], S, dealias=params.dealias)
     c[2] = FST.fss(Uc[2], c[2], S, dealias=params.dealias)

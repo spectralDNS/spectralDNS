@@ -9,7 +9,7 @@ import warnings
 import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
-eps = 1e-5
+eps = 1e-7
 def initOS(OS, U, X, t=0.):
     for i in range(U.shape[1]):
         x = X[0, i, 0, 0]
@@ -23,29 +23,22 @@ def initOS(OS, U, X, t=0.):
     U[2] = 0
 
 OS, e0 = None, None
-def initialize(U, U_hat, U_hat0, solvePressure, H_hat1, FST,
-               ST, X, comm, rank, conv, TDMASolverD, params, work, **kw):
+def initialize(U, U_hat, U_hat0, solvePressure, H_hat1, FST, ST, X, comm, rank,
+               conv, TDMASolverD, params, work, backward_velocity, forward_velocity, **kw):
     global OS, e0
-    OS = OrrSommerfeld(Re=params.Re, N=100)
+    OS = OrrSommerfeld(Re=params.Re, N=160)
     initOS(OS, U, X)
     
+    U_hat0 = forward_velocity(U_hat0, U, FST)
+    U = backward_velocity(U, U_hat0, FST)
+    
     if not params.solver in ("KMM", "KMMRK3"):
-        for i in range(3):
-            U_hat0[i] = FST.fst(U[i], U_hat0[i], ST)        
-        for i in range(3):
-            U[i] = FST.ifst(U_hat0[i], U[i], ST)
-        for i in range(3):
-            U_hat0[i] = FST.fst(U[i], U_hat0[i], ST)        
         H_hat1 = conv(H_hat1, U_hat0)
         e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, ST.quad)    
 
-        initOS(OS, U, U_hat, X, t=params.dt)
-        for i in range(3):
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
-        for i in range(3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
-        for i in range(3):
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
+        initOS(OS, U, X, t=params.dt)
+        U_hat = forward_velocity(U_hat, U, FST)
+        U = backward_velocity(U, U_hat, FST)
 
         conv2 = zeros_like(H_hat1)
         conv2 = conv(conv2, 0.5*(U_hat0+U_hat))  
@@ -60,23 +53,11 @@ def initialize(U, U_hat, U_hat0, solvePressure, H_hat1, FST,
         params.tstep = 1
         
     else:
-        U_hat0[0] = FST.fst(U[0], U_hat0[0], kw['SB']) 
-        for i in range(1, 3):
-            U_hat0[i] = FST.fst(U[i], U_hat0[i], ST)        
-        U[0] = FST.ifst(U_hat0[0], U[0], kw['SB'])
-        for i in range(1, 3):
-            U[i] = FST.ifst(U_hat0[i], U[i], ST)
         H_hat1 = conv(H_hat1, U_hat0)
-        e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, ST.quad) 
-        
+        e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, ST.quad)
         initOS(OS, U, X, t=params.dt)
-        U_hat[0] = FST.fst(U[0], U_hat[0], kw['SB']) 
-        for i in range(1, 3):
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)        
-        U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
-        for i in range(1, 3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
-
+        U_hat = forward_velocity(U_hat, U, FST)
+        U = backward_velocity(U, U_hat, FST)
         U_hat0[:] = U_hat
         params.t = params.dt
         params.tstep = 1
@@ -89,7 +70,7 @@ def set_Source(Source, Sk, FST, ST, params, **kw):
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
         
 im1, im2, im3, im4 = (None, )*4        
-def update(rank, X, U, comm, FST, ST, U_hat, work, params, **kw):
+def update(rank, X, U, comm, FST, ST, U_hat, work, params, backward_velocity, **kw):
     
     # Use GL for postprocessing
     global im1, im2, im3, OS, e0
@@ -112,15 +93,8 @@ def update(rank, X, U, comm, FST, ST, U_hat, work, params, **kw):
         globals().update(im1=im1, im2=im2, im3=im3)
 
     if (params.tstep % params.plot_step == 0 or
-        params.tstep % params.compute_energy == 0):
-        
-        if "KMM" in params.solver:
-            U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
-            for i in range(1, 3):
-                U[i] = FST.ifst(U_hat[i], U[i], ST)     
-        else:
-            for i in range(3):
-                U[i] = FST.ifst(U_hat[i], U[i], ST)
+        params.tstep % params.compute_energy == 0):        
+        U = backward_velocity(U, U_hat, FST)
     
     if params.tstep % params.plot_step == 0 and rank == 0 and params.plot_step > 0:
         im1.ax.clear()
@@ -134,10 +108,7 @@ def update(rank, X, U, comm, FST, ST, U_hat, work, params, **kw):
 
     if params.tstep % params.compute_energy == 0: 
         U_tmp = work[(U, 0)]
-        U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
-        for i in range(1, 3):
-            U[i] = FST.ifst(U_hat[i], U[i], ST)     
-
+        U = backward_velocity(U, U_hat, FST)
         pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
         e1 = 0.5*FST.dx(pert, ST.quad)
         exact = exp(2*imag(OS.eigval)*(params.t))
@@ -166,8 +137,9 @@ def update(rank, X, U, comm, FST, ST, U_hat, work, params, **kw):
         if rank == 0:
             print "Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2))
 
-def regression_test(U, U0, X, comm, rank, FST, U_hat, U_hat0, params, ST, **kw):
+def regression_test(U, U0, X, comm, rank, FST, U_hat, U_hat0, params, ST, backward_velocity, **kw):
     global OS, e0
+    U = backward_velocity(U, U_hat, FST)
     pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
     e1 = 0.5*FST.dx(pert, ST.quad)
     exact = exp(2*imag(OS.eigval)*params.t)
@@ -175,9 +147,6 @@ def regression_test(U, U0, X, comm, rank, FST, U_hat, U_hat0, params, ST, **kw):
         print "Computed error = %2.8e %2.8e " %(sqrt(abs(e1/e0-exact)), params.dt)
     #U0[:] = 0
     #initOS(OS, U0, X, t=params.t)
-    #U[0] = FST.ifst(U_hat[0], U[0], kw['SB'])
-    #for i in range(1, 3):
-        #U[i] = FST.ifst(U_hat[i], U[i], kw['ST'])
     #pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
     #e1 = 0.5*FST.dx(pert, kw['ST'].quad)
     #if rank == 0:
