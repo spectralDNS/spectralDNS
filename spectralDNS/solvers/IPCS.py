@@ -12,7 +12,7 @@ from ..shen import SFTc
 vars().update(setup['IPCS'](**vars()))
 
 assert params.precision == "double"
-hdf5file = HDF5Writer(FST, float, {"U":U[0], "V":U[1], "W":U[2], "P":P}, 
+hdf5file = HDF5Writer({"U":U[0], "V":U[1], "W":U[2], "P":P}, 
                       chkpoint={'current':{'U':U, 'P':P}, 'previous':{'U':U0}},
                       filename=params.solver+".h5", 
                       mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  

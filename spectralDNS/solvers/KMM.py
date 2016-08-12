@@ -35,9 +35,9 @@ class KMMWriter(HDF5Writer):
         if params.tstep % params.checkpoint == 0:
             U0 = backward_velocity(U0, U_hat0, FST)
 
-hdf5file = KMMWriter(FST, float, {"U":U[0], "V":U[1], "W":U[2]}, 
-                     chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
-                     filename=params.solver+".h5", mesh={"x": x0, "y": x1, "z": x2})
+hdf5file = KMMWriter({"U":U[0], "V":U[1], "W":U[2]}, 
+                      chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
+                      filename=params.solver+".h5", mesh={"x": x0, "y": x1, "z": x2})
 
 nu, dt, N = params.nu, params.dt, params.N
 K4 = K2**2

@@ -17,8 +17,8 @@ class MHDWriter(HDF5Writer):
                 UB[i] = FFT.ifftn(UB_hat[i], UB[i])
             P = FFT.ifftn(P_hat, P)
 
-hdf5file = MHDWriter(FFT, float, {"U":U[0], "V":U[1], "W":U[2], "P":P, 
-                                  "Bx": B[0], "By": B[1], "Bz":B[2]}, 
+hdf5file = MHDWriter({"U":U[0], "V":U[1], "W":U[2], "P":P, 
+                      "Bx": B[0], "By": B[1], "Bz":B[2]}, 
                      chkpoint={'current':{'UB':UB, 'P':P}, 'previous':{}},
                      filename="MHD.h5")
 

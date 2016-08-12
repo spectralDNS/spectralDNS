@@ -14,7 +14,7 @@ context = solve.func_globals
 context.update(setup['VV'](**vars()))
 vars().update(context)
 
-hdf5file = HDF5Writer(FFT, float, {'U':U[0], 'V':U[1], 'W':U[2], 'P':P}, 
+hdf5file = HDF5Writer({'U':U[0], 'V':U[1], 'W':U[2], 'P':P}, 
                       chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
                       filename=params.solver+'.h5')
 

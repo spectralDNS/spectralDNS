@@ -8,9 +8,9 @@ from spectralDNS.mesh.doublyperiodic import setup
 
 vars().update(setup['NS2D'](**vars()))
 
-hdf5file = HDF5Writer(FFT, float, {"U":U[0], "V":U[1], "P":P}, 
-                      filename=params.solver+".h5",
-                      chkpoint={'current':{'U':U, 'P':P}, 'previous':{}})
+hdf5file = HDF5Writer({"U":U[0], "V":U[1], "P":P}, 
+                       filename=params.solver+".h5",
+                       chkpoint={'current':{'U':U, 'P':P}, 'previous':{}})
 
 def update_components(U, U_hat, P, P_hat, FFT, params, **kw):
     """Transform to real data when storing the solution"""

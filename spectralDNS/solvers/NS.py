@@ -20,7 +20,7 @@ def backward_velocity():
         U[i] = FFT.ifftn(U_hat[i], U[i])
     return U
 
-hdf5file = HDF5Writer(FFT, float, {'U':U[0], 'V':U[1], 'W':U[2], 'P':P}, 
+hdf5file = HDF5Writer({'U':U[0], 'V':U[1], 'W':U[2], 'P':P}, 
                       chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
                       filename=params.solver+'.h5')
 

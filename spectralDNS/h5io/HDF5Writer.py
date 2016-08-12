@@ -5,6 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 """Wrap call to hdf5 to allow running without installing h5py
 """
+from numpy import all
 from numpy.linalg import norm
 
 __all__ = ['HDF5Writer']
@@ -13,20 +14,16 @@ try:
     import h5py
     class HDF5Writer(object):
 
-        def __init__(self, FFT, dtype, comps, chkpoint={}, filename="U.h5", mesh={}):
-            self.FFT = FFT
+        def __init__(self, comps, chkpoint={}, filename="U.h5", mesh={}):
             self.components = comps
             self.chkpoint = chkpoint
             self.fname = filename
-            self.dtype = dtype
             self.f = None
-            self.N = FFT.N
             self.dim = len(comps[comps.keys()[0]].shape)
             self.mesh = mesh
-            self.updatestep = 0
 
-        def init_h5file(self, params):
-            self.f = h5py.File(self.fname, "w", driver="mpio", comm=self.FFT.comm)
+        def _init_h5file(self, params, comm, **kw):
+            self.f = h5py.File(self.fname, "w", driver="mpio", comm=comm)
             self.f.create_group("3D")
             self.f.create_group("2D")
             self.f["2D"].create_group("xy") # For slices in 3D geometries
@@ -46,27 +43,27 @@ try:
                 self.f[dim+"/checkpoint"].create_group(key)
 
             self.f.attrs.create("dt", params.dt)
-            self.f.attrs.create("N", self.N)    
+            self.f.attrs.create("N", params.N)
             self.f.attrs.create("L", params.L)    
             if params.has_key('write_yz_slice'):
                 self.f["2D/yz"].attrs.create("i", params.write_yz_slice[0])
                 self.f["2D/xy"].attrs.create("j", params.write_xy_slice[0])
                 self.f["2D/xz"].attrs.create("k", params.write_xz_slice[0])
-            
+
             if len(self.mesh) > 0:
                 self.f["3D"].create_group("mesh")
             for key, val in self.mesh.iteritems():
-                self.f["3D/mesh/"].create_dataset(key, shape=(len(val),), dtype=self.dtype)
+                self.f["3D/mesh/"].create_dataset(key, shape=(len(val),), dtype=val.dtype)
                 self.f["3D/mesh/"+key][:] = val
 
         def update(self, **kw):
             self.update_components(**kw)
             params = kw['params']
             if self.check_if_write(params):
-                self.write(params)
+                self._write(**kw)
 
             if params.tstep % params.checkpoint == 0:
-                self.checkpoint(params)
+                self._checkpoint(**kw)
 
         def check_if_write(self, params):
             if params.tstep % params.write_result == 0:
@@ -79,21 +76,27 @@ try:
                     return True
             return False
 
-        def checkpoint(self, params):
-            if self.f is None: self.init_h5file(params) 
+        def _checkpoint(self, params, comm, **kw):
+            if self.f is None: 
+                self._init_h5file(params, comm, **kw) 
             else:
-                self.f = h5py.File(self.fname, driver="mpio", comm=self.FFT.comm)
+                self.f = h5py.File(self.fname, driver="mpio", comm=comm)
+                if not all(self.f.attrs['N'] == params.N):
+                    self._init_h5file(params, comm, **kw)
 
             dim = str(self.dim)+"D"
             keys = self.chkpoint['current'].keys()
             # Create datasets first time around
             if not "1" in self.f["{}/checkpoint/{}".format(dim, keys[0])].keys():
                 for key, val in self.chkpoint['current'].iteritems():
-                    self.f["{}/checkpoint/{}".format(dim, key)].create_dataset("1", shape=self.N, dtype=val.dtype)
+                    shape = params.N if len(val.shape) == self.dim else (val.shape[0],)+tuple(params.N)
+                    self.f["{}/checkpoint/{}".format(dim, key)].create_dataset("1", shape=shape, dtype=val.dtype)
                 for key, val in self.chkpoint['previous'].iteritems():
-                    self.f["{}/checkpoint/{}".format(dim, key)].create_dataset("0", shape=self.N, dtype=val.dtype)
+                    shape = params.N if len(val.shape) == self.dim else (val.shape[0],)+tuple(params.N)
+                    self.f["{}/checkpoint/{}".format(dim, key)].create_dataset("0", shape=shape, dtype=val.dtype)
 
-            s = self.FFT.real_local_slice()
+            FFT = kw.get('FFT', kw.get('FST'))
+            s = FFT.real_local_slice()
             # Get new values
             if dim == "2D":
                 for key, val in self.chkpoint['current'].iteritems():
@@ -120,18 +123,21 @@ try:
                         self.f["3D/checkpoint/{}/0".format(key)][:, s[0], s[1], s[2]] = val
             self.f.close()
 
-        def write(self, params):
+        def _write(self, params, comm, **kw):
             if self.f is None: 
-                self.init_h5file(params) 
+                self._init_h5file(params, comm, **kw) 
             else:
-                self.f = h5py.File(self.fname, driver="mpio", comm=self.FFT.comm)
+                self.f = h5py.File(self.fname, driver="mpio", comm=comm)
+                if not all(self.f.attrs['N'] == params.N):
+                    self._init_h5file(params, comm, **kw)
 
-            N = self.N
             dim = str(self.dim)+"D"
-            s = self.FFT.real_local_slice()
+            FFT = kw.get('FFT', kw.get('FST'))
+            N = params.N
+            s = FFT.real_local_slice()
             if params.tstep % params.write_result == 0:                
                 for comp, val in self.components.iteritems():
-                    self.f[dim+"/"+comp].create_dataset(str(params.tstep), shape=N, dtype=self.dtype)
+                    self.f[dim+"/"+comp].create_dataset(str(params.tstep), shape=N, dtype=val.dtype)
                     self.f[dim+"/%s/%d"%(comp, params.tstep)][s] = val
 
             # Write slices
@@ -149,7 +155,7 @@ try:
                 if params.tstep % params.write_xz_slice[1] == 0:
                     j = params.write_xz_slice[0]                
                     for comp in self.components:
-                        self.f["2D/xz/"+comp].create_dataset(str(params.tstep), shape=(N[0], N[2]), dtype=self.dtype)
+                        self.f["2D/xz/"+comp].create_dataset(str(params.tstep), shape=(N[0], N[2]), dtype=FFT.float)
 
                     if params.decomposition == 'slab':
                         for comp, val in self.components.iteritems():
@@ -179,17 +185,17 @@ try:
 
 except:
     class HDF5Writer(object):
-        def __init__(self, FFT, dtype, comps, filename="U.h5", mesh={}):
+        def __init__(self, comps, filename="U.h5", mesh={}):
             if FFT.comm.Get_rank() == 0:
                 print Warning("Need to install h5py to allow storing results")
-
-        def write(self, params):
-            pass
 
         def check_if_write(self, params):
             return False
 
-        def checkpoint(self, *args):
+        def _checkpoint(self, *args):
+            pass
+
+        def _write(self, params):
             pass
 
         def close(self):
