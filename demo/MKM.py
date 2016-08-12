@@ -299,8 +299,8 @@ if __name__ == "__main__":
     config.channel.add_argument("--print_energy0", type=int, default=10)
     #solver = get_solver(update=update, mesh="channel")    
     solver = get_solver(update=update, mesh="channel")    
-    #initialize(**vars(solver))    
-    init_from_file("KMM665.h5", **vars(solver))
+    initialize(**vars(solver))    
+    #init_from_file("KMM665.h5", **vars(solver))
     set_Source(**vars(solver))
     solver.stats = Stats(solver.U, solver.comm, filename="KMMstatsq")
     solver.hdf5file.fname = "KMM665b.h5"

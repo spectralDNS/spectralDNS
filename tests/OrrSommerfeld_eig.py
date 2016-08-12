@@ -5,7 +5,9 @@ FIXME Should use Shen basis for fourth order problem
 
 """
 from scipy.linalg import eig
-from numpy import ones, cos, arange, pi, dot, eye, real, imag, resize, transpose, float, newaxis, sum, abs, max, complex, linspace, argmax, argmin, zeros, squeeze, seterr, array, hstack
+from numpy import ones, cos, arange, pi, dot, eye, real, imag, resize, transpose, \
+    float, newaxis, sum, abs, max, complex, linspace, argmax, argmin, zeros, squeeze, \
+    seterr, array, hstack, argpartition
 from numpy.linalg import inv
 from numpy.polynomial import chebyshev as n_cheb
 seterr(divide='ignore')
@@ -28,6 +30,7 @@ class OrrSommerfeld(object):
         self.par={'alfa':1.,
                   'Re':8000.,
                   'N':20,
+                  'eigval':1,
                   'order':None}
         self.par.update(**kwargs)
         [setattr(self, name, val) for name, val in self.par.iteritems()]
@@ -51,9 +54,9 @@ class OrrSommerfeld(object):
         print 'Solving the Orr-Sommerfeld eigenvalue problem...'
         print 'Re = ', self.par['Re'], ' and alfa = ', self.par['alfa']
         self.eigvals, self.eigvectors = self.solve()
-        self.nx = [argmax(imag(self.eigvals))]
+        self.nx = [argpartition(imag(self.eigvals), -1)[-self.par['eigval']]]
         self.eigval = self.eigvals[self.nx][0]
-        print 'Least stable eigenvalue = ', self.eigval
+        print 'Eigenvalue = ', self.eigval
         self.create_interpolation_arrays()
         
     def create_interpolation_arrays(self):

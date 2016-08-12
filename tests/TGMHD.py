@@ -1,7 +1,7 @@
 from spectralDNS import config, get_solver
-from numpy import array, pi
+from numpy import array, pi, sin, cos, float64, sum
 
-def initialize(UB_hat, UB, U, B, X, sin, cos, FFT, **kw):
+def initialize(UB_hat, UB, U, B, X, FFT, **kw):
     # Taylor-Green initialization
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
@@ -12,7 +12,7 @@ def initialize(UB_hat, UB, U, B, X, sin, cos, FFT, **kw):
     for i in range(6):
         UB_hat[i] = FFT.fftn(UB[i], UB_hat[i])
         
-def regression_test(comm, UB, UB_hat, U, B, float64, sum,  rank, params, FFT, **kw):
+def regression_test(comm, UB, UB_hat, U, B, rank, params, FFT, **kw):
     dx, L = params.dx, params.L
     for i in range(6):
         UB[i] = FFT.ifftn(UB_hat[i], UB[i])

@@ -9,7 +9,7 @@ import warnings
 import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
-eps = 1e-7
+eps = 1e-6
 def initOS(OS, U, X, t=0.):
     for i in range(U.shape[1]):
         x = X[0, i, 0, 0]

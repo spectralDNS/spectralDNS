@@ -89,9 +89,9 @@ try:
             # Create datasets first time around
             if not "1" in self.f["{}/checkpoint/{}".format(dim, keys[0])].keys():
                 for key, val in self.chkpoint['current'].iteritems():
-                    self.f["{}/checkpoint/{}".format(dim, key)].create_dataset("1", shape=val.shape, dtype=val.dtype)
+                    self.f["{}/checkpoint/{}".format(dim, key)].create_dataset("1", shape=self.N, dtype=val.dtype)
                 for key, val in self.chkpoint['previous'].iteritems():
-                    self.f["{}/checkpoint/{}".format(dim, key)].create_dataset("0", shape=val.shape, dtype=val.dtype)
+                    self.f["{}/checkpoint/{}".format(dim, key)].create_dataset("0", shape=self.N, dtype=val.dtype)
 
             s = self.FFT.real_local_slice()
             # Get new values

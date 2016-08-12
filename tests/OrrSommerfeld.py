@@ -18,12 +18,12 @@ def initOS(OS, U, X, t=0.):
     U[2] = 0
 
 OS, e0 = None, None
-def initialize(U, U_hat, U0, U_hat0, solvePressure, H_hat1, FST,
-               ST, X, comm, rank, conv, TDMASolverD, params, 
-               forward_velocity, backward_velocity, **kw): 
+def initialize(U, U_hat, U_hat0, solvePressure, H_hat1, FST, ST, X, comm, rank,
+               conv, TDMASolverD, params, work, backward_velocity, forward_velocity, **kw):
     global OS, e0
-    OS = OrrSommerfeld(Re=params.Re, N=100)
-    initOS(OS, U0, X)
+    OS = OrrSommerfeld(Re=params.Re, N=160)
+    initOS(OS, U, X)
+    
     U_hat0 = forward_velocity(U_hat0, U, FST)
     U = backward_velocity(U, U_hat0, FST)
     H_hat1 = conv(H_hat1, U_hat0)
@@ -32,22 +32,20 @@ def initialize(U, U_hat, U0, U_hat0, solvePressure, H_hat1, FST,
     U_hat = forward_velocity(U_hat, U, FST)
     U = backward_velocity(U, U_hat, FST)
     
-    if not params.solver in ("KMM", "KMMRK3"):
+    if not params.solver in ("KMM", "KMMRK3"):    
         conv2 = zeros_like(H_hat1)
         conv2 = conv(conv2, 0.5*(U_hat0+U_hat))  
         for j in range(3):
             conv2[j] = TDMASolverD(conv2[j])
         conv2 *= -1
         kw['P_hat'] = solvePressure(kw['P_hat'], conv2)
-        kw['P'] = FST.ifst(kw['P_hat'], kw['P'], kw['SN'])
 
-        U0[:] = U
+        kw['P'] = FST.ifst(kw['P_hat'], kw['P'], kw['SN'])
         U_hat0[:] = U_hat
         params.t = params.dt
         params.tstep = 1
-
+        
     else:
-        U0[:] = U
         U_hat0[:] = U_hat
         params.t = params.dt
         params.tstep = 1

@@ -1,5 +1,5 @@
 from spectralDNS import config, get_solver
-from numpy import array, pi
+from numpy import array, pi, sin, cos, float64
 import sys
 
 def initialize(**kw):
@@ -9,14 +9,14 @@ def initialize(**kw):
     else:
         initialize2(**kw)
         
-def initialize1(U, U_hat, X, sin, cos, FFT, **kw):    
+def initialize1(U, U_hat, X, FFT, **kw):    
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0 
     for i in range(3):
         U_hat[i] = FFT.fftn(U[i], U_hat[i])
         
-def initialize2(U, W, W_hat, X, sin, cos, FFT, work, cross2, K, **kw):
+def initialize2(U, W, W_hat, X, FFT, work, cross2, K, **kw):
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0         
@@ -28,16 +28,14 @@ def initialize2(U, W, W_hat, X, sin, cos, FFT, work, cross2, K, **kw):
     for i in range(3):
         W[i] = FFT.ifftn(W_hat[i], W[i])        
 
-def regression_test(comm, U_hat, U, curl, float64, sum, rank, Curl, FFT, params, **kw):
+def regression_test(comm, U_hat, U, curl, sum, rank, Curl, FFT, params, 
+                    backward_velocity, **kw):
     dx, L = params.dx, params.L
-    U = backward_velocity(U, U_hat)
+    U = backward_velocity()
     if params.solver == 'NS':
-        for i in range(3):
-            U[i] = FFT.ifftn(U_hat[i], U[i])
         curl = Curl(U_hat, curl)
         w = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     elif params.solver == 'VV':
-        U = Curl(kw['W_hat'], U)
         for i in range(3):
             kw['W'][i] = FFT.ifftn(kw['W_hat'][i], kw['W'][i])
         w = comm.reduce(sum(kw['W'].astype(float64)*kw['W'].astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
