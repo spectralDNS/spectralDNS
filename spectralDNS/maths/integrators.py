@@ -168,7 +168,7 @@ def AB2(u0, u1, dU, dt, tstep, ComputeRHS):
     u1[:] = dU*dt    
     return u0, dt, dt
 
-def getintegrator(dU, ComputeRHS, float, array, zeros, zeros_like, FFT, params, **kw):
+def getintegrator(dU, ComputeRHS, float, FFT, params, **kw):
     """Return integrator using choice in global parameter integrator.
     """
     if params.solver in ("NS", "VV", "NS2D"):
@@ -181,8 +181,8 @@ def getintegrator(dU, ComputeRHS, float, array, zeros, zeros_like, FFT, params, 
         
     if params.integrator == "RK4": 
         # RK4 parameters
-        a = array([1./6., 1./3., 1./3., 1./6.], dtype=float)
-        b = array([0.5, 0.5, 1.], dtype=float)
+        a = np.array([1./6., 1./3., 1./3., 1./6.], dtype=float)
+        b = np.array([0.5, 0.5, 1.], dtype=float)
         u2 = u0.copy()
         @wraps(RK4)
         def func():
@@ -203,9 +203,9 @@ def getintegrator(dU, ComputeRHS, float, array, zeros, zeros_like, FFT, params, 
         offset = [0]
         s = A.shape[0]
         U = kw['U']
-        fY_hat = zeros((s,) + u0.shape, dtype=u0.dtype)
-        sc = zeros_like(u0)
-        err = zeros_like(u0)
+        fY_hat = np.zeros((s,) + u0.shape, dtype=u0.dtype)
+        sc = np.zeros_like(u0)
+        err = np.zeros_like(u0)
 
         @wraps(adaptiveRK)
         def func():

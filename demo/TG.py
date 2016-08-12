@@ -1,6 +1,6 @@
 from spectralDNS import config, get_solver
 import matplotlib.pyplot as plt
-from numpy import array, pi, zeros, sum
+from numpy import array, pi, zeros, sum, float64
 from numpy.linalg import norm
 import sys
 
@@ -34,18 +34,14 @@ k = []
 w = []
 im1 = None
 kold = zeros(1)
-def update(comm, rank, P, P_hat, U, curl, Curl, float64, params,
-           FFT, X, U_hat, K, work, dU, ComputeRHS, **kw):
+def update(comm, rank, P, P_hat, U, curl, Curl, params,
+           FFT, X, U_hat, K, work, dU, ComputeRHS, backward_velocity, **kw):
     global k, w, im1
     if params.tstep % params.compute_energy == 0:
         P = FFT.ifftn(P_hat*1j, P)
+        U = backward_velocity()
         if 'NS' in params.solver:
-            for i in range(3):
-                U[i] = FFT.ifftn(U_hat[i], U[i])
-
             curl = Curl(U_hat, curl)
-        if params.solver == 'VV':
-            U = Curl(kw['W_hat'], U)
                 
     if im1 is None and rank == 0 and params.plot_step > 0:
         plt.figure()
@@ -82,7 +78,8 @@ def update(comm, rank, P, P_hat, U, curl, Curl, float64, params,
                 #print ww, params.nu*ww2, ww3, ww-ww2
                 
         elif params.solver == 'VV':
-            U = Curl(kw['W_hat'], U)
+            for i in range(3):
+                kw['W'][i] = FFT.ifftn(kw['W_hat'][i], kw['W'][i]) 
             ww = comm.reduce(sum(kw['W'].astype(float64)*kw['W'].astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
             
         kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
@@ -97,13 +94,13 @@ def update(comm, rank, P, P_hat, U, curl, Curl, float64, params,
             #if rank == 0:
                 #print 0.5*(kk2-kold[0])/params.dt
 
-def regression_test(comm, U, U_hat, curl, Curl, float64, rank, FFT, params, **kw):
+def regression_test(comm, U, U_hat, curl, Curl, rank, FFT, params, backward_velocity, **kw):
     dx, L = params.dx, params.L
+    U = backward_velocity()
     if 'NS' in params.solver:
         curl = Curl(U_hat, curl)
         w = comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     elif params.solver == 'VV':
-        U = Curl(kw['W_hat'], U)
         for i in range(3):
             kw['W'][i] = FFT.ifftn(kw['W_hat'][i], kw['W'][i])        
         w = comm.reduce(sum(kw['W'].astype(float64)*kw['W'].astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)

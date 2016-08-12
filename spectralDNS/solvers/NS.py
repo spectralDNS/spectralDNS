@@ -8,12 +8,14 @@ from spectralDNS.mesh.triplyperiodic import setup
 
 vars().update(setup['NS'](**vars()))
 
-def forward_velocity(U_hat, U):
+def forward_velocity():
+    global U_hat, U, FFT
     for i in range(3):
         U_hat[i] = FFT.fftn(U[i], U_hat[i])
     return U_hat
     
-def backward_velocity(U, U_hat):
+def backward_velocity():
+    global U, U_hat, FFT
     for i in range(3):
         U[i] = FFT.ifftn(U_hat[i], U[i])
     return U
@@ -33,6 +35,7 @@ hdf5file.update_components = update_components
 
 def standardConvection(c, U_dealiased, U_hat, dealias=None):
     """c_i = u_j du_i/dx_j"""
+    global FFT, work, K
     gradUi = work[(U_dealiased, 2, False)]
     for i in range(3):
         for j in range(3):
@@ -42,6 +45,7 @@ def standardConvection(c, U_dealiased, U_hat, dealias=None):
 
 def divergenceConvection(c, U_dealiased, dealias=None, add=False):
     """c_i = div(u_i u_j)"""
+    global FFT, work, K
     if not add: c.fill(0)
     UUi_hat = work[(c, 0, False)]
     for i in range(3):
@@ -59,6 +63,7 @@ def divergenceConvection(c, U_dealiased, dealias=None, add=False):
 #@profile
 def Cross(a, b, c, dealias=None):
     """c_k = F_k(a x b)"""
+    global work, cross1, FFT
     Uc = work[(a, 2, False)]
     Uc = cross1(Uc, a, b)
     c[0] = FFT.fftn(Uc[0], c[0], dealias)
@@ -69,6 +74,7 @@ def Cross(a, b, c, dealias=None):
 #@profile
 def Curl(a, c, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
+    global work, cross2, K
     curl_hat = work[(a, 0, False)]
     curl_hat = cross2(curl_hat, K, a)
     c[0] = FFT.ifftn(curl_hat[0], c[0], dealias)
@@ -81,6 +87,7 @@ def getConvection(convection):
     if convection == "Standard":
         
         def Conv(dU, U_hat):
+            global FFT, work, params
             U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0, False)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], params.dealias)
@@ -91,6 +98,7 @@ def getConvection(convection):
     elif convection == "Divergence":
         
         def Conv(dU, U_hat):
+            global FFT, work, params
             U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0, False)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], params.dealias)
@@ -101,6 +109,7 @@ def getConvection(convection):
     elif convection == "Skewed":
         
         def Conv(dU, U_hat):
+            global FFT, work, params
             U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0, False)]
             for i in range(3):
                 U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], params.dealias)
@@ -113,6 +122,7 @@ def getConvection(convection):
         
         #@profile
         def Conv(dU, U_hat):
+            global FFT, work, params
             U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0, False)]
             curl_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 1, False)]
             for i in range(3):
@@ -141,7 +151,9 @@ def add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, nu):
 
 #@profile
 def ComputeRHS(dU, U_hat):
-    """Compute and return entire rhs contribution"""                            
+    """Compute and return entire rhs contribution"""          
+    global K2, K, P_hat, K_over_K2, params
+    
     dU = conv(dU, U_hat)
     
     dU = add_pressure_diffusion(dU, U_hat, K2, K, P_hat, K_over_K2, params.nu)

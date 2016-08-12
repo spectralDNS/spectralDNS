@@ -18,7 +18,7 @@ hdf5file = HDF5Writer(FFT, float, {'U':U[0], 'V':U[1], 'W':U[2], 'P':P},
                       chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
                       filename=params.solver+'.h5')
 
-def Curl(a, c, dealias=None):
+def computeU(a, c, dealias=None):
     """Compute u from curl(u)
     
     Follows from
@@ -29,6 +29,7 @@ def Curl(a, c, dealias=None):
     u_hat = (ik \times w_hat) / k^2
     u = iFFT(u_hat)
     """
+    global work, K_over_K2, FFT
     F_tmp = work[(a, 0)]
     F_tmp = cross2(F_tmp, K_over_K2, a)
     c[0] = FFT.ifftn(F_tmp[0], c[0], dealias)
@@ -36,18 +37,20 @@ def Curl(a, c, dealias=None):
     c[2] = FFT.ifftn(F_tmp[2], c[2], dealias)    
     return c
 
-def backward_velocity(U, W_hat):
+def backward_velocity():
     """Compute velocity from curl coefficients"""
-    U = Curl(W_hat, U)
+    global W_hat, U
+    U = computeU(W_hat, U)
     return U
 
 #@profile
 def ComputeRHS(dU, W_hat):
+    global work, FFT, K, K2, Source
     U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
     W_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
     F_tmp = work[(dU, 0)]
     
-    U_dealiased[:] = Curl(W_hat, U_dealiased, params.dealias)
+    U_dealiased[:] = computeU(W_hat, U_dealiased, params.dealias)
     for i in range(3):
         W_dealiased[i] = FFT.ifftn(W_hat[i], W_dealiased[i], params.dealias)
     F_tmp[:] = Cross(U_dealiased, W_dealiased, F_tmp, params.dealias)
