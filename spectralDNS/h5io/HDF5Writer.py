@@ -145,7 +145,7 @@ try:
                 if params.tstep % params.write_yz_slice[1] == 0:
                     i = params.write_yz_slice[0]
                     for comp in self.components:
-                        self.f["2D/yz/"+comp].create_dataset(str(params.tstep), shape=(N[1], N[2]), dtype=self.dtype)
+                        self.f["2D/yz/"+comp].create_dataset(str(params.tstep), shape=(N[1], N[2]), dtype=FFT.float)
 
                     sx = s[0]
                     if i >= sx.start and i < sx.stop:
@@ -170,7 +170,7 @@ try:
                 if params.tstep % params.write_xy_slice[1] == 0:
                     k = params.write_xy_slice[0]                
                     for comp in self.components:
-                        self.f["2D/xy/"+comp].create_dataset(str(params.tstep), shape=(N[0], N[1]), dtype=self.dtype)
+                        self.f["2D/xy/"+comp].create_dataset(str(params.tstep), shape=(N[0], N[1]), dtype=FFT.float)
                     
                     for comp, val in self.components.iteritems():
                         self.f["2D/xy/%s/%d"%(comp, params.tstep)][s[0], s[1]] = val[:, :, k]

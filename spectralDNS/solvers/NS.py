@@ -20,18 +20,19 @@ def backward_velocity():
         U[i] = FFT.ifftn(U_hat[i], U[i])
     return U
 
-hdf5file = HDF5Writer({'U':U[0], 'V':U[1], 'W':U[2], 'P':P}, 
-                      chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
-                      filename=params.solver+'.h5')
+# Subclass HDF5Writer for appropriate updating of real components
+class NSWriter(HDF5Writer):
+    
+    def update_components(self, U, U_hat, P, P_hat, FFT, params, **kw):
+        """Transform to real data when storing the solution"""
+        if self.check_if_write(params) or params.tstep % params.checkpoint == 0:
+            for i in range(3):
+                U[i] = FFT.ifftn(U_hat[i], U[i])
+            P = FFT.ifftn(P_hat, P)
 
-def update_components(U, U_hat, P, P_hat, FFT, params, **kw):
-    """Transform to real data when storing the solution"""
-    if hdf5file.check_if_write(params) or params.tstep % params.checkpoint == 0:
-        for i in range(3):
-            U[i] = FFT.ifftn(U_hat[i], U[i])
-        P = FFT.ifftn(P_hat, P)
-
-hdf5file.update_components = update_components
+hdf5file = NSWriter({'U':U[0], 'V':U[1], 'W':U[2], 'P':P}, 
+                     chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
+                     filename=params.solver+'.h5')
 
 def standardConvection(c, U_dealiased, U_hat, dealias=None):
     """c_i = u_j du_i/dx_j"""
