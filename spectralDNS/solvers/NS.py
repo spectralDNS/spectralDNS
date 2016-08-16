@@ -161,7 +161,7 @@ def ComputeRHS(dU, U_hat):
         
     return dU
 
-@profile
+#@profile
 def solve():
     global dU, U, U_hat, conv, integrate, profiler, timer
     
