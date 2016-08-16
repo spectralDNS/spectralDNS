@@ -1,27 +1,25 @@
 from spectralDNS import config, get_solver
-from spectralDNS.maths.cross import cross2
-from spectralDNS.mesh.triplyperiodic import Curl
 
 import matplotlib.pyplot as plt
 from numpy import array, pi, zeros, sum, float64,sin, cos
 from numpy.linalg import norm
 import sys
 
-def initialize(**kw):
+def initialize(solver, **kw):
     if 'NS' in config.params.solver:
-        initialize1(**kw)
+        initialize1(solver, **kw)
     
     else:
-        initialize2(**kw)
+        initialize2(solver, **kw)
         
-def initialize1(U, U_hat, X, FFT, **kw):    
+def initialize1(solver, U, U_hat, X, FFT, **kw):    
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0 
     for i in range(3):
         U_hat[i] = FFT.fftn(U[i], U_hat[i])
         
-def initialize2(U, W_hat, X, FFT, K, work, **kw):
+def initialize2(solver, U, W_hat, X, FFT, K, work, **kw):
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0
@@ -29,7 +27,7 @@ def initialize2(U, W_hat, X, FFT, K, work, **kw):
     for i in range(3):
         F_tmp[i] = FFT.fftn(U[i], F_tmp[i])
 
-    W_hat = cross2(W_hat, K, F_tmp)
+    W_hat = solver.cross2(W_hat, K, F_tmp)
 
 k = []
 w = []
@@ -42,18 +40,13 @@ def update(context):
     
     if (params.tstep % params.compute_energy == 0 or
         params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0):
-        c.P = c.FFT.ifftn(c.P_hat*1j, c.P)
-        c.U = solver.backward_velocity(**c)
-        if 'NS' in params.solver:
-            c.curl = Curl(c.U_hat, c.curl, c.work, c.FFT, c.K)
-        else:
-            for i in range(3):
-                c.curl[i] = c.FFT.ifftn(c.W_hat[i], c.curl[i])
+        P = c.FFT.ifftn(c.P_hat*1j, c.P)
+        U = solver.get_velocity(**c)
+        curl = solver.get_curl(**c)
                 
-    #from IPython import embed; embed()
     if im1 is None and solver.rank == 0 and params.plot_step > 0:
         plt.figure()
-        im1 = plt.contourf(c.X[1,:,:,0], c.X[0,:,:,0], c.U[0,:,:,10], 100)
+        im1 = plt.contourf(c.X[1,:,:,0], c.X[0,:,:,0], U[0,:,:,10], 100)
         plt.colorbar(im1)
         plt.draw()
         plt.pause(1e-6)
@@ -61,7 +54,7 @@ def update(context):
         
     if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
         im1.ax.clear()
-        im1.ax.contourf(c.X[1,:,:,0], c.X[0,:,:,0], c.U[0,:,:,10], 100) 
+        im1.ax.contourf(c.X[1,:,:,0], c.X[0,:,:,0], U[0,:,:,10], 100) 
         im1.autoscale()
         plt.pause(1e-6)
 
@@ -85,8 +78,8 @@ def update(context):
             #if rank == 0:
                 #print ww, params.nu*ww2, ww3, ww-ww2
             
-        ww = solver.comm.reduce(sum(c.curl.astype(float64)*c.curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
-        kk = solver.comm.reduce(sum(c.U.astype(float64)*c.U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
+        ww = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+        kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
         kold[0] = kk
         if solver.rank == 0:
             k.append(kk)
@@ -102,16 +95,11 @@ def regression_test(context):
     params = config.params
     dx, L = params.dx, params.L
     solver = regression_test.solver
-    c = context
-    c.U = solver.backward_velocity(**c)
-    if 'NS' in params.solver:
-        c.curl = Curl(c.U_hat, c.curl, c.work, c.FFT, c.K)
-    elif params.solver == 'VV':
-        for i in range(3):
-            c.curl[i] = c.FFT.ifftn(c.W_hat[i], c.curl[i])
+    U = solver.get_velocity(**context)
+    curl = solver.get_curl(**context)
 
-    w = solver.comm.reduce(sum(c.curl.astype(float64)*c.curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
-    k = solver.comm.reduce(sum(c.U.astype(float64)*c.U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
+    w = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+    k = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
     if solver.rank == 0:
         assert round(k - 0.124953117517, 7) == 0
         assert round(w - 0.375249930801, 7) == 0
@@ -139,20 +127,21 @@ if __name__ == "__main__":
                         additional_callback=additional_callback, 
                         mesh="triplyperiodic")
 
+    context = solver.setup()
+
     # Add curl to the stored results. For this we need to update the update_components
     # method used by the HDF5Writer class to compute the real fields that are stored
-    #solver.hdf5file.fname = "NS7.h5"
-    #solver.hdf5file.components["W0"] = solver.curl[0]
-    #solver.hdf5file.components["W1"] = solver.curl[1]
-    #solver.hdf5file.components["W2"] = solver.curl[2]    
-    #def update_components(hdf5file, U, U_hat, P, P_hat, FFT, params, curl, Curl, **kw):
-        #"""Transform to real data when storing the solution"""
-        #if hdf5file.check_if_write(params) or params.tstep % params.checkpoint == 0:
-            #for i in range(3):
-                #U[i] = FFT.ifftn(U_hat[i], U[i])
-            #P = FFT.ifftn(P_hat, P)
-            #curl = Curl(U_hat, curl)
-    #solver.hdf5file.update_components = update_components
-    context = solver.setup()
-    initialize(**context)
+    context.hdf5file.fname = "NS7.h5"
+    context.hdf5file.components["W0"] = context.curl[0]
+    context.hdf5file.components["W1"] = context.curl[1]
+    context.hdf5file.components["W2"] = context.curl[2]    
+    def update_components(FFT, U, U_hat, P, P_hat, curl, work, K, **context):
+        """Overload default because we want to store the curl as well"""
+        for i in range(3):
+            U[i] = FFT.ifftn(U_hat[i], U[i])
+        P = FFT.ifftn(P_hat, P)
+        curl = solver.get_curl(curl, U_hat, work, FFT, K)
+        
+    context.hdf5file.update_components = update_components
+    initialize(solver, **context)
     solver.solve(context)

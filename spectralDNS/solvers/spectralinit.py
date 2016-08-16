@@ -21,6 +21,7 @@ rank = comm.Get_rank()
 params = config.params
 
 def get_FFT(params):
+    """Return instance of class for performing transformations"""
     if params.decomposition == 'slab':
         assert len(params.N) == 3
         assert len(params.L) == 3
@@ -46,12 +47,15 @@ def get_FFT(params):
     return FFT
 
 def regression_test(**kw):
+    """Optional function called at the end"""
     pass
 
 def update(**kw):
+    """Optional function called every time step"""
     pass
 
 def additional_callback(**kw):
+    """Function used by some integrators"""
     pass
 
 def set_source(Source, **kw):

@@ -23,15 +23,15 @@ def initOS(OS, U, X, t=0.):
     U[2] = 0
 
 OS, e0 = None, None
-def initialize(U, U_hat, U_hat0, solvePressure, H_hat1, FST, ST, X, comm, rank,
-               conv, TDMASolverD, params, work, backward_velocity, forward_velocity, **kw):
+def initialize(solver, U, U_hat, U_hat0, solvePressure, H_hat1, FST, ST, X,
+               TDMASolverD, params, work, **context):
     global OS, e0
     OS = OrrSommerfeld(Re=params.Re, N=160)
     initOS(OS, U, X)
     
-    U_hat0 = forward_velocity(U_hat0, U, FST)
-    U = backward_velocity(U, U_hat0, FST)
-    H_hat1 = conv(H_hat1, U_hat0)
+    U_hat0 = solver.forward_transform(U, U_hat0, FST)
+    U = solver.backward_transform(U_hat0, U, FST)
+    H_hat1 = solver.conv(H_hat1, U_hat0)
     e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, ST.quad)
     initOS(OS, U, X, t=params.dt)
     U_hat = forward_velocity(U_hat, U, FST)

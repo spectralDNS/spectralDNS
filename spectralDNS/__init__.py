@@ -6,7 +6,9 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 import config
 import importlib
 
-def get_solver(update=None, regression_test=None, additional_callback=None, 
+def get_solver(update=None,
+               regression_test=None,
+               additional_callback=None,
                mesh="triplyperiodic", parse_args=None):
     assert parse_args is None or isinstance(parse_args, list)
     args = getattr(eval('.'.join(('config', mesh))),
@@ -22,9 +24,13 @@ def get_solver(update=None, regression_test=None, additional_callback=None,
     if update:
         update.solver = solver
         solver.update = update
+
     if regression_test:
         regression_test.solver = solver
         solver.regression_test = regression_test
-        
-    if additional_callback: solver.additional_callback = additional_callback
+
+    if additional_callback:
+        additional_callback.solver = solver
+        solver.additional_callback = additional_callback
+
     return solver

@@ -8,9 +8,9 @@ import numpy as np
 
 __all__ = ['getintegrator']
 
-def adaptiveRK(A, b, bhat, err_order, fY_hat, U_hat_new, sc, err, fsal, offset, 
-               aTOL, rTOL, adaptive, errnorm, dU, U_hat, ComputeRHS, dt, tstep,
-               FFT, additional_callback, params, args, predictivecontroller=False):
+def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset, 
+               aTOL, rTOL, adaptive, errnorm, rhs, u0, ComputeRHS, dt, tstep,
+               context, additional_callback, params, predictivecontroller=False):
     """
     Take a step using any Runge-Kutta method.
     Parameters
@@ -19,7 +19,7 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, U_hat_new, sc, err, fsal, offset,
         Runge-Kutta coefficients
     err_order : int
         Order of embedded method
-    fY_hat, U_tmp, U_hat_new, sc, err : work arrays
+    fY_hat, U_tmp, u0_new, sc, err : work arrays
     fsal : boolean
         Whether method is first-same-as-last
     offset : length-1 array of int
@@ -30,9 +30,9 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, U_hat_new, sc, err, fsal, offset,
         If true, adapt the step size
     errnorm : str
         Which norm to use in computing the error estimate.  One of {"2", "inf"}.
-    dU : array
+    rhs : array
         RHS evaluation
-    U_hat : array
+    u0 : array
         solution value (returned)
     ComputeRHS : callable
         RHS of evolution equation
@@ -51,6 +51,7 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, U_hat_new, sc, err, fsal, offset,
     facmax = facmax_default
     fac = 0.8
     facmin = 0.01
+    FFT = context.FFT
 
     #We may need to repeat the time-step until a small enough value is used.
     while True:
@@ -59,31 +60,31 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, U_hat_new, sc, err, fsal, offset,
             offset[0] = (offset[0] - 1) % s
         for i in range(0, s):
             if not fsal or (tstep == 0 or i != 0 ):
-                fY_hat[(i + offset[0]) % s] =  U_hat
+                fY_hat[(i + offset[0]) % s] =  u0
                 for j in range(0,i):
                     fY_hat[(i+offset[0]) % s] += dt*A[i,j]*fY_hat[(j+offset[0]) % s]
                 #Compute F(Y)
-                dU = ComputeRHS(dU, fY_hat[(i+offset[0]) % s], *args)
-                fY_hat[(i+offset[0]) % s] = dU
+                rhs = ComputeRHS(rhs, fY_hat[(i+offset[0]) % s], **context)
+                fY_hat[(i+offset[0]) % s] = rhs
                 
             if i == 0:
-                additional_callback(fU_hat=fY_hat[(0+offset[0]) % s])
+                additional_callback(fu0=fY_hat[(0+offset[0]) % s])
                 
         #Calculate the new value
-        U_hat_new[:] = U_hat
-        U_hat_new[:] += dt*b[0]*fY_hat[(0+offset[0]) % s]
+        u0_new[:] = u0
+        u0_new[:] += dt*b[0]*fY_hat[(0+offset[0]) % s]
         err[:] = dt*(b[0] - bhat[0])*fY_hat[(0+offset[0]) % s]
 
         for j in range(1,s):
-            U_hat_new[:] += dt*b[j]*fY_hat[(j+offset[0])%s]
+            u0_new[:] += dt*b[j]*fY_hat[(j+offset[0])%s]
             err[:] += dt*(b[j] - bhat[j])*fY_hat[(j+offset[0])%s]
 
         est = 0.0
-        sc[:] = aTOL + np.maximum(np.abs(U_hat),np.abs(U_hat_new))*rTOL
+        sc[:] = aTOL + np.maximum(np.abs(u0),np.abs(u0_new))*rTOL
         if errnorm == "2":
             est_to_bcast = None
-            nsquared = np.zeros(U_hat.shape[0])
-            for k in range(U_hat.shape[0]):
+            nsquared = np.zeros(u0.shape[0])
+            for k in range(u0.shape[0]):
                 nsquared[k] = FFT.comm.reduce(np.sum(np.power(np.abs(err[k]/sc[k]), 2)))
             if FFT.comm.rank == 0:
                 est_to_bcast = np.zeros(1)
@@ -96,7 +97,7 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, U_hat_new, sc, err, fsal, offset,
         elif errnorm == "inf":
             raise AssertionError("Don't use this, not sure if it works")
             #TODO: Test this error norm
-            sc[:] = aTOL + np.maximum(np.abs(U_hat),np.abs(U_hat_new))*rTOL
+            sc[:] = aTOL + np.maximum(np.abs(u0),np.abs(u0_new))*rTOL
             err[:] = err[:] / sc[:]
             err = np.abs(err, out=err)
             asdf = np.max(err)
@@ -136,47 +137,41 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, U_hat_new, sc, err, fsal, offset,
         break
 
 
-    #Update U_hat and U
-    U_hat[:] = U_hat_new
-    return U_hat, dt, dt_prev
+    #Update u0 and U
+    u0[:] = u0_new
+    return u0, dt, dt_prev
 
 @optimizer
-def RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS, args):
+def RK4(u0, u1, u2, rhs, a, b, dt, ComputeRHS, context):
     """Runge Kutta fourth order"""
     u2[:] = u1[:] = u0
     for rk in range(4):
-        dU = ComputeRHS(dU, u0, *args)
+        rhs = ComputeRHS(rhs, u0, **context)
         if rk < 3:
-            u0[:] = u1 + b[rk]*dt*dU
-        u2 += a[rk]*dt*dU
+            u0[:] = u1 + b[rk]*dt*rhs
+        u2 += a[rk]*dt*rhs
     u0[:] = u2
     return u0, dt, dt
 
 @optimizer
-def ForwardEuler(u0, u1, dU, dt, ComputeRHS, args):
-    dU = ComputeRHS(dU, u0, *args) 
-    u0 += dU*dt
+def ForwardEuler(u0, u1, rhs, dt, ComputeRHS, context):
+    rhs = ComputeRHS(rhs, u0, **context) 
+    u0 += rhs*dt
     return u0, dt, dt
 
 @optimizer
-def AB2(u0, u1, dU, dt, tstep, ComputeRHS, args):
-    dU = ComputeRHS(dU, u0, *args)
+def AB2(u0, u1, rhs, dt, tstep, ComputeRHS, context):
+    rhs = ComputeRHS(rhs, u0, **context)
     if tstep == 0:
-        u0 += dU*dt
+        u0 += rhs*dt
     else:
-        u0 += (1.5*dU*dt - 0.5*u1)        
-    u1[:] = dU*dt    
+        u0 += (1.5*rhs*dt - 0.5*u1)
+    u1[:] = rhs*dt
     return u0, dt, dt
 
-def getintegrator(ComputeRHS, dU, u0, params, args):
+def getintegrator(ComputeRHS, rhs, u0, params, context, additional_callback=None):
     """Return integrator using choice in global parameter integrator.
     """
-    #if params.solver in ("NS", "VV", "NS2D"):
-        #u0 = U_hat
-    #elif params.solver == "MHD":
-        #u0 = kw['UB_hat']
-    #elif params.solver == "Bq2D":
-        #u0 = kw['Ur_hat']
     u1 = u0.copy()    
         
     if params.integrator == "RK4": 
@@ -186,7 +181,7 @@ def getintegrator(ComputeRHS, dU, u0, params, args):
         u2 = u0.copy()
         @wraps(RK4)
         def func():
-            return RK4(u0, u1, u2, dU, a, b, params.dt, ComputeRHS, args)
+            return RK4(u0, u1, u2, rhs, a, b, params.dt, ComputeRHS, context)
         return func
 
     elif params.integrator in ("BS5_adaptive", "BS5_fixed"): 
@@ -202,7 +197,6 @@ def getintegrator(ComputeRHS, dU, u0, params, args):
         #Offset for fsal stuff. #TODO: infer this from tstep
         offset = [0]
         s = A.shape[0]
-        U = kw['U']
         fY_hat = np.zeros((s,) + u0.shape, dtype=u0.dtype)
         sc = np.zeros_like(u0)
         err = np.zeros_like(u0)
@@ -210,20 +204,19 @@ def getintegrator(ComputeRHS, dU, u0, params, args):
         @wraps(adaptiveRK)
         def func():
             return adaptiveRK(A, b, bhat, err_order, fY_hat, u1, sc, err, fsal, offset, 
-                              params.TOL, params.TOL, adaptive, errnorm, dU, u0, ComputeRHS, 
-                              params.dt, params.tstep, FFT, kw['additional_callback'], params,
-                              args)
+                              params.TOL, params.TOL, adaptive, errnorm, rhs, u0, ComputeRHS, 
+                              params.dt, params.tstep, context, additional_callback, params)
 
         return func
 
     elif params.integrator == "ForwardEuler":  
         @wraps(ForwardEuler)
         def func():
-            return ForwardEuler(u0, u1, dU, params.dt, ComputeRHS, args)
+            return ForwardEuler(u0, u1, rhs, params.dt, ComputeRHS, context)
         return func
     
     else:
         @wraps(AB2)
         def func():
-            return AB2(u0, u1, dU, params.dt, params.tstep, ComputeRHS, args)
+            return AB2(u0, u1, rhs, params.dt, params.tstep, ComputeRHS, context)
         return func
