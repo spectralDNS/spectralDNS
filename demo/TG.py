@@ -62,17 +62,17 @@ def update(comm, rank, P, P_hat, U, curl, Curl, params,
         if 'NS' in params.solver:
             ww = comm.reduce(sum(curl*curl)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
             
-            duidxj = work[(((3,3)+FFT.real_shape()), FFT.float, 0)]
-            for i in range(3):
-                for j in range(3):
-                    duidxj[i,j] = FFT.ifftn(1j*K[j]*U_hat[i], duidxj[i,j]) 
-            ww2 = comm.reduce(sum(duidxj*duidxj)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+            #duidxj = work[(((3,3)+FFT.real_shape()), FFT.float, 0)]
+            #for i in range(3):
+                #for j in range(3):
+                    #duidxj[i,j] = FFT.ifftn(1j*K[j]*U_hat[i], duidxj[i,j]) 
+            #ww2 = comm.reduce(sum(duidxj*duidxj)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
             
-            ddU = work[(((3,)+FFT.real_shape()), FFT.float, 0)]
-            dU = ComputeRHS(dU, U_hat)
-            for i in range(3):
-                ddU[i] = FFT.ifftn(dU[i], ddU[i]) 
-            ww3 = comm.reduce(sum(ddU*U)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+            #ddU = work[(((3,)+FFT.real_shape()), FFT.float, 0)]
+            #dU = ComputeRHS(dU, U_hat)
+            #for i in range(3):
+                #ddU[i] = FFT.ifftn(dU[i], ddU[i]) 
+            #ww3 = comm.reduce(sum(ddU*U)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
             
             #if rank == 0:
                 #print ww, params.nu*ww2, ww3, ww-ww2
