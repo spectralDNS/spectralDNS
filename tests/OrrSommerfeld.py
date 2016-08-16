@@ -1,7 +1,8 @@
 """Orr-Sommerfeld"""
 from spectralDNS import config, get_solver
 from OrrSommerfeld_eig import OrrSommerfeld
-from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose
+from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array, \
+    zeros_like, allclose
 from mpiFFT4py import dct
 
 eps = 1e-6
@@ -39,7 +40,6 @@ def initialize(U, U_hat, U_hat0, solvePressure, H_hat1, FST, ST, X, comm, rank,
             conv2[j] = TDMASolverD(conv2[j])
         conv2 *= -1
         kw['P_hat'] = solvePressure(kw['P_hat'], conv2)
-
         kw['P'] = FST.ifst(kw['P_hat'], kw['P'], kw['SN'])
         U_hat0[:] = U_hat
         params.t = params.dt

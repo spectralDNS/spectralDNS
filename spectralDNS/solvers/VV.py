@@ -4,19 +4,45 @@ __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 """
 Velocity-vorticity formulation
+
+Derived by taking the curl of the momentum equation and solving for the curl.
+The velocity that is required in the convective term is computed from the curl
+in the computeU method.
+
+This solver inherits most features from the NS solver. The global namespace 
+of the NS solver is modified to avoid having two namespaces filled with arrays. 
+Overloading just a few routines.
 """
 from NS import *
 
-# Get and update the global namespace of the NS solver (to avoid having two namespaces filled with arrays)
-# Overload just a few routines
+setupNS = setup
+def setup():
+    d = setupNS()
+    # Rename variable since we are working with a vorticity formulation
+    Source = zeros((3,) + FFT.complex_shape(), dtype=complex) # Possible source term initialized to zero
+    
+    # Subclass HDF5Writer for appropriate updating of real components
+    class VVWriter(HDF5Writer):
 
-context = solve.func_globals
-context.update(setup['VV'](**vars()))
+        def update_components(self, U, W_hat, curl, FFT, **kw):
+            """Transform to real data when storing the solution"""
+            U = computeU(W_hat, U)
+            for i in range(3):
+                curl[i] = FFT.ifftn(W_hat[i], curl[i])
+    curl = d['curl']
+    hdf5file = VVWriter({'U':U[0], 'V':U[1], 'W':U[2],
+                         'curlx':curl[0], 'curly':curl[1], 'curlz':curl[2]},
+                        chkpoint={'current':{'U':U, 'curl':curl}, 'previous':{}},
+                        filename=params.solver+'.h5')
+    
+    d.update(dict(Source=Source,
+                  hdf5file=hdf5file,
+                  W_hat=d['U_hat']))
+    return d
+
+context = setupNS.func_globals
+context.update(setup())
 vars().update(context)
-
-hdf5file = HDF5Writer({'U':U[0], 'V':U[1], 'W':U[2], 'P':P}, 
-                      chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
-                      filename=params.solver+'.h5')
 
 def computeU(a, c, dealias=None):
     """Compute u from curl(u)
@@ -38,7 +64,10 @@ def computeU(a, c, dealias=None):
     return c
 
 def backward_velocity():
-    """Compute velocity from curl coefficients"""
+    """A common method for obtaining the transformed velocity
+    
+    Compute velocity from curl coefficients
+    """
     global W_hat, U
     U = computeU(W_hat, U)
     return U
@@ -46,14 +75,14 @@ def backward_velocity():
 #@profile
 def ComputeRHS(dU, W_hat):
     global work, FFT, K, K2, Source
-    U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
-    W_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
+    U_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
+    W_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
     F_tmp = work[(dU, 0)]
     
-    U_dealiased[:] = computeU(W_hat, U_dealiased, params.dealias)
+    U_dealias[:] = computeU(W_hat, U_dealias, params.dealias)
     for i in range(3):
-        W_dealiased[i] = FFT.ifftn(W_hat[i], W_dealiased[i], params.dealias)
-    F_tmp[:] = Cross(U_dealiased, W_dealiased, F_tmp, params.dealias)
+        W_dealias[i] = FFT.ifftn(W_hat[i], W_dealias[i], params.dealias)
+    F_tmp[:] = Cross(U_dealias, W_dealias, F_tmp, params.dealias)
     dU = cross2(dU, K, F_tmp)    
     dU -= params.nu*K2*W_hat    
     dU += Source    

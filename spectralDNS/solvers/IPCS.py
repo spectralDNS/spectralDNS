@@ -4,18 +4,101 @@ __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
-from spectralDNS.mesh.channel import setup
-from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, CNDmat, HelmholtzCoeff
+from ..mesh.channel import SlabShen_R2C
+from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, CNDmat, \
+    HelmholtzCoeff
 from ..shen.la import Helmholtz, TDMA
-from ..shen import SFTc
+from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, \
+    ShenBiharmonicBasis, SFTc
 
-vars().update(setup['IPCS'](**vars()))
+def setup():
+    """Set up context for solver
+    
+    All data structures and variables defined here will be added to the global
+    namespace of the current solver.
+    """
+
+    # Get points and weights for Chebyshev weighted integrals
+    ST = ShenDirichletBasis(quad=params.Dquad, threads=params.threads,
+                            planner_effort=params.planner_effort["dct"])
+    SN = ShenNeumannBasis(quad=params.Nquad, threads=params.threads,
+                          planner_effort=params.planner_effort["dct"])
+
+    Nf = params.N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
+    Nu = params.N[0]-2   # Number of velocity modes in Shen basis
+    Nq = params.N[0]-3   # Number of pressure modes in Shen basis
+    u_slice = slice(0, Nu)
+    p_slice = slice(1, Nu)
+
+    FST = SlabShen_R2C(params.N, params.L, MPI, threads=params.threads,
+                       communication=params.communication,
+                       planner_effort=params.planner_effort,
+                       dealias_cheb=params.dealias_cheb)
+
+    float, complex, mpitype = datatypes("double")
+    
+    # Get grid for velocity points
+    X = FST.get_local_mesh(ST)
+    x0, x1, x2 = FST.get_mesh_dims(ST)
+
+    U     = zeros((3,)+FST.real_shape(), dtype=float)
+    U_hat = zeros((3,)+FST.complex_shape(), dtype=complex)
+    P     = zeros(FST.real_shape(), dtype=float)
+    P_hat = zeros(FST.complex_shape(), dtype=complex)
+    Pcorr = zeros(FST.complex_shape(), dtype=complex)
+    U0      = zeros((3,)+FST.real_shape(), dtype=float)
+    U_hat0  = zeros((3,)+FST.complex_shape(), dtype=complex)
+    U_hat1  = zeros((3,)+FST.complex_shape(), dtype=complex)
+    dU      = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat    = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat0   = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat1   = zeros((3,)+FST.complex_shape(), dtype=complex)
+
+    diff0   = zeros((3,)+FST.complex_shape(), dtype=complex)
+    Source  = zeros((3,)+FST.real_shape(), dtype=float)
+    Sk      = zeros((3,)+FST.complex_shape(), dtype=complex)
+
+    K = FST.get_scaled_local_wavenumbermesh()
+    K2 = K[1]*K[1]+K[2]*K[2]
+    K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)
+    work = work_arrays()
+    
+    nu, dt, N = params.nu, params.dt, params.N
+    HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt),
+                                 ST.quad, False)
+    HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2), SN.quad,
+                                 True)
+    TDMASolverD = TDMA(ST.quad, False)
+    TDMASolverN = TDMA(SN.quad, True)
+
+    alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
+    CDN = CDNmat(K[0, :, 0, 0])
+    CND = CNDmat(K[0, :, 0, 0])
+    BDN = BDNmat(K[0, :, 0, 0], ST.quad)
+    CDD = CDDmat(K[0, :, 0, 0])
+    BDD = BDDmat(K[0, :, 0, 0], ST.quad)
+    BDT = BDTmat(K[0, :, 0, 0], SN.quad)
+    AB = HelmholtzCoeff(K[0, :, 0, 0], -1.0, -alfa, ST.quad)
+    
+    class IPCSWriter(HDF5Writer):
+        def update_components(self, U, U0, U_hat, U_hat0, P, P_hat, FST, SN, ST, params, **kw):
+            """Transform to real data when storing the solution"""
+            U = backward_velocity(U, U_hat, FST)
+            P = FST.ifst(P_hat, P, SN)
+            if params.tstep % params.checkpoint == 0:
+                U0 = backward_velocity(U0, U_hat0, FST)
+
+    hdf5file = IPCSWriter({"U":U[0], "V":U[1], "W":U[2], "P":P}, 
+                          chkpoint={'current':{'U':U, 'P':P}, 'previous':{'U':U0}},
+                          filename=params.solver+".h5",
+                          mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
+
+
+    return locals()
+
+vars().update(setup())
 
 assert params.precision == "double"
-hdf5file = HDF5Writer({"U":U[0], "V":U[1], "W":U[2], "P":P}, 
-                      chkpoint={'current':{'U':U, 'P':P}, 'previous':{'U':U0}},
-                      filename=params.solver+".h5", 
-                      mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
 
 def backward_velocity(U, U_hat, FST):
     for i in range(3):
@@ -27,32 +110,6 @@ def forward_velocity(U_hat, U, FST):
         U_hat[i] = FST.fst(U[i], U_hat[i], ST)
     return U_hat
 
-def update_components(U, U0, U_hat, U_hat0, P, P_hat, FST, SN, ST, params, **kw):
-    """Transform to real data when storing the solution"""
-    if hdf5file.check_if_write(params) or params.tstep % params.checkpoint == 0:
-        U = backward_velocity(U, U_hat, FST)
-        P = FST.ifst(P_hat, P, SN)
-
-    if params.tstep % params.checkpoint == 0:
-        U0 = backward_velocity(U0, U_hat0, FST)
-
-hdf5file.update_components = update_components
-
-HelmholtzSolverU = Helmholtz(params.N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/params.nu/params.dt), ST.quad, False)
-HelmholtzSolverP = Helmholtz(params.N[0], sqrt(K[1, 0]**2+K[2, 0]**2), SN.quad, True)
-TDMASolverD = TDMA(ST.quad, False)
-TDMASolverN = TDMA(SN.quad, True)
-
-alfa = K[1, 0]**2+K[2, 0]**2-2.0/params.nu/params.dt
-CDN = CDNmat(K[0, :, 0, 0])
-CND = CNDmat(K[0, :, 0, 0])
-BDN = BDNmat(K[0, :, 0, 0], ST.quad)
-CDD = CDDmat(K[0, :, 0, 0])
-BDD = BDDmat(K[0, :, 0, 0], ST.quad)
-BDT = BDTmat(K[0, :, 0, 0], SN.quad)
-AB = HelmholtzCoeff(K[0, :, 0, 0], -1.0, -alfa, ST.quad)
-
-dpdx = P.copy()
 #@profile
 def pressuregrad(P, P_hat, dU):
     # Pressure gradient x-direction
@@ -234,11 +291,11 @@ def getConvection(convection):
         
         def Conv(H_hat, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
+            U_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             for i in range(3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
+                U_dealias[i] = FST.ifst(U_hat[i], U_dealias[i], ST, params.dealias)
 
-            H_hat = standardConvection(H_hat, U_dealiased, U_hat)
+            H_hat = standardConvection(H_hat, U_dealias, U_hat)
             H_hat[:] *= -1
             return H_hat
         
@@ -246,11 +303,11 @@ def getConvection(convection):
         
         def Conv(H_hat, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
+            U_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             for i in range(3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
+                U_dealias[i] = FST.ifst(U_hat[i], U_dealias[i], ST, params.dealias)
 
-            H_hat = divergenceConvection(H_hat, U_dealiased, U_hat, False)
+            H_hat = divergenceConvection(H_hat, U_dealias, U_hat, False)
             H_hat[:] *= -1
             return H_hat
         
@@ -258,12 +315,12 @@ def getConvection(convection):
         
         def Conv(H_hat, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
+            U_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             for i in range(3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
+                U_dealias[i] = FST.ifst(U_hat[i], U_dealias[i], ST, params.dealias)
 
-            H_hat = standardConvection(H_hat, U_dealiased, U_hat)
-            H_hat = divergenceConvection(H_hat, U_dealiased, U_hat, True)            
+            H_hat = standardConvection(H_hat, U_dealias, U_hat)
+            H_hat = divergenceConvection(H_hat, U_dealias, U_hat, True)            
             H_hat *= -0.5
             return H_hat
 
@@ -271,13 +328,13 @@ def getConvection(convection):
         
         def Conv(H_hat, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
-            curl_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 1)]
+            U_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
+            curl_dealias = work[((3,)+FST.work_shape(params.dealias), float, 1)]
             for i in range(3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
+                U_dealias[i] = FST.ifst(U_hat[i], U_dealias[i], ST, params.dealias)
             
-            curl_dealiased[:] = Curl(U_hat, curl_dealiased, ST)
-            H_hat[:] = Cross(U_dealiased, curl_dealiased, H_hat, ST)            
+            curl_dealias[:] = Curl(U_hat, curl_dealias, ST)
+            H_hat[:] = Cross(U_dealias, curl_dealias, H_hat, ST)            
             return H_hat
         
     return Conv           
@@ -350,7 +407,7 @@ def solve():
             # Update pressure
             P_hat[p_slice] += Pcorr[p_slice]
             
-            comm.Allreduce(linalg.norm(Pcorr), pressure_error)
+            comm.Allreduce(np.linalg.norm(Pcorr), pressure_error)
             if jj == 0 and params.print_divergence_progress and rank == 0:
                 print "   Divergence error"
             if params.print_divergence_progress:

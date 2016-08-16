@@ -1,6 +1,6 @@
 from spectralDNS import config, get_solver
 import matplotlib.pyplot as plt
-from numpy import zeros, exp, sum, pi, exp, sin, cos, tanh
+from numpy import zeros, exp, sum, pi, exp, sin, cos, tanh, float64
 
 def initialize(X, U, Ur, Ur_hat, rho, FFT, float, params, **kwargs):
     
@@ -27,7 +27,7 @@ def initialize(X, U, Ur, Ur_hat, rho, FFT, float, params, **kwargs):
 
 im, im2 = None, None
 def update(comm, rank, rho, curl, K, FFT, U_hat, U, params,
-           P_hat, P, float64, rho_hat, **kwargs):
+           P_hat, P, rho_hat, **kwargs):
     global im, im2
     
     dx, L, N = params.dx, params.L, params.N

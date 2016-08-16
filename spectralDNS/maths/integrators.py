@@ -10,7 +10,7 @@ __all__ = ['getintegrator']
 
 def adaptiveRK(A, b, bhat, err_order, fY_hat, U_hat_new, sc, err, fsal, offset, 
                aTOL, rTOL, adaptive, errnorm, dU, U_hat, ComputeRHS, dt, tstep,
-               FFT, additional_callback, params, predictivecontroller=False):
+               FFT, additional_callback, params, args, predictivecontroller=False):
     """
     Take a step using any Runge-Kutta method.
     Parameters
@@ -63,7 +63,7 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, U_hat_new, sc, err, fsal, offset,
                 for j in range(0,i):
                     fY_hat[(i+offset[0]) % s] += dt*A[i,j]*fY_hat[(j+offset[0]) % s]
                 #Compute F(Y)
-                dU = ComputeRHS(dU, fY_hat[(i+offset[0]) % s])
+                dU = ComputeRHS(dU, fY_hat[(i+offset[0]) % s], *args)
                 fY_hat[(i+offset[0]) % s] = dU
                 
             if i == 0:
@@ -141,11 +141,11 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, U_hat_new, sc, err, fsal, offset,
     return U_hat, dt, dt_prev
 
 @optimizer
-def RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS):
+def RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS, args):
     """Runge Kutta fourth order"""
     u2[:] = u1[:] = u0
     for rk in range(4):
-        dU = ComputeRHS(dU, u0)
+        dU = ComputeRHS(dU, u0, *args)
         if rk < 3:
             u0[:] = u1 + b[rk]*dt*dU
         u2 += a[rk]*dt*dU
@@ -153,14 +153,14 @@ def RK4(u0, u1, u2, dU, a, b, dt, ComputeRHS):
     return u0, dt, dt
 
 @optimizer
-def ForwardEuler(u0, u1, dU, dt, ComputeRHS):
-    dU = ComputeRHS(dU, u0) 
+def ForwardEuler(u0, u1, dU, dt, ComputeRHS, args):
+    dU = ComputeRHS(dU, u0, *args) 
     u0 += dU*dt
     return u0, dt, dt
 
 @optimizer
-def AB2(u0, u1, dU, dt, tstep, ComputeRHS):
-    dU = ComputeRHS(dU, u0)
+def AB2(u0, u1, dU, dt, tstep, ComputeRHS, args):
+    dU = ComputeRHS(dU, u0, *args)
     if tstep == 0:
         u0 += dU*dt
     else:
@@ -168,15 +168,15 @@ def AB2(u0, u1, dU, dt, tstep, ComputeRHS):
     u1[:] = dU*dt    
     return u0, dt, dt
 
-def getintegrator(dU, ComputeRHS, float, FFT, params, **kw):
+def getintegrator(ComputeRHS, dU, u0, params, args):
     """Return integrator using choice in global parameter integrator.
     """
-    if params.solver in ("NS", "VV", "NS2D"):
-        u0 = kw['U_hat']
-    elif params.solver == "MHD":
-        u0 = kw['UB_hat']
-    elif params.solver == "Bq2D":
-        u0 = kw['Ur_hat']
+    #if params.solver in ("NS", "VV", "NS2D"):
+        #u0 = U_hat
+    #elif params.solver == "MHD":
+        #u0 = kw['UB_hat']
+    #elif params.solver == "Bq2D":
+        #u0 = kw['Ur_hat']
     u1 = u0.copy()    
         
     if params.integrator == "RK4": 
@@ -186,7 +186,7 @@ def getintegrator(dU, ComputeRHS, float, FFT, params, **kw):
         u2 = u0.copy()
         @wraps(RK4)
         def func():
-            return RK4(u0, u1, u2, dU, a, b, params.dt, ComputeRHS)
+            return RK4(u0, u1, u2, dU, a, b, params.dt, ComputeRHS, args)
         return func
 
     elif params.integrator in ("BS5_adaptive", "BS5_fixed"): 
@@ -211,18 +211,19 @@ def getintegrator(dU, ComputeRHS, float, FFT, params, **kw):
         def func():
             return adaptiveRK(A, b, bhat, err_order, fY_hat, u1, sc, err, fsal, offset, 
                               params.TOL, params.TOL, adaptive, errnorm, dU, u0, ComputeRHS, 
-                              params.dt, params.tstep, FFT, kw['additional_callback'], params)
+                              params.dt, params.tstep, FFT, kw['additional_callback'], params,
+                              args)
 
         return func
 
     elif params.integrator == "ForwardEuler":  
         @wraps(ForwardEuler)
         def func():
-            return ForwardEuler(u0, u1, dU, params.dt, ComputeRHS)
+            return ForwardEuler(u0, u1, dU, params.dt, ComputeRHS, args)
         return func
     
     else:
         @wraps(AB2)
         def func():
-            return AB2(u0, u1, dU, params.dt, params.tstep, ComputeRHS)
+            return AB2(u0, u1, dU, params.dt, params.tstep, ComputeRHS, args)
         return func

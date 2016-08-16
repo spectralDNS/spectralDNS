@@ -73,7 +73,7 @@ from numpy import pi, array, float32, float64
 import collections
 import json
 
-class Params(collections.MutableMapping, dict):
+class ParamsBase(collections.MutableMapping, dict):
     """Class for collection of parameters
 
     The values of this dictionary may be accessed as attributes:
@@ -84,8 +84,46 @@ class Params(collections.MutableMapping, dict):
         assert M is N
     """
     def __init__(self, *args, **kwargs):
-        super(Params, self).__init__(*args, **kwargs)
+        super(ParamsBase, self).__init__(*args, **kwargs)
         self.__dict__ = self
+
+    def __getattribute__(self, key):
+        return dict.__getattribute__(self, key)
+
+    def __setattr__(self, key, val):
+        dict.__setattr__(self, key, val)
+        
+    def __getitem__(self, key):
+        return dict.__getitem__(self, key)
+    
+    def __setitem__(self, key, val):
+        dict.__setitem__(self, key, val)
+         
+    def __delitem__(self, key):
+        dict.__delitem__(self, key)
+        
+    def __iter__(self):
+        return dict.__iter__(self)
+    
+    def __len__(self):
+        return dict.__len__(self)
+    
+    def __contains__(self, x):
+        return dict.__contains__(self, x)
+
+
+class Params(ParamsBase):
+    """Class for collection of parameters
+
+    The values of this dictionary may be accessed as attributes:
+
+        p = Params({'M': 2})
+        M = p.M
+        N = p['M']
+        assert M is N
+    """
+    def __init__(self, *args, **kwargs):
+        ParamsBase.__init__(self, *args, **kwargs)
         
     def __getattr__(self, key):
         # Called if key is missing in __getattribute__
@@ -115,9 +153,6 @@ class Params(collections.MutableMapping, dict):
         else:
             dict.__setattr__(self, key, val)
         
-    def __getitem__(self, key):
-        return dict.__getitem__(self, key)
-    
     def __setitem__(self, key, val):
         if key == 'M':
             val = array([eval(str(f)) for f in val], dtype=int)
@@ -131,18 +166,6 @@ class Params(collections.MutableMapping, dict):
         
         else:
             dict.__setitem__(self, key, val)
-         
-    def __delitem__(self, key):
-        dict.__delitem__(self, key)
-        
-    def __iter__(self):
-        return dict.__iter__(self)
-    
-    def __len__(self):
-        return dict.__len__(self)
-    
-    def __contains__(self, x):
-        return dict.__contains__(self, x)
 
 fft_plans = collections.defaultdict(lambda: "FFTW_MEASURE",
                                     {'dct': "FFTW_EXHAUSTIVE"})

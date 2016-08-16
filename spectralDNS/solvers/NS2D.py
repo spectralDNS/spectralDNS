@@ -3,27 +3,41 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from spectralinit import *
-from spectralDNS.mesh.doublyperiodic import setup
+from .spectralinit import *
 
-vars().update(setup['NS2D'](**vars()))
+def setup():
+    FFT = get_FFT(params)
+    float, complex, mpitype = datatypes(params.precision)
+    X = FFT.get_local_mesh()
+    K = FFT.get_scaled_local_wavenumbermesh()
+    U     = empty((2,) + FFT.real_shape(), dtype=float)
+    U_hat = empty((2,) + FFT.complex_shape(), dtype=complex)
+    P     = empty(FFT.real_shape(), dtype=float)
+    P_hat = empty(FFT.complex_shape(), dtype=complex)
+    curl  = empty(FFT.real_shape(), dtype=float)
+    dU    = empty((2,) + FFT.complex_shape(), dtype=complex)
+    K2 = np.sum(K*K, 0, dtype=float)
+    K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)
+    work = work_arrays()
 
-hdf5file = HDF5Writer({"U":U[0], "V":U[1], "P":P}, 
-                       filename=params.solver+".h5",
-                       chkpoint={'current':{'U':U, 'P':P}, 'previous':{}})
+    class NS2DWriter(HDF5Writer):
+        def update_components(self, U, U_hat, P, P_hat, FFT, **kw):
+            """Transform to real data when storing the solution"""
+            for i in range(2):
+                U[i] = FFT.ifft2(U_hat[i], U[i])
+            P = FFT.ifft2(P_hat, P)
 
-def update_components(U, U_hat, P, P_hat, FFT, params, **kw):
-    """Transform to real data when storing the solution"""
-    if hdf5file.check_if_write(params) or params.tstep % params.checkpoint == 0:
-        for i in range(2):
-            U[i] = FFT.ifft2(U_hat[i], U[i])
-        P = FFT.ifft2(P_hat, P)
+    hdf5file = NS2DWriter({"U":U[0], "V":U[1], "P":P}, 
+                          filename=params.solver+".h5",
+                          chkpoint={'current':{'U':U, 'P':P}, 'previous':{}})
 
-hdf5file.update_components = update_components
+    return locals()
+
+vars().update(setup())
 
 def add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, nu):
     # Compute pressure (To get actual pressure multiply by 1j)
-    P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
+    P_hat[:] = np.sum(dU*K_over_K2, 0, out=P_hat)
 
     # Add pressure gradient
     dU -= P_hat*K
@@ -35,15 +49,15 @@ def add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, nu):
 
 def ComputeRHS(dU, U_hat):
     curl_hat = work[(FFT.complex_shape(), complex, 0)]    
-    U_dealiased = work[((2,)+FFT.work_shape(params.dealias), float, 0)]
-    curl_dealiased = work[(FFT.work_shape(params.dealias), float, 0)]
+    U_dealias = work[((2,)+FFT.work_shape(params.dealias), float, 0)]
+    curl_dealias = work[(FFT.work_shape(params.dealias), float, 0)]
     
     curl_hat = cross2(curl_hat, K, U_hat)    
-    curl_dealiased = FFT.ifft2(curl_hat, curl_dealiased, params.dealias)
-    U_dealiased[0] = FFT.ifft2(U_hat[0], U_dealiased[0], params.dealias)
-    U_dealiased[1] = FFT.ifft2(U_hat[1], U_dealiased[1], params.dealias)
-    dU[0] = FFT.fft2(U_dealiased[1]*curl_dealiased, dU[0], params.dealias)
-    dU[1] = FFT.fft2(-U_dealiased[0]*curl_dealiased, dU[1], params.dealias)
+    curl_dealias = FFT.ifft2(curl_hat, curl_dealias, params.dealias)
+    U_dealias[0] = FFT.ifft2(U_hat[0], U_dealias[0], params.dealias)
+    U_dealias[1] = FFT.ifft2(U_hat[1], U_dealias[1], params.dealias)
+    dU[0] = FFT.fft2(U_dealias[1]*curl_dealias, dU[0], params.dealias)
+    dU[1] = FFT.fft2(-U_dealias[0]*curl_dealias, dU[1], params.dealias)
     dU = add_pressure_diffusion(dU, P_hat, U_hat, K, K2, K_over_K2, params.nu)    
     return dU
 

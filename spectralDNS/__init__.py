@@ -19,7 +19,12 @@ def get_solver(update=None, regression_test=None, additional_callback=None,
     except AttributeError:
         raise AttributeError("Wrong solver!")
 
-    if update: solver.update = update
-    if regression_test: solver.regression_test = regression_test
+    if update:
+        update.solver = solver
+        solver.update = update
+    if regression_test:
+        regression_test.solver = solver
+        solver.regression_test = regression_test
+        
     if additional_callback: solver.additional_callback = additional_callback
     return solver

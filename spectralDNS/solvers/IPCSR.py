@@ -6,27 +6,27 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from IPCS import *
 from ..shen.Matrices import CDTmat, CTDmat, BDTmat, BTDmat, BTTmat, BTNmat, CNDmat, BNDmat
 
+setupIPCS = setup
+def setup():
+    CDT = CDTmat(K[0, :, 0, 0])
+    CTD = CTDmat(K[0, :, 0, 0])
+    BDT = BDTmat(K[0, :, 0, 0], ST.quad)
+    BTD = BTDmat(K[0, :, 0, 0], SN.quad)
+    BTT = BTTmat(K[0, :, 0, 0], SN.quad)
+    BTN = BTNmat(K[0, :, 0, 0], SN.quad)
+    CND = CNDmat(K[0, :, 0, 0])
+    BND = BNDmat(K[0, :, 0, 0], SN.quad)
+
+    dd = BTT.dd.repeat(array(P_hat.shape[1:]).prod()).reshape(P_hat.shape)
+
+
 # Get and update the global namespace of the ShenDNS solver (to avoid having two namespaces filled with arrays)
 # Overload just a few routines
-context = solve.func_globals
-context.update(setup['IPCSR'](**vars()))
+context = setup.func_globals
+context.update(setup())
 vars().update(context)
 
-hdf5file = HDF5Writer({"U":U[0], "V":U[1], "W":U[2], "P":P}, 
-                      chkpoint={'current':{'U':U, 'P':P}, 'previous':{'U':U0}},
-                      filename=params.solver+".h5", 
-                      mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})
 
-CDT = CDTmat(K[0, :, 0, 0])
-CTD = CTDmat(K[0, :, 0, 0])
-BDT = BDTmat(K[0, :, 0, 0], ST.quad)
-BTD = BTDmat(K[0, :, 0, 0], SN.quad)
-BTT = BTTmat(K[0, :, 0, 0], SN.quad)
-BTN = BTNmat(K[0, :, 0, 0], SN.quad)
-CND = CNDmat(K[0, :, 0, 0])
-BND = BNDmat(K[0, :, 0, 0], SN.quad)
-
-dd = BTT.dd.repeat(array(P_hat.shape[1:]).prod()).reshape(P_hat.shape)
 
 #@profile
 def pressuregrad(P, P_hat, dU):

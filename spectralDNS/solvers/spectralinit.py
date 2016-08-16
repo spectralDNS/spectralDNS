@@ -5,8 +5,10 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from mpi4py import MPI
 import sys, cProfile
-from numpy import *
-from mpiFFT4py import Slab_R2C, Pencil_R2C, Line_R2C, empty, zeros    # possibly byte-aligned zeros/empty
+import numpy as np
+# possibly byte-aligned zeros/empty
+from mpiFFT4py import Slab_R2C, Pencil_R2C, Line_R2C, empty, zeros, \
+     work_arrays, datatypes    
 from spectralDNS import config
 from spectralDNS.utilities import create_profile, MemoryUsage, Timer, reset_profile
 from spectralDNS.h5io import HDF5Writer
@@ -16,6 +18,7 @@ from spectralDNS.maths import cross1, cross2, project, getintegrator
 comm = MPI.COMM_WORLD
 num_processes = comm.Get_size()
 rank = comm.Get_rank()
+params = config.params
 
 def get_FFT(params):
     if params.decomposition == 'slab':

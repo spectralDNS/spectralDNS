@@ -1,13 +1,13 @@
 from spectralDNS import config, get_solver
-from numpy import pi, sin, cos, exp, zeros
+from numpy import pi, sin, cos, exp, zeros, float64, sum
 
-def initialize(U, U_hat, X, sin, cos, FFT, **kw):    
+def initialize(U, U_hat, X, FFT, **kw):    
     U[0] = sin(X[0])*cos(X[1])
     U[1] = -sin(X[1])*cos(X[0])
     for i in range(2):
         U_hat[i] = FFT.fft2(U[i], U_hat[i])
 
-def regression_test(comm, U, float64, sum, rank, X, params, **kw):
+def regression_test(comm, U, rank, X, params, **kw):
     dx, L = params.dx, params.L
     k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
     U[0] = -sin(X[1])*cos(X[0])*exp(-2*params.nu*params.t)

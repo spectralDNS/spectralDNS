@@ -56,9 +56,11 @@ try:
                 self.f["3D/mesh/"].create_dataset(key, shape=(len(val),), dtype=val.dtype)
                 self.f["3D/mesh/"+key][:] = val
 
-        def update(self, **kw):
-            self.update_components(**kw)
-            params = kw['params']
+        def update(self, params, **kw):
+            if (self.check_if_write(params) or 
+                  params.tstep % params.checkpoint == 0):
+                self.update_components(**kw)
+
             if self.check_if_write(params):
                 self._write(**kw)
 

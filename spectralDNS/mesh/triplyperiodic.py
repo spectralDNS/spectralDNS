@@ -4,13 +4,19 @@ __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from mpiFFT4py import work_arrays, datatypes, zeros, empty
+from ..maths.cross import cross2
 
-__all__ = ['setup']
+#@profile
+def Curl(a, c, work, FFT, K, dealias=None):
+    """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
+    curl_hat = work[(a, 0, False)]
+    curl_hat = cross2(curl_hat, K, a)
+    c[0] = FFT.ifftn(curl_hat[0], c[0], dealias)
+    c[1] = FFT.ifftn(curl_hat[1], c[1], dealias)
+    c[2] = FFT.ifftn(curl_hat[2], c[2], dealias)
+    return c
 
-def setupDNS(sum, where, config, get_FFT, **kwargs):
-    
-    params = config.params
-    L = params.L
+def setupDNS(sum, where, params, get_FFT, **kwargs):    
     FFT = get_FFT(params)
     float, complex, mpitype = datatypes(params.precision)
     X = FFT.get_local_mesh()

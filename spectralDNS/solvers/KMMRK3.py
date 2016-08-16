@@ -5,31 +5,40 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from KMM import *
 
-a = (8./15., 5./12., 3./4.)
-b = (0.0, -17./60., -5./12.)
+setupKMM = setup
+def setup():
+    locals().update(setupKMM())
+    
+    # RK parameters
+    a = (8./15., 5./12., 3./4.)
+    b = (0.0, -17./60., -5./12.)
 
-nu, dt, N = params.nu, params.dt, params.N
-HelmholtzSolverG = [Helmholtz(N[0], sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[rk]+b[rk])/dt), 
-                              ST.quad, False) for rk in range(3)]
+    HelmholtzSolverG = [Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[rk]+b[rk])/dt),
+                                  ST.quad, False) for rk in range(3)]
 
-BiharmonicSolverU = [Biharmonic(N[0], -nu*(a[rk]+b[rk])*dt/2., 1.+nu*(a[rk]+b[rk])*dt*K2[0], 
-                                -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)]
+    BiharmonicSolverU = [Biharmonic(N[0], -nu*(a[rk]+b[rk])*dt/2., 1.+nu*(a[rk]+b[rk])*dt*K2[0],
+                                    -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)]
 
-HelmholtzSolverU0 = [Helmholtz(N[0], sqrt(2./nu/(a[rk]+b[rk])/dt), ST.quad, False) for rk in range(3)]
+    HelmholtzSolverU0 = [Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST.quad, False) for rk in range(3)]
 
-AC = [BiharmonicCoeff(K[0, :, 0, 0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2[0]),
-                      -(K2[0] - nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)]
+    AC = [BiharmonicCoeff(K[0, :, 0, 0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2[0]),
+                        -(K2[0] - nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)]
 
-AB = [HelmholtzCoeff(K[0, :, 0, 0], -1.0, -(K2[0] - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)]
+    AB = [HelmholtzCoeff(K[0, :, 0, 0], -1.0, -(K2[0] - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)]
 
-U_hat1 = U_hat0.copy()
-U_hat2 = U_hat0.copy()
-hg0 = hg.copy()
-hv0 = hv.copy()
-u0_hat = zeros((3, N[0]), dtype=complex)
-h0_hat = zeros((3, N[0]), dtype=complex)
-h0 = zeros((2, N[0]), dtype=complex)
-h1 = zeros((2, N[0]), dtype=complex)
+    U_hat1 = U_hat0.copy()
+    U_hat2 = U_hat0.copy()
+    hg0 = hg.copy()
+    hv0 = hv.copy()
+    u0_hat = zeros((3, N[0]), dtype=complex)
+    h0_hat = zeros((3, N[0]), dtype=complex)
+    h0 = zeros((2, N[0]), dtype=complex)
+    h1 = zeros((2, N[0]), dtype=complex)
+    return locals()
+
+context = setupKMM.func_globals
+context.update(setup())
+vars().update(context)
 
 @optimizer
 def add_diffusion_u(u, d, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):

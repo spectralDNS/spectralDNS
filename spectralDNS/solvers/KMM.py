@@ -4,12 +4,116 @@ __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from .spectralinit import *
-from spectralDNS.mesh.channel import setup
-from ..shen.Matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, ADDmat, BDDmat, CDBmat, BiharmonicCoeff, HelmholtzCoeff
+from ..mesh.channel import SlabShen_R2C
+from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, \
+    ShenBiharmonicBasis, SFTc
+from ..shen.Matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, \
+    ADDmat, BDDmat, CDBmat, BiharmonicCoeff, HelmholtzCoeff
 from ..shen.la import Helmholtz, TDMA, Biharmonic
 from ..shen import SFTc
 
-vars().update(setup['KMM'](**vars()))
+def setup():
+    """Set up context for solver
+    
+    All data structures and variables defined here will be added to the global
+    namespace of the current solver.
+    """
+
+    # Get points and weights for Chebyshev weighted integrals
+    ST = ShenDirichletBasis(quad=params.Dquad, threads=params.threads,
+                            planner_effort=params.planner_effort["dct"])
+    SB = ShenBiharmonicBasis(quad=params.Bquad, threads=params.threads,
+                             planner_effort=params.planner_effort["dct"])
+
+    Nu = params.N[0]-2   # Number of velocity modes in Shen basis
+    Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
+    u_slice = slice(0, Nu)
+    v_slice = slice(0, Nb)
+
+    FST = SlabShen_R2C(params.N, params.L, MPI, threads=params.threads,
+                       communication=params.communication,
+                       planner_effort=params.planner_effort,
+                       dealias_cheb=params.dealias_cheb)
+
+    float, complex, mpitype = datatypes("double")
+
+    X = FST.get_local_mesh(ST)
+    x0, x1, x2 = FST.get_mesh_dims(ST)
+
+    U  = zeros((3,)+FST.real_shape(), dtype=float)
+    U0 = zeros((3,)+FST.real_shape(), dtype=float)
+    U_hat  = zeros((3,)+FST.complex_shape(), dtype=complex)
+    U_hat0 = zeros((3,)+FST.complex_shape(), dtype=complex)
+    
+    # We're solving for:
+    u = U_hat0[0]
+    g = zeros(FST.complex_shape(), dtype=complex)
+
+    H_hat  = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat0 = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat1 = zeros((3,)+FST.complex_shape(), dtype=complex)
+
+    dU = zeros((3,)+FST.complex_shape(), dtype=complex)
+    hv = zeros(FST.complex_shape(), dtype=complex)
+    hg = zeros(FST.complex_shape(), dtype=complex)
+    diff0 = zeros((3,)+FST.complex_shape(), dtype=complex)
+    Source = zeros((3,)+FST.real_shape(), dtype=float)
+    Sk = zeros((3,)+FST.complex_shape(), dtype=complex)
+
+    K = FST.get_scaled_local_wavenumbermesh()
+    K2 = K[1]*K[1]+K[2]*K[2]
+    K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)
+
+    work = work_arrays()
+    
+    nu, dt, N = params.nu, params.dt, params.N
+    K4 = K2**2
+    kx = K[0, :, 0, 0]
+    HelmholtzSolverG = Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST.quad, False)
+    BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0],
+                                   -(K2[0] + nu*dt/2.*K4[0]), quad=SB.quad,
+                                   solver="cython")
+    HelmholtzSolverU0 = Helmholtz(N[0], np.sqrt(2./nu/dt), ST.quad, False)
+
+    u0_hat = zeros((3, N[0]), dtype=complex)
+    h0_hat = zeros((3, N[0]), dtype=complex)
+
+    TDMASolverD = TDMA(ST.quad, False)
+
+    alfa = K2[0] - 2.0/nu/dt
+    CDD = CDDmat(kx)
+
+    AB = HelmholtzCoeff(kx, -1.0, -alfa, ST.quad)
+    AC = BiharmonicCoeff(kx, nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad)
+
+    # Matrices for biharmonic equation
+    CBD = CBDmat(kx)
+    ABB = ABBmat(kx)
+    BBB = BBBmat(kx, SB.quad)
+    SBB = SBBmat(kx)
+
+    # Matrices for Helmholtz equation
+    ADD = ADDmat(kx)
+    BDD = BDDmat(kx, ST.quad)
+
+    BBD = BBDmat(kx, SB.quad)
+    CDB = CDBmat(kx)
+    
+    class KMMWriter(HDF5Writer):
+        def update_components(self, U, U0, U_hat, U_hat0, FST, SB, ST, params, **kw):
+            """Transform to real data when storing the solution"""
+            U = backward_velocity(U, U_hat, FST)
+            if params.tstep % params.checkpoint == 0:
+                U0 = backward_velocity(U0, U_hat0, FST)
+
+    hdf5file = KMMWriter({"U":U[0], "V":U[1], "W":U[2]},
+                         chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
+                         filename=params.solver+".h5",
+                         mesh={"x": x0, "y": x1, "z": x2})
+    
+    return locals()
+
+vars().update(setup())
 
 assert params.precision == "double"
 
@@ -24,52 +128,6 @@ def forward_velocity(U_hat, U, FST):
     for i in range(1, 3):
         U_hat[i] = FST.fst(U[i], U_hat[i], ST)
     return U_hat
-
-class KMMWriter(HDF5Writer):
-    
-    def update_components(self, U, U0, U_hat, U_hat0, FST, SB, ST, params, **kw):
-        """Transform to real data when storing the solution"""
-        if self.check_if_write(params) or params.tstep % params.checkpoint == 0:
-            U = backward_velocity(U, U_hat, FST)
-
-        if params.tstep % params.checkpoint == 0:
-            U0 = backward_velocity(U0, U_hat0, FST)
-
-hdf5file = KMMWriter({"U":U[0], "V":U[1], "W":U[2]}, 
-                      chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
-                      filename=params.solver+".h5", mesh={"x": x0, "y": x1, "z": x2})
-
-nu, dt, N = params.nu, params.dt, params.N
-K4 = K2**2
-kx = K[0, :, 0, 0]
-HelmholtzSolverG = Helmholtz(N[0], sqrt(K2[0]+2.0/nu/dt), ST.quad, False)
-BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0], -(K2[0] + nu*dt/2.*K4[0]), quad=SB.quad, solver="cython")
-HelmholtzSolverU0 = Helmholtz(N[0], sqrt(2./nu/dt), ST.quad, False)
-
-u0_hat = zeros((3, N[0]), dtype=complex)
-h0_hat = zeros((3, N[0]), dtype=complex)
-
-TDMASolverD = TDMA(ST.quad, False)
-
-alfa = K2[0] - 2.0/nu/dt
-CDD = CDDmat(kx)
-
-AB = HelmholtzCoeff(kx, -1.0, -alfa, ST.quad)
-AC = BiharmonicCoeff(kx, nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad)
-
-# Matrices for biharmonic equation
-CBD = CBDmat(kx)
-ABB = ABBmat(kx)
-BBB = BBBmat(kx, SB.quad)
-SBB = SBBmat(kx)
-
-# Matrices for Helmholtz equation
-ADD = ADDmat(kx)
-BDD = BDDmat(kx, ST.quad)
-
-# 
-BBD = BBDmat(kx, SB.quad)
-CDB = CDBmat(kx)
 
 def solvePressure(P_hat, Ni):
     """Solve for pressure if Ni is fst of convection"""
@@ -122,9 +180,9 @@ def Curl(a_hat, c, S):
     return c
 
 #@profile
-def standardConvection(c, U_dealiased, U_hat):
+def standardConvection(c, U_dealias, U_hat):
     c[:] = 0
-    U = U_dealiased
+    U = U_dealias
     Uc = work[(U, 1)]
     Uc2 = work[(U, 2)]
     F_tmp = work[(c, 0)]
@@ -203,12 +261,12 @@ def getConvection(convection):
         
         def Conv(H_hat, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
-            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, params.dealias) 
+            U_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
+            U_dealias[0] = FST.ifst(U_hat[0], U_dealias[0], SB, params.dealias) 
             for i in range(1, 3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
+                U_dealias[i] = FST.ifst(U_hat[i], U_dealias[i], ST, params.dealias)
 
-            H_hat = standardConvection(H_hat, U_dealiased, U_hat)
+            H_hat = standardConvection(H_hat, U_dealias, U_hat)
             H_hat[:] *= -1
             return H_hat
         
@@ -216,12 +274,12 @@ def getConvection(convection):
         
         def Conv(H_hat, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
-            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, params.dealias) 
+            U_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
+            U_dealias[0] = FST.ifst(U_hat[0], U_dealias[0], SB, params.dealias) 
             for i in range(1, 3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
+                U_dealias[i] = FST.ifst(U_hat[i], U_dealias[i], ST, params.dealias)
 
-            H_hat = divergenceConvection(H_hat, U_dealiased, U_hat, False)
+            H_hat = divergenceConvection(H_hat, U_dealias, U_hat, False)
             H_hat[:] *= -1
             return H_hat
         
@@ -229,13 +287,13 @@ def getConvection(convection):
         
         def Conv(H_hat, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
-            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, params.dealias) 
+            U_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
+            U_dealias[0] = FST.ifst(U_hat[0], U_dealias[0], SB, params.dealias) 
             for i in range(1, 3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
+                U_dealias[i] = FST.ifst(U_hat[i], U_dealias[i], ST, params.dealias)
 
-            H_hat = standardConvection(H_hat, U_dealiased, U_hat)
-            H_hat = divergenceConvection(H_hat, U_dealiased, U_hat, True)            
+            H_hat = standardConvection(H_hat, U_dealias, U_hat)
+            H_hat = divergenceConvection(H_hat, U_dealias, U_hat, True)            
             H_hat *= -0.5
             return H_hat
 
@@ -243,14 +301,14 @@ def getConvection(convection):
         
         def Conv(H_hat, U_hat):
             
-            U_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 0)]
-            curl_dealiased = work[((3,)+FST.work_shape(params.dealias), float, 1)]
-            U_dealiased[0] = FST.ifst(U_hat[0], U_dealiased[0], SB, params.dealias) 
+            U_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
+            curl_dealias = work[((3,)+FST.work_shape(params.dealias), float, 1)]
+            U_dealias[0] = FST.ifst(U_hat[0], U_dealias[0], SB, params.dealias) 
             for i in range(1, 3):
-                U_dealiased[i] = FST.ifst(U_hat[i], U_dealiased[i], ST, params.dealias)
+                U_dealias[i] = FST.ifst(U_hat[i], U_dealias[i], ST, params.dealias)
             
-            curl_dealiased[:] = Curl(U_hat, curl_dealiased, ST)
-            H_hat[:] = Cross(U_dealiased, curl_dealiased, H_hat, ST)
+            curl_dealias[:] = Curl(U_hat, curl_dealias, ST)
+            H_hat[:] = Cross(U_dealias, curl_dealias, H_hat, ST)
             
             return H_hat
         

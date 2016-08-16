@@ -1,8 +1,8 @@
 from spectralDNS import config, get_solver
-from numpy import pi, sin, cos, exp, zeros, sum
+from numpy import pi, sin, cos, exp, zeros, sum, sin, cos, float64
 import matplotlib.pyplot as plt
 
-def initialize(U, U_hat, X, sin, cos, FFT, **kw):    
+def initialize(U, U_hat, X, FFT, **kw):    
     U[0] = sin(X[0])*cos(X[1])
     U[1] = -sin(X[1])*cos(X[0])
     for i in range(2):
@@ -16,11 +16,6 @@ def update(U_hat, curl, X, FFT, K, P, P_hat, hdf5file, params, **kw):
         im = plt.imshow(zeros((params.N[0], params.N[1])))
         plt.colorbar(im)
         plt.draw()
-        
-    if hdf5file.check_if_write(params):   
-        P = FFT.ifft2(P_hat*1j, P)
-        curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
-        hdf5file.write(params)
 
     if params.tstep % params.plot_result == 0 and params.plot_result > 0:
         curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
@@ -28,7 +23,7 @@ def update(U_hat, curl, X, FFT, K, P, P_hat, hdf5file, params, **kw):
         im.autoscale()
         plt.pause(1e-6)
         
-def regression_test(comm, U, float64, rank, X, U_hat, params, **kw):
+def regression_test(comm, U, rank, X, U_hat, params, **kw):
     dx, L = params.dx, params.L
     k = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
     U[0] = -sin(X[1])*cos(X[0])*exp(-2*params.nu*params.t)
@@ -50,6 +45,5 @@ if __name__ == '__main__':
 
     config.doublyperiodic.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
     solver = get_solver(update=update, regression_test=regression_test, mesh="doublyperiodic")
-    solver.hdf5file.components["curl"] = solver.curl
     initialize(**vars(solver))
     solver.solve()
