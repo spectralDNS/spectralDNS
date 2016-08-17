@@ -14,23 +14,23 @@ def get_solver(update=None,
     args = getattr(eval('.'.join(('config', mesh))),
                     'parse_args')(parse_args)
     config.params.update(vars(args))
-
+    
     try:
         solver = importlib.import_module('.'.join(('spectralDNS.solvers',
-                                            config.params.solver)))
+                                                   config.params.solver)))
     except AttributeError:
         raise AttributeError("Wrong solver!")
 
     if update:
-        update.solver = solver
         solver.update = update
 
     if regression_test:
-        regression_test.solver = solver
         solver.regression_test = regression_test
 
     if additional_callback:
-        additional_callback.solver = solver
         solver.additional_callback = additional_callback
+        
+    # Create link to solver module in config
+    config.solver = solver
 
     return solver

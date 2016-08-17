@@ -59,16 +59,15 @@ try:
 
         def update(self, params, **kw):
             #from IPython import embed; embed()
-            FFT = kw.pop('FFT', kw.get('FST'))
             if (self.check_if_write(params) or 
                   params.tstep % params.checkpoint == 0):
-                self.update_components(FFT, **kw)
+                self.update_components(**kw)
 
             if self.check_if_write(params):
-                self._write(params, FFT, **kw)
+                self._write(params, **kw)
 
             if params.tstep % params.checkpoint == 0:
-                self._checkpoint(params, FFT, **kw)
+                self._checkpoint(params, **kw)
 
         def check_if_write(self, params):
             if params.tstep % params.write_result == 0:
@@ -81,7 +80,8 @@ try:
                     return True
             return False
 
-        def _checkpoint(self, params, FFT, **kw):
+        def _checkpoint(self, params, **kw):
+            FFT = kw.pop('FFT', kw.get('FST'))
             if self.f is None: 
                 self._init_h5file(params, FFT, **kw) 
             else:
@@ -127,7 +127,8 @@ try:
                         self.f["3D/checkpoint/{}/0".format(key)][:, s[0], s[1], s[2]] = val
             self.f.close()
 
-        def _write(self, params, FFT, **kw):
+        def _write(self, params, **kw):
+            FFT = kw.pop('FFT', kw.get('FST'))
             if self.f is None: 
                 self._init_h5file(params, FFT, **kw) 
             else:
