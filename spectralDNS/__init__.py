@@ -54,11 +54,11 @@ def solve(solver, context):
     params.t = 0.0
     params.tstep = 0
     
-    ComputeRHS = solver.ComputeRHS(params)
+    ComputeRHS = solver.ComputeRHS()
     
     integrate = solver.getintegrator(ComputeRHS, 
-                                     context.dU,
-                                     context.u, # primary variable
+                                     context.dU, # rhs array
+                                     context.u,  # primary variable
                                      params,
                                      context,
                                      solver.additional_callback)

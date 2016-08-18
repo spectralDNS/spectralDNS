@@ -4,6 +4,7 @@ __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from .spectralinit import *
+from .NS import ComputeRHS as NS_ComputeRHS
 
 def setup():
     """Set up context for NS2D solver"""
@@ -60,66 +61,29 @@ def get_pressure(P, P_hat, FFT, **context):
     P = FFT.ifft2(1j*P_hat, P)
     return P
 
-def add_pressure_diffusion(rhs, u_hat, P_hat, K, K2, K_over_K2, nu):
-    # Compute pressure (To get actual pressure multiply by 1j)
-    P_hat[:] = np.sum(rhs*K_over_K2, 0, out=P_hat)
-
-    # Add pressure gradient
-    rhs -= P_hat*K
-
-    # Add contribution from diffusion
-    rhs -= nu*K2*u_hat
+class ComputeRHS(NS_ComputeRHS):
+    """Compute rhs of 2D spectral Navier Stokes equations"""
     
-    return rhs
+    @staticmethod
+    def getConvection(convection):
+        """Return function used to compute nonlinear term"""
+        if convection in ("Standard", "Divergence", "Skewed"):
 
-def getConvection(convection):
-    """Return function used to compute nonlinear term"""
-    if convection in ("Standard", "Divergence", "Skewed"):
+            raise NotImplementedError
 
-        raise NotImplementedError
+        elif convection == "Vortex":
 
-    elif convection == "Vortex":
+            def Conv(rhs, u_hat, work, FFT, K):
+                curl_hat = work[(FFT.complex_shape(), complex, 0)]
+                u_dealias = work[((2,)+FFT.work_shape(params.dealias), float, 0)]
+                curl_dealias = work[(FFT.work_shape(params.dealias), float, 0)]
+                
+                curl_hat = cross2(curl_hat, K, u_hat)
+                curl_dealias = FFT.ifft2(curl_hat, curl_dealias, params.dealias)
+                u_dealias[0] = FFT.ifft2(u_hat[0], u_dealias[0], params.dealias)
+                u_dealias[1] = FFT.ifft2(u_hat[1], u_dealias[1], params.dealias)
+                rhs[0] = FFT.fft2(u_dealias[1]*curl_dealias, rhs[0], params.dealias)
+                rhs[1] = FFT.fft2(-u_dealias[0]*curl_dealias, rhs[1], params.dealias)
+                return rhs
 
-        def Conv(rhs, u_hat, work, FFT, K):
-            curl_hat = work[(FFT.complex_shape(), complex, 0)]
-            u_dealias = work[((2,)+FFT.work_shape(params.dealias), float, 0)]
-            curl_dealias = work[(FFT.work_shape(params.dealias), float, 0)]
-            
-            curl_hat = cross2(curl_hat, K, u_hat)
-            curl_dealias = FFT.ifft2(curl_hat, curl_dealias, params.dealias)
-            u_dealias[0] = FFT.ifft2(u_hat[0], u_dealias[0], params.dealias)
-            u_dealias[1] = FFT.ifft2(u_hat[1], u_dealias[1], params.dealias)
-            rhs[0] = FFT.fft2(u_dealias[1]*curl_dealias, rhs[0], params.dealias)
-            rhs[1] = FFT.fft2(-u_dealias[0]*curl_dealias, rhs[1], params.dealias)
-            return rhs
-
-    return Conv
-
-def ComputeRHS(rhs, u_hat, work, FFT, K, K2, K_over_K2, P_hat, **context):
-    """Compute rhs of spectral Navier Stokes in 2D
-    
-    args:
-        rhs        The right hand side to be returned
-        u_hat      The FFT of the velocity at current time. May differ from
-                   context.U_hat since it is set by the integrator
-
-    Remaining args extracted from context:
-        work       Work arrays
-        FFT        Transform class from mpiFFT4py
-        K          Scaled wavenumber mesh
-        K2         K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
-        K_over_K2  K / K2
-        P_hat      Transfomred pressure
-    
-    global functions:
-        add_pressure_diffusion
-                   Adds pressure and diffusion terms
-        conv       Method returned from getConvection. Must be present in
-                   global namespace prior to calling ComputeRHS
-    """
-
-    rhs = conv(rhs, u_hat, work, FFT, K)
-    
-    rhs = add_pressure_diffusion(rhs, u_hat, P_hat, K, K2, K_over_K2, params.nu)    
-    
-    return rhs
+        return Conv

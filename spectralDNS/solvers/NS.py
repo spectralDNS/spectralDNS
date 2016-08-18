@@ -87,123 +87,100 @@ def compute_curl(c, a, work, FFT, K, dealias=None):
     c[2] = FFT.ifftn(curl_hat[2], c[2], dealias)
     return c
 
-def _standard_convection(rhs, u_dealias, U_hat, work, FFT, K, dealias=None):
-    """rhs_i = u_j du_i/dx_j"""
-    gradUi = work[(u_dealias, 2, False)]
-    for i in range(3):
-        for j in range(3):
-            gradUi[j] = FFT.ifftn(1j*K[j]*U_hat[i], gradUi[j], dealias)
-        rhs[i] = FFT.fftn(np.sum(u_dealias*gradUi, 0), rhs[i], dealias)
-    return rhs
-
-def _divergence_convection(rhs, u_dealias, work, FFT, K, dealias=None, add=False):
-    """rhs_i = div(u_i u_j)"""
-    if not add: rhs.fill(0)
-    UUi_hat = work[(rhs, 0, False)]
-    for i in range(3):
-        UUi_hat[i] = FFT.fftn(u_dealias[0]*u_dealias[i], UUi_hat[i], dealias)
-    rhs[0] += 1j*np.sum(K*UUi_hat, 0)
-    rhs[1] += 1j*K[0]*UUi_hat[1]
-    rhs[2] += 1j*K[0]*UUi_hat[2]
-    UUi_hat[0] = FFT.fftn(u_dealias[1]*u_dealias[1], UUi_hat[0], dealias)
-    UUi_hat[1] = FFT.fftn(u_dealias[1]*u_dealias[2], UUi_hat[1], dealias)
-    UUi_hat[2] = FFT.fftn(u_dealias[2]*u_dealias[2], UUi_hat[2], dealias)
-    rhs[1] += (1j*K[1]*UUi_hat[0] + 1j*K[2]*UUi_hat[1])
-    rhs[2] += (1j*K[1]*UUi_hat[1] + 1j*K[2]*UUi_hat[2])
-    return rhs
-
-#@profile
-def Cross(rhs, a, b, work, FFT, dealias=None):
-    """rhs_k = F_k(a x b)"""
+def Cross(c, a, b, work, FFT, dealias=None):
+    """c_k = F_k(a x b)"""
     Uc = work[(a, 2, False)]
     Uc = cross1(Uc, a, b)
-    rhs[0] = FFT.fftn(Uc[0], rhs[0], dealias)
-    rhs[1] = FFT.fftn(Uc[1], rhs[1], dealias)
-    rhs[2] = FFT.fftn(Uc[2], rhs[2], dealias)
-    return rhs
+    c[0] = FFT.fftn(Uc[0], c[0], dealias)
+    c[1] = FFT.fftn(Uc[1], c[1], dealias)
+    c[2] = FFT.fftn(Uc[2], c[2], dealias)
+    return c
 
-def getConvection(convection):
-    """Return function used to compute convection"""
-    if convection == "Standard":
-
-        def Conv(rhs, u_hat, work, FFT, K):
-            u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                              float, 0, False)]
-            for i in range(3):
-                u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
-            rhs = _standard_convection(rhs, u_dealias, u_hat, work, FFT, K, params.dealias)
-            rhs[:] *= -1
-            return rhs
-
-    elif convection == "Divergence":
-
-        def Conv(rhs, u_hat, work, FFT, K):
-            u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                              float, 0, False)]
-            for i in range(3):
-                u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
-            rhs = _divergence_convection(rhs, u_dealias, work, FFT, K, params.dealias, False)
-            rhs[:] *= -1
-            return rhs
-
-    elif convection == "Skewed":
-
-        def Conv(rhs, u_hat, work, FFT, K):
-            u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                              float, 0, False)]
-            for i in range(3):
-                u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
-            rhs = _standard_convection(rhs, u_dealias, u_hat, work, FFT, K, params.dealias)
-            rhs = _divergence_convection(rhs, u_dealias, work, FFT, K, params.dealias, True)
-            rhs *= -0.5
-            return rhs
-
-    elif convection == "Vortex":
-
-        #@profile
-        def Conv(rhs, u_hat, work, FFT, K):
-            u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                              float, 0, False)]
-            curl_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                                 float, 1, False)]
-            for i in range(3):
-                u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
-
-            curl_dealias = compute_curl(curl_dealias, u_hat, work, FFT, K, params.dealias)
-            rhs = Cross(rhs, u_dealias, curl_dealias, work, FFT, params.dealias)
-            return rhs
-
-    return Conv
-
-class ComputeRHS(object):
-    """Compute rhs of spectral Navier Stokes
+class ComputeRHS(RhsBase):
+    """Compute rhs of spectral Navier Stokes equations"""
     
-    args:
-        rhs        The right hand side to be returned
-        u_hat      The FFT of the velocity at current time. May differ from
-                   context.U_hat since it is set by the integrator
+    @staticmethod
+    def getConvection(convection):
+        
+        def _standard_convection(rhs, u_dealias, U_hat, work, FFT, K, dealias=None):
+            """rhs_i = u_j du_i/dx_j"""
+            gradUi = work[(u_dealias, 2, False)]
+            for i in range(3):
+                for j in range(3):
+                    gradUi[j] = FFT.ifftn(1j*K[j]*U_hat[i], gradUi[j], dealias)
+                rhs[i] = FFT.fftn(np.sum(u_dealias*gradUi, 0), rhs[i], dealias)
+            return rhs
 
-    Remaining args extracted from context:
-        work       Work arrays
-        FFT        Transform class from mpiFFT4py
-        K          Scaled wavenumber mesh
-        K2         K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
-        K_over_K2  K / K2
-        P_hat      Transfomred pressure
-    
-    global functions:
-        add_pressure_diffusion
-                   Adds pressure and diffusion terms
-        conv       Method returned from getConvection. Must be present in
-                   global namespace prior to calling ComputeRHS
-    """
+        def _divergence_convection(rhs, u_dealias, work, FFT, K, dealias=None, add=False):
+            """rhs_i = div(u_i u_j)"""
+            if not add: rhs.fill(0)
+            UUi_hat = work[(rhs, 0, False)]
+            for i in range(3):
+                UUi_hat[i] = FFT.fftn(u_dealias[0]*u_dealias[i], UUi_hat[i], dealias)
+            rhs[0] += 1j*np.sum(K*UUi_hat, 0)
+            rhs[1] += 1j*K[0]*UUi_hat[1]
+            rhs[2] += 1j*K[0]*UUi_hat[2]
+            UUi_hat[0] = FFT.fftn(u_dealias[1]*u_dealias[1], UUi_hat[0], dealias)
+            UUi_hat[1] = FFT.fftn(u_dealias[1]*u_dealias[2], UUi_hat[1], dealias)
+            UUi_hat[2] = FFT.fftn(u_dealias[2]*u_dealias[2], UUi_hat[2], dealias)
+            rhs[1] += (1j*K[1]*UUi_hat[0] + 1j*K[2]*UUi_hat[1])
+            rhs[2] += (1j*K[1]*UUi_hat[1] + 1j*K[2]*UUi_hat[2])
+            return rhs
 
-    def __init__(self, params):
-        self.conv = getConvection(params.convection)
+        if convection == "Standard":
 
+            def Conv(rhs, u_hat, work, FFT, K):
+                u_dealias = work[((3,)+FFT.work_shape(params.dealias),
+                                float, 0, False)]
+                for i in range(3):
+                    u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
+                rhs = _standard_convection(rhs, u_dealias, u_hat, work, FFT, K, params.dealias)
+                rhs[:] *= -1
+                return rhs
+
+        elif convection == "Divergence":
+
+            def Conv(rhs, u_hat, work, FFT, K):
+                u_dealias = work[((3,)+FFT.work_shape(params.dealias),
+                                float, 0, False)]
+                for i in range(3):
+                    u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
+                rhs = _divergence_convection(rhs, u_dealias, work, FFT, K, params.dealias, False)
+                rhs[:] *= -1
+                return rhs
+
+        elif convection == "Skewed":
+
+            def Conv(rhs, u_hat, work, FFT, K):
+                u_dealias = work[((3,)+FFT.work_shape(params.dealias),
+                                float, 0, False)]
+                for i in range(3):
+                    u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
+                rhs = _standard_convection(rhs, u_dealias, u_hat, work, FFT, K, params.dealias)
+                rhs = _divergence_convection(rhs, u_dealias, work, FFT, K, params.dealias, True)
+                rhs *= -0.5
+                return rhs
+
+        elif convection == "Vortex":
+
+            #@profile
+            def Conv(rhs, u_hat, work, FFT, K):
+                u_dealias = work[((3,)+FFT.work_shape(params.dealias),
+                                float, 0, False)]
+                curl_dealias = work[((3,)+FFT.work_shape(params.dealias),
+                                    float, 1, False)]
+                for i in range(3):
+                    u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
+
+                curl_dealias = compute_curl(curl_dealias, u_hat, work, FFT, K, params.dealias)
+                rhs = Cross(rhs, u_dealias, curl_dealias, work, FFT, params.dealias)
+                return rhs
+
+        return Conv
+        
     @staticmethod
     @optimizer
-    def add_pressure_diffusion(rhs, u_hat, K2, K, P_hat, K_over_K2, nu):
+    def add_linear(rhs, u_hat, nu, K2, K, P_hat, K_over_K2):
         """Add contributions from pressure and diffusion to the rhs"""
 
         # Compute pressure (To get actual pressure multiply by 1j)
@@ -218,6 +195,23 @@ class ComputeRHS(object):
         return rhs
 
     def __call__(self, rhs, u_hat, work, FFT, K, K2, K_over_K2, P_hat, **context):
-        rhs = self.conv(rhs, u_hat, work, FFT, K)
-        rhs = self.add_pressure_diffusion(rhs, u_hat, K2, K, P_hat, K_over_K2, params.nu)
+        """Compute right hand side of Navier Stokes
+        
+        args:
+            rhs         The right hand side to be returned
+            u_hat       The FFT of the velocity at current time. May differ from
+                        context.U_hat since it is set by the integrator
+
+        Remaining args may be extracted from context:
+            work        Work arrays
+            FFT         Transform class from mpiFFT4py
+            K           Scaled wavenumber mesh
+            K2          K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+            K_over_K2   K / K2
+            P_hat       Transformed pressure
+        
+        """
+
+        rhs = self.nonlinear(rhs, u_hat, work, FFT, K)
+        rhs = self.add_linear(rhs, u_hat, params.nu, K2, K, P_hat, K_over_K2)
         return rhs

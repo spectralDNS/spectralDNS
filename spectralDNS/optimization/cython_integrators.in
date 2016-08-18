@@ -102,7 +102,8 @@ def RK4_2D(np.ndarray[complex_t, ndim=3] U_hat,
         np.ndarray[real_t, ndim=1] a, 
         np.ndarray[real_t, ndim=1] b,
         real_t dt,
-        ComputeRHS):
+        ComputeRHS,
+        context):
     cdef complex_t z
     cdef unsigned int rk, i, j, k
     for i in xrange(dU.shape[0]):
@@ -113,7 +114,7 @@ def RK4_2D(np.ndarray[complex_t, ndim=3] U_hat,
                 U_hat0[i,j,k] = z
         
     for rk in xrange(4):
-        dU = ComputeRHS(dU, U_hat)
+        dU = ComputeRHS(dU, U_hat, **context)
         if rk < 3:
             for i in xrange(dU.shape[0]):
                 for j in xrange(dU.shape[1]):
@@ -130,32 +131,34 @@ def RK4_2D(np.ndarray[complex_t, ndim=3] U_hat,
             for k in xrange(dU.shape[2]):
                 U_hat[i,j,k] = U_hat1[i,j,k]
                     
-    return U_hat
+    return U_hat, dt, dt
 
 def ForwardEuler_2D(np.ndarray[complex_t, ndim=3] U_hat, 
                     np.ndarray[complex_t, ndim=3] U_hat0, 
                     np.ndarray[complex_t, ndim=3] dU, 
                     real_t dt,
-                    ComputeRHS):
+                    ComputeRHS,
+                    context):
     cdef complex_t z
     cdef unsigned int rk, i, j, k
-    dU = ComputeRHS(dU, U_hat)
+    dU = ComputeRHS(dU, U_hat, **context)
     for i in xrange(dU.shape[0]):
         for j in xrange(dU.shape[1]):
             for k in xrange(dU.shape[2]):
                 U_hat[i,j,k] = U_hat[i,j,k] + dU[i,j,k]*dt 
-    return U_hat
+    return U_hat, dt, dt
 
 def AB2_2D(np.ndarray[complex_t, ndim=3] U_hat, 
            np.ndarray[complex_t, ndim=3] U_hat0, 
            np.ndarray[complex_t, ndim=3] dU,
            real_t dt, int tstep,
-           ComputeRHS):
+           ComputeRHS,
+           context):
     cdef complex_t z
     cdef real_t p0 = 1.5
     cdef real_t p1 = 0.5
     cdef unsigned int rk, i, j, k
-    dU = ComputeRHS(dU, U_hat)
+    dU = ComputeRHS(dU, U_hat, **context)
     
     if tstep == 1:
         for i in xrange(dU.shape[0]):
@@ -173,4 +176,4 @@ def AB2_2D(np.ndarray[complex_t, ndim=3] U_hat,
         for j in xrange(dU.shape[1]):
             for k in xrange(dU.shape[2]):
                 U_hat0[i,j,k] = dU[i,j,k]*dt
-    return U_hat
+    return U_hat, dt, dt

@@ -120,8 +120,7 @@ if __name__ == "__main__":
     )
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=2)
     config.triplyperiodic.add_argument("--plot_step", type=int, default=2)
-    sol = get_solver(update=update, regression_test=regression_test,
-                     mesh="triplyperiodic")
+    sol = get_solver(mesh="triplyperiodic")
 
     context = sol.setup()
 

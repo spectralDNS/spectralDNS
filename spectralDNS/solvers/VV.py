@@ -83,45 +83,57 @@ def get_curl(curl, W_hat, FFT, **context):
         curl[i] = FFT.ifftn(W_hat[i], curl[i])
     return curl
 
-def getConvection(convection):
-    """Return function used to compute nonlinear term"""
-    if convection in ("Standard", "Divergence", "Skewed"):
-
-        raise NotImplementedError
-
-    elif convection == "Vortex":
-
-        def Conv(rhs, w_hat, work, FFT, K, K_over_K2):
-            u_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
-            w_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
-            v_hat = work[(rhs, 0)]
-            
-            u_dealias = computeU(u_dealias, w_hat, work, FFT, K_over_K2, params.dealias)
-            for i in range(3):
-                w_dealias[i] = FFT.ifftn(w_hat[i], w_dealias[i], params.dealias)
-            v_hat = Cross(v_hat, u_dealias, w_dealias, work, FFT, params.dealias) # v_hat = F_k(u_dealias x w_dealias)
-            rhs = cross2(rhs, K, v_hat)  # rhs = 1j*(K x v_hat)
-            return rhs
-
-    return Conv
-
-def ComputeRHS(rhs, w_hat, work, FFT, K, K2, K_over_K2, Source, **context):
-    """Compute rhs of spectral Navier Stokes in velocity-vorticity formulation
+class ComputeRHS(RhsBase):
+    """Compute rhs of spectral Navier Stokes equations in velocity-vortex form"""
     
-    args:
-        rhs        The right hand side to be returned
-        w_hat      The FFT of the curl at current time. May differ from
-                   context.W_hat since it is set by the integrator
+    @staticmethod
+    def getConvection(convection):
+        """Return function used to compute nonlinear term"""
+        if convection in ("Standard", "Divergence", "Skewed"):
 
-    Remaining args extracted from context:
-        work       Work arrays
-        FFT        Transform class from mpiFFT4py
-        K          Scaled wavenumber mesh
-        K2         K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
-        K_over_K2  K / K2
-        Source     Source term to rhs
-    """
-    rhs = conv(rhs, w_hat, work, FFT, K, K_over_K2)
-    rhs -= params.nu*K2*w_hat
-    rhs += Source
-    return rhs
+            raise NotImplementedError
+
+        elif convection == "Vortex":
+
+            def Conv(rhs, w_hat, work, FFT, K, K_over_K2):
+                u_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
+                w_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
+                v_hat = work[(rhs, 0)]
+                
+                u_dealias = computeU(u_dealias, w_hat, work, FFT, K_over_K2, params.dealias)
+                for i in range(3):
+                    w_dealias[i] = FFT.ifftn(w_hat[i], w_dealias[i], params.dealias)
+                v_hat = Cross(v_hat, u_dealias, w_dealias, work, FFT, params.dealias) # v_hat = F_k(u_dealias x w_dealias)
+                rhs = cross2(rhs, K, v_hat)  # rhs = 1j*(K x v_hat)
+                return rhs
+
+        return Conv
+
+    @staticmethod
+    @optimizer
+    def add_linear(rhs, w_hat, nu, K2, Source):
+        """Add contributions from pressure and diffusion to the rhs"""
+        rhs -= nu*K2*w_hat
+        rhs += Source
+        return rhs
+
+    def __call__(self, rhs, w_hat, work, FFT, K, K2, K_over_K2, Source, **context):
+        """Compute and return right hand side of Navier Stokes
+        
+        args:
+            rhs         The right hand side to be returned
+            w_hat       The FFT of the curl at current time. May differ from
+                        context.W_hat since it is set by the integrator
+
+        Remaining args may be extracted from context:
+            work        Work arrays
+            FFT         Transform class from mpiFFT4py
+            K           Scaled wavenumber mesh
+            K2          K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+            K_over_K2   K / K2
+            Source      Scalar source term
+        
+        """
+        rhs = self.nonlinear(rhs, w_hat, work, FFT, K, K_over_K2)
+        rhs = self.add_linear(rhs, w_hat, params.nu, K2, Source)
+        return rhs
