@@ -54,14 +54,14 @@ def solve(solver, context):
     params.t = 0.0
     params.tstep = 0
     
-    integrate = solver.getintegrator(solver.ComputeRHS, 
+    ComputeRHS = solver.ComputeRHS(params)
+    
+    integrate = solver.getintegrator(ComputeRHS, 
                                      context.dU,
                                      context.u, # primary variable
                                      params,
                                      context,
                                      solver.additional_callback)
-
-    solver.conv = solver.getConvection(params.convection)
 
     if params.make_profile: solver.profiler = cProfile.Profile()
 
@@ -92,7 +92,7 @@ def solve(solver, context):
 
     params.dt = dt_in
 
-    dU = solver.ComputeRHS(context.dU, u, **context)
+    dU = ComputeRHS(context.dU, u, **context)
 
     solver.additional_callback(context)
 

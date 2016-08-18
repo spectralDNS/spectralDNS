@@ -175,22 +175,7 @@ def getConvection(convection):
 
     return Conv
 
-@optimizer
-def add_pressure_diffusion(rhs, u_hat, K2, K, P_hat, K_over_K2, nu):
-    """Add contributions from pressure and diffusion to the rhs"""
-
-    # Compute pressure (To get actual pressure multiply by 1j)
-    P_hat = np.sum(rhs*K_over_K2, 0, out=P_hat)
-
-    # Subtract pressure gradient
-    rhs -= P_hat*K
-
-    # Subtract contribution from diffusion
-    rhs -= nu*K2*u_hat
-
-    return rhs
-
-def ComputeRHS(rhs, u_hat, work, FFT, K, K2, K_over_K2, P_hat, **context):
+class ComputeRHS(object):
     """Compute rhs of spectral Navier Stokes
     
     args:
@@ -213,8 +198,26 @@ def ComputeRHS(rhs, u_hat, work, FFT, K, K2, K_over_K2, P_hat, **context):
                    global namespace prior to calling ComputeRHS
     """
 
-    rhs = conv(rhs, u_hat, work, FFT, K)
+    def __init__(self, params):
+        self.conv = getConvection(params.convection)
 
-    rhs = add_pressure_diffusion(rhs, u_hat, K2, K, P_hat, K_over_K2, params.nu)
+    @staticmethod
+    @optimizer
+    def add_pressure_diffusion(rhs, u_hat, K2, K, P_hat, K_over_K2, nu):
+        """Add contributions from pressure and diffusion to the rhs"""
 
-    return rhs
+        # Compute pressure (To get actual pressure multiply by 1j)
+        P_hat = np.sum(rhs*K_over_K2, 0, out=P_hat)
+
+        # Subtract pressure gradient
+        rhs -= P_hat*K
+
+        # Subtract contribution from diffusion
+        rhs -= nu*K2*u_hat
+
+        return rhs
+
+    def __call__(self, rhs, u_hat, work, FFT, K, K2, K_over_K2, P_hat, **context):
+        rhs = self.conv(rhs, u_hat, work, FFT, K)
+        rhs = self.add_pressure_diffusion(rhs, u_hat, K2, K, P_hat, K_over_K2, params.nu)
+        return rhs
