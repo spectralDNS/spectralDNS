@@ -6,8 +6,8 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 from .spectralinit import *
 
 def setup():
-    """Set up context for solver"""
-    
+    """Set up context for classical (NS) solver"""
+
     # FFT class performs the 3D parallel transforms
     FFT = get_FFT(params)
     float, complex, mpitype = datatypes(params.precision)
@@ -47,7 +47,7 @@ class NSWriter(HDF5Writer):
     wanted, then subclass HDF5Writer in the application.
     """
     def update_components(self, **context):
-        """Transform to real data when storing the solution"""
+        """Transform to real data before storing the solution"""
         U = get_velocity(**context)
         P = get_pressure(**context)
 
@@ -190,7 +190,7 @@ def add_pressure_diffusion(rhs, u_hat, K2, K, P_hat, K_over_K2, nu):
 
     return rhs
 
-def ComputeRHS(rhs, u_hat, work, FFT, K, K2, P_hat, K_over_K2, **context):
+def ComputeRHS(rhs, u_hat, work, FFT, K, K2, K_over_K2, P_hat, **context):
     """Compute rhs of spectral Navier Stokes
     
     args:
@@ -203,7 +203,14 @@ def ComputeRHS(rhs, u_hat, work, FFT, K, K2, P_hat, K_over_K2, **context):
         FFT        Transform class from mpiFFT4py
         K          Scaled wavenumber mesh
         K2         K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+        K_over_K2  K / K2
         P_hat      Transfomred pressure
+    
+    global functions:
+        add_pressure_diffusion
+                   Adds pressure and diffusion terms
+        conv       Method returned from getConvection. Must be present in
+                   global namespace prior to calling ComputeRHS
     """
 
     rhs = conv(rhs, u_hat, work, FFT, K)

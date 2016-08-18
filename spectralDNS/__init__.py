@@ -5,6 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 import config
 import importlib
+import cProfile
 
 def get_solver(update=None,
                regression_test=None,
@@ -34,3 +35,73 @@ def get_solver(update=None,
     config.solver = solver
 
     return solver
+
+def solve(solver, context):
+    """Solve triply periodic Navier Stokes equations
+
+    args:
+        solver       The solver (e.g., NS or VV) module
+        context      The solver's context from setup()
+
+    global args:
+        params       Dictionary (config.params) of parameters
+                     that control the integration.
+                     See spectralDNS.config for details
+    """
+    
+    solver.timer = solver.Timer()
+    params = solver.params
+    params.t = 0.0
+    params.tstep = 0
+    
+    integrate = solver.getintegrator(solver.ComputeRHS, 
+                                     context.dU,
+                                     context.u, # primary variable
+                                     params,
+                                     context,
+                                     solver.additional_callback)
+
+    solver.conv = solver.getConvection(params.convection)
+
+    if params.make_profile: solver.profiler = cProfile.Profile()
+
+    dt_in = params.dt
+
+    while params.t + params.dt <= params.T+1e-15:
+
+        u, params.dt, dt_took = integrate()
+
+        params.t += dt_took
+        params.tstep += 1
+
+        solver.update(context)
+
+        context.hdf5file.update(params, **context)
+
+        solver.timer()
+
+        if params.tstep == 1 and params.make_profile:
+            #Enable profiling after first step is finished
+            solver.profiler.enable()
+
+        #Make sure that the last step hits T exactly.
+        if params.t + params.dt >= params.T:
+            params.dt = params.T - params.t
+            if params.dt <= 1.e-14:
+                break
+
+    params.dt = dt_in
+
+    dU = solver.ComputeRHS(context.dU, u, **context)
+
+    solver.additional_callback(context)
+
+    solver.timer.final(solver.MPI, solver.rank)
+
+    if params.make_profile:
+        results = solver.create_profile(solver.profiler, solver.comm,
+                                        solver.MPI, solver.rank)
+
+    solver.regression_test(context)
+
+    context.hdf5file.close()

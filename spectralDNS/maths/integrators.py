@@ -68,7 +68,8 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
                 fY_hat[(i+offset[0]) % s] = rhs
                 
             if i == 0:
-                additional_callback(fu0=fY_hat[(0+offset[0]) % s])
+                context.fu0 = fY_hat[(0+offset[0]) % s]
+                additional_callback(context)
                 
         #Calculate the new value
         u0_new[:] = u0
@@ -125,7 +126,9 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
             dt = dt*factor
             if  est > 1.0:
                 facmax = 1
-                additional_callback(is_step_rejected_callback=True, dt_rejected=dt_prev)
+                context.is_step_rejected_callback=True
+                context.dt_rejected = dt_prev
+                additional_callback(context)
                 #The offset gets decreased in the  next step, which is something we do not want.
                 if fsal:
                     offset[0] += 1

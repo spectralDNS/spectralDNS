@@ -1,25 +1,25 @@
-from spectralDNS import config, get_solver
+from spectralDNS import config, get_solver, solve
 
 import matplotlib.pyplot as plt
 from numpy import array, pi, zeros, sum, float64,sin, cos
 from numpy.linalg import norm
 import sys
 
-def initialize(solver, **kw):
+def initialize(solver, **context):
     if 'NS' in config.params.solver:
-        initialize1(solver, **kw)
+        initialize1(solver, **context)
     
     else:
-        initialize2(solver, **kw)
+        initialize2(solver, **context)
         
-def initialize1(solver, U, U_hat, X, FFT, **kw):    
+def initialize1(solver, U, U_hat, X, FFT, **context):    
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0 
     for i in range(3):
         U_hat[i] = FFT.fftn(U[i], U_hat[i])
         
-def initialize2(solver, U, W_hat, X, FFT, K, work, **kw):
+def initialize2(solver, U, W_hat, X, FFT, K, work, **context):
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0
@@ -104,9 +104,6 @@ def regression_test(context):
         assert round(k - 0.124953117517, 7) == 0
         assert round(w - 0.375249930801, 7) == 0
 
-def additional_callback(**kw):
-    pass
-    
 if __name__ == "__main__":
     config.update(
         {
@@ -123,8 +120,7 @@ if __name__ == "__main__":
     )
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=2)
     config.triplyperiodic.add_argument("--plot_step", type=int, default=2)
-    sol = get_solver(update=update, regression_test=regression_test, 
-                     additional_callback=additional_callback, 
+    sol = get_solver(update=update, regression_test=regression_test,
                      mesh="triplyperiodic")
 
     context = sol.setup()
@@ -145,4 +141,4 @@ if __name__ == "__main__":
         context.hdf5file.update_components = update_components
 
     initialize(sol, **context)
-    sol.solve(sol, context)
+    solve(sol, context)

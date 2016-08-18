@@ -15,7 +15,7 @@ Overloading just a few routines.
 from NS import *
 
 def setup():
-    """Set up context for solver"""
+    """Set up context for Velocity-Vorticity (VV) solver"""
     
     # FFT class performs the 3D parallel transforms
     FFT = get_FFT(params)
@@ -27,7 +27,7 @@ def setup():
     K2 = np.sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)    
     
-    # Velocity and pressure
+    # Solution variables
     U     = empty((3,) + FFT.real_shape(), dtype=float)  
     curl  = empty((3,) + FFT.real_shape(), dtype=float)   
     W_hat = empty((3,) + FFT.complex_shape(), dtype=complex) # curl transformed
@@ -35,7 +35,7 @@ def setup():
     # Primary variable
     u = W_hat
 
-    # RHS array
+    # RHS, source and work arrays
     dU     = empty((3,) + FFT.complex_shape(), dtype=complex)
     Source = zeros((3,) + FFT.complex_shape(), dtype=complex) # Possible source term initialized to zero
     work = work_arrays()
@@ -83,7 +83,28 @@ def get_curl(curl, W_hat, FFT, **context):
         curl[i] = FFT.ifftn(W_hat[i], curl[i])
     return curl
 
-#@profile
+def getConvection(convection):
+    """Return function used to compute nonlinear term"""
+    if convection in ("Standard", "Divergence", "Skewed"):
+
+        raise NotImplementedError
+
+    elif convection == "Vortex":
+
+        def Conv(rhs, w_hat, work, FFT, K, K_over_K2):
+            u_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
+            w_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
+            v_hat = work[(rhs, 0)]
+            
+            u_dealias = computeU(u_dealias, w_hat, work, FFT, K_over_K2, params.dealias)
+            for i in range(3):
+                w_dealias[i] = FFT.ifftn(w_hat[i], w_dealias[i], params.dealias)
+            v_hat = Cross(v_hat, u_dealias, w_dealias, work, FFT, params.dealias) # v_hat = F_k(u_dealias x w_dealias)
+            rhs = cross2(rhs, K, v_hat)  # rhs = 1j*(K x v_hat)
+            return rhs
+
+    return Conv
+
 def ComputeRHS(rhs, w_hat, work, FFT, K, K2, K_over_K2, Source, **context):
     """Compute rhs of spectral Navier Stokes in velocity-vorticity formulation
     
@@ -100,15 +121,7 @@ def ComputeRHS(rhs, w_hat, work, FFT, K, K2, K_over_K2, Source, **context):
         K_over_K2  K / K2
         Source     Source term to rhs
     """
-    u_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
-    w_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
-    v_hat = work[(rhs, 0)]
-    
-    u_dealias = computeU(u_dealias, w_hat, work, FFT, K_over_K2, params.dealias)
-    for i in range(3):
-        w_dealias[i] = FFT.ifftn(w_hat[i], w_dealias[i], params.dealias)
-    v_hat = Cross(v_hat, u_dealias, w_dealias, work, FFT, params.dealias) # v_hat = F_k(u_dealias x w_dealias)
-    rhs = cross2(rhs, K, v_hat)  # rhs = 1j*(K x v_hat)
-    rhs -= params.nu*K2*w_hat    
-    rhs += Source    
+    rhs = conv(rhs, w_hat, work, FFT, K, K_over_K2)
+    rhs -= params.nu*K2*w_hat
+    rhs += Source
     return rhs

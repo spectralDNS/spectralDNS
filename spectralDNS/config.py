@@ -262,6 +262,9 @@ doublyperiodic.add_argument('--integrator', default='RK4',
                             help='Integrator for doubly periodic domain')
 doublyperiodic.add_argument('--L', default=[2*pi, 2*pi], nargs=2, metavar=('Lx', 'Ly'),
                             help='Physical mesh size')
+doublyperiodic.add_argument('--convection', default='Vortex',
+                            choices=('Vortex'),
+                            help='Choose method for computing the nonlinear convective term')
 doublyperiodic.add_argument('--decomposition', default='line',
                             choices=('line', ),
                             help="For 2D problems line is the only choice.")
