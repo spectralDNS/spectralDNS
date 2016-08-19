@@ -1,8 +1,9 @@
-from spectralDNS import config, get_solver
+from spectralDNS import config, get_solver, solve
 import matplotlib.pyplot as plt
-from numpy import zeros, pi, sum
+from numpy import zeros, pi, sum, exp, sin, cos, tanh, float64
 
-def initialize(X, U, U_hat, exp, sin, cos, tanh, FFT, params, **kwargs):
+def initialize(X, U, U_hat, FFT, **context):
+    params = config.params
     Um = 0.5*(params.U1 - params.U2)
     N = params.N    
     U[1] = params.A*sin(2*X[0])       
@@ -15,22 +16,20 @@ def initialize(X, U, U_hat, exp, sin, cos, tanh, FFT, params, **kwargs):
         U_hat[i] = FFT.fft2(U[i], U_hat[i])
 
 im, im2 = None, None
-def update(comm, rank, FFT, U_hat, U, params,
-           P_hat, P, hdf5file, float64, K, curl, **kwargs):
+def update(context):
     global im, im2
-    
+    c = context
+    params = config.params
+    solver = config.solver
     dx, L, N = params.dx, params.L, params.N
-    if (hdf5file.check_if_write(params) or (params.tstep % params.plot_result == 0 
-        and params.plot_result > 0)):
-        P = FFT.ifft2(P_hat*1j, P)
-        curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
-
-    if hdf5file.check_if_write(params):
-        hdf5file.write(params)           
+    if params.tstep % params.plot_result == 0 and params.plot_result > 0:
+        P = solver.get_pressure(**context)
+        curl = solver.get_curl(**context)
 
     if params.tstep % params.compute_energy == 0:
-        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
-        if rank == 0:
+        U = solver.get_velocity(**context)
+        kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
+        if solver.rank == 0:
             print params.tstep, kk
             
     if params.tstep == 1 and params.plot_result > 0:
@@ -60,7 +59,7 @@ def update(comm, rank, FFT, U_hat, U, params,
         im2.set_data(curl[:,:].T)
         im2.autoscale()
         plt.pause(1e-6)
-        if rank == 0:
+        if solver.rank == 0:
             print params.tstep            
 
 if __name__ == "__main__":
@@ -80,7 +79,8 @@ if __name__ == "__main__":
     # Adding new arguments required here to allow overloading through commandline
     config.doublyperiodic.add_argument('--plot_result', type=int, default=10)    
     config.doublyperiodic.add_argument('--compute_energy', type=int, default=10)
-    solver = get_solver(update, mesh='doublyperiodic')
+    solver = get_solver(update=update, mesh='doublyperiodic')
     assert config.params.solver == 'NS2D'
-    initialize(**vars(solver))
-    solver.solve()
+    context = solver.setup()
+    initialize(**context)
+    solve(solver, context)

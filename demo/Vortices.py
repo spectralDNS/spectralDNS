@@ -1,4 +1,4 @@
-from spectralDNS import config, get_solver
+from spectralDNS import config, get_solver, solve
 import matplotlib.pyplot as plt
 from numpy import array, sqrt, random, exp, pi
 
@@ -37,10 +37,10 @@ def update(context):
     global im, im2
     c = context
     params = config.params
+    solver = config.solver
     
     if (params.tstep % params.plot_step == 0 and params.plot_step > 0 or
         params.tstep == 1):
-        P = c.FFT.ifftn(c.P_hat*1j, c.P)
         U = solver.get_velocity(**c)
         curl = solver.get_curl(**c)
     
@@ -70,6 +70,7 @@ def update(context):
     
 def regression_test(context):
     global im
+    solver = config.solver
     U = solver.get_velocity(**context)
     im.set_UVC(U[1, 0], U[2, 0])
     plt.pause(1e-6)
@@ -93,4 +94,4 @@ if __name__ == "__main__":
     context = solver.setup()
     initialize(**context)
     set_source(**context)
-    solver.solve(context)
+    solve(solver, context)

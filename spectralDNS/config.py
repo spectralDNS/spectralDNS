@@ -21,6 +21,7 @@ Generic parameters for all solvers::
     dealias          (str)           ('3/2-rule', '2/3-rule', 'None')
     ntol             (int)           Tolerance (number of accurate digits used in tests)
     threads          (int)           Number of threads used for FFTs
+    h5filename       (str)           Filename for storing HDF5 results
 
 Parameters for 3D solvers in triply periodic domain::
     convection       (str)           ('Standard', 'Divergence', 'Skewed', 'Vortex')
@@ -213,6 +214,7 @@ parser.add_argument('--threads', default=1, type=int,
                     help='Number of threads used for FFTs')
 parser.add_argument('--planner_effort', action=PlanAction, default=fft_plans, 
                     help="""Planning effort for FFTs. Usage, e.g., --planner_effort '{"dct":"FFTW_EXHAUSTIVE"}' """)
+parser.add_argument('--h5filename', default='results', type=str, help='Filename of HDF5 datafile used to store intermediate checkpoint data or timeseries results')
 
 # Arguments for 3D isotropic solvers
 triplyperiodic = argparse.ArgumentParser(parents=[parser])

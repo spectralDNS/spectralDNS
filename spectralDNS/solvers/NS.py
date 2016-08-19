@@ -35,7 +35,7 @@ def setup():
         
     hdf5file = NSWriter({'U':U[0], 'V':U[1], 'W':U[2], 'P':P},
                         chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
-                        filename=params.solver+'.h5')
+                        filename=params.h5filename+'.h5')
 
     return config.ParamsBase(locals())
 
@@ -100,7 +100,7 @@ class ComputeRHS(RhsBase):
     """Compute rhs of spectral Navier Stokes equations"""
     
     @staticmethod
-    def getConvection(convection):
+    def _getConvection(convection):
         
         def _standard_convection(rhs, u_dealias, U_hat, work, FFT, K, dealias=None):
             """rhs_i = u_j du_i/dx_j"""
@@ -206,7 +206,7 @@ class ComputeRHS(RhsBase):
             work        Work arrays
             FFT         Transform class from mpiFFT4py
             K           Scaled wavenumber mesh
-            K2          K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+            K2          sum_i K[i]*K[i]
             K_over_K2   K / K2
             P_hat       Transformed pressure
         

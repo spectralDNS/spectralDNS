@@ -66,29 +66,31 @@ class RhsBase(object):
     """Compute rhs of spectral Navier Stokes equations"""
     
     def __init__(self):
-        self.conv = None
-        
+        self._conv = None
+
     @staticmethod
-    def getConvection(conv_type):
+    def _getConvection(conv_type):
         pass
-    
+
     def nonlinear(self, *args):
         """Compute contribution to rhs from nonlinear term
-        
+
         Since there may be many different ways of computing the nonlinear
-        term, the actual method is chosen using a parameter set externally:
-        config.params.convection
+        term, the actual method is here chosen using a parameter set 
+        externally:
+
+            config.params.convection
 
         To avoid costly if tests, the function to use is collected
         dynamically the first time nonlinear is called. Overload only
         getConvection in subclasses.
         """
         try:
-            return self.conv(*args)
+            return self._conv(*args)
 
         except TypeError:
-            self.conv = self.getConvection(params.convection)
-            return self.conv(*args)
+            self._conv = self._getConvection(params.convection)
+            return self._conv(*args)
 
     @staticmethod
     def add_linear(rhs, u_hat, *args):
@@ -103,7 +105,7 @@ class RhsBase(object):
         return rhs
 
     def __call__(self, rhs, u_hat, **context):
-        """Compute right hand side of Navier Stokes
+        """Return right hand side of Navier Stokes
         
         args:
             rhs         The right hand side to be returned

@@ -43,7 +43,7 @@ def setup():
     hdf5file = VVWriter({'U':U[0], 'V':U[1], 'W':U[2],
                          'curlx':curl[0], 'curly':curl[1], 'curlz':curl[2]},
                         chkpoint={'current':{'U':U, 'curl':curl}, 'previous':{}},
-                        filename=params.solver+'.h5')
+                        filename=params.h5filename+'.h5')
 
     return config.ParamsBase(locals())
 
@@ -87,7 +87,7 @@ class ComputeRHS(RhsBase):
     """Compute rhs of spectral Navier Stokes equations in velocity-vortex form"""
     
     @staticmethod
-    def getConvection(convection):
+    def _getConvection(convection):
         """Return function used to compute nonlinear term"""
         if convection in ("Standard", "Divergence", "Skewed"):
 
@@ -118,7 +118,7 @@ class ComputeRHS(RhsBase):
         return rhs
 
     def __call__(self, rhs, w_hat, work, FFT, K, K2, K_over_K2, Source, **context):
-        """Compute and return right hand side of Navier Stokes
+        """Return right hand side of Navier Stokes in velocity-vorticity form
         
         args:
             rhs         The right hand side to be returned

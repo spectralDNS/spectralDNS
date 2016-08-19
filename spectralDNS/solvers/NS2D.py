@@ -33,7 +33,7 @@ def setup():
     work = work_arrays()
 
     hdf5file = NS2DWriter({"U":U[0], "V":U[1], "P":P}, 
-                          filename=params.solver+".h5",
+                          filename=params.h5filename+".h5",
                           chkpoint={'current':{'U':U, 'P':P}, 'previous':{}})
 
     return config.ParamsBase(locals())
@@ -62,10 +62,14 @@ def get_pressure(P, P_hat, FFT, **context):
     return P
 
 class ComputeRHS(NS_ComputeRHS):
-    """Compute rhs of 2D spectral Navier Stokes equations"""
+    """Compute rhs of 2D spectral Navier Stokes equations
+    
+    Everything except getConvection is inherited from the NS solver
+    
+    """
     
     @staticmethod
-    def getConvection(convection):
+    def _getConvection(convection):
         """Return function used to compute nonlinear term"""
         if convection in ("Standard", "Divergence", "Skewed"):
 

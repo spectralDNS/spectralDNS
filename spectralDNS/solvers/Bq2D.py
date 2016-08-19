@@ -38,9 +38,9 @@ def setup():
     dU     = empty((3,) + FFT.complex_shape(), dtype=complex)
     work = work_arrays()
     
-    hdf5file = Bq2DWriter({"U":U[0], "V":U[1], "rho":rho, "P":P},
+    hdf5file = Bq2DWriter({'U':U[0], 'V':U[1], 'rho':rho, 'P':P},
                           chkpoint={'current':{'U':Ur, 'P':P}, 'previous':{}},
-                          filename="Bq2D.h5")
+                          filename=params.h5filename+'.h5')
     
     return config.ParamsBase(locals())
 
@@ -51,15 +51,28 @@ class Bq2DWriter(HDF5Writer):
             Ur[i] = FFT.ifft2(Ur_hat[i], Ur[i])
         P = FFT.ifft2(P_hat, P)
 
+def get_Ur(Ur, Ur_hat, FFT, **context):
+    """Compute and return Ur from context"""
+    for i in range(3):
+        Ur[i] = FFT.ifft2(Ur_hat[i], Ur[i])
+    return Ur
+
 def get_rho(Ur, Ur_hat, FFT, **context):
+    """Compute and return rho from context"""
     Ur[2] = FFT.ifft2(Ur_hat[2], Ur[2])
     return Ur[2]
+
+def get_velocity(Ur, Ur_hat, FFT, **context):
+    """Compute and return velocity from context"""
+    Ur[0] = FFT.ifft2(Ur_hat[0], Ur[0])
+    Ur[1] = FFT.ifft2(Ur_hat[1], Ur[1])
+    return Ur[:2]
 
 class ComputeRHS(RhsBase):
     """Compute right hand side of 2D Navier Stokes equations on Boussinesq form"""
 
     @staticmethod
-    def getConvection(convection):
+    def _getConvection(convection):
         """Return function used to compute nonlinear term"""
         if convection in ("Standard", "Divergence", "Skewed"):
 

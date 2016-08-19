@@ -35,7 +35,7 @@ def setup():
     hdf5file = MHDWriter({'U':U[0], 'V':U[1], 'W':U[2], 'P':P,
                          'Bx':B[0], 'By':B[1], 'Bz':B[2]},
                          chkpoint={'current':{'UB':UB, 'P':P}, 'previous':{}},
-                         filename="MHD.h5")
+                         filename=params.h5filename+'.h5')
 
     return config.ParamsBase(locals())
 
@@ -65,9 +65,9 @@ class ComputeRHS(RhsBase):
     """Compute rhs of spectral Navier Stokes"""
     
     @staticmethod
-    def getConvection(convection):
+    def _getConvection(convection):
     
-        def set_Elsasser(c, F_tmp, K):
+        def _set_Elsasser(c, F_tmp, K):
             c[:3] = -1j*(K[0]*(F_tmp[:, 0] + F_tmp[0, :])
                         +K[1]*(F_tmp[:, 1] + F_tmp[1, :])
                         +K[2]*(F_tmp[:, 2] + F_tmp[2, :]))/2.0
@@ -87,7 +87,7 @@ class ComputeRHS(RhsBase):
                 for j in range(3):
                     F_tmp[i, j] = FFT.fftn(z0[i]*z1[j], F_tmp[i, j], dealias)
 
-            c = set_Elsasser(c, F_tmp, K)
+            c = _set_Elsasser(c, F_tmp, K)
             return c
 
         if convection in ("Standard", "Vortex", "Skewed"):
@@ -130,7 +130,7 @@ class ComputeRHS(RhsBase):
         return rhs
 
     def __call__(self, rhs, ub_hat, work, FFT, K, K2, K_over_K2, P_hat, **context):
-        """Compute right hand side of Navier Stokes
+        """Return right hand side of Navier Stokes
         
         args:
             rhs         The right hand side to be returned
@@ -142,7 +142,7 @@ class ComputeRHS(RhsBase):
             work        Work arrays
             FFT         Transform class from mpiFFT4py
             K           Scaled wavenumber mesh
-            K2          K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+            K2          sum_i K[i]*K[i]
             K_over_K2   K / K2
             P_hat       Transfomred pressure
         
