@@ -133,6 +133,12 @@ def get_curl(curl, U_hat, g, work, FST, SB, ST, K, **context):
     curl = compute_curl(curl, U_hat, g, K, FST, SB, ST, work)
     return curl
 
+def get_convection(H_hat, U_hat, g, K, FST, SB, ST, work, mat, la, **context):
+    """Compute convection from context"""
+    conv = getConvection(params.convection)
+    H_hat = conv(H_hat, U_hat, g, K, FST, SB, ST, work, mat, la)
+    return H_hat
+
 #def get_pressure(P_hat, Ni):
     #"""Solve for pressure if Ni is fst of convection"""
     #pass

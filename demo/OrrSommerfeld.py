@@ -23,43 +23,36 @@ def initOS(OS, U, X, t=0.):
     U[2] = 0
 
 OS, e0 = None, None
-def initialize(solver, U, U_hat, U_hat0, H_hat1, FST, SB, ST, X, mat,
-               la, work, K, **context):
+def initialize(solver, context):
     global OS, e0
     params = config.params
     OS = OrrSommerfeld(Re=params.Re, N=160)
+    U = context.U
+    X = context.X
+    FST = context.FST
     initOS(OS, U, X)
+    
+    U_hat = solver.set_velocity(**context)
+    U = solver.get_velocity(**context)
 
-    U_hat0 = solver.set_velocity(U_hat0, U, FST, ST, SB)
-    U = solver.get_velocity(U, U_hat0, FST, ST, SB)
+    # Compute convection from data in context (i.e., context.U_hat and context.g)
+    context.H_hat1[:] = solver.get_convection(**context)
 
-    conv = solver.getConvection(params.convection)
-    H_hat1 = conv(H_hat1, U_hat0, context['g'], K, FST, SB, ST, work, mat, la)
-
-    e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, ST.quad)
+    e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.ST.quad)
     initOS(OS, U, X, t=params.dt)
-    U_hat = solver.set_velocity(U_hat, U, FST, ST, SB)
-    U = solver.get_velocity(U, U_hat, FST, ST, SB)
+    U_hat = solver.set_velocity(**context)
+    U = solver.get_velocity(**context)
 
     if not params.solver in ("KMM", "KMMRK3"):  
-        pass
-        #conv2 = zeros_like(H_hat1)
-        #conv2 = conv(conv2, 0.5*(U_hat0+U_hat))  
-        #for j in range(3):
-            #conv2[j] = la.TDMASolverD(conv2[j])
-        #conv2 *= -1
-        #kw['P_hat'] = solvePressure(kw['P_hat'], conv2)
-
-        #kw['P'] = FST.ifst(kw['P_hat'], kw['P'], kw['SN'])
-        #U_hat0[:] = U_hat
-        #params.t = params.dt
-        #params.tstep = 1
+        P_hat = solver.get_pressure(**context)
+        context.P = FST.ifst(P_hat, context.P, context.SN)
         
     else:
-        U_hat0[:] = U_hat
-        params.t = params.dt
-        params.tstep = 1
-        context['g'][:] = 0
+        context.g[:] = 0
+
+    context.U_hat0[:] = U_hat
+    params.t = params.dt
+    params.tstep = 1
 
 def set_Source(Source, Sk, FST, ST, **kw):
     Source[:] = 0
@@ -169,7 +162,7 @@ if __name__ == "__main__":
     solver = get_solver(update=update, regression_test=regression_test, mesh="channel")  
     #solver = get_solver(mesh="channel")  
     context = solver.setup()
-    initialize(solver, **context)
+    initialize(solver, context)
     set_Source(**context)
     solve(solver, context)
     #s = solver
