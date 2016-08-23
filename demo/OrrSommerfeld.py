@@ -1,5 +1,5 @@
 """Orr-Sommerfeld"""
-from spectralDNS import config, get_solver
+from spectralDNS import config, get_solver, solve
 from OrrSommerfeld_eig import OrrSommerfeld
 from numpy import dot, real, pi, cos, vstack, flipud, hstack, floor, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose
 from mpiFFT4py import dct
@@ -23,8 +23,8 @@ def initOS(OS, U, X, t=0.):
     U[2] = 0
 
 OS, e0 = None, None
-def initialize(solver, U, U_hat, U_hat0, H_hat1, FST, SB, ST, X,
-               TDMASolverD, work, K, **context):
+def initialize(solver, U, U_hat, U_hat0, H_hat1, FST, SB, ST, X, mat,
+               la, work, K, **context):
     global OS, e0
     params = config.params
     OS = OrrSommerfeld(Re=params.Re, N=160)
@@ -33,8 +33,8 @@ def initialize(solver, U, U_hat, U_hat0, H_hat1, FST, SB, ST, X,
     U_hat0 = solver.set_velocity(U_hat0, U, FST, ST, SB)
     U = solver.get_velocity(U, U_hat0, FST, ST, SB)
 
-    conv = solver.ComputeRHS()
-    H_hat1 = conv.nonlinear(H_hat1, U_hat0, context['g'], K, FST, SB, ST, work)
+    conv = solver.getConvection(params.convection)
+    H_hat1 = conv(H_hat1, U_hat0, context['g'], K, FST, SB, ST, work, mat, la)
 
     e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, ST.quad)
     initOS(OS, U, X, t=params.dt)
@@ -46,7 +46,7 @@ def initialize(solver, U, U_hat, U_hat0, H_hat1, FST, SB, ST, X,
         #conv2 = zeros_like(H_hat1)
         #conv2 = conv(conv2, 0.5*(U_hat0+U_hat))  
         #for j in range(3):
-            #conv2[j] = TDMASolverD(conv2[j])
+            #conv2[j] = la.TDMASolverD(conv2[j])
         #conv2 *= -1
         #kw['P_hat'] = solvePressure(kw['P_hat'], conv2)
 
@@ -165,12 +165,13 @@ if __name__ == "__main__":
         },  "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)
-    config.channel.add_argument("--plot_step", type=int, default=1)
-    solver = get_solver(update=update, regression_test=regression_test, mesh="channel")    
+    config.channel.add_argument("--plot_step", type=int, default=10)
+    solver = get_solver(update=update, regression_test=regression_test, mesh="channel")  
+    #solver = get_solver(mesh="channel")  
     context = solver.setup()
     initialize(solver, **context)
     set_Source(**context)
-    solver.solve(context)
+    solve(solver, context)
     #s = solver
     #s.FST.padsize = 2.0
     #U0 = s.FST.get_workarray(((3,)+s.FST.real_shape_padded(), s.float), 0)

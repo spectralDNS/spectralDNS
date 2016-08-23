@@ -46,22 +46,16 @@ def solve(solver, context):
     global args:
         params       Dictionary (config.params) of parameters
                      that control the integration.
-                     See spectralDNS.config for details
+                     See spectralDNS.config.py for details
     """
     
     solver.timer = solver.Timer()
     params = solver.params
-    params.t = 0.0
-    params.tstep = 0
     
-    ComputeRHS = solver.ComputeRHS()
-    
-    integrate = solver.getintegrator(ComputeRHS, 
-                                     context.dU, # rhs array
+    integrate = solver.getintegrator(context.dU, # rhs array
                                      context.u,  # primary variable
-                                     params,
-                                     context,
-                                     solver.additional_callback)
+                                     solver,
+                                     context)
 
     if params.make_profile: solver.profiler = cProfile.Profile()
 
@@ -91,10 +85,6 @@ def solve(solver, context):
                 break
 
     params.dt = dt_in
-
-    dU = ComputeRHS(context.dU, u, **context)
-
-    solver.additional_callback(context)
 
     solver.timer.final(solver.MPI, solver.rank)
 

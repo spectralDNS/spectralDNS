@@ -319,8 +319,12 @@ channelsubparsers = channel.add_subparsers(dest='solver')
 
 KMM = channelsubparsers.add_parser('KMM',
                                    help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
+KMM.add_argument('--integrator', default='implicit', choices=('implicit',),
+                 help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
 KMMRK3 = channelsubparsers.add_parser('KMMRK3',
                                       help='Kim Moin Moser channel solver with third order semi-implicit Runge-Kutta discretization.')
+KMMRK3.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',),
+                    help='RK3 integrator for channel solver')
 
 IPCS = channelsubparsers.add_parser('IPCS',
                                     help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')

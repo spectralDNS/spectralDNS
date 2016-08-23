@@ -6,6 +6,8 @@ def initialize(U, U_hat, X, FFT, **context):
     U[1] = -sin(X[1])*cos(X[0])
     for i in range(2):
         U_hat[i] = FFT.fft2(U[i], U_hat[i])
+    config.params.t = 0
+    config.params.tstep = 0
 
 def regression_test(context):
     cx = context
@@ -47,6 +49,8 @@ if __name__ == '__main__':
     config.params.write_result = 1
     config.params.checkpoint = 1
     config.params.dt = 0.01
+    config.params.t = 0.0
+    config.params.tstep = 0    
     config.params.T = 0.04
     solver.regression_test = lambda c: None
     initialize(**context)

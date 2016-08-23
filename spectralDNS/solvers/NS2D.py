@@ -3,8 +3,9 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from .spectralinit import *
-from .NS import ComputeRHS as NS_ComputeRHS
+from .NS import *
+
+# Reuses most of NS.py module
 
 def setup():
     """Set up context for NS2D solver"""
@@ -61,33 +62,26 @@ def get_pressure(P, P_hat, FFT, **context):
     P = FFT.ifft2(1j*P_hat, P)
     return P
 
-class ComputeRHS(NS_ComputeRHS):
-    """Compute rhs of 2D spectral Navier Stokes equations
+def getConvection(convection):
+    """Return function used to compute nonlinear term"""
+    if convection in ("Standard", "Divergence", "Skewed"):
+        raise NotImplementedError
+
+    elif convection == "Vortex":
+
+        def Conv(rhs, u_hat, work, FFT, K):
+            curl_hat = work[(FFT.complex_shape(), complex, 0)]
+            u_dealias = work[((2,)+FFT.work_shape(params.dealias), float, 0)]
+            curl_dealias = work[(FFT.work_shape(params.dealias), float, 0)]
+            
+            curl_hat = cross2(curl_hat, K, u_hat)
+            curl_dealias = FFT.ifft2(curl_hat, curl_dealias, params.dealias)
+            u_dealias[0] = FFT.ifft2(u_hat[0], u_dealias[0], params.dealias)
+            u_dealias[1] = FFT.ifft2(u_hat[1], u_dealias[1], params.dealias)
+            rhs[0] = FFT.fft2(u_dealias[1]*curl_dealias, rhs[0], params.dealias)
+            rhs[1] = FFT.fft2(-u_dealias[0]*curl_dealias, rhs[1], params.dealias)
+            return rhs
     
-    Everything except getConvection is inherited from the NS solver
-    
-    """
-    
-    @staticmethod
-    def _getConvection(convection):
-        """Return function used to compute nonlinear term"""
-        if convection in ("Standard", "Divergence", "Skewed"):
+    Conv.convection = convection
+    return Conv
 
-            raise NotImplementedError
-
-        elif convection == "Vortex":
-
-            def Conv(rhs, u_hat, work, FFT, K):
-                curl_hat = work[(FFT.complex_shape(), complex, 0)]
-                u_dealias = work[((2,)+FFT.work_shape(params.dealias), float, 0)]
-                curl_dealias = work[(FFT.work_shape(params.dealias), float, 0)]
-                
-                curl_hat = cross2(curl_hat, K, u_hat)
-                curl_dealias = FFT.ifft2(curl_hat, curl_dealias, params.dealias)
-                u_dealias[0] = FFT.ifft2(u_hat[0], u_dealias[0], params.dealias)
-                u_dealias[1] = FFT.ifft2(u_hat[1], u_dealias[1], params.dealias)
-                rhs[0] = FFT.fft2(u_dealias[1]*curl_dealias, rhs[0], params.dealias)
-                rhs[1] = FFT.fft2(-u_dealias[0]*curl_dealias, rhs[1], params.dealias)
-                return rhs
-
-        return Conv

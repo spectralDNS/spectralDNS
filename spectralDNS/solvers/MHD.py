@@ -61,94 +61,97 @@ def get_UB(UB, UB_hat, FFT, **context):
     UB = backward_transform(UB, UB_hat, FFT)
     return UB
 
-class ComputeRHS(RhsBase):
-    """Compute rhs of spectral Navier Stokes"""
+def set_Elsasser(c, F_tmp, K):
+    c[:3] = -1j*(K[0]*(F_tmp[:, 0] + F_tmp[0, :])
+                +K[1]*(F_tmp[:, 1] + F_tmp[1, :])
+                +K[2]*(F_tmp[:, 2] + F_tmp[2, :]))/2.0
+
+    c[3:] =  1j*(K[0]*(F_tmp[0, :] - F_tmp[:, 0])
+                +K[1]*(F_tmp[1, :] - F_tmp[:, 1])
+                +K[2]*(F_tmp[2, :] - F_tmp[:, 2]))/2.0
+    return c
+
+def divergenceConvection(c, z0, z1, work, FFT, K, dealias=None):
+    """Divergence convection using Elsasser variables
+    z0=U+B
+    z1=U-B
+    """
+    F_tmp = work[((3, 3) + FFT.complex_shape(), complex, 0)]
+    for i in range(3):
+        for j in range(3):
+            F_tmp[i, j] = FFT.fftn(z0[i]*z1[j], F_tmp[i, j], dealias)
+
+    c = _set_Elsasser(c, F_tmp, K)
+    return c
+
+def getConvection(convection):
+
+    if convection in ("Standard", "Vortex", "Skewed"):
+        raise NotImplementedError
+
+    elif convection == "Divergence":
+
+        def Conv(rhs, ub_hat, work, FFT, K):
+            ub_dealias = work[((6,)+FFT.work_shape(params.dealias), float, 0)]
+            for i in range(6):
+                ub_dealias[i] = FFT.ifftn(ub_hat[i], ub_dealias[i], params.dealias)
+
+            u_dealias = ub_dealias[:3]
+            b_dealias = ub_dealias[3:]
+            # Compute convective term and place in dU
+            rhs = _divergenceConvection(rhs, u_dealias+b_dealias, u_dealias-b_dealias,
+                                        work, FFT, K, params.dealias)
+            return rhs
     
-    @staticmethod
-    def _getConvection(convection):
+    Conv.convection = convection
+    return Conv
+
+@optimizer
+def add_pressure_diffusion(rhs, ub_hat, nu, eta, K2, K, P_hat, K_over_K2):
+    """Add contributions from pressure and diffusion to the rhs"""
+
+    u_hat = ub_hat[:3]
+    b_hat = ub_hat[3:]
     
-        def _set_Elsasser(c, F_tmp, K):
-            c[:3] = -1j*(K[0]*(F_tmp[:, 0] + F_tmp[0, :])
-                        +K[1]*(F_tmp[:, 1] + F_tmp[1, :])
-                        +K[2]*(F_tmp[:, 2] + F_tmp[2, :]))/2.0
+    # Compute pressure (To get actual pressure multiply by 1j)
+    P_hat = np.sum(rhs[:3]*K_over_K2, 0, out=P_hat)
 
-            c[3:] =  1j*(K[0]*(F_tmp[0, :] - F_tmp[:, 0])
-                        +K[1]*(F_tmp[1, :] - F_tmp[:, 1])
-                        +K[2]*(F_tmp[2, :] - F_tmp[:, 2]))/2.0
-            return c
+    # Add pressure gradient
+    rhs[:3] -= P_hat*K
 
-        def _divergenceConvection(c, z0, z1, work, FFT, K, dealias=None):
-            """Divergence convection using Elsasser variables
-            z0=U+B
-            z1=U-B
-            """
-            F_tmp = work[((3, 3) + FFT.complex_shape(), complex, 0)]
-            for i in range(3):
-                for j in range(3):
-                    F_tmp[i, j] = FFT.fftn(z0[i]*z1[j], F_tmp[i, j], dealias)
+    # Add contribution from diffusion
+    rhs[:3] -= nu*K2*u_hat
+    rhs[3:] -= eta*K2*b_hat
+    return rhs
 
-            c = _set_Elsasser(c, F_tmp, K)
-            return c
+def ComputeRHS(rhs, ub_hat, solver, work, FFT, K, K2, K_over_K2, P_hat, **context):
+    """Return right hand side of Navier Stokes
+    
+    args:
+        rhs         The right hand side to be returned
+        ub_hat      The FFT of the velocity and magnetic fields at current
+                    time. May differ from context.UB_hat since it is set by
+                    the integrator
+        solver      The solver module. Included for possible inheritance.
 
-        if convection in ("Standard", "Vortex", "Skewed"):
-            
-            raise NotImplementedError
+    Remaining args may be extracted from context:
+        work        Work arrays
+        FFT         Transform class from mpiFFT4py
+        K           Scaled wavenumber mesh
+        K2          sum_i K[i]*K[i]
+        K_over_K2   K / K2
+        P_hat       Transfomred pressure
+    
+    """
+    # Get and evaluate the convection method
+    try:
+        rhs = ComputeRHS._conv(rhs, ub_hat, work, FFT, K)
+        assert ComputeRHS._conv.convection == params.convection
 
-        elif convection == "Divergence":
+    except (AttributeError, AssertionError):
+        ComputeRHS._conv = solver.getConvection(params.convection)
+        rhs = ComputeRHS._conv(rhs, ub_hat, work, FFT, K)
 
-            def Conv(rhs, ub_hat, work, FFT, K):
-                ub_dealias = work[((6,)+FFT.work_shape(params.dealias), float, 0)]
-                for i in range(6):
-                    ub_dealias[i] = FFT.ifftn(ub_hat[i], ub_dealias[i], params.dealias)
-
-                u_dealias = ub_dealias[:3]
-                b_dealias = ub_dealias[3:]
-                # Compute convective term and place in dU
-                rhs = _divergenceConvection(rhs, u_dealias+b_dealias, u_dealias-b_dealias,
-                                            work, FFT, K, params.dealias)
-                return rhs
-        
-        return Conv
-
-    @staticmethod
-    @optimizer
-    def add_linear(rhs, ub_hat, nu, eta, K2, K, P_hat, K_over_K2):
-        """Add contributions from pressure and diffusion to the rhs"""
-
-        u_hat = ub_hat[:3]
-        b_hat = ub_hat[3:]
-        
-        # Compute pressure (To get actual pressure multiply by 1j)
-        P_hat = np.sum(rhs[:3]*K_over_K2, 0, out=P_hat)
-
-        # Add pressure gradient
-        rhs[:3] -= P_hat*K
-
-        # Add contribution from diffusion
-        rhs[:3] -= nu*K2*u_hat
-        rhs[3:] -= eta*K2*b_hat
-        return rhs
-
-    def __call__(self, rhs, ub_hat, work, FFT, K, K2, K_over_K2, P_hat, **context):
-        """Return right hand side of Navier Stokes
-        
-        args:
-            rhs         The right hand side to be returned
-            ub_hat      The FFT of the velocity and magnetic fields at current
-                        time. May differ from context.UB_hat since it is set by
-                        the integrator
-
-        Remaining args may be extracted from context:
-            work        Work arrays
-            FFT         Transform class from mpiFFT4py
-            K           Scaled wavenumber mesh
-            K2          sum_i K[i]*K[i]
-            K_over_K2   K / K2
-            P_hat       Transfomred pressure
-        
-        """
-
-        rhs = self.nonlinear(rhs, ub_hat, work, FFT, K)
-        rhs = self.add_linear(rhs, ub_hat, params.nu, params.eta, K2, K, P_hat,
-                              K_over_K2)
-        return rhs
+    rhs = solver.add_pressure_diffusion(rhs, ub_hat, params.nu, params.eta, K2,
+                                        K, P_hat, K_over_K2)
+    return rhs

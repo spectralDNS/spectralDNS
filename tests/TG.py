@@ -8,6 +8,8 @@ def initialize(solver, **context):
     
     else:
         initialize2(solver, **context)
+    config.params.t = 0.0
+    config.params.tstep = 0
         
 def initialize1(solver, U, U_hat, X, FFT, **context):
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
@@ -66,6 +68,8 @@ if __name__ == "__main__":
     config.params.write_result = 1
     config.params.checkpoint = 1
     config.params.dt = 0.01
+    config.params.t = 0.0
+    config.params.tstep = 0
     config.params.T = 0.04
     solver.regression_test = lambda c: None
     solve(solver, context)
@@ -89,6 +93,8 @@ if __name__ == "__main__":
     config.params.write_result = 1
     config.params.checkpoint = 1
     config.params.dt = 0.01
+    config.params.t = 0.0
+    config.params.tstep = 0
     config.params.T = 0.04
     VVsolver.regression_test = lambda c: None
     solve(VVsolver, VVcontext)

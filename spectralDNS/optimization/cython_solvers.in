@@ -4,16 +4,26 @@ cimport numpy as np
 
 {0}
 
-def add_diffusion_u_KMM(d, u, AC, SBB, ABB, BBB, nu, dt, K2, K4):
-    d = AC.matvec(u, d)
-    return d
+def add_linear_KMM(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
+        diff_u = work[(g, 0)]
+        diff_g = work[(g, 1)]
+        
+        # Compute diffusion for g-equation
+        diff_g = AB.matvec(g, diff_g)
+
+        # Compute diffusion++ for u-equation
+        diff_u = AC.matvec(u, diff_u)
+
+        rhs[0] += diff_u
+        rhs[1] += diff_g
+        return rhs
 
 def add_diffusion_u_KMMRK3(d, u, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
     d = AC.matvec(u, d)
     return d
 
-def assembleAB_KMM(np.ndarray[complex_t, ndim=4] H_hat, 
-                   np.ndarray[complex_t, ndim=4] H_hat0, 
+def assembleAB_KMM(np.ndarray[complex_t, ndim=4] H_hat0, 
+                   np.ndarray[complex_t, ndim=4] H_hat, 
                    np.ndarray[complex_t, ndim=4] H_hat1):
     cdef int i, j, k, l
     
@@ -22,14 +32,15 @@ def assembleAB_KMM(np.ndarray[complex_t, ndim=4] H_hat,
             for j in range(H_hat.shape[2]):
                 for k in range(H_hat.shape[3]):
                     H_hat0[l, i, j, k] = 1.5*H_hat[l, i, j, k] - 0.5*H_hat1[l, i, j, k]
+    return H_hat0
 
-def add_linear_NS(np.ndarray[complex_t, ndim=4] du,
-                  np.ndarray[complex_t, ndim=4] u_hat,
-                  real_t nu,
-                  np.ndarray[real_t, ndim=3] ksq,
-                  np.ndarray[real_t, ndim=4] kk,
-                  np.ndarray[complex_t, ndim=3] p_hat,
-                  np.ndarray[real_t, ndim=4] k_over_k2):
+def add_pressure_diffusion_NS(np.ndarray[complex_t, ndim=4] du,
+                              np.ndarray[complex_t, ndim=4] u_hat,
+                              real_t nu,
+                              np.ndarray[real_t, ndim=3] ksq,
+                              np.ndarray[real_t, ndim=4] kk,
+                              np.ndarray[complex_t, ndim=3] p_hat,
+                              np.ndarray[real_t, ndim=4] k_over_k2):
     cdef unsigned int i, j, k
     cdef real_t z
     cdef real_t k0, k1, k2
@@ -46,36 +57,36 @@ def add_linear_NS(np.ndarray[complex_t, ndim=4] du,
                 du[2,i,j,k] = du[2,i,j,k] - (p_hat[i,j,k]*k2+u_hat[2,i,j,k]*z)
     return du
 
-def add_linear_Bq2D(np.ndarray[complex_t, ndim=3] du, 
-                    np.ndarray[complex_t, ndim=2] p_hat, 
-                    np.ndarray[complex_t, ndim=3] u_hat,
-                    np.ndarray[complex_t, ndim=2] rho_hat,
-                    np.ndarray[real_t, ndim=3] k_over_k2, 
-                    np.ndarray[real_t, ndim=3] k, 
-                    np.ndarray[real_t, ndim=2] ksq, 
-                    real_t nu, real_t Ri, real_t Pr):
+def add_pressure_diffusion_Bq2D(np.ndarray[complex_t, ndim=3] du, 
+                                np.ndarray[complex_t, ndim=3] ur_hat,
+                                np.ndarray[complex_t, ndim=2] p_hat, 
+                                np.ndarray[real_t, ndim=3] k_over_k2, 
+                                np.ndarray[real_t, ndim=3] k, 
+                                np.ndarray[real_t, ndim=2] ksq, 
+                                real_t nu, real_t Ri, real_t Pr):
     cdef unsigned int i, j
     cdef real_t k0, k1, k2
     cdef real_t z
+    
     for i in xrange(ksq.shape[0]):
         for j in xrange(ksq.shape[1]):
             z = nu*ksq[i,j]
             k0 = k[0,i,j]
             k1 = k[1,i,j]
             k2 = k[2,i,j]
-            p_hat[i,j] = du[0,i,j]*k_over_k2[0,i,j]+du[1,i,j]*k_over_k2[1,i,j] - Ri*rho_hat[i,j]*k_over_k2[1,i,j]            
-            du[0,i,j] = du[0,i,j] - (p_hat[i,j]*k0+u_hat[0,i,j]*z)
-            du[1,i,j] = du[1,i,j] - (p_hat[i,j]*k1+u_hat[1,i,j]*z+Ri*rho_hat[i,j])
-            du[2,i,j] = du[2,i,j] - rho_hat[i,j]*z/Pr            
+            p_hat[i,j] = du[0,i,j]*k_over_k2[0,i,j]+du[1,i,j]*k_over_k2[1,i,j] - Ri*ur_hat[2,i,j]*k_over_k2[1,i,j]
+            du[0,i,j] = du[0,i,j] - (p_hat[i,j]*k0+ur_hat[0,i,j]*z)
+            du[1,i,j] = du[1,i,j] - (p_hat[i,j]*k1+ur_hat[1,i,j]*z+Ri*ur_hat[2,i,j])
+            du[2,i,j] = du[2,i,j] - ur_hat[2,i,j]*z/Pr
     return du
 
-def add_linear_NS2D(np.ndarray[complex_t, ndim=3] du,
-                    np.ndarray[complex_t, ndim=3] u_hat,
-                    real_t nu,
-                    np.ndarray[real_t, ndim=2] ksq,
-                    np.ndarray[real_t, ndim=3] k,
-                    np.ndarray[complex_t, ndim=2] p_hat,
-                    np.ndarray[real_t, ndim=3] k_over_k2):
+def add_pressure_diffusion_NS2D(np.ndarray[complex_t, ndim=3] du,
+                                np.ndarray[complex_t, ndim=3] u_hat,
+                                real_t nu,
+                                np.ndarray[real_t, ndim=2] ksq,
+                                np.ndarray[real_t, ndim=3] k,
+                                np.ndarray[complex_t, ndim=2] p_hat,
+                                np.ndarray[real_t, ndim=3] k_over_k2):
     cdef unsigned int i, j
     cdef real_t z
     cdef real_t k0, k1

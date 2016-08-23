@@ -58,12 +58,16 @@ def additional_callback(context):
     """Function used by some integrators"""
     pass
 
+def solve_linear(context):
+    """Function used by implicit solvers"""
+    pass
+
 def set_source(Source, **context):
     Source[:] = 0
     return Source
 
-class RhsBase(object):
-    """Compute rhs of spectral Navier Stokes equations"""
+class SolverBase(object):
+    """Assemble and solve rhs of spectral Navier Stokes equations"""
     
     def __init__(self):
         self._conv = None
@@ -83,7 +87,7 @@ class RhsBase(object):
 
         To avoid costly if tests, the function to use is collected
         dynamically the first time nonlinear is called. Overload only
-        getConvection in subclasses.
+        required for _getConvection in subclasses.
         """
         try:
             return self._conv(*args)

@@ -11,6 +11,8 @@ def initialize(UB_hat, UB, U, B, X, FFT, **context):
     B[2] = 0 
     for i in range(6):
         UB_hat[i] = FFT.fftn(UB[i], UB_hat[i])
+    config.params.t = 0
+    config.params.tstep = 0
         
 def regression_test(context):
     params = config.params
@@ -54,6 +56,8 @@ if __name__ == "__main__":
     config.params.write_result = 1
     config.params.checkpoint = 1
     config.dt = 0.01
+    config.params.t = 0.0
+    config.params.tstep = 0
     config.T = 0.04
     solver.regression_test = lambda c: None
     solve(solver, context)
