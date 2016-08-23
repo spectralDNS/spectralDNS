@@ -25,6 +25,9 @@ def test_single_KMM3():
 def test_single_IPCS():
     d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py --optimization cython IPCS", shell=True)
 
+def test_single_IPCSR():
+    d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py IPCSR", shell=True)
+
 def test_mpi_slab_DNS():
     d = subprocess.check_output("mpirun -np 4 python TG.py NS", shell=True)
 
@@ -60,3 +63,6 @@ def test_mpi_KMM3():
 
 def test_mpi_IPCS():
     d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --optimization cython --checkpoint 5 IPCS", shell=True)
+
+def test_mpi_IPCSR():
+    d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --optimization cython --checkpoint 5 IPCSR", shell=True)

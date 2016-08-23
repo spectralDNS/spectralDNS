@@ -36,23 +36,24 @@ def initialize(solver, context):
     U = solver.get_velocity(**context)
 
     # Compute convection from data in context (i.e., context.U_hat and context.g)
+    # This is the convection at t=0
     context.H_hat1[:] = solver.get_convection(**context)
 
+    # Initialize at t = dt
     e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.ST.quad)
     initOS(OS, U, X, t=params.dt)
     U_hat = solver.set_velocity(**context)
     U = solver.get_velocity(**context)
-
-    if not params.solver in ("KMM", "KMMRK3"):  
-        P_hat = solver.get_pressure(**context)
-        context.P = FST.ifst(P_hat, context.P, context.SN)
-        
-    else:
-        context.g[:] = 0
-
     context.U_hat0[:] = U_hat
     params.t = params.dt
     params.tstep = 1
+
+    if not params.solver in ("KMM", "KMMRK3"):  
+        P_hat = solver.compute_pressure(**context)
+        P = FST.ifst(P_hat, context.P, context.SN)
+        
+    else:
+        context.g[:] = 0
 
 def set_Source(Source, Sk, FST, ST, **kw):
     Source[:] = 0

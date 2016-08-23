@@ -104,7 +104,7 @@ class IPCSWriter(HDF5Writer):
         U = get_velocity(**context)
         P = get_pressure(**context)
         if params.tstep % params.checkpoint == 0:
-            c = context
+            c = config.ParamsBase(context)
             U0 = get_velocity(c.U0, c.U_hat0, c.FST, c.ST)
 
 assert params.precision == "double"
@@ -130,8 +130,13 @@ def get_convection(H_hat, U_hat, K, FST, ST, work, mat, la, **context):
     H_hat = conv(H_hat, U_hat, K, FST, ST, work, mat, la)
     return H_hat
 
-def get_pressure(P_hat, H_hat, U_hat, U_hat0, K, FST, ST, work, mat, la,
-                 u_slice, p_slice, **context):
+def get_pressure(P_hat, P, FST, SN, **context):
+    """Get pressure from context"""
+    P = FST.ifst(P_hat, P, SN)
+    return P
+    
+def compute_pressure(P_hat, H_hat, U_hat, U_hat0, K, FST, ST, work, mat, la,
+                     u_slice, p_slice, **context):
     """Solve for pressure
     
     Assuming U_hat and U_hat0 are the solutions at two subsequent time steps
@@ -140,6 +145,9 @@ def get_pressure(P_hat, H_hat, U_hat, U_hat0, K, FST, ST, work, mat, la,
     """
     conv = getConvection(params.convection)
     H_hat = conv(H_hat, 0.5*(U_hat+U_hat0), K, FST, ST, work, mat, la)
+    for i in range(3):
+        H_hat[i] = la.TDMASolverD(H_hat[i])
+    H_hat *= -1
     
     dP = work[(P_hat, 0)]
     SFTc.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], H_hat[0, u_slice],
@@ -414,9 +422,19 @@ def solve_pressure_correction(p_hat, u_hat, solver,
     p_hat[p_slice] += Pcorr[p_slice]
     return p_hat, Pcorr
 
+def update_velocity(u_hat, p_corr, rhs, solver, mat, work, K, Nu, u_slice, la, **context):
+    rhs[:] = 0
+    rhs = solver.pressuregrad(rhs, p_corr, mat, work, K, Nu)
+    rhs[0] = la.TDMASolverD(rhs[0])
+    rhs[1] = la.TDMASolverD(rhs[1])
+    rhs[2] = la.TDMASolverD(rhs[2])
+    u_hat[:, u_slice] += params.dt*rhs[:, u_slice]  # + since pressuregrad computes negative pressure gradient
+    return u_hat
+
 #@profile
-pressure_error = zeros(1)
 def integrate(u_hat, p_hat, rhs, dt, solver, context):
+    
+    pressure_error = zeros(1)
     # Tentative momentum solve
     for jj in range(params.velocity_pressure_iters):
 
@@ -434,18 +452,10 @@ def integrate(u_hat, p_hat, rhs, dt, solver, context):
         if pressure_error[0] < params.divergence_tol:
             break
             
-        #for i in range(3):
-            #U[i] = FST.ifst(u_hat[i], U[i], ST)
-                 
     # Update velocity
-    rhs[:] = 0
-    rhs = solver.pressuregrad(rhs, p_corr, context.mat, context.work, context.K, context.Nu)
-    rhs[0] = context.la.TDMASolverD(rhs[0])
-    rhs[1] = context.la.TDMASolverD(rhs[1])
-    rhs[2] = context.la.TDMASolverD(rhs[2])
-    u_hat[:, context.u_slice] += params.dt*rhs[:, context.u_slice]  # + since pressuregrad computes negative pressure gradient
-
-    # Rotate velocities
+    u_hat = solver.update_velocity(u_hat, p_corr, rhs, solver, **context)
+    
+    # Rotate velocities and convection
     context.U_hat1[:] = context.U_hat0
     context.U_hat0[:] = u_hat        
     context.H_hat1[:] = context.H_hat

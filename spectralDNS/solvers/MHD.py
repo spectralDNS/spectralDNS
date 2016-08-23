@@ -81,7 +81,7 @@ def divergenceConvection(c, z0, z1, work, FFT, K, dealias=None):
         for j in range(3):
             F_tmp[i, j] = FFT.fftn(z0[i]*z1[j], F_tmp[i, j], dealias)
 
-    c = _set_Elsasser(c, F_tmp, K)
+    c = set_Elsasser(c, F_tmp, K)
     return c
 
 def getConvection(convection):
@@ -99,8 +99,8 @@ def getConvection(convection):
             u_dealias = ub_dealias[:3]
             b_dealias = ub_dealias[3:]
             # Compute convective term and place in dU
-            rhs = _divergenceConvection(rhs, u_dealias+b_dealias, u_dealias-b_dealias,
-                                        work, FFT, K, params.dealias)
+            rhs = divergenceConvection(rhs, u_dealias+b_dealias, u_dealias-b_dealias,
+                                       work, FFT, K, params.dealias)
             return rhs
     
     Conv.convection = convection
