@@ -3,13 +3,14 @@ __date__ = "2015-10-29"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from spectralinit import *
+from .spectralinit import *
 from ..mesh.channel import SlabShen_R2C
 from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, CNDmat, \
     HelmholtzCoeff
 from ..shen.la import Helmholtz, TDMA
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, \
     ShenBiharmonicBasis, SFTc
+from functools import wraps
 
 def setup():
     """Set up context for solver"""
@@ -65,7 +66,7 @@ def setup():
     nu, dt, N = params.nu, params.dt, params.N
     
     # Collect all linear algebra solvers
-    la = config.ParamsBase(dict(
+    la = config.AttributeDict(dict(
         HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt),
                                     ST.quad, False),
         HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2),
@@ -78,7 +79,7 @@ def setup():
     alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
     
     # Collect all matrices
-    mat = config.ParamsBase(dict(
+    mat = config.AttributeDict(dict(
         CDN = CDNmat(K[0, :, 0, 0]),
         CND = CNDmat(K[0, :, 0, 0]),
         BDN = BDNmat(K[0, :, 0, 0], ST.quad),
@@ -95,7 +96,7 @@ def setup():
                           mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})  
 
 
-    return config.ParamsBase(locals())
+    return config.AttributeDict(locals())
 
 
 class IPCSWriter(HDF5Writer):
@@ -104,7 +105,7 @@ class IPCSWriter(HDF5Writer):
         U = get_velocity(**context)
         P = get_pressure(**context)
         if params.tstep % params.checkpoint == 0:
-            c = config.ParamsBase(context)
+            c = config.AttributeDict(context)
             U0 = get_velocity(c.U0, c.U_hat0, c.FST, c.ST)
 
 assert params.precision == "double"
@@ -375,13 +376,7 @@ def ComputeRHS(rhs, u_hat, p_hat, jj, solver, H_hat, H_hat0, H_hat1, diff0, la, 
     
     # Add convection to rhs
     if jj == 0:
-        try:
-            H_hat = ComputeRHS._conv(H_hat, u_hat, K, FST, ST, work, mat, la)
-            assert ComputeRHS._conv.convection == params.convection
-
-        except (AttributeError, AssertionError):
-            ComputeRHS._conv = solver.getConvection(params.convection)
-            H_hat = ComputeRHS._conv(H_hat, u_hat, K, FST, ST, work, mat, la)
+        H_hat = solver.conv(H_hat, u_hat, K, FST, ST, work, mat, la)
         
         # Compute diffusion
         diff0[:] = 0
@@ -464,6 +459,7 @@ def integrate(u_hat, p_hat, rhs, dt, solver, context):
 
 def getintegrator(rhs, u0, solver, context):
     u_hat, p_hat = u0
+    @wraps(solver.integrate)
     def func():
         return solver.integrate(u_hat, p_hat, rhs, params.dt, solver, context)
     return func

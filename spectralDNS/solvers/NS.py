@@ -14,7 +14,7 @@ def setup():
     
     # Mesh variables
     X = FFT.get_local_mesh()
-    K = FFT.get_scaled_local_wavenumbermesh()    
+    K = FFT.get_scaled_local_wavenumbermesh()
     K2 = np.sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)    
     
@@ -37,7 +37,7 @@ def setup():
                         chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
                         filename=params.h5filename+'.h5')
 
-    return config.ParamsBase(locals())
+    return config.AttributeDict(locals())
 
 class NSWriter(HDF5Writer):
     """Subclass HDF5Writer for appropriate updating of real components
@@ -208,15 +208,7 @@ def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, K2, K_over_K2, **context
         K_over_K2   K / K2
     
     """
-    # Get and evaluate the convection method
-    try:
-        rhs = ComputeRHS._conv(rhs, u_hat, work, FFT, K)
-        assert ComputeRHS._conv.convection == params.convection
-
-    except (AttributeError, AssertionError):
-        ComputeRHS._conv = solver.getConvection(params.convection)
-        rhs = ComputeRHS._conv(rhs, u_hat, work, FFT, K)
-        
+    rhs = solver.conv(rhs, u_hat, work, FFT, K)
     rhs = solver.add_pressure_diffusion(rhs, u_hat, params.nu, K2, K, P_hat,
                                         K_over_K2)
     return rhs

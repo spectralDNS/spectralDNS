@@ -70,19 +70,14 @@ def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
         u_hat       The FST of the velocity at current time. 
         g_hat       The FST of the curl in wall normal direction
         rk          The step in the Runge Kutta integrator
+        solver      The current solver module
 
     Remaining args are extracted from context
     
     """
     
     # Nonlinear convection term at current u_hat
-    try:
-        H_hat = ComputeRHS._conv(H_hat, u_hat, g_hat, K, FST, SB, ST, work, mat, la)
-        assert ComputeRHS._conv.convection == params.convection
-
-    except (AttributeError, AssertionError):
-        ComputeRHS._conv = solver.getConvection(params.convection)
-        H_hat = ComputeRHS._conv(H_hat, u_hat, g_hat, K, FST, SB, ST, work, mat, la)
+    H_hat = solver.conv(H_hat, u_hat, g_hat, K, FST, SB, ST, work, mat, la)
 
     hv[1] = -K2*mat.BBD.matvec(H_hat[0])
     #hv[:] = FST.fss(H[0], hv, SB)

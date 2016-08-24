@@ -52,6 +52,8 @@ def solve(solver, context):
     solver.timer = solver.Timer()
     params = solver.params
     
+    solver.conv = solver.getConvection(params.convection)
+    
     integrate = solver.getintegrator(context.dU, # rhs array
                                      context.u,  # primary variable
                                      solver,
@@ -74,11 +76,11 @@ def solve(solver, context):
 
         solver.timer()
 
-        if params.tstep == 1 and params.make_profile:
+        if len(solver.profiler.getstats()) == 0 and params.make_profile:
             #Enable profiling after first step is finished
             solver.profiler.enable()
 
-        #Make sure that the last step hits T exactly.
+        # Make sure that the last step hits T exactly.
         if params.t + params.dt >= params.T:
             params.dt = params.T - params.t
             if params.dt <= 1.e-14:

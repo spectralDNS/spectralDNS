@@ -37,7 +37,7 @@ def setup():
                           filename=params.h5filename+".h5",
                           chkpoint={'current':{'U':U, 'P':P}, 'previous':{}})
 
-    return config.ParamsBase(locals())
+    return config.AttributeDict(locals())
 
 class NS2DWriter(HDF5Writer):
     def update_components(self, **context):

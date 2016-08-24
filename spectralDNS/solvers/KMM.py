@@ -4,9 +4,8 @@ __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from .spectralinit import *
-from ..mesh.channel import SlabShen_R2C
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, \
-    ShenBiharmonicBasis, SFTc
+    ShenBiharmonicBasis, SFTc, SlabShen_R2C
 from ..shen.Matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, \
     ADDmat, BDDmat, CDBmat, BiharmonicCoeff, HelmholtzCoeff
 from ..shen.la import Helmholtz, TDMA, Biharmonic
@@ -67,7 +66,7 @@ def setup():
     kx = K[0, :, 0, 0]
     
     # Collect all linear algebra solvers
-    la = config.ParamsBase(dict(
+    la = config.AttributeDict(dict(
         HelmholtzSolverG = Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST.quad, False),
         BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0],
                                     -(K2[0] + nu*dt/2.*K4[0]), quad=SB.quad,
@@ -79,7 +78,7 @@ def setup():
 
     alfa = K2[0] - 2.0/nu/dt
     # Collect all matrices
-    mat = config.ParamsBase(dict(
+    mat = config.AttributeDict(dict(
         CDD = CDDmat(kx),
         AB = HelmholtzCoeff(kx, -1.0, -alfa, ST.quad),
         AC = BiharmonicCoeff(kx, nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad),
@@ -101,7 +100,7 @@ def setup():
                          filename=params.solver+".h5",
                          mesh={"x": x0, "y": x1, "z": x2})
     
-    return config.ParamsBase(locals())
+    return config.AttributeDict(locals())
 
 class KMMWriter(HDF5Writer):
     def update_components(self, **context):
@@ -109,7 +108,7 @@ class KMMWriter(HDF5Writer):
         U = get_velocity(**context)    # updates U from U_hat
         if params.tstep % params.checkpoint == 0:
             # update U0 from U0_hat
-            c = config.ParamsBase(context)
+            c = config.AttributeDict(context)
             U0 = get_velocity(c.U0, c.U_hat0, c.FST, c.ST, c.SB)
 
 assert params.precision == "double"
@@ -371,19 +370,13 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
         rhs         The right hand side to be returned
         u_hat       The FST of the velocity at current time
         g_hat       The FST of the curl in wall normal direction
+        solver      The current solver module
 
     Remaining args are extracted from context
     
     """
-
     # Nonlinear convection term at current u_hat
-    try:
-        H_hat = ComputeRHS._conv(H_hat, u_hat, g_hat, K, FST, SB, ST, work, mat, la)
-        assert ComputeRHS._conv.convection == params.convection
-
-    except (AttributeError, AssertionError):
-        ComputeRHS._conv = solver.getConvection(params.convection)
-        H_hat = ComputeRHS._conv(H_hat, u_hat, g_hat, K, FST, SB, ST, work, mat, la)
+    H_hat = solver.conv(H_hat, u_hat, g_hat, K, FST, SB, ST, work, mat, la)
 
     # Assemble convection with Adams-Bashforth at time = n+1/2
     H_hat0 = solver.assembleAB(H_hat0, H_hat, H_hat1)

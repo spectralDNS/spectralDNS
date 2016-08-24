@@ -74,8 +74,8 @@ from numpy import pi, array, float32, float64
 import collections
 import json
 
-class ParamsBase(collections.MutableMapping, dict):
-    """Class for collection of parameters
+class AttributeDict(collections.MutableMapping, dict):
+    """Dictionary class
 
     The values of this dictionary may be accessed as attributes:
 
@@ -83,9 +83,10 @@ class ParamsBase(collections.MutableMapping, dict):
         M = p.M
         N = p['M']
         assert M is N
+
     """
     def __init__(self, *args, **kwargs):
-        super(ParamsBase, self).__init__(*args, **kwargs)
+        super(AttributeDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
 
     def __getattribute__(self, key):
@@ -113,7 +114,7 @@ class ParamsBase(collections.MutableMapping, dict):
         return dict.__contains__(self, x)
 
 
-class Params(ParamsBase):
+class Params(AttributeDict):
     """Class for collection of parameters
 
     The values of this dictionary may be accessed as attributes:
@@ -122,9 +123,10 @@ class Params(ParamsBase):
         M = p.M
         N = p['M']
         assert M is N
+
     """
     def __init__(self, *args, **kwargs):
-        ParamsBase.__init__(self, *args, **kwargs)
+        AttributeDict.__init__(self, *args, **kwargs)
         
     def __getattr__(self, key):
         # Called if key is missing in __getattribute__

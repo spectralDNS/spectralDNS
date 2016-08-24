@@ -7,10 +7,11 @@ Velocity-vorticity formulation
 
 Derived by taking the curl of the momentum equation and solving for the curl.
 The velocity that is required in the convective term is computed from the curl
-in the computeU method.
+in the compute_velocity method.
 
 This solver inherits most features from the NS solver. 
 Overloading just a few routines.
+
 """
 from .NS import *
 
@@ -45,7 +46,7 @@ def setup():
                         chkpoint={'current':{'U':U, 'curl':curl}, 'previous':{}},
                         filename=params.h5filename+'.h5')
 
-    return config.ParamsBase(locals())
+    return config.AttributeDict(locals())
 
 class VVWriter(HDF5Writer):
     """Subclass HDF5Writer for appropriate updating of real components"""
@@ -54,19 +55,20 @@ class VVWriter(HDF5Writer):
         U = get_velocity(**context)
         curl = get_curl(**context)
 
-def computeU(c, a, work, FFT, K_over_K2, dealias=None):
+def compute_velocity(c, w_hat, work, FFT, K_over_K2, dealias=None):
     """Compute u from curl(u)
     
     Follows from
-    w = [curl(u)=] \nabla \times u
-    curl(w) = \nabla^2(u) (since div(u)=0)
-    FFT(curl(w)) = FFT(\nabla^2(u))
-    ik \times w_hat = k^2 u_hat
-    u_hat = (ik \times w_hat) / k^2
-    u = iFFT(u_hat)
+      w = [curl(u)=] \nabla \times u
+      curl(w) = \nabla^2(u) (since div(u)=0)
+      FFT(curl(w)) = FFT(\nabla^2(u))
+      ik \times w_hat = k^2 u_hat
+      u_hat = (ik \times w_hat) / k^2
+      u = iFFT(u_hat)
+
     """
-    v_hat = work[(a, 0)]
-    v_hat = cross2(v_hat, K_over_K2, a)
+    v_hat = work[(w_hat, 0)]
+    v_hat = cross2(v_hat, K_over_K2, w_hat)
     c[0] = FFT.ifftn(v_hat[0], c[0], dealias)
     c[1] = FFT.ifftn(v_hat[1], c[1], dealias)
     c[2] = FFT.ifftn(v_hat[2], c[2], dealias)    
@@ -74,7 +76,7 @@ def computeU(c, a, work, FFT, K_over_K2, dealias=None):
 
 def get_velocity(W_hat, U, work, FFT, K_over_K2, **context):
     """Compute velocity from context"""
-    U = computeU(U, W_hat, work, FFT, K_over_K2)
+    U = compute_velocity(U, W_hat, work, FFT, K_over_K2)
     return U
 
 def get_curl(curl, W_hat, FFT, **context):
@@ -95,7 +97,7 @@ def getConvection(convection):
             w_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
             v_hat = work[(rhs, 0)]
             
-            u_dealias = computeU(u_dealias, w_hat, work, FFT, K_over_K2, params.dealias)
+            u_dealias = compute_velocity(u_dealias, w_hat, work, FFT, K_over_K2, params.dealias)
             for i in range(3):
                 w_dealias[i] = FFT.ifftn(w_hat[i], w_dealias[i], params.dealias)
             v_hat = Cross(v_hat, u_dealias, w_dealias, work, FFT, params.dealias) # v_hat = F_k(u_dealias x w_dealias)
@@ -130,14 +132,6 @@ def ComputeRHS(rhs, w_hat, solver, work, FFT, K, K2, K_over_K2, Source, **contex
         Source      Scalar source term
     
     """
-    # Get and evaluate the convection method
-    try:
-        rhs = ComputeRHS._conv(rhs, w_hat, work, FFT, K, K_over_K2)
-        assert ComputeRHS._conv.convection == params.convection
-
-    except (AttributeError, AssertionError):
-        ComputeRHS._conv = solver.getConvection(params.convection)
-        rhs = ComputeRHS._conv(rhs, w_hat, work, FFT, K, K_over_K2)
-        
+    rhs = solver.conv(rhs, w_hat, work, FFT, K, K_over_K2)
     rhs = solver.add_linear(rhs, w_hat, params.nu, K2, Source)
     return rhs

@@ -42,7 +42,7 @@ def setup():
                           chkpoint={'current':{'U':Ur, 'P':P}, 'previous':{}},
                           filename=params.h5filename+'.h5')
     
-    return config.ParamsBase(locals())
+    return config.AttributeDict(locals())
 
 class Bq2DWriter(HDF5Writer):
     def update_components(self, Ur, Ur_hat, P, P_hat, FFT, **context):
@@ -138,15 +138,7 @@ def ComputeRHS(rhs, ur_hat, solver, work, FFT, K, K2, K_over_K2, P_hat, **contex
         P_hat       Transformed pressure
     
     """
-    # Get and evaluate the convection method
-    try:
-        rhs = ComputeRHS._conv(rhs, ur_hat, work, FFT, K)
-        assert ComputeRHS._conv.convection == params.convection
-
-    except (AttributeError, AssertionError):
-        ComputeRHS._conv = solver.getConvection(params.convection)
-        rhs = ComputeRHS._conv(rhs, ur_hat, work, FFT, K)
-        
+    rhs = solver.conv(rhs, ur_hat, work, FFT, K)
     rhs = solver.add_pressure_diffusion(rhs, ur_hat, P_hat, K_over_K2, K, K2,
                                         params.nu, params.Ri, params.Pr)
     return rhs

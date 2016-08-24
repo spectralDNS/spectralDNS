@@ -62,7 +62,12 @@ def solve_linear(context):
     """Function used by implicit solvers"""
     pass
 
+def conv(*args):
+    """Function used to compute convective term"""
+    raise NotImplementedError
+    
 def set_source(Source, **context):
+    """Return the source term"""
     Source[:] = 0
     return Source
 
