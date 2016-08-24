@@ -81,6 +81,6 @@ if __name__ == "__main__":
     config.doublyperiodic.add_argument('--compute_energy', type=int, default=10)
     solver = get_solver(update=update, mesh='doublyperiodic')
     assert config.params.solver == 'NS2D'
-    context = solver.setup()
+    context = solver.get_context()
     initialize(**context)
     solve(solver, context)

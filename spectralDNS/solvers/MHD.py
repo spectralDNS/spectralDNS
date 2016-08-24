@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from spectralinit import *
 
-def setup():
+def get_context():
     FFT = get_FFT(params)
     float, complex, mpitype = datatypes(params.precision)
     X = FFT.get_local_mesh()

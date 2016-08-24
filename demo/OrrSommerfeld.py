@@ -162,7 +162,7 @@ if __name__ == "__main__":
     config.channel.add_argument("--plot_step", type=int, default=10)
     solver = get_solver(update=update, regression_test=regression_test, mesh="channel")  
     #solver = get_solver(mesh="channel")  
-    context = solver.setup()
+    context = solver.get_context()
     initialize(solver, context)
     set_Source(**context)
     solve(solver, context)

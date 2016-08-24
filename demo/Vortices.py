@@ -91,7 +91,7 @@ if __name__ == "__main__":
                         mesh="triplyperiodic")
     
     assert config.params.decomposition == 'slab'
-    context = solver.setup()
+    context = solver.get_context()
     initialize(**context)
     set_source(**context)
     solve(solver, context)

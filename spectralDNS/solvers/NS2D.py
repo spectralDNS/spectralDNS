@@ -7,7 +7,7 @@ from .NS import *
 
 # Reuses most of NS.py module
 
-def setup():
+def get_context():
     """Set up context for NS2D solver"""
 
     FFT = get_FFT(params)

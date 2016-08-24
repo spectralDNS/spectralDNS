@@ -11,7 +11,7 @@ from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, \
     ShenBiharmonicBasis, SFTc, SlabShen_R2C
 from functools import wraps
 
-def setup():
+def get_context():
     """Set up context for solver"""
 
     # Get points and weights for Chebyshev weighted integrals
@@ -113,6 +113,11 @@ def get_pressure(P, P_hat, FST, SN, **context):
     """Compute pressure from context"""
     P = FST.ifst(P_hat, P, SN)
     return P
+
+def set_pressure(P_hat, P, FST, SN, **context):
+    """Compute pressure from context"""
+    P_hat = FST.fst(P, P_hat, SN)
+    return P_hat
 
 def get_velocity(U, U_hat, FST, ST, **context):
     for i in range(3):

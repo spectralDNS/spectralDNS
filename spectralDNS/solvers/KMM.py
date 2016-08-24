@@ -11,7 +11,7 @@ from ..shen.Matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, \
 from ..shen.la import Helmholtz, TDMA, Biharmonic
 from ..shen import SFTc
 
-def setup():
+def get_context():
     """Set up context for solver"""
 
     # Get points and weights for Chebyshev weighted integrals

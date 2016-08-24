@@ -53,7 +53,7 @@ def update(context):
     params = config.params
     solver = config.solver
     X = context.X
-    
+    U = solver.get_velocity(**context)
     if (params.tstep % params.plot_step == 0 and params.plot_step > 0 or
            params.tstep % params.compute_energy == 0):
         U = solver.get_velocity(**context)
@@ -80,6 +80,7 @@ def update(context):
         
         if solver.rank == 0:
             uall = uall.reshape((params.N[0],))
+            x0 = context.FST.get_mesh_dim(context.ST, 0)
             #x = x0
             #pc = zeros(len(x))
             #pc = ST.fct(uall, pc)  # Cheb transform of result
@@ -91,6 +92,7 @@ def update(context):
             print "Time %2.5f Error %2.12e " %(params.t, sqrt(sum((u_exact-uall)**2)/params.N[0]))
 
 def regression_test(context):
+    params = config.params
     solver = config.solver
     U = solver.get_velocity(**context)
     u0 = U[1, :, 0, 0].copy()
@@ -101,6 +103,7 @@ def regression_test(context):
     solver.comm.Gather(u0, uall, root=0)
     if solver.rank == 0:
         uall = uall.reshape((params.N[0],))
+        x0 = context.FST.get_mesh_dim(context.ST, 0)
         #x = x0
         #pc = zeros(len(x))
         #pc = ST.fct(uall, pc)  # Cheb transform of result
@@ -124,7 +127,7 @@ if __name__ == "__main__":
     config.channel.add_argument("--compute_energy", type=int, default=5)
     config.channel.add_argument("--plot_step", type=int, default=10)
     solver = get_solver(update=update, regression_test=regression_test, mesh="channel")    
-    context = solver.setup()
+    context = solver.get_context()
     initialize(**context)
     set_Source(**context)
     solve(solver, context)

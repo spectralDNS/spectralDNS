@@ -15,7 +15,7 @@ Overloading just a few routines.
 """
 from .NS import *
 
-def setup():
+def get_context():
     """Set up context for Velocity-Vorticity (VV) solver"""
     
     # FFT class performs the 3D parallel transforms

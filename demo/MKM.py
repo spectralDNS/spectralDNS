@@ -1,5 +1,5 @@
 """Turbulent channel"""
-from spectralDNS import config, get_solver
+from spectralDNS import config, get_solver, solve
 from numpy import dot, real, pi, exp, sum, complex, float, zeros, arange, imag, \
     cos, where, pi, random, exp, sin, log, array, zeros_like
 import h5py
@@ -27,20 +27,22 @@ def initOS(OS, U, X, t=0.):
             U[1, i, j, :] = v
     U[2] = 0
 
-def initialize(U, U_hat, U_hat0, FST, ST, X, comm, rank, 
-               Curl, conv, TDMASolverD, solvePressure, H_hat1, K,
-               forward_velocity, backward_velocity, **kw):
+def initialize(solver, context):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
+    U = context.U
+    X = context.X
+    params = config.params
+    
     Y = where(X[0]<0, 1+X[0], 1-X[0])
-    utau = config.params.nu * config.params.Re_tau
+    utau = params.nu * params.Re_tau
     #Um = 46.9091*utau
     Um = 56.*utau 
-    Xplus = Y*config.params.Re_tau
-    Yplus = X[1]*config.params.Re_tau
-    Zplus = X[2]*config.params.Re_tau
+    Xplus = Y*params.Re_tau
+    Yplus = X[1]*params.Re_tau
+    Zplus = X[2]*params.Re_tau
     duplus = Um*0.2/utau  #Um*0.25/utau 
-    alfaplus = config.params.L[1]/500.
-    betaplus = config.params.L[2]/200.
+    alfaplus = params.L[1]/500.
+    betaplus = params.L[2]/200.
     sigma = 0.00055 # 0.00055
     epsilon = Um/200.   #Um/200.
     U[:] = 0
@@ -49,76 +51,52 @@ def initialize(U, U_hat, U_hat0, FST, ST, X, comm, rank,
     dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
     U[1] += dd
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
-    #U[0] = 0.00001*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
-
-    #U[:] = 0
-    #U[:] = 0.001*random.randn(*U.shape)
-    #for i in range(3):
-        #U_hat[i] = FST.fst(U[i], U_hat[i], ST)    
-    #U = Curl(U_hat, U, ST)
-    #U[1] += Um*(Y-0.5*Y**2)
-    #U[1] += utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)
-    #U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)
-        
-    #U[0] += 0.1*(1-X[0]**2)*sin(4*pi*X[0])*cos(2*pi*X[1])
-    #U[1] += 0.1*((1-X[0]**2)*sin(2*pi*X[1])+2*X[0]*sin(4*pi*X[0])*sin(2*pi*X[1])/2./pi)
     
-    U_hat = forward_velocity(U_hat, U, FST)
-    U = backward_velocity(U, U_hat, FST)
-    U_hat = forward_velocity(U_hat, U, FST)
+    U_hat = solver.set_velocity(**context)
+    U = solver.get_velocity(**context)
+    U_hat = solver.set_velocity(**context)
     
-    if "KMM" in config.params.solver:
-        g = kw['g']
-        g[:] = 1j*K[1]*U_hat[2] - 1j*K[2]*U_hat[1]
+    if "KMM" in params.solver:
+        context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
 
     # Set the flux
     
-    flux[0] = FST.dx(U[1], ST.quad)
-    comm.Bcast(flux)
+    #flux[0] = context.FST.dx(U[1], context.ST.quad)
+    #solver.comm.Bcast(flux)
     
-    if rank == 0:
+    if solver.rank == 0:
         print "Flux", flux[0]
     
-    if not config.params.solver in ("KMM", "KMMRK3"):
-        conv2 = zeros_like(U_hat)
-        conv2 = conv(conv2, U, U_hat)  
-        for j in range(3):
-            conv2[j] = TDMASolverD(conv2[j])
-        conv2 *= -1
-        kw['P_hat'] = solvePressure(kw['P_hat'], conv2)
-        kw['P'] = FST.ifst(kw['P_hat'], kw['P'], kw['SN'])
+    if not params.solver in ("KMM", "KMMRK3"):
+        P_hat = solver.compute_pressure(**context)
+        P = context.FST.ifst(P_hat, context.P, context.SN)
         
-    U_hat0[:] = U_hat[:]
-    H_hat1 = conv(H_hat1, U_hat0)
- 
-def init_from_file(filename, comm, U_hat0, U, U_hat, H_hat1, K,
-                   rank, conv, FST, ST, forward_velocity, **kw):
-    f = h5py.File(filename, driver="mpio", comm=comm)
+    context.U_hat0[:] = context.U_hat[:]
+    context.H_hat1[:] = solver.get_convection(**context)
+
+def init_from_file(filename, solver, context):
+    f = h5py.File(filename, driver="mpio", comm=solver.comm)
     assert "0" in f["3D/checkpoint/U"]
+    U = context.U
     N = U.shape[1]
-    s = slice(rank*N, (rank+1)*N, 1)
+    s = slice(solver.rank*N, (solver.rank+1)*N, 1)
     U[:] = f["3D/checkpoint/U/0"][:, s]
-    U_hat0 = forward_velocity(U_hat0, U, FST)
-    H_hat1[:] = conv(H_hat1, U_hat0)
+    U_hat = solver.set_velocity(**context)
+    context.U_hat0[:] = U_hat
+    context.H_hat1[:] = solver.get_convection(**context)
     U[:] = f["3D/checkpoint/U/1"][:, s]
-    U_hat0 = forward_velocity(U_hat0, U, FST)
+    U_hat = solver.set_velocity(**context)
     
     if config.params.solver in ("IPCS", "IPCSR"):
-        kw['P'][:] = f["3D/checkpoint/P/1"][s]
-
-        if config.solver == "IPCSR":
-            kw['P_hat'] = FST.fct(kw['P'], kw['P_hat'], kw['SN'])
-        else:
-            kw['P_hat'] = FST.fst(kw['P'], kw['P_hat'], kw['SN'])
+        context.P[:] = f["3D/checkpoint/P/1"][s]
+        P_hat = solver.set_pressure(**context)
 
     elif "KMM" in config.params.solver:        
-        g = kw['g']
-        g[:] = 1j*K[1]*U_hat0[2] - 1j*K[2]*U_hat0[1]
-        U_hat[:] = U_hat0[:]        
+        context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
         
     f.close()
 
-def set_Source(Source, Sk, ST, FST, **kw):
+def set_Source(Source, Sk, ST, FST, **context):
     utau = config.params.nu * config.params.Re_tau
     Source[:] = 0
     Source[1, :] = -utau**2
@@ -126,19 +104,28 @@ def set_Source(Source, Sk, ST, FST, **kw):
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
     
 beta = zeros(1)    
-def update(U, U_hat, rank, X, stats, FST, Source, Sk, 
-           ST, SB, comm, params, backward_velocity, **kw):
+def update(context):
     global im1, im2, im3, flux
+    
+    c = context
+    params = config.params
+    solver = config.solver
+    X, U, U_hat = c.X, c.U, c.U_hat
 
-    #q = FST.dx(U[1], ST.quad)
-    #beta[0] = (flux[0] - q)/(array(config.params.L).prod())
-    #comm.Bcast(beta)
-    #U_tmp[1] = beta[0]    
-    #F_tmp[1] = FST.fst(U_tmp[1], F_tmp[1], ST)
-    #U_hat[1] += F_tmp[1]
-    #U[1] = FST.ifst(U_hat[1], U[1], ST)
-    #Source[1] -= beta[0]
-    #Sk[1] = FST.fss(Source[1], Sk[1], ST)
+    # Dynamically adjust flux
+    #q = c.FST.dx(U[1], c.ST.quad)
+    #beta[0] = (flux[0] - q)/(array(params.L).prod())
+    #solver.comm.Bcast(beta)
+    #U_tmp = c.work[(U[0], 0)]
+    #F_tmp = c.work[(U_hat[0], 0)]
+    #U_tmp[:] = beta[0]
+    #F_tmp = c.FST.fst(U_tmp, F_tmp, c.ST)
+    #U_hat[1] += F_tmp
+    #U[1] = c.FST.ifst(U_hat[1], U[1], c.ST)
+    #c.Source[1] -= beta[0]
+    #c.Sk[1] = c.FST.fss(c.Source[1], c.Sk[1], c.ST)
+    
+    
     #utau = config.params.Re_tau * config.params.nu
     #Source[:] = 0
     #Source[1] = -utau**2
@@ -146,16 +133,16 @@ def update(U, U_hat, rank, X, stats, FST, Source, Sk,
     #for i in range(3):
         #Sk[i] = FST.fss(Source[i], Sk[i], ST)
         
-    if params.tstep % params.print_energy0 == 0 and rank == 0:        
-        print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 2))
-        print (U_hat[0].real*U_hat[0].real).mean(axis=(0, 1))
+    if params.tstep % params.print_energy0 == 0 and solver.rank == 0:        
+        print (c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 2))
+        print (c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 1))
         
     if (params.tstep % params.compute_energy == 0 or 
         params.tstep % params.plot_result == 0 and params.plot_result > 0 or
         params.tstep % params.sample_stats == 0):
-        U = backward_velocity(U, U_hat, FST)
+        U = solver.get_velocity(**c)
     
-    if params.tstep == 1 and rank == 0 and params.plot_result > 0:
+    if params.tstep == 1 and solver.rank == 0 and params.plot_result > 0:
         # Initialize figures
         plt.figure()
         im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
@@ -173,9 +160,8 @@ def update(U, U_hat, rank, X, stats, FST, Source, Sk,
         plt.draw()
 
         plt.pause(1e-6)    
-        globals().update(im1=im1, im2=im2, im3=im3)
         
-    if params.tstep % params.plot_result == 0 and rank == 0 and params.plot_result > 0:
+    if params.tstep % params.plot_result == 0 and solver.rank == 0 and params.plot_result > 0:
         im1.ax.clear()
         im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100)         
         im1.autoscale()
@@ -189,15 +175,15 @@ def update(U, U_hat, rank, X, stats, FST, Source, Sk,
         plt.pause(1e-6)
     
     if params.tstep % params.compute_energy == 0: 
-        e0 = FST.dx(U[0]*U[0], ST.quad)
-        e1 = FST.dx(U[1]*U[1], ST.quad)
-        e2 = FST.dx(U[2]*U[2], ST.quad)
-        q = FST.dx(U[1], ST.quad)
-        if rank == 0:
-            print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, Source[1].mean())
+        e0 = c.FST.dx(U[0]*U[0], c.ST.quad)
+        e1 = c.FST.dx(U[1]*U[1], c.ST.quad)
+        e2 = c.FST.dx(U[2]*U[2], c.ST.quad)
+        q = c.FST.dx(U[1], c.ST.quad)
+        if solver.rank == 0:
+            print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, c.Source[1].mean())
 
     if params.tstep % params.sample_stats == 0:
-        stats(U)     
+        solver.stats(U)
         
     #if params.tstep == 1:
         #print "Reset profile"
@@ -299,26 +285,11 @@ if __name__ == "__main__":
     config.channel.add_argument("--sample_stats", type=int, default=10)
     config.channel.add_argument("--print_energy0", type=int, default=10)
     #solver = get_solver(update=update, mesh="channel")    
-    solver = get_solver(update=update, mesh="channel")    
-    initialize(**vars(solver))
-    #init_from_file("KMM665.h5", **vars(solver))
-    set_Source(**vars(solver))
-    solver.stats = Stats(solver.U, solver.comm, filename="KMMstatsq")
-    solver.hdf5file.fname = "KMM665b.h5"
-    solver.solve()
-    #s = solver.stats.get_stats()
-
-    #from numpy import meshgrid, float
-    #s = solver
-    #Np = s.N / s.num_processes
-    #x1 = arange(1.5*s.N[1], dtype=float)*config.params.L[1]/(1.5*s.N[1])
-    #x2 = arange(1.5*s.N[2], dtype=float)*config.params.L[2]/(1.5*s.N[2])
-    #points, weights = s.ST.points_and_weights(s.N[0])
-    ## Get grid for velocity points
-    #X = array(meshgrid(points[s.rank*Np[0]:(s.rank+1)*Np[0]], x1, x2, indexing='ij'), dtype=float)    
-    #s.U_pad2[1] = s.FST.ifst_padded(s.U_hat[1], s.U_pad2[1], s.ST)
-    #plt.figure()
-    #plt.contourf(X[1,:,:,0], X[0,:,:,0], s.U_pad2[1,:,:,0], 100)
-    #plt.colorbar()
-    #plt.show()    
-    
+    solver = get_solver(update=update, mesh="channel")
+    context = solver.get_context()
+    initialize(solver, context)
+    #init_from_file("KMM665b.h5", solver, context)
+    set_Source(**context)
+    solver.stats = Stats(context.U, solver.comm, filename="KMMstatsq")
+    context.hdf5file.fname = "KMM665c.h5"
+    solve(solver, context)

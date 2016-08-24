@@ -122,7 +122,7 @@ if __name__ == "__main__":
     config.triplyperiodic.add_argument("--plot_step", type=int, default=2)
     sol = get_solver(mesh="triplyperiodic")
 
-    context = sol.setup()
+    context = sol.get_context()
 
     # Add curl to the stored results. For this we need to update the update_components
     # method used by the HDF5Writer class to compute the real fields that are stored

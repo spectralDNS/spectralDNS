@@ -5,9 +5,9 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from KMM import *
 
-setupKMM = setup
-def setup():
-    d = setupKMM()
+get_context_KMM = get_context
+def get_context():
+    d = get_context_KMM()
     
     # RK parameters
     a = (8./15., 5./12., 3./4.)
@@ -106,8 +106,8 @@ def solve_linear(u_hat, g_hat, rhs, rk,
     g_hat = la.HelmholtzSolverG[rk](g_hat, rhs[1])
 
     if rank == 0:
-        u0_hat = work[((2, params.N[0]), complex, 0, False)]
-        h0_hat = work[((2, params.N[0]), complex, 1, False)]
+        u0_hat = work[((2, params.N[0]), complex, 0)]
+        h0_hat = work[((2, params.N[0]), complex, 1)]
         u0_hat[0] = u_hat[1, :, 0, 0]
         u0_hat[1] = u_hat[2, :, 0, 0]
 
@@ -130,9 +130,9 @@ def solve_linear(u_hat, g_hat, rhs, rk,
         
         beta = 2./params.nu/(a[rk]+b[rk])/params.dt
         w[:] = beta*(a[rk]*h1[1, 0] + b[rk]*h1[0, 0])*params.dt
-        w -= mat.ADD.matvec(u0_hat[1])
-        w += beta*mat.BDD.matvec(u0_hat[1])    
-        u0_hat[1] = la.HelmholtzSolverU0[rk](u0_hat[1], w)
+        w -= mat.ADD.matvec(u0_hat[0])
+        w += beta*mat.BDD.matvec(u0_hat[0])    
+        u0_hat[0] = la.HelmholtzSolverU0[rk](u0_hat[0], w)
         
         w[:] = beta*(a[rk]*h1[1, 1] + b[rk]*h1[0, 1])*params.dt
         w -= mat.ADD.matvec(u0_hat[1])

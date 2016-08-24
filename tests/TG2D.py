@@ -33,7 +33,7 @@ if __name__ == '__main__':
     )
 
     solver = get_solver(regression_test=regression_test, mesh='doublyperiodic')
-    context = solver.setup()
+    context = solver.get_context()
     initialize(**context)
     solve(solver, context)
 

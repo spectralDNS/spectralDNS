@@ -13,6 +13,7 @@ Time discretization is done by a semi-implicit Crank-Nicolson scheme.
 
 """
 
+##FIXME Not working with latest version of spectralDNS
 
 from spectralinit import *
 from ..shenGeneralBCs import SFTc

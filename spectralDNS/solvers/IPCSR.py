@@ -6,9 +6,9 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from IPCS import *
 from ..shen.Matrices import CDTmat, CTDmat, BDTmat, BTDmat, BTTmat, BTNmat, CNDmat, BNDmat
 
-setupIPCS = setup
-def setup():
-    d = setupIPCS()
+get_context_IPCS = get_context
+def get_context():
+    d = get_context_IPCS()
     
     k = d.K[0, :, 0, 0] 
     d.mat.update(dict(
@@ -26,6 +26,16 @@ def setup():
     d.dd = d.mat.BTT.dd.repeat(np.array(d.P_hat.shape[1:]).prod()).reshape(d.P_hat.shape)
 
     return d
+
+def get_pressure(P, P_hat, FST, SN, **context):
+    """Compute pressure from context"""
+    P = FST.ifct(P_hat, P, SN)
+    return P
+
+def set_pressure(P_hat, P, FST, SN, **context):
+    """Compute pressure from context"""
+    P_hat = FST.fct(P, P_hat, SN)
+    return P_hat
 
 def pressuregrad(rhs, p_hat, mat, work, K, Nu):
     """Compute contribution to rhs from pressure gradient

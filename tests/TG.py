@@ -51,7 +51,7 @@ if __name__ == "__main__":
         }
     )
     solver = get_solver(regression_test=regression_test)
-    context = solver.setup()
+    context = solver.get_context()
     initialize(solver, **context)
     solve(solver, context)
     
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     
     VVsolver = get_solver(regression_test=regression_test, 
                           parse_args=sys.argv[1:-1]+['VV'])
-    VVcontext = VVsolver.setup()
+    VVcontext = VVsolver.get_context()
     initialize(VVsolver, **VVcontext)
     solve(VVsolver, VVcontext)
 

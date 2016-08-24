@@ -5,7 +5,7 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 
 from .spectralinit import *
 
-def setup():
+def get_context():
     """Set up context for classical (NS) solver"""
 
     # FFT class performs the 3D parallel transforms

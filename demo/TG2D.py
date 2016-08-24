@@ -51,6 +51,6 @@ if __name__ == '__main__':
 
     config.doublyperiodic.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
     sol = get_solver(update=update, regression_test=regression_test, mesh="doublyperiodic")
-    context = sol.setup()
+    context = sol.get_context()
     initialize(**context)
     solve(sol, context)

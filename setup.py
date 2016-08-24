@@ -68,7 +68,7 @@ else:
  
 setup(name = "spectralDNS",
       version = "%d.%d.%d" % (major, minor, maintenance),
-      description = "spectralDNS -- Spectral Navier-Stokes solvers framework from the Center of Biomedical Computing",
+      description = "spectralDNS -- Spectral Navier-Stokes solvers framework",
       long_description = "",
       author = "Mikael Mortensen",
       author_email = "mikaem@math.uio.no", 

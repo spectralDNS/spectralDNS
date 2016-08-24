@@ -97,6 +97,6 @@ if __name__ == "__main__":
     config.doublyperiodic.add_argument("--plot_result", type=int, default=10)
     config.doublyperiodic.add_argument("--compute_energy", type=int, default=2)
     sol = get_solver(update=update, mesh='doublyperiodic')
-    context = sol.setup()    
+    context = sol.get_context()
     initialize(**context)
     solve(sol, context)

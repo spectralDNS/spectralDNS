@@ -82,7 +82,7 @@ if __name__ == "__main__":
     config.channel.add_argument("--compute_energy", type=int, default=1)
     config.channel.add_argument("--plot_step", type=int, default=1)
     solver = get_solver(regression_test=regression_test, mesh="channel")    
-    context = solver.setup()
+    context = solver.get_context()
     initialize(solver, context)
     set_Source(**context)
     solve(solver, context)

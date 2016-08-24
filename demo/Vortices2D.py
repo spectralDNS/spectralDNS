@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
     config.doublyperiodic.add_argument('--plot_result', type=int, default=10) # required to allow overloading through commandline
     solver = get_solver(update=update, regression_test=regression_test, mesh='doublyperiodic')
-    context = solver.setup()
+    context = solver.get_context()
     context.hdf5file.components['curl'] = context.curl
     def update_components(**context):
         """Overload default because we want to store the curl as well"""
