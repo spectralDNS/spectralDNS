@@ -11,8 +11,9 @@ config.update(
     }
 )
 solver = get_solver(regression_test=regression_test)
-initialize(**vars(solver))
-solver.solve()
+context = solver.get_context()
+initialize(solver, **context)
+solve(solver, context)
 
 for integrator in ('ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed'):
     if integrator in ('ForwardEuler', 'AB2'):
@@ -20,5 +21,5 @@ for integrator in ('ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed'):
     else:
         config.params.ntol = 7
     config.params.integrator = integrator
-    initialize(**vars(solver))
-    solver.solve()
+    initialize(solver, **context)
+    solve(solver, context)

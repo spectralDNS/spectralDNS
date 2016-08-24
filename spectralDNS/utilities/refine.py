@@ -1,8 +1,8 @@
 from mpiFFT4py.slab import R2C as FFT
 
 ### FIXME Need to move SlabShen_R2C in its own module, out of spectralDNS
-from spectralDNS.mesh.channel import SlabShen_R2C as FST
-from spectralDNS.shen.shentransform import ShenDirichletBasis, ShenBiharmonicBasis
+from spectralDNS.shen.shentransform import ShenDirichletBasis, ShenBiharmonicBasis, \
+    SlabShen_R2C as FST
 from mpi4py import MPI
 import numpy as np
 import h5py

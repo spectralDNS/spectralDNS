@@ -3,7 +3,7 @@ import pprint
 
 __all__ = ['create_profile']
 
-def create_profile(profiler, comm, MPI, rank, **kw):
+def create_profile(profiler, comm, MPI, rank):
     profiler.disable()
     ps = pstats.Stats(profiler).sort_stats('cumulative')
     #ps.print_stats(1000)
@@ -30,10 +30,15 @@ def create_profile(profiler, comm, MPI, rank, **kw):
                  'rollaxis',
                  'copy_to_padded',
                  'copy_from_padded',
-                 'add_pressure_diffusion',
+                 'RK4',
+                 'ForwardEuler',
+                 'AB2',
+                 'adaptiveRK',
+                 'nonlinear',
+                 'add_linear',
                  'cross1',
                  'cross2',
-                 'Curl',
+                 'compute_curl',
                  'Cross',
                  'project',
                  'Scatter',
@@ -46,9 +51,11 @@ def create_profile(profiler, comm, MPI, rank, **kw):
                                  comm.reduce(val[3], op=MPI.MAX, root=0))
                 del ps.stats[key]
                 break
-        
+    
     if rank == 0:
         print "Printing profiling for total min/max cumulative min/max:"
-        pprint.pprint(results)
+        print " {0:14s}{1:11s}{2:11s}{3:11s}{4:11s}".format('Method', 'total min', 'total max', 'cum min', 'cum max')
+        pprint.pprint(["{0:12s} {1:2.4e} {2:2.4e} {3:2.4e} {4:2.4e}".format(k,*v)
+                       for k,v in results.iteritems()])
 
     return results

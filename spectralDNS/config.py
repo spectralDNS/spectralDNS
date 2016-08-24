@@ -21,6 +21,7 @@ Generic parameters for all solvers::
     dealias          (str)           ('3/2-rule', '2/3-rule', 'None')
     ntol             (int)           Tolerance (number of accurate digits used in tests)
     threads          (int)           Number of threads used for FFTs
+    h5filename       (str)           Filename for storing HDF5 results
 
 Parameters for 3D solvers in triply periodic domain::
     convection       (str)           ('Standard', 'Divergence', 'Skewed', 'Vortex')
@@ -73,7 +74,47 @@ from numpy import pi, array, float32, float64
 import collections
 import json
 
-class Params(collections.MutableMapping, dict):
+class AttributeDict(collections.MutableMapping, dict):
+    """Dictionary class
+
+    The values of this dictionary may be accessed as attributes:
+
+        p = Params({'M': 2})
+        M = p.M
+        N = p['M']
+        assert M is N
+
+    """
+    def __init__(self, *args, **kwargs):
+        super(AttributeDict, self).__init__(*args, **kwargs)
+        self.__dict__ = self
+
+    def __getattribute__(self, key):
+        return dict.__getattribute__(self, key)
+
+    def __setattr__(self, key, val):
+        dict.__setattr__(self, key, val)
+        
+    def __getitem__(self, key):
+        return dict.__getitem__(self, key)
+    
+    def __setitem__(self, key, val):
+        dict.__setitem__(self, key, val)
+         
+    def __delitem__(self, key):
+        dict.__delitem__(self, key)
+        
+    def __iter__(self):
+        return dict.__iter__(self)
+    
+    def __len__(self):
+        return dict.__len__(self)
+    
+    def __contains__(self, x):
+        return dict.__contains__(self, x)
+
+
+class Params(AttributeDict):
     """Class for collection of parameters
 
     The values of this dictionary may be accessed as attributes:
@@ -82,10 +123,10 @@ class Params(collections.MutableMapping, dict):
         M = p.M
         N = p['M']
         assert M is N
+
     """
     def __init__(self, *args, **kwargs):
-        super(Params, self).__init__(*args, **kwargs)
-        self.__dict__ = self
+        AttributeDict.__init__(self, *args, **kwargs)
         
     def __getattr__(self, key):
         # Called if key is missing in __getattribute__
@@ -115,9 +156,6 @@ class Params(collections.MutableMapping, dict):
         else:
             dict.__setattr__(self, key, val)
         
-    def __getitem__(self, key):
-        return dict.__getitem__(self, key)
-    
     def __setitem__(self, key, val):
         if key == 'M':
             val = array([eval(str(f)) for f in val], dtype=int)
@@ -131,18 +169,6 @@ class Params(collections.MutableMapping, dict):
         
         else:
             dict.__setitem__(self, key, val)
-         
-    def __delitem__(self, key):
-        dict.__delitem__(self, key)
-        
-    def __iter__(self):
-        return dict.__iter__(self)
-    
-    def __len__(self):
-        return dict.__len__(self)
-    
-    def __contains__(self, x):
-        return dict.__contains__(self, x)
 
 fft_plans = collections.defaultdict(lambda: "FFTW_MEASURE",
                                     {'dct': "FFTW_EXHAUSTIVE"})
@@ -190,6 +216,7 @@ parser.add_argument('--threads', default=1, type=int,
                     help='Number of threads used for FFTs')
 parser.add_argument('--planner_effort', action=PlanAction, default=fft_plans, 
                     help="""Planning effort for FFTs. Usage, e.g., --planner_effort '{"dct":"FFTW_EXHAUSTIVE"}' """)
+parser.add_argument('--h5filename', default='results', type=str, help='Filename of HDF5 datafile used to store intermediate checkpoint data or timeseries results')
 
 # Arguments for 3D isotropic solvers
 triplyperiodic = argparse.ArgumentParser(parents=[parser])
@@ -239,6 +266,9 @@ doublyperiodic.add_argument('--integrator', default='RK4',
                             help='Integrator for doubly periodic domain')
 doublyperiodic.add_argument('--L', default=[2*pi, 2*pi], nargs=2, metavar=('Lx', 'Ly'),
                             help='Physical mesh size')
+doublyperiodic.add_argument('--convection', default='Vortex',
+                            choices=('Vortex'),
+                            help='Choose method for computing the nonlinear convective term')
 doublyperiodic.add_argument('--decomposition', default='line',
                             choices=('line', ),
                             help="For 2D problems line is the only choice.")
@@ -291,8 +321,12 @@ channelsubparsers = channel.add_subparsers(dest='solver')
 
 KMM = channelsubparsers.add_parser('KMM',
                                    help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
+KMM.add_argument('--integrator', default='implicit', choices=('implicit',),
+                 help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
 KMMRK3 = channelsubparsers.add_parser('KMMRK3',
                                       help='Kim Moin Moser channel solver with third order semi-implicit Runge-Kutta discretization.')
+KMMRK3.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',),
+                    help='RK3 integrator for channel solver')
 
 IPCS = channelsubparsers.add_parser('IPCS',
                                     help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')

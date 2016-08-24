@@ -10,9 +10,8 @@ from Cython.Build import cythonize
  
     
 # Version number
-major = 1
+major = 2
 minor = 0
-maintenance = 0
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 cdir = os.path.join(cwd, "spectralDNS", "optimization")
@@ -67,8 +66,8 @@ else:
             os.remove(os.path.join(cdir, name))
  
 setup(name = "spectralDNS",
-      version = "%d.%d.%d" % (major, minor, maintenance),
-      description = "spectralDNS -- Spectral Navier-Stokes solvers framework from the Center of Biomedical Computing",
+      version = "%d.%d" % (major, minor),
+      description = "spectralDNS -- Spectral Navier-Stokes solvers framework",
       long_description = "",
       author = "Mikael Mortensen",
       author_email = "mikaem@math.uio.no", 
@@ -86,7 +85,6 @@ setup(name = "spectralDNS",
           ],
       packages = ["spectralDNS",
                   "spectralDNS.h5io",
-                  "spectralDNS.mesh",
                   "spectralDNS.utilities",
                   "spectralDNS.maths",
                   "spectralDNS.shen",
