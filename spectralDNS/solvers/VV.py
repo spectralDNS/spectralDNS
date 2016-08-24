@@ -4,112 +4,134 @@ __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 """
 Velocity-vorticity formulation
+
+Derived by taking the curl of the momentum equation and solving for the curl.
+The velocity that is required in the convective term is computed from the curl
+in the compute_velocity method.
+
+This solver inherits most features from the NS solver. 
+Overloading just a few routines.
+
 """
-from NS import *
+from .NS import *
 
-# Get and update the global namespace of the NS solver (to avoid having two namespaces filled with arrays)
-# Overload just a few routines
+def get_context():
+    """Set up context for Velocity-Vorticity (VV) solver"""
+    
+    # FFT class performs the 3D parallel transforms
+    FFT = get_FFT(params)
+    float, complex, mpitype = datatypes(params.precision)
+    
+    # Mesh variables
+    X = FFT.get_local_mesh()
+    K = FFT.get_scaled_local_wavenumbermesh()    
+    K2 = np.sum(K*K, 0, dtype=float)
+    K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)    
+    
+    # Solution variables
+    U     = empty((3,) + FFT.real_shape(), dtype=float)  
+    curl  = empty((3,) + FFT.real_shape(), dtype=float)   
+    W_hat = empty((3,) + FFT.complex_shape(), dtype=complex) # curl transformed
 
-context = solve.func_globals
-context.update(setup['VV'](**vars()))
-vars().update(context)
+    # Primary variable
+    u = W_hat
 
-hdf5file = HDF5Writer({'U':U[0], 'V':U[1], 'W':U[2], 'P':P}, 
-                      chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
-                      filename=params.solver+'.h5')
+    # RHS, source and work arrays
+    dU     = empty((3,) + FFT.complex_shape(), dtype=complex)
+    Source = zeros((3,) + FFT.complex_shape(), dtype=complex) # Possible source term initialized to zero
+    work = work_arrays()
+        
+    hdf5file = VVWriter({'U':U[0], 'V':U[1], 'W':U[2],
+                         'curlx':curl[0], 'curly':curl[1], 'curlz':curl[2]},
+                        chkpoint={'current':{'U':U, 'curl':curl}, 'previous':{}},
+                        filename=params.h5filename+'.h5')
 
-def computeU(a, c, dealias=None):
+    return config.AttributeDict(locals())
+
+class VVWriter(HDF5Writer):
+    """Subclass HDF5Writer for appropriate updating of real components"""
+    def update_components(self, **context):
+        """Transform to real data when storing the solution"""
+        U = get_velocity(**context)
+        curl = get_curl(**context)
+
+def compute_velocity(c, w_hat, work, FFT, K_over_K2, dealias=None):
     """Compute u from curl(u)
     
     Follows from
-    w = [curl(u)=] \nabla \times u
-    curl(w) = \nabla^2(u) (since div(u)=0)
-    FFT(curl(w)) = FFT(\nabla^2(u))
-    ik \times w_hat = k^2 u_hat
-    u_hat = (ik \times w_hat) / k^2
-    u = iFFT(u_hat)
+      w = [curl(u)=] \nabla \times u
+      curl(w) = \nabla^2(u) (since div(u)=0)
+      FFT(curl(w)) = FFT(\nabla^2(u))
+      ik \times w_hat = k^2 u_hat
+      u_hat = (ik \times w_hat) / k^2
+      u = iFFT(u_hat)
+
     """
-    global work, K_over_K2, FFT
-    F_tmp = work[(a, 0)]
-    F_tmp = cross2(F_tmp, K_over_K2, a)
-    c[0] = FFT.ifftn(F_tmp[0], c[0], dealias)
-    c[1] = FFT.ifftn(F_tmp[1], c[1], dealias)
-    c[2] = FFT.ifftn(F_tmp[2], c[2], dealias)    
+    v_hat = work[(w_hat, 0)]
+    v_hat = cross2(v_hat, K_over_K2, w_hat)
+    c[0] = FFT.ifftn(v_hat[0], c[0], dealias)
+    c[1] = FFT.ifftn(v_hat[1], c[1], dealias)
+    c[2] = FFT.ifftn(v_hat[2], c[2], dealias)    
     return c
 
-def backward_velocity():
-    """Compute velocity from curl coefficients"""
-    global W_hat, U
-    U = computeU(W_hat, U)
+def get_velocity(W_hat, U, work, FFT, K_over_K2, **context):
+    """Compute velocity from context"""
+    U = compute_velocity(U, W_hat, work, FFT, K_over_K2)
     return U
 
-#@profile
-def ComputeRHS(dU, W_hat):
-    global work, FFT, K, K2, Source
-    U_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
-    W_dealiased = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
-    F_tmp = work[(dU, 0)]
-    
-    U_dealiased[:] = computeU(W_hat, U_dealiased, params.dealias)
+def get_curl(curl, W_hat, FFT, **context):
+    """Compute curl from context"""
     for i in range(3):
-        W_dealiased[i] = FFT.ifftn(W_hat[i], W_dealiased[i], params.dealias)
-    F_tmp[:] = Cross(U_dealiased, W_dealiased, F_tmp, params.dealias)
-    dU = cross2(dU, K, F_tmp)    
-    dU -= params.nu*K2*W_hat    
-    dU += Source    
-    return dU
+        curl[i] = FFT.ifftn(W_hat[i], curl[i])
+    return curl
 
-def solve():
-    global dU, W, W_hat, conv, integrate, profiler
+def getConvection(convection):
+    """Return function used to compute nonlinear term"""
+    if convection in ("Standard", "Divergence", "Skewed"):
+        raise NotImplementedError
+
+    elif convection == "Vortex":
+
+        def Conv(rhs, w_hat, work, FFT, K, K_over_K2):
+            u_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
+            w_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
+            v_hat = work[(rhs, 0)]
+            
+            u_dealias = compute_velocity(u_dealias, w_hat, work, FFT, K_over_K2, params.dealias)
+            for i in range(3):
+                w_dealias[i] = FFT.ifftn(w_hat[i], w_dealias[i], params.dealias)
+            v_hat = Cross(v_hat, u_dealias, w_dealias, work, FFT, params.dealias) # v_hat = F_k(u_dealias x w_dealias)
+            rhs = cross2(rhs, K, v_hat)  # rhs = 1j*(K x v_hat)
+            return rhs
+
+    Conv.convection = convection
+    return Conv
+
+@optimizer
+def add_linear(rhs, w_hat, nu, K2, Source):
+    """Add contributions from source and diffusion to the rhs"""
+    rhs -= nu*K2*w_hat
+    rhs += Source
+    return rhs
+
+def ComputeRHS(rhs, w_hat, solver, work, FFT, K, K2, K_over_K2, Source, **context):
+    """Return right hand side of Navier Stokes in velocity-vorticity form
     
-    timer = Timer()
-    params.t = 0.0
-    params.tstep = 0
-    # Set up function to perform temporal integration (using params.integrator parameter)
-    integrate = getintegrator(**globals())
-    conv = getConvection(params.convection)
+    args:
+        rhs         The right hand side to be returned
+        w_hat       The FFT of the curl at current time. May differ from
+                    context.W_hat since it is set by the integrator
+        solver      The solver module. Included for possible inheritance.
 
-    if params.make_profile: profiler = cProfile.Profile()
-
-    dt_in = params.dt
+    Remaining args may be extracted from context:
+        work        Work arrays
+        FFT         Transform class from mpiFFT4py
+        K           Scaled wavenumber mesh
+        K2          K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+        K_over_K2   K / K2
+        Source      Scalar source term
     
-    while params.t + params.dt <= params.T+1e-15:
-        
-        W_hat, params.dt, dt_took = integrate()
-
-        #for i in range(3):
-            #W[i] = FFT.ifftn(W_hat[i], W[i])
-
-        params.t += dt_took
-        params.tstep += 1
-                 
-        hdf5file.update(**globals())
-        
-        update(**globals())
-        
-        timer()
-        
-        if params.tstep == 1 and params.make_profile:
-            #Enable profiling after first step is finished
-            profiler.enable()
-
-        #Make sure that the last step hits T exactly.
-        if params.t + params.dt >= params.T:
-            params.dt = params.T - params.t
-            if params.dt <= 1.e-14:
-                break
-
-    params.dt = dt_in
-    
-    dU = ComputeRHS(dU, W_hat)
-    
-    additional_callback(fU_hat=dU, **globals())
-
-    timer.final(MPI, rank)
-    
-    if params.make_profile:
-        results = create_profile(**globals())
-        
-    regression_test(**globals())
-        
-    hdf5file.close()
+    """
+    rhs = solver.conv(rhs, w_hat, work, FFT, K, K_over_K2)
+    rhs = solver.add_linear(rhs, w_hat, params.nu, K2, Source)
+    return rhs

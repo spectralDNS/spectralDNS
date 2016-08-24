@@ -1,5 +1,5 @@
 """Orr-Sommerfeld"""
-from spectralDNS import config, get_solver
+from spectralDNS import config, get_solver, solve
 from OrrSommerfeld_eig import OrrSommerfeld
 from numpy import dot, real, pi, cos, vstack, flipud, hstack, floor, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose
 from mpiFFT4py import dct
@@ -23,63 +23,66 @@ def initOS(OS, U, X, t=0.):
     U[2] = 0
 
 OS, e0 = None, None
-def initialize(U, U_hat, U_hat0, solvePressure, H_hat1, FST, ST, X, comm, rank,
-               conv, TDMASolverD, params, work, backward_velocity, forward_velocity, **kw):
+def initialize(solver, context):
     global OS, e0
+    params = config.params
     OS = OrrSommerfeld(Re=params.Re, N=160)
+    U = context.U
+    X = context.X
+    FST = context.FST
     initOS(OS, U, X)
     
-    U_hat0 = forward_velocity(U_hat0, U, FST)
-    U = backward_velocity(U, U_hat0, FST)
-    H_hat1 = conv(H_hat1, U_hat0)
-    e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, ST.quad)
-    initOS(OS, U, X, t=params.dt)
-    U_hat = forward_velocity(U_hat, U, FST)
-    U = backward_velocity(U, U_hat, FST)
-    
-    if not params.solver in ("KMM", "KMMRK3"):    
-        conv2 = zeros_like(H_hat1)
-        conv2 = conv(conv2, 0.5*(U_hat0+U_hat))  
-        for j in range(3):
-            conv2[j] = TDMASolverD(conv2[j])
-        conv2 *= -1
-        kw['P_hat'] = solvePressure(kw['P_hat'], conv2)
+    U_hat = solver.set_velocity(**context)
+    U = solver.get_velocity(**context)
 
-        kw['P'] = FST.ifst(kw['P_hat'], kw['P'], kw['SN'])
-        U_hat0[:] = U_hat
-        params.t = params.dt
-        params.tstep = 1
+    # Compute convection from data in context (i.e., context.U_hat and context.g)
+    # This is the convection at t=0
+    context.H_hat1[:] = solver.get_convection(**context)
+
+    # Initialize at t = dt
+    e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.ST.quad)
+    initOS(OS, U, X, t=params.dt)
+    U_hat = solver.set_velocity(**context)
+    U = solver.get_velocity(**context)
+    context.U_hat0[:] = U_hat
+    params.t = params.dt
+    params.tstep = 1
+
+    if not params.solver in ("KMM", "KMMRK3"):  
+        P_hat = solver.compute_pressure(**context)
+        P = FST.ifst(P_hat, context.P, context.SN)
         
     else:
-        U_hat0[:] = U_hat
-        params.t = params.dt
-        params.tstep = 1
-        kw['g'][:] = 0
+        context.g[:] = 0
 
-def set_Source(Source, Sk, FST, ST, params, **kw):
+def set_Source(Source, Sk, FST, ST, **kw):
     Source[:] = 0
-    Source[1] = -2./params.Re
+    Source[1] = -2./config.params.Re
     Sk[:] = 0
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
-        
+
 im1, im2, im3, im4 = (None, )*4        
-def update(rank, X, U, comm, FST, ST, U_hat, work, params, backward_velocity, **kw):
+def update(context):
+    
+    c = context
+    params = config.params
+    solver = config.solver
     
     # Use GL for postprocessing
     global im1, im2, im3, OS, e0
-    if im1 is None and rank == 0 and params.plot_step > 0:
+    if im1 is None and solver.rank == 0 and params.plot_step > 0:
         plt.figure()
-        im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
+        im1 = plt.contourf(c.X[1,:,:,0], c.X[0,:,:,0], c.U[0,:,:,0], 100)
         plt.colorbar(im1)
         plt.draw()
 
         plt.figure()
-        im2 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[1,:,:,0] - (1-X[0,:,:,0]**2), 100)
+        im2 = plt.contourf(c.X[1,:,:,0], c.X[0,:,:,0], c.U[1,:,:,0] - (1-c.X[0,:,:,0]**2), 100)
         plt.colorbar(im2)
         plt.draw()
 
         plt.figure()
-        im3 = plt.quiver(X[1, :,:,0], X[0,:,:,0], U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
+        im3 = plt.quiver(c.X[1, :,:,0], c.X[0,:,:,0], c.U[1,:,:,0]-(1-c.X[0,:,:,0]**2), c.U[0,:,:,0])
         plt.draw()
         
         plt.pause(1e-6)
@@ -87,27 +90,27 @@ def update(rank, X, U, comm, FST, ST, U_hat, work, params, backward_velocity, **
 
     if (params.tstep % params.plot_step == 0 or
         params.tstep % params.compute_energy == 0):        
-        U = backward_velocity(U, U_hat, FST)
+        U = solver.get_velocity(**context)
     
-    if params.tstep % params.plot_step == 0 and rank == 0 and params.plot_step > 0:
+    if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
         im1.ax.clear()
-        im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100) 
+        im1.ax.contourf(c.X[1, :,:,0], c.X[0, :,:,0], U[0, :, :, 0], 100) 
         im1.autoscale()
         im2.ax.clear()
-        im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0]-(1-X[0,:,:,0]**2), 100)         
+        im2.ax.contourf(c.X[1, :,:,0], c.X[0, :,:,0], U[1, :, :, 0]-(1-c.X[0,:,:,0]**2), 100)         
         im2.autoscale()
-        im3.set_UVC(U[1,:,:,0]-(1-X[0,:,:,0]**2), U[0,:,:,0])
+        im3.set_UVC(U[1,:,:,0]-(1-c.X[0,:,:,0]**2), U[0,:,:,0])
         plt.pause(1e-6)
 
     if params.tstep % params.compute_energy == 0: 
-        U_tmp = work[(U, 0)]
-        U = backward_velocity(U, U_hat, FST)
-        pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
-        e1 = 0.5*FST.dx(pert, ST.quad)
+        U_tmp = c.work[(U, 0)]
+        U = solver.get_velocity(**context)
+        pert = (U[1] - (1-c.X[0]**2))**2 + U[0]**2
+        e1 = 0.5*c.FST.dx(pert, c.ST.quad)
         exact = exp(2*imag(OS.eigval)*(params.t))
-        initOS(OS, U_tmp, X, t=params.t)
+        initOS(OS, U_tmp, c.X, t=params.t)
         pert = (U[0] - U_tmp[0])**2 + (U[1]-U_tmp[1])**2
-        e2 = 0.5*FST.dx(pert, ST.quad)
+        e2 = 0.5*c.FST.dx(pert, c.ST.quad)
         
         #ST.quad = 'GL'
         #kw['SB'].quad = 'GL'
@@ -123,16 +126,19 @@ def update(rank, X, U, comm, FST, ST, U_hat, work, params, backward_velocity, **
         #kw['SB'].quad = 'GC'
         #X[:] = FST.get_local_mesh(ST)
         
-        if rank == 0:
+        if solver.rank == 0:
             print "Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2))
 
-def regression_test(U, U0, X, comm, rank, FST, U_hat, U_hat0, params, ST, backward_velocity, **kw):
+def regression_test(context):
     global OS, e0
-    U = backward_velocity(U, U_hat, FST)
-    pert = (U[1] - (1-X[0]**2))**2 + U[0]**2
-    e1 = 0.5*FST.dx(pert, ST.quad)
+    c = context
+    params = config.params
+    solver = config.solver
+    U = solver.get_velocity(**context)
+    pert = (U[1] - (1-c.X[0]**2))**2 + U[0]**2
+    e1 = 0.5*c.FST.dx(pert, c.ST.quad)
     exact = exp(2*imag(OS.eigval)*params.t)
-    if rank == 0:
+    if solver.rank == 0:
         print "Computed error = %2.8e %2.8e " %(sqrt(abs(e1/e0-exact)), params.dt)
     #U0[:] = 0
     #initOS(OS, U0, X, t=params.t)
@@ -153,11 +159,13 @@ if __name__ == "__main__":
         },  "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)
-    config.channel.add_argument("--plot_step", type=int, default=1)
-    solver = get_solver(update=update, regression_test=regression_test, mesh="channel")    
-    initialize(**vars(solver))
-    set_Source(**vars(solver))	
-    solver.solve()
+    config.channel.add_argument("--plot_step", type=int, default=10)
+    solver = get_solver(update=update, regression_test=regression_test, mesh="channel")  
+    #solver = get_solver(mesh="channel")  
+    context = solver.get_context()
+    initialize(solver, context)
+    set_Source(**context)
+    solve(solver, context)
     #s = solver
     #s.FST.padsize = 2.0
     #U0 = s.FST.get_workarray(((3,)+s.FST.real_shape_padded(), s.float), 0)

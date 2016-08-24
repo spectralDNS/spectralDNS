@@ -1,6 +1,6 @@
 """Orr-Sommerfeld"""
 from numpy.polynomial import chebyshev as n_cheb
-from spectralDNS import config, get_solver
+from spectralDNS import config, get_solver, solve
 from numpy import dot, real, pi, exp, sum, zeros, cos, exp, arange, imag, sqrt, array
 from mpiFFT4py import dct
 import matplotlib.pyplot as plt
@@ -8,19 +8,20 @@ import warnings
 import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
-def initialize(U, U_hat, U_hat0, P, P_hat, params, **kw):  
+def initialize(U, U_hat, U_hat0, **context):  
     U_hat[:] = 0
     U_hat0[:] = 0
     U[:] = 0    
-    P[:] = 0
-    P_hat[:] = 0
-    if "KMM" in params.solver:
-        kw['g'][:] = 0
-        kw['H_hat1'][:] = 0
+    if "KMM" in config.params.solver:
+        context['g'][:] = 0
+        context['H_hat1'][:] = 0
+    else:
+        context['P'][:] = 0
+        context['P_hat'][:] = 0
 
-def set_Source(Source, Sk, FST, ST, params, **kw):
+def set_Source(Source, Sk, FST, ST, **context):
     Source[:] = 0
-    Source[1, :] = -2./params.Re
+    Source[1, :] = -2./config.params.Re
     Sk[:] = 0
     Sk[1] = FST.fss(Source[1], Sk[1], ST)
 
@@ -47,35 +48,39 @@ def reference(Re, t, num_terms=200):
     return u
 
 im1 = None
-def update(rank, X, U, U_hat, comm, x0, num_processes, params, FST, **kw):
+def update(context):
     global im1
-    
-    if im1 is None and rank == 0 and params.plot_step > 0:
+    params = config.params
+    solver = config.solver
+    X = context.X
+    U = solver.get_velocity(**context)
+    if (params.tstep % params.plot_step == 0 and params.plot_step > 0 or
+           params.tstep % params.compute_energy == 0):
+        U = solver.get_velocity(**context)
+        
+    if im1 is None and solver.rank == 0 and params.plot_step > 0:
         plt.figure()
-        im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[1,:,:,0], 100)
+        im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], context.U[1,:,:,0], 100)
         plt.colorbar(im1)
         plt.draw()
-
         plt.pause(1e-6)
-        globals().update(im1=im1)
     
-    if params.tstep % params.plot_step == 0 and params.plot_step > 0:
-        U[1] = FST.ifst(U_hat[1], U[1], kw['ST'])
+    if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
         im1.ax.clear()
         im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0], 100) 
         im1.autoscale()
         plt.pause(1e-6)                
 
     if params.tstep % params.compute_energy == 0: 
-        U[1] = FST.ifst(U_hat[1], U[1], kw['ST'])
         u0 = U[1, :, 0, 0].copy()
         uall = None
-        if rank == 0:
-            uall = zeros((num_processes, params.N[0]/num_processes))
-        comm.Gather(u0, uall, root=0)
+        if solver.rank == 0:
+            uall = zeros((solver.num_processes, params.N[0]/solver.num_processes))
+        solver.comm.Gather(u0, uall, root=0)
         
-        if rank == 0:
+        if solver.rank == 0:
             uall = uall.reshape((params.N[0],))
+            x0 = context.FST.get_mesh_dim(context.ST, 0)
             #x = x0
             #pc = zeros(len(x))
             #pc = ST.fct(uall, pc)  # Cheb transform of result
@@ -86,15 +91,19 @@ def update(rank, X, U, U_hat, comm, x0, num_processes, params, FST, **kw):
             #u_exact = reference(params.Re, params.t)
             print "Time %2.5f Error %2.12e " %(params.t, sqrt(sum((u_exact-uall)**2)/params.N[0]))
 
-def regression_test(U, U_hat, X, comm, rank, num_processes, x0, params, FST, **kw):
-    U[1] = FST.ifst(U_hat[1], U[1], kw['ST'])
+def regression_test(context):
+    params = config.params
+    solver = config.solver
+    U = solver.get_velocity(**context)
     u0 = U[1, :, 0, 0].copy()
     uall = None
-    if rank == 0:
-        uall = zeros((num_processes, params.N[0]/num_processes))
-    comm.Gather(u0, uall, root=0)
-    if rank == 0:
+    if solver.rank == 0:
+        uall = zeros((solver.num_processes, params.N[0]/solver.num_processes))
+
+    solver.comm.Gather(u0, uall, root=0)
+    if solver.rank == 0:
         uall = uall.reshape((params.N[0],))
+        x0 = context.FST.get_mesh_dim(context.ST, 0)
         #x = x0
         #pc = zeros(len(x))
         #pc = ST.fct(uall, pc)  # Cheb transform of result
@@ -118,6 +127,7 @@ if __name__ == "__main__":
     config.channel.add_argument("--compute_energy", type=int, default=5)
     config.channel.add_argument("--plot_step", type=int, default=10)
     solver = get_solver(update=update, regression_test=regression_test, mesh="channel")    
-    initialize(**vars(solver))
-    set_Source(**vars(solver))
-    solver.solve()
+    context = solver.get_context()
+    initialize(**context)
+    set_Source(**context)
+    solve(solver, context)

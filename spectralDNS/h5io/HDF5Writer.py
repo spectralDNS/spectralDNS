@@ -22,7 +22,8 @@ try:
             self.dim = len(comps[comps.keys()[0]].shape)
             self.mesh = mesh
 
-        def _init_h5file(self, params, comm, **kw):
+        def _init_h5file(self, params, FFT, **kw):
+            comm = FFT.comm
             self.f = h5py.File(self.fname, "w", driver="mpio", comm=comm)
             self.f.create_group("3D")
             self.f.create_group("2D")
@@ -56,14 +57,17 @@ try:
                 self.f["3D/mesh/"].create_dataset(key, shape=(len(val),), dtype=val.dtype)
                 self.f["3D/mesh/"+key][:] = val
 
-        def update(self, **kw):
-            self.update_components(**kw)
-            params = kw['params']
+        def update(self, params, **kw):
+            #from IPython import embed; embed()
+            if (self.check_if_write(params) or 
+                  params.tstep % params.checkpoint == 0):
+                self.update_components(**kw)
+
             if self.check_if_write(params):
-                self._write(**kw)
+                self._write(params, **kw)
 
             if params.tstep % params.checkpoint == 0:
-                self._checkpoint(**kw)
+                self._checkpoint(params, **kw)
 
         def check_if_write(self, params):
             if params.tstep % params.write_result == 0:
@@ -76,13 +80,14 @@ try:
                     return True
             return False
 
-        def _checkpoint(self, params, comm, **kw):
+        def _checkpoint(self, params, **kw):
+            FFT = kw.pop('FFT', kw.get('FST'))
             if self.f is None: 
-                self._init_h5file(params, comm, **kw) 
+                self._init_h5file(params, FFT, **kw) 
             else:
-                self.f = h5py.File(self.fname, driver="mpio", comm=comm)
+                self.f = h5py.File(self.fname, driver="mpio", comm=FFT.comm)
                 if not all(self.f.attrs['N'] == params.N):
-                    self._init_h5file(params, comm, **kw)
+                    self._init_h5file(params, FFT, **kw)
 
             dim = str(self.dim)+"D"
             keys = self.chkpoint['current'].keys()
@@ -95,7 +100,6 @@ try:
                     shape = params.N if len(val.shape) == self.dim else (val.shape[0],)+tuple(params.N)
                     self.f["{}/checkpoint/{}".format(dim, key)].create_dataset("0", shape=shape, dtype=val.dtype)
 
-            FFT = kw.get('FFT', kw.get('FST'))
             s = FFT.real_local_slice()
             # Get new values
             if dim == "2D":
@@ -123,16 +127,16 @@ try:
                         self.f["3D/checkpoint/{}/0".format(key)][:, s[0], s[1], s[2]] = val
             self.f.close()
 
-        def _write(self, params, comm, **kw):
+        def _write(self, params, **kw):
+            FFT = kw.pop('FFT', kw.get('FST'))
             if self.f is None: 
-                self._init_h5file(params, comm, **kw) 
+                self._init_h5file(params, FFT, **kw) 
             else:
-                self.f = h5py.File(self.fname, driver="mpio", comm=comm)
+                self.f = h5py.File(self.fname, driver="mpio", comm=FFT.comm)
                 if not all(self.f.attrs['N'] == params.N):
-                    self._init_h5file(params, comm, **kw)
+                    self._init_h5file(params, FFT, **kw)
 
             dim = str(self.dim)+"D"
-            FFT = kw.get('FFT', kw.get('FST'))
             N = params.N
             s = FFT.real_local_slice()
             if params.tstep % params.write_result == 0:                
@@ -185,17 +189,16 @@ try:
 
 except:
     class HDF5Writer(object):
-        def __init__(self, comps, filename="U.h5", mesh={}):
-            if FFT.comm.Get_rank() == 0:
-                print Warning("Need to install h5py to allow storing results")
+        def __init__(self, comps, chkpoint={}, filename="U.h5", mesh={}):
+            print Warning("Need to install h5py to allow storing results")
 
         def check_if_write(self, params):
             return False
 
-        def _checkpoint(self, *args):
+        def _checkpoint(self, params, **context):
             pass
 
-        def _write(self, params):
+        def _write(self, params, **context):
             pass
 
         def close(self):

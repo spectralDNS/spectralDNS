@@ -1,9 +1,10 @@
-from spectralDNS import config, get_solver
+from spectralDNS import config, get_solver, solve
 import matplotlib.pyplot as plt
-from numpy import zeros, exp, sum, pi, exp, sin, cos, tanh
+from numpy import zeros, exp, sum, pi, exp, sin, cos, tanh, float64
 
-def initialize(X, U, Ur, Ur_hat, rho, FFT, float, params, **kwargs):
+def initialize(X, U, Ur, Ur_hat, rho, FFT, float, **kwargs):
     
+    params = config.params
     N = params.N
     Um = 0.5*(params.U1 - params.U2)
     U[1] = params.A*sin(2*X[0])
@@ -26,14 +27,17 @@ def initialize(X, U, Ur, Ur_hat, rho, FFT, float, params, **kwargs):
         Ur_hat[i] = FFT.fft2(Ur[i], Ur_hat[i]) 
 
 im, im2 = None, None
-def update(comm, rank, rho, curl, K, FFT, U_hat, U, params,
-           P_hat, P, float64, rho_hat, **kwargs):
+def update(context):
     global im, im2
+    c = context
+    params = config.params
+    solver = config.solver
     
     dx, L, N = params.dx, params.L, params.N
     if (params.tstep % params.plot_result == 0 and params.plot_result > 0):
-        P = FFT.ifft2(P_hat*1j, P)
-        curl = FFT.ifft2(1j*K[0]*U_hat[1]-1j*K[1]*U_hat[0], curl)
+        P = solver.get_pressure(**context)
+        curl = solver.get_curl(**context)
+        rho = solver.get_rho(**context)
         
     if params.tstep == 1 and params.plot_result > 0:
         fig, ax = plt.subplots(1, 1)
@@ -62,12 +66,13 @@ def update(comm, rank, rho, curl, K, FFT, U_hat, U, params,
         im2.set_data(curl[:,:].T)
         im2.autoscale()
         plt.pause(1e-6)
-        if rank == 0:
+        if solver.rank == 0:
             print params.tstep
 
     if params.tstep % params.compute_energy == 0:
-        kk = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
-        if rank == 0:
+        U = solver.get_velocity(**context)
+        kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
+        if solver.rank == 0:
             print params.tstep, kk
 
 if __name__ == "__main__":
@@ -91,8 +96,7 @@ if __name__ == "__main__":
     )
     config.doublyperiodic.add_argument("--plot_result", type=int, default=10)
     config.doublyperiodic.add_argument("--compute_energy", type=int, default=2)
-    solver = get_solver(update, mesh='doublyperiodic')
-    solver.hdf5file.components["curl"] = solver.curl
-    
-    initialize(**vars(solver))
-    solver.solve()
+    sol = get_solver(update=update, mesh='doublyperiodic')
+    context = sol.get_context()
+    initialize(**context)
+    solve(sol, context)

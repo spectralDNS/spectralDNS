@@ -22,8 +22,20 @@ def test_single_KMM2():
 def test_single_KMM3():
     d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py --optimization cython --dealias 3/2-rule --dealias_cheb KMM", shell=True)
 
+def test_single_KMMRK3():
+    d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py --optimization cython KMMRK3", shell=True)
+
+def test_single_KMMRK32():
+    d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py --optimization cython --dealias 3/2-rule KMMRK3", shell=True)
+
+def test_single_KMMRK33():
+    d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py --optimization cython --dealias 3/2-rule --dealias_cheb KMMRK3", shell=True)
+
 def test_single_IPCS():
     d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py --optimization cython IPCS", shell=True)
+
+def test_single_IPCSR():
+    d = subprocess.check_output("mpirun -np 1 python OrrSommerfeld.py IPCSR", shell=True)
 
 def test_mpi_slab_DNS():
     d = subprocess.check_output("mpirun -np 4 python TG.py NS", shell=True)
@@ -58,5 +70,17 @@ def test_mpi_KMM2():
 def test_mpi_KMM3():
     d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --optimization cython --checkpoint 5 --dealias 3/2-rule --dealias_cheb KMM", shell=True)
 
+def test_mpi_KMMRK3():
+    d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --optimization cython --checkpoint 5 KMMRK3", shell=True)
+
+def test_mpi_KMMRK32():
+    d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --optimization cython --checkpoint 5 --dealias 3/2-rule  KMMRK3", shell=True)
+
+def test_mpi_KMMRK33():
+    d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --optimization cython --checkpoint 5 --dealias 3/2-rule --dealias_cheb KMMRK3", shell=True)
+
 def test_mpi_IPCS():
     d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --optimization cython --checkpoint 5 IPCS", shell=True)
+
+def test_mpi_IPCSR():
+    d = subprocess.check_output("mpirun -np 4 python OrrSommerfeld.py --optimization cython --checkpoint 5 IPCSR", shell=True)
