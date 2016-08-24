@@ -4,12 +4,11 @@ __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from .spectralinit import *
-from ..mesh.channel import SlabShen_R2C
 from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, CNDmat, \
     HelmholtzCoeff
 from ..shen.la import Helmholtz, TDMA
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, \
-    ShenBiharmonicBasis, SFTc
+    ShenBiharmonicBasis, SFTc, SlabShen_R2C
 from functools import wraps
 
 def setup():

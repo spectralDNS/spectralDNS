@@ -59,8 +59,6 @@ def solve(solver, context):
                                      solver,
                                      context)
 
-    if params.make_profile: solver.profiler = cProfile.Profile()
-
     dt_in = params.dt
 
     while params.t + params.dt <= params.T+1e-15:

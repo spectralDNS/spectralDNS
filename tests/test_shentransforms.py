@@ -7,9 +7,9 @@ from scipy.linalg import solve
 
 from spectralDNS import config
 config.mesh = "channel"
-config.solver = "IPCS"
-config.dealias = "3/2-rule"
-from spectralDNS.mesh.channel import SlabShen_R2C
+config.params.solver = "IPCS"
+config.params.dealias = "3/2-rule"
+from spectralDNS.shen.shentransform import SlabShen_R2C
 from mpi4py import MPI
 
 from sympy import chebyshevt, Symbol, sin, cos, pi
