@@ -110,8 +110,8 @@ def regression_test(context):
     w = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     k = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
     if solver.rank == 0:
-        assert round(k - 0.124953117517, 7) == 0
-        assert round(w - 0.375249930801, 7) == 0
+        assert round(k - 0.124953117517, params.ntol) == 0
+        assert round(w - 0.375249930801, params.ntol) == 0
 
 if __name__ == "__main__":
     config.update(
