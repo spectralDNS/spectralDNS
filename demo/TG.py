@@ -2,6 +2,8 @@ from spectralDNS import config, get_solver, solve
 from numpy import array, pi, zeros, sum, float64,sin, cos
 from numpy.linalg import norm
 import sys
+import warnings
+
 try:
     import matplotlib.pyplot as plt
 
