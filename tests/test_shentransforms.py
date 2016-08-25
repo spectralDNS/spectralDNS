@@ -1,17 +1,13 @@
 import pytest
-from spectralDNS.shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, ChebyshevTransform, ShenBiharmonicBasis
+from spectralDNS.shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, \
+    ChebyshevTransform, ShenBiharmonicBasis, SlabShen_R2C
 from spectralDNS.shen.la import TDMA, Helmholtz, Biharmonic
-from spectralDNS.shen.Matrices import BNNmat, BTTmat, BDDmat, CDDmat, CDNmat, BNDmat, CNDmat, BDNmat, ADDmat, ANNmat, CTDmat, BDTmat, CDTmat, BTDmat, BTNmat, BBBmat, ABBmat, SBBmat, CDBmat, CBDmat, ATTmat, BBDmat, HelmholtzCoeff
+from spectralDNS.shen.Matrices import BNNmat, BTTmat, BDDmat, CDDmat, CDNmat, \
+    BNDmat, CNDmat, BDNmat, ADDmat, ANNmat, CTDmat, BDTmat, CDTmat, BTDmat, \
+    BTNmat, BBBmat, ABBmat, SBBmat, CDBmat, CBDmat, ATTmat, BBDmat, HelmholtzCoeff
 from spectralDNS.shen import SFTc
 from scipy.linalg import solve
-
-from spectralDNS import config
-config.mesh = "channel"
-config.params.solver = "IPCS"
-config.params.dealias = "3/2-rule"
-from spectralDNS.shen.shentransform import SlabShen_R2C
 from mpi4py import MPI
-
 from sympy import chebyshevt, Symbol, sin, cos, pi
 import numpy as np
 import scipy.sparse.linalg as la

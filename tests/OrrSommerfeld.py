@@ -4,6 +4,7 @@ from OrrSommerfeld_eig import OrrSommerfeld
 from numpy import dot, real, pi, exp, sum, zeros, arange, imag, sqrt, array, \
     zeros_like, allclose
 from mpiFFT4py import dct
+import sys
 
 eps = 1e-6
 def initOS(OS, U, X, t=0.):
@@ -81,8 +82,25 @@ if __name__ == "__main__":
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)
     config.channel.add_argument("--plot_step", type=int, default=1)
-    solver = get_solver(regression_test=regression_test, mesh="channel")    
-    context = solver.get_context()
-    initialize(solver, context)
-    set_Source(**context)
-    solve(solver, context)
+    for sol in ['KMM', 'KMMRK3', 'IPCS', 'IPCSR']:
+        solver = get_solver(regression_test=regression_test, mesh="channel",
+                            parse_args=sys.argv[1:]+[sol])
+        context = solver.get_context()
+        initialize(solver, context)
+        set_Source(**context)
+        solve(solver, context)
+        
+        config.params.dealias = '3/2-rule'
+        config.params.optimization = 'cython'
+        initialize(solver, context)
+        solve(solver, context)
+        
+        config.params.dealias_cheb = True
+        config.params.checkpoint = 5
+        config.params.write_result = 2
+        initialize(solver, context)
+        solve(solver, context)
+    
+    
+
+    

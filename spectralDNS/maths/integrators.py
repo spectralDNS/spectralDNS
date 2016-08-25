@@ -172,58 +172,16 @@ def AB2(u0, u1, rhs, dt, tstep, solver, context):
     u1[:] = rhs*dt
     return u0, dt, dt
 
-def implicitIPCS(u_hat, p_hat, rhs, dt, assembler, solver, params, context):
-    """IPCS channel solver"""
-    
-    # Tentative momentum solve
-    for jj in range(params.velocity_pressure_iters):
-        rhs[:] = 0
-        rhs = assembler(rhs, u_hat, jj, **context)
-        u_hat = solver(u_hat, rhs, context.la)
-    
-        # Pressure correction
-        dP = work[(p_hat, 0)]
-        dP = pressurerhs(u_hat, dP) 
-        Pcorr[:] = la.HelmholtzSolverP(Pcorr, dP)
-
-        # Update pressure
-        p_hat[p_slice] += Pcorr[p_slice]
-        
-        comm.Allreduce(np.linalg.norm(Pcorr), pressure_error)
-        if jj == 0 and params.print_divergence_progress and rank == 0:
-            print "   Divergence error"
-        if params.print_divergence_progress:
-            if rank == 0:                
-                print "         Pressure correction norm %6d  %2.6e" %(jj, pressure_error[0])
-        if pressure_error[0] < params.divergence_tol:
-            break
-        
-    for i in range(3):
-        U[i] = FST.ifst(U_hat[i], U[i], ST)
-                
-    # Update velocity
-    dU[:] = 0
-    Uc = work[(U[0], 0)]
-    Uc = FST.ifst(Pcorr, Uc, SN)
-    pressuregrad(Uc, Pcorr, dU)
-    dU[0] = TDMASolverD(dU[0])
-    dU[1] = TDMASolverD(dU[1])
-    dU[2] = TDMASolverD(dU[2])
-    U_hat[:, u_slice] += params.dt*dU[:, u_slice]  # + since pressuregrad computes negative pressure gradient
-
-    
-    return (u_hat, g_hat), dt, dt
-
 def getintegrator(rhs, u0, solver, context):
     """Return integrator using choice in global parameter integrator.
     """
     params = solver.params
+    u1 = u0.copy()
     
     if params.integrator == "RK4": 
         # RK4 parameters
         a = np.array([1./6., 1./3., 1./3., 1./6.], dtype=float)
         b = np.array([0.5, 0.5, 1.], dtype=float)
-        u1 = u0.copy()
         u2 = u0.copy()
         @wraps(RK4)
         def func():
@@ -246,40 +204,23 @@ def getintegrator(rhs, u0, solver, context):
         fY_hat = np.zeros((s,) + u0.shape, dtype=u0.dtype)
         sc = np.zeros_like(u0)
         err = np.zeros_like(u0)
-        u1 = u0.copy()
 
         @wraps(adaptiveRK)
         def func():
-            return adaptiveRK(A, b, bhat, err_order, fY_hat, u1, sc, err, fsal, offset, 
-                              params.TOL, params.TOL, adaptive, errnorm, rhs, u0, solver, 
-                              params.dt, params.tstep, context, solver.additional_callback, params)
-
+            return adaptiveRK(A, b, bhat, err_order, fY_hat, u1, sc, err, fsal,
+                              offset, params.TOL, params.TOL, adaptive, errnorm,
+                              rhs, u0, solver, params.dt, params.tstep, context,
+                              solver.additional_callback, params)
         return func
 
     elif params.integrator == "ForwardEuler":  
-        u1 = u0.copy()
         @wraps(ForwardEuler)
         def func():
             return ForwardEuler(u0, u1, rhs, params.dt, solver, context)
         return func
     
     elif params.integrator == "AB2":
-        u1 = u0.copy()
         @wraps(AB2)
         def func():
             return AB2(u0, u1, rhs, params.dt, params.tstep, solver, context)
         return func
-        
-    #elif params.integrator == "implicitRK3":
-        #u_hat, g_hat = u0
-        #@wraps(implicitRK3)
-        #def func():
-            #return implicitRK3(u_hat, g_hat, rhs, params.dt, assembler, solver, context)
-        #return func
-
-    #elif params.integrator == "implicitIPCS":
-        #u_hat, p_hat = u0
-        #@wraps(implicitIPCS)
-        #def func():
-            #return implicitIPCS(u_hat, p_hat, rhs, params.dt, assembler, solver, params, context)
-        #return func
