@@ -11,6 +11,8 @@ def initialize(solver, **context):
     
     else:
         initialize2(solver, **context)
+    config.params.t = 0.0
+    config.params.tstep = 0
         
 def initialize1(solver, U, U_hat, X, FFT, **context):    
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
