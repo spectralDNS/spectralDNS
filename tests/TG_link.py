@@ -1,1 +1,1 @@
-/home/mikael/MySoftware/spectralDNS/demo/TG.py
+../demo/TG.py
