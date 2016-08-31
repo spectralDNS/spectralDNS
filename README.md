@@ -64,7 +64,7 @@ Results also from the old Shaheen BlueGene/P:
 </p>
 
 <p align="center">
-    <img src="https://www.dropbox.com/s/8oayxts0ix359hi/KHmovie2.gif?dl=1" width="600" height="400" alt="Kelvin Helmholtz instability"/>
+    <img src="https://www.dropbox.com/s/8oayxts0ix359hi/KHmovie1.gif?dl=1" width="600" height="400" alt="Kelvin Helmholtz instability"/>
 </p>
 
 <p align="center">
