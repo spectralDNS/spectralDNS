@@ -4,6 +4,9 @@ spectralDNS
 [![Build Status](https://travis-ci.org/spectralDNS/spectralDNS.svg?branch=master)](https://travis-ci.org/spectralDNS/spectralDNS)
 [![CircleCI](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master.svg?style=svg)](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master)
 
+Description
+----------
+
 spectralDNS contains a classical high-performance pseudo-spectral Navier-Stokes DNS solver for triply periodic domains. The most notable feature of this solver is that it's written entirely in Python using NumPy, MPI for Python (mpi4py) and pyFFTW. MPI decomposition is performed using either the "slab" or the "pencil" approach and, stripping away unnecessary pre- and post-processing steps, the slab solver is no more than 100 lines long, including the MPI. The code has been found to scale very well in tests on the Shaheen Blue Gene/P supercomputer at KAUST Supercomputing Laboratory. Results of both weak and strong scaling tests are shown below. In addition to incompressible Navier-Stokes there are also solvers for MHD and Navier-Stokes or MHD with variable density through a Boussinesq approximation. The solver is described more thoroughly in this paper:
 
 M. Mortensen and H. P. Langtangen "High performance Python for direct numerical simulations of turbulent flows", Computer Physics Communications 203, p 53-65 (2016) http://arxiv.org/pdf/1602.03638v1.pdf
@@ -12,8 +15,24 @@ The efficiency of the pure NumPy/mpi4py solver has been enhanced using Cython fo
 
 A channel flow solver is implemented using the Shen basis (Jie Shen, SIAM Journal on Scientific Computing, 16, 74-87, 1995) for the scheme described by Kim, Moin and Moser (J. Fluid Mechanics, Vol 177, 133-166, 1987).
 
+Installation
+-----------
+spectralDNS is installed with regular python distutils
+
+    python setup.py install --prefix=...
+    
+or in-place using
+
+    python setup.py build_ext --inplace
+
+spectralDNS requires that [mpiFFT4py](https://github.com/spectralDNS/mpiFFT4py) has been installed already. Other than that, it requires [*h5py*](http://www.h5py.org) built with parallel HDF5, for analyzing the results.  [*cython*](http://cython.org) is used to optimize a few routines. 
+
+Usage
+-----
 See the demo folder for usage.
 
+Scaling
+------
 The most recent simulations of the pencil version of the NS solver are showing excellent scaling up to 65k cores at KAUST and Shaheen II!
 
 <p align="center">
@@ -52,3 +71,23 @@ Results also from the old Shaheen BlueGene/P:
     Evolution of vorticity. Two-dimensional simulation of Kelvin Helmholtz shear instability using a Boussinesq formulation (solvers/spectralDNS2D_Boussinesq.py)
 </p>
 
+Authors
+-------
+spectralDNS is developed by
+
+  * Mikael Mortensen
+  * Diako Darian
+
+Licence
+-------
+spectralDNS is licensed under the GNU GPL, version 3 or (at your option) any later version. spectralDNS is Copyright (2014-2016) by the authors.
+
+Contact
+-------
+The latest version of this software can be obtained from
+
+  https://github.com/spectralDNS/spectralDNS
+
+Please report bugs and other issues through the issue tracker at:
+
+  https://github.com/spectralDNS/spectralDNS/issues
