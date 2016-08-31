@@ -17,7 +17,7 @@ A channel flow solver is implemented using the Shen basis (Jie Shen, SIAM Journa
 
 Installation
 -----------
-spectralDNS is installed with regular python distutils
+spectralDNS is installed by cloning or forking the repository and then with regular python distutils
 
     python setup.py install --prefix=...
     
