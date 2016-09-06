@@ -13,15 +13,14 @@ requirements:
     - python
     - cython
     - numpy
-    - gcc
-    - hdf5 ==1.8.14
-    - h5py ==2.6.0
+    - hdf5-parallel
+    - h5py-parallel
 
   run:
     - python
     - numpy
-    - hdf5 ==1.8.14
-    - h5py ==2.6.0
+    - hdf5-parallel
+    - h5py-parallel
     - mpi4py
     - mpifft4py
     - sympy

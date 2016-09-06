@@ -1,9 +1,14 @@
 from spectralDNS import config, get_solver, solve
-
-import matplotlib.pyplot as plt
-from numpy import array, pi, zeros, sum, float64,sin, cos
+from numpy import array, pi, zeros, sum, float64, sin, cos
 from numpy.linalg import norm
-import sys
+import warnings
+
+try:
+    import matplotlib.pyplot as plt
+
+except ImportError:
+    warnings.warn("matplotlib not installed")
+    plt = None
 
 def initialize(solver, **context):
     if 'NS' in config.params.solver:
@@ -11,6 +16,8 @@ def initialize(solver, **context):
     
     else:
         initialize2(solver, **context)
+    config.params.t = 0.0
+    config.params.tstep = 0
         
 def initialize1(solver, U, U_hat, X, FFT, **context):    
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
@@ -46,18 +53,19 @@ def update(context):
         if params.solver == 'NS':
             P = solver.get_pressure(**c)
 
-    if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
-        if im1 is None:
-            plt.figure()
-            im1 = plt.contourf(c.X[1,:,:,0], c.X[0,:,:,0], U[0,:,:,10], 100)
-            plt.colorbar(im1)
-            plt.draw()
-            globals().update(im1=im1)
-        else:
-            im1.ax.clear()
-            im1.ax.contourf(c.X[1,:,:,0], c.X[0,:,:,0], U[0,:,:,10], 100) 
-            im1.autoscale()
-        plt.pause(1e-6)
+    if plt is not None:
+        if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
+            if im1 is None:
+                plt.figure()
+                im1 = plt.contourf(c.X[1,:,:,0], c.X[0,:,:,0], U[0,:,:,10], 100)
+                plt.colorbar(im1)
+                plt.draw()
+                globals().update(im1=im1)
+            else:
+                im1.ax.clear()
+                im1.ax.contourf(c.X[1,:,:,0], c.X[0,:,:,0], U[0,:,:,10], 100) 
+                im1.autoscale()
+            plt.pause(1e-6)
 
     if params.tstep % params.compute_energy == 0:
         dx, L = params.dx, params.L
@@ -101,8 +109,8 @@ def regression_test(context):
     w = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     k = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
     if solver.rank == 0:
-        assert round(k - 0.124953117517, 7) == 0
-        assert round(w - 0.375249930801, 7) == 0
+        assert round(w - 0.375249930801, params.ntol) == 0
+        assert round(k - 0.124953117517, params.ntol) == 0
 
 if __name__ == "__main__":
     config.update(
@@ -120,7 +128,8 @@ if __name__ == "__main__":
     )
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=2)
     config.triplyperiodic.add_argument("--plot_step", type=int, default=2)
-    sol = get_solver(mesh="triplyperiodic")
+    sol = get_solver(update=update, regression_test=regression_test,
+                     mesh="triplyperiodic")
 
     context = sol.get_context()
 
