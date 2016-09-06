@@ -37,7 +37,8 @@ def test_solvers(sol):
         {
             'nu': 0.000625,             # Viscosity
             'dt': 0.01,                 # Time step
-            'T': 0.1                    # End time
+            'T': 0.1,                    # End time
+            'convection': 'Vortex'
         }
     )
 
@@ -71,7 +72,8 @@ def test_integrators(sol):
         {
             'nu': 0.000625,             # Viscosity
             'dt': 0.01,                 # Time step
-            'T': 0.1                    # End time
+            'T': 0.1,                    # End time
+            'convection': 'Vortex'
         }
     )
 
