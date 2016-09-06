@@ -21,10 +21,10 @@ dependencies:
       fi
     - conda config --set always_yes yes
     - conda config --add channels spectralDNS
-    - conda config --add channels mikaem/label/dev
+    - conda config --add channels mikaem/label/ubuntu1604-host-gcc
     - conda update -q conda
     - conda info -a
-    - conda install -y mpi4py scipy pytest cython mpifft4py sympy h5py nodepy conda-build
+    - conda install -y mpi4py scipy pytest cython mpifft4py sympy h5py-parallel nodepy conda-build=1.21.4
 
 ## Customize test commands
 test:
