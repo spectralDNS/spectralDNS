@@ -13,7 +13,9 @@ from scipy.special import orthogonal
 from numpy.polynomial import chebyshev as n_cheb
 from scipy.sparse.linalg import LinearOperator
 from scipy.sparse import diags
+import warnings
 seterr(divide='ignore')
+
 
 try:
     from pylab import find, plot, figure, show, axis
