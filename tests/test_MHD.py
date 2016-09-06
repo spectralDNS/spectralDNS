@@ -1,32 +1,34 @@
+import pytest
 from spectralDNS import config, get_solver, solve
-from numpy import array, pi, sin, cos, float64, sum
+from TGMHD import initialize, regression_test, pi
+from mpi4py import MPI
 
-def initialize(UB_hat, UB, U, B, X, FFT, **context):
-    # Taylor-Green initialization
-    U[0] = sin(X[0])*cos(X[1])*cos(X[2])
-    U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
-    U[2] = 0 
-    B[0] = sin(X[0])*sin(X[1])*cos(X[2])
-    B[1] = cos(X[0])*cos(X[1])*cos(X[2])
-    B[2] = 0 
-    for i in range(6):
-        UB_hat[i] = FFT.fftn(UB[i], UB_hat[i])
-    config.params.t = 0
-    config.params.tstep = 0
-        
-def regression_test(context):
-    params = config.params
-    solver = config.solver
-    dx, L = params.dx, params.L
-    UB = solver.get_UB(**context)
-    U, B = UB[:3], UB[3:]
-    k = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
-    b = solver.comm.reduce(sum(B.astype(float64)*B.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
-    if solver.rank == 0:
-        assert round(k - 0.124565408177, 7) == 0 
-        assert round(b - 0.124637762143, 7) == 0
+comm = MPI.COMM_WORLD
 
-if __name__ == "__main__":
+if comm.Get_size() >= 4:
+    params = ('uniform_slab', 'nonuniform_slab', 
+              'uniform_pencil', 'nonuniform_pencil')
+else:
+    params = ('uniform', 'nonuniform')
+
+@pytest.fixture(params=params)
+def sol(request):
+    """Check for uniform and non-uniform cube"""
+    pars = request.param.split('_')
+    mesh = pars[0]
+    mpi = 'slab'
+    if len(pars) == 2:
+        mpi = pars[1]
+    _args = ['--decomposition', mpi]
+    if mesh == 'uniform':
+        _args += ['--M', '4', '4', '4', '--L', '2*pi', '2*pi', '2*pi']
+    else:
+        _args += ['--M', '6', '5', '4', '--L', '6*pi', '4*pi', '2*pi']
+    _args += ['MHD']
+    
+    return _args
+
+def test_MHD(sol):
     config.update(
         {
         'nu': 0.000625,             # Viscosity
@@ -39,7 +41,8 @@ if __name__ == "__main__":
         }
     )
         
-    solver = get_solver(regression_test=regression_test)
+    solver = get_solver(regression_test=regression_test,
+                        parse_args=sol)
     context = solver.get_context()
     initialize(**context)
     solve(solver, context)
