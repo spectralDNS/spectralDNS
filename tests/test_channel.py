@@ -1,23 +1,24 @@
 import pytest
 from spectralDNS import config, get_solver, solve
 from OrrSommerfeld import initialize, regression_test, set_Source, pi
-config.update(
-    {
-    'Re': 8000.,
-    'nu': 1./8000.,             # Viscosity
-    'dt': 0.001,                 # Time step
-    'T': 0.01,                   # End time
-    'L': [2, 2*pi, 4*pi/3.],
-    'M': [7, 5, 2]
-    },  "channel"
-)
 
-@pytest.fixture(params=('KMM', 'KMMRK3', 'IPCS', 'IPCSR'))
+@pytest.fixture(params=('KMM', 'KMMRK3', 'IPCS', 'IPCSR'), scope='module')
 def sol(request):
     """Check for uniform and non-uniform cube"""
     return request.param
 
 def test_channel(sol):
+    config.update(
+        {
+            'Re': 8000.,
+            'nu': 1./8000.,             # Viscosity
+            'dt': 0.001,                 # Time step
+            'T': 0.01,                   # End time
+            'L': [2, 2*pi, 4*pi/3.],
+            'M': [7, 5, 2]
+        },  "channel"
+    )
+    
     solver = get_solver(regression_test=regression_test,
                         mesh="channel",
                         parse_args=[sol])

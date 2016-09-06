@@ -1,18 +1,9 @@
 import pytest
-from spectralDNS import get_solver, config, solve
+from spectralDNS import config, get_solver, solve
 from TG import initialize, regression_test, pi
-import sys
 from mpi4py import MPI
 
 comm = MPI.COMM_WORLD
-
-config.update(
-    {
-    'nu': 0.000625,             # Viscosity
-    'dt': 0.01,                 # Time step
-    'T': 0.1,                   # End time
-    }
-)
 
 if comm.Get_size() >= 4:
     params = ('NS_uniform_slab', 'VV_uniform_slab',
@@ -40,7 +31,16 @@ def sol(request):
     
     return _args
 
+
 def test_solvers(sol):
+    config.update(
+        {
+            'nu': 0.000625,             # Viscosity
+            'dt': 0.01,                 # Time step
+            'T': 0.1                    # End time
+        }
+    )
+
     solver = get_solver(regression_test=regression_test, 
                         parse_args=sol)
     context = solver.get_context()
@@ -67,6 +67,14 @@ def test_solvers(sol):
     solve(solver, context)
 
 def test_integrators(sol):
+    config.update(
+        {
+            'nu': 0.000625,             # Viscosity
+            'dt': 0.01,                 # Time step
+            'T': 0.1                    # End time
+        }
+    )
+
     solver = get_solver(regression_test=regression_test,
                         parse_args=sol)
     context = solver.get_context()
@@ -80,5 +88,5 @@ def test_integrators(sol):
         solve(solver, context)
 
 if __name__ == '__main__':
-    test_solvers('NS')
-    test_integrators('NS')
+    test_solvers(['NS'])
+    test_integrators(['NS'])
