@@ -8,13 +8,18 @@ from scipy.linalg import eig
 from numpy import ones, cos, arange, pi, dot, eye, real, imag, resize, transpose, \
     float, newaxis, sum, abs, max, complex, linspace, argmax, argmin, zeros, squeeze, \
     seterr, array, hstack, argpartition
-from pylab import find, plot, figure, show, axis
 from numpy.linalg import inv
 from scipy.special import orthogonal
 from numpy.polynomial import chebyshev as n_cheb
 from scipy.sparse.linalg import LinearOperator
 from scipy.sparse import diags
 seterr(divide='ignore')
+
+try:
+    from pylab import find, plot, figure, show, axis
+
+except ImportError:
+    warnings.warn("matplotlib not installed")
 
 def cheb_derivative_matrix(N):
     x = arange(N)
