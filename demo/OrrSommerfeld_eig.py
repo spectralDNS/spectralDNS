@@ -16,7 +16,6 @@ from scipy.sparse import diags
 import warnings
 seterr(divide='ignore')
 
-
 try:
     from pylab import find, plot, figure, show, axis
 
