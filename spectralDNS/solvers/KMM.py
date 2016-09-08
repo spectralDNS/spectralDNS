@@ -25,7 +25,7 @@ def get_context():
     u_slice = slice(0, Nu)
     v_slice = slice(0, Nb)
 
-    FST = SlabShen_R2C(params.N, params.L, MPI, threads=params.threads,
+    FST = SlabShen_R2C(params.N, params.L, comm, threads=params.threads,
                        communication=params.communication,
                        planner_effort=params.planner_effort,
                        dealias_cheb=params.dealias_cheb)

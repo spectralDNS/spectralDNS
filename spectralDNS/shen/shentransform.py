@@ -11,6 +11,7 @@ from ..shen.Matrices import BBBmat
 from ..optimization import optimizer
 from collections import defaultdict
 import decimal
+from mpi4py import MPI
 
 """
 Fast transforms for pure Chebyshev basis or 
@@ -374,9 +375,9 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
 
 class SlabShen_R2C(Slab_R2C):
     
-    def __init__(self, N, L, MPI, padsize=1.5, threads=1, communication='Alltoallw', dealias_cheb=False,
+    def __init__(self, N, L, comm, padsize=1.5, threads=1, communication='Alltoallw', dealias_cheb=False,
                  planner_effort=defaultdict(lambda: "FFTW_MEASURE", {"dct": "FFTW_EXHAUSTIVE"})):
-        Slab_R2C.__init__(self, N, L, MPI, "double", padsize=padsize, threads=threads,
+        Slab_R2C.__init__(self, N, L, comm, "double", padsize=padsize, threads=threads,
                           communication=communication, planner_effort=planner_effort)
         self.dealias_cheb = dealias_cheb
         
@@ -413,12 +414,14 @@ class SlabShen_R2C(Slab_R2C):
                     slice(0, int(padsize*self.N[1]), 1), 
                     slice(0, int(padsize*self.N[2]), 1))
     
-    def global_complex_shape_padded(self):
+    def global_complex_shape(self, padsize=1.0):
         """Global size of problem in complex wavenumber space"""
         if self.dealias_cheb:
-            return (int(self.padsize*self.N[0]), int(self.padsize*self.N[1]), self.Nfp)
+            return (int(self.padsize*self.N[0]), int(self.padsize*self.N[1]),
+                    int(padsize*self.N[2]/2+1))
         else:
-            return (self.N[0], int(self.padsize*self.N[1]), self.Nfp)
+            return (self.N[0], int(self.padsize*self.N[1]),
+                    int(padsize*self.N[2]/2+1))
     
     def get_mesh_dim(self, ST, d):
         if d == 0:
@@ -469,8 +472,8 @@ class SlabShen_R2C(Slab_R2C):
         if axis == 1:
             fu[:, :N[1]/2] = fp[:, :N[1]/2, :(N[2]/2+1)]
             fu[:, N[1]/2:] = fp[:, -N[1]/2:, :(N[2]/2+1)]
-            #fu[:, self.N[1]/2, 0] *= 2 # Because of symmetrical padding
-            #fu[:, self.N[1]/2, self.N[2]/2] *= 2
+            #fu[:, N[1]/2, 0] *= 2 # Because of symmetrical padding
+            #fu[:, N[1]/2, N[2]/2] *= 2
         elif axis == 2:
             fu[:] = fp[:, :, :(N[2]//2+1)]
             
@@ -539,7 +542,7 @@ class SlabShen_R2C(Slab_R2C):
                 Uc_mpi  = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
                 Uc_hatT = rfft2(u, Uc_hatT, axes=(1,2), threads=self.threads, planner_effort=self.planner_effort['rfft2'])
                 Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
-                self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
+                self.comm.Alltoall(MPI.IN_PLACE, [Uc_hat, self.mpitype])
                 
             elif self.communication == 'Alltoallw':
                 if len(self._subarraysA) == 0:
@@ -568,8 +571,11 @@ class SlabShen_R2C(Slab_R2C):
                 
                 if self.communication == 'alltoall':
                     Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
-                    self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
+                    self.comm.Alltoall(MPI.IN_PLACE, [Uc_hat, self.mpitype])
+                
                 elif self.communication == 'Alltoallw':
+                    if len(self._subarraysA) == 0:
+                        self._subarraysA, self._subarraysB, self._counts_displs = self.get_subarrays()
                     self.comm.Alltoallw(
                         [Uc_hatT, self._counts_displs, self._subarraysB],
                         [Uc_hat,  self._counts_displs, self._subarraysA])
@@ -597,7 +603,7 @@ class SlabShen_R2C(Slab_R2C):
                     # Transpose and commuincate data
                     U_mpi = Upad_hat.reshape(self.complex_shape_padded_0_I())
                     U_mpi[:] = rollaxis(Upad_hat1.reshape(self.complex_shape_padded_I()), 1)
-                    self.comm.Alltoall(self.MPI.IN_PLACE, [Upad_hat, self.mpitype])
+                    self.comm.Alltoall(MPI.IN_PLACE, [Upad_hat, self.mpitype])
                     
                 elif self.communication == 'Alltoallw':
                     if len(self._subarraysA_pad) == 0:
@@ -672,7 +678,7 @@ class SlabShen_R2C(Slab_R2C):
             Uc_hat = fun(fu, Uc_hat)
             
             if self.communication == 'alltoall':
-                self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
+                self.comm.Alltoall(MPI.IN_PLACE, [Uc_hat, self.mpitype])
                 Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())                
                 #Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0, False)]
                 #self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
@@ -696,7 +702,7 @@ class SlabShen_R2C(Slab_R2C):
                 
                 Uc_hat = fun(fu*self.padsize**2, Uc_hat)
                 if self.communication == 'alltoall':
-                    self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
+                    self.comm.Alltoall(MPI.IN_PLACE, [Uc_hat, self.mpitype])
                     Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
                     
                 elif self.communication == 'Alltoallw':
@@ -728,7 +734,7 @@ class SlabShen_R2C(Slab_R2C):
                 
                 if self.communication == 'alltoall':
                     # Communicate to distribute first dimension (like Fig. 2b but padded in x-dir)
-                    self.comm.Alltoall(self.MPI.IN_PLACE, [Upad_hat, self.mpitype])
+                    self.comm.Alltoall(MPI.IN_PLACE, [Upad_hat, self.mpitype])
                     
                     # Transpose data and pad in y-direction before doing ifft. Now data is padded in x and y 
                     U_mpi = Upad_hat.reshape(self.complex_shape_padded_0_I())

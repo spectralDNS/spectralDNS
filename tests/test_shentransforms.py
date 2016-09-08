@@ -1,6 +1,6 @@
 import pytest
 from spectralDNS.shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, \
-    ChebyshevTransform, ShenBiharmonicBasis, SlabShen_R2C
+    ChebyshevTransform, ShenBiharmonicBasis, SlabShen_R2C, rfft2
 from spectralDNS.shen.la import TDMA, Helmholtz, Biharmonic
 from spectralDNS.shen.Matrices import BNNmat, BTTmat, BDDmat, CDDmat, CDNmat, \
     BNDmat, CNDmat, BDNmat, ADDmat, ANNmat, CTDmat, BDTmat, CDTmat, BTDmat, \
@@ -12,7 +12,9 @@ from sympy import chebyshevt, Symbol, sin, cos, pi
 import numpy as np
 import scipy.sparse.linalg as la
 
-N = 12
+comm = MPI.COMM_WORLD
+
+N = 32
 x = Symbol("x")
 
 @pytest.fixture(params=("NGC", "NGL", "DGC", "DGL", "CGC", "CGL", "BGL", "BGC"))
@@ -276,7 +278,7 @@ def test_BBDmat(SBSD):
     u2 = B.matvec(f_hat)
     assert np.linalg.norm(u2-u0)/(N*N*N) < 1e-12    
     
-    FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), MPI)
+    FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), MPI.COMM_SELF)
     f_hat = np.zeros(FST.complex_shape(), dtype=np.complex)
     fj = np.random.random((N, N, N))
     f_hat = FST.fst(fj, f_hat, SD)
@@ -361,62 +363,108 @@ def test_transforms(ST):
 #test_transforms(ShenBiharmonicBasis("GC"))
 
 def test_FST(ST):
-    FST = SlabShen_R2C(np.array([N, 4, 4]), np.array([2*pi, 2*pi, 2*pi]), MPI)
-    points, weights = ST.points_and_weights(N)
-    fj = np.random.random((N,4,4))    
-    f_hat = fj.copy()
-    
-    if not ST.__class__.__name__ == "ChebyshevTransform":
-        f_hat = ST.fst(fj, f_hat)
-        fj = ST.ifst(f_hat, fj)
+    FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), comm)
+        
+    if FST.rank == 0:
+        
+        FST_SELF = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]),
+                                MPI.COMM_SELF)
+        
+        A = np.random.random((N, N, N)).astype(FST.float)
+        B2 = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
+        
+        if not ST.__class__.__name__ == "ChebyshevTransform":
+            B2 = FST_SELF.fst(A, B2, ST)
+            A = FST_SELF.ifst(B2, A, ST)
+            B2 = FST_SELF.fst(A, B2, ST)
+        
+        else:
+            B2 = FST_SELF.fct(A, B2, ST)
 
-    # Then check if transformations work as they should
-    u_hat = np.zeros((N,4,3), dtype=np.complex)
-    u0 = np.zeros((N,4,4))
-    if ST.__class__.__name__ == "ChebyshevTransform":
-        u_hat = FST.fct(fj, u_hat, ST)
-        u0 = FST.ifct(u_hat, u0, ST)
     else:
-        u_hat = FST.fst(fj, u_hat, ST)
-        u0 = FST.ifst(u_hat, u0, ST)
+        A = np.zeros((N, N, N), dtype=FST.float)
+        B2 = np.zeros((N, N, N/2+1), dtype=FST.complex)
 
-    #from IPython import embed; embed()
-    assert np.allclose(fj, u0)
+    atol, rtol = (1e-10, 1e-8) if FST.float is np.float64 else (5e-7, 1e-4)
+    FST.comm.Bcast(A, root=0)
+    FST.comm.Bcast(B2, root=0)
+    
+    a = np.zeros(FST.real_shape(), dtype=FST.float)
+    c = np.zeros(FST.complex_shape(), dtype=FST.complex)
+    a[:] = A[FST.real_local_slice()]
+    if ST.__class__.__name__ == "ChebyshevTransform":
+        c = FST.fct(a, c, ST)
+    else:
+        c = FST.fst(a, c, ST)
+        
+    assert np.all(abs((c - B2[FST.complex_local_slice()])/c.max()) < rtol)
+    
+    if ST.__class__.__name__ == "ChebyshevTransform":
+        a = FST.ifct(c, a, ST)
 
-#test_FST(ShenBiharmonicBasis("GC"))    
+    else:
+        a = FST.ifst(c, a, ST)
+    
+    assert np.all(abs((a - A[FST.real_local_slice()])/a.max()) < rtol)
+    
+
+test_FST(ShenDirichletBasis("GL"))    
 
 def test_FST_padded(ST):
-    FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), MPI)
-    points, weights = ST.points_and_weights(N)
+    FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), comm,
+                       communication='Alltoallw')
+    FST_SELF = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]),
+                            MPI.COMM_SELF)
     
-    fj = np.random.random(FST.real_shape())
-    f_hat = np.zeros(FST.complex_shape(), dtype=FST.complex)
+    if FST.rank == 0:
+        A = np.random.random((N, N, N)).astype(FST.float)
+        A_hat = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
         
-    if not ST.__class__.__name__ == "ChebyshevTransform":
-        f_hat = FST.fst(fj, f_hat, ST)
-        fj = FST.ifst(f_hat, fj, ST)
-        f_hat = FST.fst(fj, f_hat, ST)
+        if not ST.__class__.__name__ == "ChebyshevTransform":
+            A_hat = FST_SELF.fst(A, A_hat, ST)
+            A = FST_SELF.ifst(A_hat, A, ST)
+            A_hat = FST_SELF.fst(A, A_hat, ST)
+        else:
+            A_hat = FST_SELF.fct(A, A_hat, ST)
+        
+        A_hat[:, -N/2] = 0
+        
+        A_pad = np.zeros(FST_SELF.real_shape_padded(), dtype=FST.float)
+        if not ST.__class__.__name__ == "ChebyshevTransform":
+            A_pad = FST_SELF.ifst(A_hat, A_pad, ST, dealias='3/2-rule')
+            A_hat = FST_SELF.fst(A_pad, A_hat, ST, dealias='3/2-rule')
+
+        else:
+            A_pad = FST_SELF.ifct(A_hat, A_pad, ST, dealias='3/2-rule')
+            A_hat = FST_SELF.fct(A_pad, A_hat, ST, dealias='3/2-rule')
+    
     else:
-        f_hat = FST.fct(fj, f_hat, ST)
-        fj = FST.ifct(f_hat, fj, ST)
-        f_hat = FST.fct(fj, f_hat, ST)
+        A_pad = np.zeros(FST_SELF.real_shape_padded(), dtype=FST.float)
+        A_hat = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
 
-    # Eliminate Nyquist frequency due to assymmetry issue
-    f_hat[:, -N/2] = 0 
-
-    # Then check if transformations work as they should
-    fj_padded = np.zeros(FST.real_shape_padded(), FST.float)
-    c_hat = np.zeros(FST.complex_shape(), dtype=FST.complex)
+    atol, rtol = (1e-10, 1e-8) if FST.float is np.float64 else (5e-7, 1e-4)
+    FST.comm.Bcast(A_pad, root=0)
+    FST.comm.Bcast(A_hat, root=0)
+    
+    a = np.zeros(FST.real_shape_padded(), dtype=FST.float)
+    c = np.zeros(FST.complex_shape(), dtype=FST.complex)
+    a[:] = A_pad[FST.real_local_slice(padsize=1.5)]
+    if ST.__class__.__name__ == "ChebyshevTransform":
+        c = FST.fct(a, c, ST, dealias='3/2-rule')
+    else:
+        c = FST.fst(a, c, ST, dealias='3/2-rule')
+        
+    assert np.all(abs((c - A_hat[FST.complex_local_slice()])/c.max()) < rtol)
     
     if ST.__class__.__name__ == "ChebyshevTransform":
-        fj_padded = FST.ifct(f_hat, fj_padded, ST, dealias="3/2-rule")
-        c_hat = FST.fct(fj_padded, c_hat, ST, dealias="3/2-rule")
-    else:
-        fj_padded = FST.ifst(f_hat, fj_padded, ST, dealias="3/2-rule")
-        c_hat = FST.fst(fj_padded, c_hat, ST, dealias="3/2-rule")
+        a = FST.ifct(c, a, ST, dealias='3/2-rule')
 
-    #from IPython import embed; embed()
-    assert np.allclose(c_hat, f_hat)
+    else:
+        a = FST.ifst(c, a, ST, dealias='3/2-rule')
+    
+    #print abs((a - A_pad[FST.real_local_slice(padsize=1.5)])/a.max())
+    assert np.all(abs((a - A_pad[FST.real_local_slice(padsize=1.5)])/a.max()) < rtol)
+
 
 #test_FST_padded(ShenBiharmonicBasis("GC"))
     

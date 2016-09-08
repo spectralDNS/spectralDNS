@@ -26,7 +26,7 @@ def get_FFT(params):
     if params.decomposition == 'slab':
         assert len(params.N) == 3
         assert len(params.L) == 3
-        FFT = Slab_R2C(params.N, params.L, MPI, params.precision, 
+        FFT = Slab_R2C(params.N, params.L, comm, params.precision, 
                        communication=params.communication, 
                        threads=params.threads,
                        planner_effort=params.planner_effort)
@@ -34,7 +34,7 @@ def get_FFT(params):
     elif params.decomposition == 'pencil':
         assert len(params.N) == 3
         assert len(params.L) == 3
-        FFT = Pencil_R2C(params.N, params.L, MPI, params.precision, P1=params.Pencil_P1, 
+        FFT = Pencil_R2C(params.N, params.L, comm, params.precision, P1=params.Pencil_P1, 
                          communication=params.communication, threads=params.threads,
                          alignment=params.Pencil_alignment,
                          planner_effort=params.planner_effort)
@@ -42,7 +42,7 @@ def get_FFT(params):
     elif params.decomposition == 'line':
         assert len(params.N) == 2
         assert len(params.L) == 2
-        FFT = Line_R2C(params.N, params.L, MPI, params.precision,
+        FFT = Line_R2C(params.N, params.L, comm, params.precision,
                        threads=params.threads,
                        planner_effort=params.planner_effort)
     return FFT

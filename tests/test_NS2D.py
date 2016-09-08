@@ -2,7 +2,7 @@ import pytest
 from spectralDNS import config, get_solver, solve
 from TG2D import initialize, regression_test, pi
 
-@pytest.fixture(params=('1', '2'), scope='module')
+@pytest.fixture(params=('1', '2'))
 def args(request):
     """Check for uniform and non-uniform cube"""
     if request.param[-1] == '1':
