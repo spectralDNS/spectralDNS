@@ -19,7 +19,7 @@ Installation
 -----------
 spectralDNS is installed by cloning or forking the repository and then with regular python distutils
 
-    python setup.py install --prefix=...
+    python setup.py install --prefix="path used for installation, that is on the PYTHONPATH"
     
 or in-place using
 
@@ -30,6 +30,20 @@ spectralDNS requires that [mpiFFT4py](https://github.com/spectralDNS/mpiFFT4py) 
 Usage
 -----
 See the demo folder for usage.
+
+There are different solvers. For example, there are two Navier Stokes solvers for the triply periodic domain. A regular one (solvers/NS.py), and one based on a velocity-vorticity formulation (solvers/VV.py). The solver of your choice is required as an argument when running the solvers. 
+    
+    cd demo
+    mpirun -np 4 python TG.py NS
+    
+or
+    mpirun -np 4 python TG.py VV
+    
+There are many different arguments to each solver. They are all described in config.py. Arguments may be specified on the commandline
+
+    mpirun -np 4 python TG.py --M 6 6 6 --precision single --dealias '3/2-rule' NS
+    
+before the required solver argument. Alternatively, use config.update as shown in demo/TG.py.
 
 Scaling
 ------
