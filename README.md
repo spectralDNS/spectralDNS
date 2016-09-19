@@ -37,6 +37,7 @@ There are different solvers. For example, there are two Navier Stokes solvers fo
     mpirun -np 4 python TG.py NS
     
 or
+
     mpirun -np 4 python TG.py VV
     
 There are many different arguments to each solver. They are all described in config.py. Arguments may be specified on the commandline
