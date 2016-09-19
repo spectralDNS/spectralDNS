@@ -25,7 +25,7 @@ or in-place using
 
     python setup.py build_ext --inplace
 
-spectralDNS requires that [mpiFFT4py](https://github.com/spectralDNS/mpiFFT4py) has been installed already. Other than that, it requires [*h5py*](http://www.h5py.org) built with parallel HDF5, for analyzing the results.  [*cython*](http://cython.org) is used to optimize a few routines. 
+spectralDNS requires that [mpiFFT4py](https://github.com/spectralDNS/mpiFFT4py) has been installed already. Other than that, it requires [*h5py*](http://www.h5py.org) built with parallel HDF5, for visualizing the results.  [*cython*](http://cython.org) is used to optimize a few routines. 
 
 Usage
 -----
