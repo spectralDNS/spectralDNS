@@ -19,7 +19,7 @@ Installation
 -----------
 spectralDNS is installed by cloning or forking the repository and then with regular python distutils
 
-    python setup.py install --prefix="path used for installation, that is on the PYTHONPATH"
+    python setup.py install --prefix="path used for installation. Must be on the PYTHONPATH"
     
 or in-place using
 
