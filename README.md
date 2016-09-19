@@ -31,7 +31,7 @@ Usage
 -----
 See the demo folder for usage.
 
-There are different solvers. For example, there are two Navier Stokes solvers for the triply periodic domain. A regular one (solvers/NS.py), and one based on a velocity-vorticity formulation (solvers/VV.py). The solver of your choice is required as an argument when running the solvers. 
+There are different solvers. For example, there are two Navier Stokes solvers for the triply periodic domain. A regular one (solvers/NS.py), and one based on a velocity-vorticity formulation (solvers/VV.py). The solver of your choice is required as an argument when running:
     
     cd demo
     mpirun -np 4 python TG.py NS
