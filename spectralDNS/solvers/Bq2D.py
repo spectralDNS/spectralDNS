@@ -35,9 +35,9 @@ def get_context():
     u = Ur_hat
 
     # RHS and work arrays
-    dU     = empty((3,) + FFT.complex_shape(), dtype=complex)
+    dU = empty((3,) + FFT.complex_shape(), dtype=complex)
     work = work_arrays()
-    
+
     hdf5file = Bq2DWriter({'U':U[0], 'V':U[1], 'rho':rho, 'P':P},
                           chkpoint={'current':{'U':Ur, 'P':P}, 'previous':{}},
                           filename=params.h5filename+'.h5')
@@ -106,8 +106,7 @@ def add_pressure_diffusion(rhs, ur_hat, P_hat, K_over_K2, K, K2, nu, Ri, Pr):
     rho_hat = ur_hat[2]
     
     # Compute pressure (To get actual pressure multiply by 1j)
-    P_hat = np.sum(rhs[:2]*K_over_K2, 0, out=P_hat)
-    
+    P_hat = np.sum(rhs[:2]*K_over_K2, 0, out=P_hat)    
     P_hat -= Ri*rho_hat*K_over_K2[1]
     
     # Add pressure gradient
@@ -116,7 +115,7 @@ def add_pressure_diffusion(rhs, ur_hat, P_hat, K_over_K2, K, K2, nu, Ri, Pr):
     # Add contribution from diffusion                      
     rhs[0] -= nu*K2*u_hat[0]
     rhs[1] -= (nu*K2*u_hat[1] + Ri*rho_hat)
-    rhs[2] -= nu * K2 * rho_hat/Pr
+    rhs[2] -= nu*K2*rho_hat/Pr
     return rhs
 
 def ComputeRHS(rhs, ur_hat, solver, work, FFT, K, K2, K_over_K2, P_hat, **context):
@@ -128,6 +127,8 @@ def ComputeRHS(rhs, ur_hat, solver, work, FFT, K, K2, K_over_K2, P_hat, **contex
         ur_hat      The FFT of the velocity and density at current time.
                     May differ from context.Ur_hat since it is set by the
                     integrator
+        solver      The solver module. Included for possible inheritance
+                    and flexibility of integrators.
 
     Remaining args may be extracted from context:
         work        Work arrays

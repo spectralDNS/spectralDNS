@@ -197,7 +197,8 @@ def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, K2, K_over_K2, **context
         rhs         The right hand side to be returned
         u_hat       The FFT of the velocity at current time. May differ from
                     context.U_hat since it is set by the integrator
-        solver      The solver module. Included for possible inheritance.
+        solver      The solver module. Included for possible inheritance
+                    and flexibility of integrators.
 
     Remaining args extracted from context:
         work        Work arrays

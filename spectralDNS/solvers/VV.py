@@ -121,7 +121,8 @@ def ComputeRHS(rhs, w_hat, solver, work, FFT, K, K2, K_over_K2, Source, **contex
         rhs         The right hand side to be returned
         w_hat       The FFT of the curl at current time. May differ from
                     context.W_hat since it is set by the integrator
-        solver      The solver module. Included for possible inheritance.
+        solver      The solver module. Included for possible inheritance
+                    and flexibility of integrators.
 
     Remaining args may be extracted from context:
         work        Work arrays

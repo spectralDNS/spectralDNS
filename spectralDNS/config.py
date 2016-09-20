@@ -26,7 +26,7 @@ Generic parameters for all solvers::
 Parameters for 3D solvers in triply periodic domain::
     convection       (str)           ('Standard', 'Divergence', 'Skewed', 'Vortex')
     decomposition    (str)           ('slab', 'pencil')
-    communication    (str)           ('alltoall', 'sendrecv_replace')
+    communication    (str)           ('Alltoallw', 'alltoall', 'sendrecv_replace')
     pencil_alignment (str)           ('X', 'Y') Final alignment direction for spectral data 
     P1               (int)           Pencil decomposition in first direction
     write_yz_slice   (int, int)      Store yz slice at x index (*0) every (*1) time step
@@ -216,7 +216,8 @@ parser.add_argument('--threads', default=1, type=int,
                     help='Number of threads used for FFTs')
 parser.add_argument('--planner_effort', action=PlanAction, default=fft_plans, 
                     help="""Planning effort for FFTs. Usage, e.g., --planner_effort '{"dct":"FFTW_EXHAUSTIVE"}' """)
-parser.add_argument('--h5filename', default='results', type=str, help='Filename of HDF5 datafile used to store intermediate checkpoint data or timeseries results')
+parser.add_argument('--h5filename', default='results', type=str,
+                    help='Filename of HDF5 datafile used to store intermediate checkpoint data or timeseries results')
 
 # Arguments for 3D isotropic solvers
 triplyperiodic = argparse.ArgumentParser(parents=[parser])
@@ -258,6 +259,9 @@ parser_NS = trippelsubparsers.add_parser('NS', help='Regular Navier Stokes solve
 parser_VV = trippelsubparsers.add_parser('VV', help='Velocity-Vorticity formulation')
 parser_MHD = trippelsubparsers.add_parser('MHD', help='Magnetohydrodynamics solver')
 parser_MHD.add_argument('--eta', default=0.01, type=float, help='MHD parameter')
+parser_Bq = trippelsubparsers.add_parser('Bq', help='Navier Stokes solver with Boussinesq model')
+parser_Bq.add_argument('--Ri', default=0.1, type=float, help='Richardson number')
+parser_Bq.add_argument('--Pr', default=1.0, type=float, help='Prandtl number')
 
 # Arguments for 2D periodic solvers
 doublyperiodic = argparse.ArgumentParser(parents=[parser])

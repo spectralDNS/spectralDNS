@@ -132,7 +132,8 @@ def ComputeRHS(rhs, ub_hat, solver, work, FFT, K, K2, K_over_K2, P_hat, **contex
         ub_hat      The FFT of the velocity and magnetic fields at current
                     time. May differ from context.UB_hat since it is set by
                     the integrator
-        solver      The solver module. Included for possible inheritance.
+        solver      The solver module. Included for possible inheritance
+                    and flexibility of integrators.
 
     Remaining args may be extracted from context:
         work        Work arrays
