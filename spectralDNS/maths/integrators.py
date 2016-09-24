@@ -381,6 +381,38 @@ def getBS5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True,predictivecontroller=Fa
     return BS5
 
 @optimizer
+def getDP5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True,predictivecontroller=False):
+    if not (context.solver_name in ["Bq2D","Bq3D"]):
+        U = context.mesh_vars["U"]
+        U_hat = context.mesh_vars["U_hat"]
+    else:
+        U = context.mesh_vars["Ur"]
+        U_hat = context.mesh_vars["Ur_hat"]
+
+    A = nodepy.rk.loadRKM("DP5").A.astype(np.float64)
+    b = nodepy.rk.loadRKM("DP5").b.astype(np.float64)
+    bhat = nodepy.rk.loadRKM("DP5").bhat.astype(np.float64)
+    err_order = 4
+    errnorm = "2"
+    fsal = True
+
+    #Offset for fsal stuff. #TODO: infer this from tstep
+    offset = [0]
+
+    s = A.shape[0]
+    U_tmp = np.zeros(U.shape, dtype=U.dtype)
+    fY_hat = np.zeros((s,) + U_hat.shape, dtype = U_hat.dtype)
+    sc = np.zeros(U_hat.shape,dtype=U_hat.dtype)
+    err = np.zeros(U_hat.shape,dtype=U_hat.dtype)
+    U_hat_new = np.zeros(U_hat.shape,dtype=U_hat.dtype)
+
+    #@wraps(adaptiveRK)
+    def DP5(t,tstep,dt,additional_args = {}):
+        return adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,U_hat,ComputeRHS,dt,tstep,additional_args,predictivecontroller=predictivecontroller)
+    return DP5
+
+
+@optimizer
 def RK4(context,u0, u1, u2, dU, a, b, dt, ComputeRHS,kw):
     """Runge Kutta fourth order"""
     U = context.mesh_vars["U"]
@@ -456,12 +488,18 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None,hphi=None
     elif context.time_integrator["time_integrator_name"] == "BS5_adaptive": 
         TOL = context.time_integrator["TOL"]
         return getBS5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=True)
+    elif context.time_integrator["time_integrator_name"] == "DP5_adaptive":
+        TOL = context.time_integrator["TOL"]
+        return getDP5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=True)
     elif context.time_integrator["time_integrator_name"] == "BS5_adaptive_p": 
         TOL = context.time_integrator["TOL"]
         return getBS5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=True,predictivecontroller=True)
     elif context.time_integrator["time_integrator_name"] == "BS5_fixed":
         TOL = 100 #This shouldn't get used
         return getBS5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=False)
+    elif context.time_integrator["time_integrator_name"] == "DP5_fixed":
+        TOL = 100 #This shouldn't get used
+        return getDP5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=False)
     elif context.time_integrator["time_integrator_name"] == "AB2":
         multistep_dt = [-1]
         @wraps(AB2)
