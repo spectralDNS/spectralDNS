@@ -89,8 +89,8 @@ def solve(solver, context):
     solver.timer.final(solver.MPI, solver.rank)
 
     if params.make_profile:
-        results = solver.create_profile(solver.profiler, solver.comm,
-                                        solver.MPI, solver.rank)
+        solver.results = solver.create_profile(solver.profiler, solver.comm,
+                                               solver.MPI, solver.rank)
 
     solver.regression_test(context)
 

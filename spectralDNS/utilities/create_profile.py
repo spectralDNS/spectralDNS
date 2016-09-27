@@ -42,7 +42,9 @@ def create_profile(profiler, comm, MPI, rank):
                  'Cross',
                  'project',
                  'Scatter',
-                 'ComputeRHS']:
+                 'ComputeRHS',
+                 'solve_linear',
+                 'Conv']:
         for key, val in ps.stats.iteritems():
             if item is key[2] or "method '%s'"%item in key[2] or ".%s"%item in key[2]:
                 results[item] = (comm.reduce(val[2], op=MPI.MIN, root=0),

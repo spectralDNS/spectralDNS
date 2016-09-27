@@ -47,7 +47,7 @@ def initialize(solver, context):
     epsilon = Um/200.   #Um/200.
     U[:] = 0
     U[1] = Um*(Y-0.5*Y**2)
-    dev = 1+0.0005*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dev = 1+0.005*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
     dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
     U[1] += dd
     U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev    
@@ -113,19 +113,37 @@ def update(context):
     X, U, U_hat = c.X, c.U, c.U_hat
 
     # Dynamically adjust flux
-    #q = c.FST.dx(U[1], c.ST.quad)
-    #beta[0] = (flux[0] - q)/(array(params.L).prod())
-    #solver.comm.Bcast(beta)
-    #U_tmp = c.work[(U[0], 0)]
-    #F_tmp = c.work[(U_hat[0], 0)]
-    #U_tmp[:] = beta[0]
-    #F_tmp = c.FST.fst(U_tmp, F_tmp, c.ST)
-    #U_hat[1] += F_tmp
-    #U[1] = c.FST.ifst(U_hat[1], U[1], c.ST)
-    #c.Source[1] -= beta[0]
-    #c.Sk[1] = c.FST.fss(c.Source[1], c.Sk[1], c.ST)
-    
-    
+    if params.tstep % 1 == 0:
+        U[1] = c.FST.ifst(U_hat[1], U[1], c.ST)
+        beta[0] = c.FST.dx(U[1], c.ST.quad)
+        #solver.comm.Bcast(beta)
+        q = (flux[0] - beta[0])  # array(params.L).prod()
+        #U_tmp = c.work[(U[0], 0)]
+        #F_tmp = c.work[(U_hat[0], 0)]
+        #U_tmp[:] = beta[0]
+        #F_tmp = c.FST.fst(U_tmp, F_tmp, c.ST)
+        #U_hat[1] += q/beta[0]*U_hat[1]
+        if solver.rank == 0:
+            d0 = c.mat.ADD.matvec(U_hat[1,:,0,0])
+            d1 = c.mat.BDD.matvec(U_hat[1,:,0,0])
+            
+            c.Sk[1,0,0,0] -= (flux[0]/beta[0]-1)/params.dt*(-params.nu*params.dt/2.*d0[0] + d1[0])*0.025
+        
+        #c.Source[1] -= q/array(params.L).prod()
+        #c.Sk[1] = c.FST.fss(c.Source[1], c.Sk[1], c.ST)
+
+    #if params.tstep % 1 == 0:
+        #U[1] = c.FST.ifst(U_hat[1], U[1], c.ST)
+        #beta[0] = c.FST.dx(U[1], c.ST.quad)
+        ##beta[0] = (flux[0] - beta[0])/(array(params.L).prod())
+        #solver.comm.Bcast(beta)
+        #q = flux[0]/beta[0]-1
+        ##U[1] += beta[0]*U[1]
+        ##U_hat[1] = c.FST.fst(U[1], U_hat[1], c.ST)
+        #U_hat[1] += q*U_hat[1]
+        #c.Source[1] -= beta[0]*q/(array(params.L).prod())/params.dt/2
+        #c.Sk[1] = c.FST.fss(c.Source[1], c.Sk[1], c.ST)
+
     #utau = config.params.Re_tau * config.params.nu
     #Source[:] = 0
     #Source[1] = -utau**2
@@ -180,7 +198,7 @@ def update(context):
         e2 = c.FST.dx(U[2]*U[2], c.ST.quad)
         q = c.FST.dx(U[1], c.ST.quad)
         if solver.rank == 0:
-            print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.8e Q %2.8e %2.8e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, c.Source[1].mean())
+            print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.6e Q %2.6e %2.6e %2.6e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, c.Sk[1,0,0,0], flux[0]/beta[0]-1)
 
     if params.tstep % params.sample_stats == 0:
         solver.stats(U)
@@ -274,10 +292,10 @@ if __name__ == "__main__":
         {
         'nu': 1./590.,                  # Viscosity
         'Re_tau': 590., 
-        'dt': 0.001,                  # Time step
+        'dt': 0.0005,                  # Time step
         'T': 100.,                    # End time
         'L': [2, 2*pi, pi],
-        'M': [6, 6, 5]
+        'M': [6, 6, 6]
         },  "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=10)

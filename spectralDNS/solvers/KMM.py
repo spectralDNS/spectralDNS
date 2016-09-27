@@ -435,7 +435,7 @@ def solve_linear(u_hat, g_hat, rhs,
         u_hat[2, :, 0, 0] = u0_hat[1]
         
     return u_hat, g_hat
-
+#@profile
 def integrate(u_hat, g_hat, rhs, dt, solver, context):
     """Regular implicit solver for KMM channel solver"""
     rhs[:] = 0
