@@ -623,8 +623,7 @@ def Mult_Div_1D(np.int_t N,
         
         if i % 2 == 0:
             sum_u0 += u_hat[i+4]
-            b[i].real += sum_u0.real*cp3[i]
-            b[i].imag += sum_u0.imag*cp3[i]
+            b[i] += sum_u0*cp3[i]
             
         else:
             sum_u1 += u_hat[i+4]
@@ -747,7 +746,7 @@ def Mult_CTD_3D_n(np.int_t N,
             bv[0, j, k] = -sum_u0[j, k]*2
             sum_u2[j, k] += w_hat[1, j, k]
             bw[0, j, k] = -sum_u2[j, k]*2
-    
+
 
 def LU_Biharmonic_1D(np.float_t a, 
                      np.float_t b, 
