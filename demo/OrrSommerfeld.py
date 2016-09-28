@@ -146,7 +146,7 @@ def regression_test(context):
     if solver.rank == 0:
         assert sqrt(e1) < 1e-12
         
-def regression_test(context):
+def refinement_test(context):
     global OS, e0
     c = context
     params = config.params
@@ -165,8 +165,6 @@ def regression_test(context):
     if solver.rank == 0:
         print "Computed error = %2.8e %2.8e " %(sqrt(abs(e2)), params.dt)
         
-    #assert sqrt(e2) < 1e-12
-
 if __name__ == "__main__":
     config.update(
         {
@@ -180,8 +178,11 @@ if __name__ == "__main__":
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)
     config.channel.add_argument("--plot_step", type=int, default=10)
+    config.channel.add_argument("--refinement_test", type=bool, default=False)    
     solver = get_solver(update=update, regression_test=regression_test, mesh="channel")  
-    #solver = get_solver(regression_test=regression_test, mesh="channel")  
+    if config.params.refinement_test:
+        solver.regression_test = refinement_test
+        
     context = solver.get_context()
     initialize(solver, context)
     set_Source(**context)

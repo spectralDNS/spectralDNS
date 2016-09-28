@@ -78,7 +78,8 @@ def solve(solver, context):
             #Enable profiling after first step is finished
             solver.profiler.enable()
 
-        solver.end_of_tstep(context)
+        if solver.end_of_tstep(context):
+            break
 
     params.dt = dt_in
 

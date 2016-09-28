@@ -73,5 +73,9 @@ def set_source(Source, **context):
     return Source
 
 def end_of_tstep(context):
-    """Function called at end of time step"""
-    pass
+    """Function called at end of time step. 
+    
+    If returning True, the while-loop in time breaks free. Used by adaptive solvers
+    to modify the time stepsize.
+    """
+    return False

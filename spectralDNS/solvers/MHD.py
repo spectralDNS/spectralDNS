@@ -3,8 +3,8 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from spectralinit import *
-from NS import end_of_tstep
+from .spectralinit import *
+from .NS import end_of_tstep
 
 def get_context():
     FFT = get_FFT(params)
