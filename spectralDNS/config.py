@@ -53,7 +53,7 @@ parser_MHD = trippelsubparsers.add_parser('MHD', help='Magnetohydrodynamics solv
 parser_MHD.add_argument('--eta', default=0.01, type=float, help='MHD parameter')
 
 doublyperiodic = argparse.ArgumentParser(parents=[parser])
-doublyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2',"BS5_adaptive","BS5_adaptive_p","BS5_fixed","IMEX1","EXPBS5","IMEX4","EXPEULER","IMEX3","IMEX5"))
+doublyperiodic.add_argument('--integrator', default='RK4', choices=('RK4', 'ForwardEuler', 'AB2',"BS5_adaptive","BS5_adaptive_p","BS5_fixed","IMEX1","EXPBS5","IMEX4","EXPEULER","IMEX3","IMEX5","DP5_adaptive","DP5_fixed","KCL5_adaptive","KCL5_fixed"))
 doublyperiodic.add_argument('--L', default=[2*pi, 2*pi], nargs=2, help='Physical mesh size')
 doublyperiodic.add_argument('--dealias', default='2/3-rule', choices=('2/3-rule','3/2-rule','None'), help='Choose dealiasing method')
 doublyperiodic.add_argument('--decomposition', default='line', choices=('line', ), help="For 2D problems line is the only choice.")
