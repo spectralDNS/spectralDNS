@@ -622,25 +622,19 @@ def Mult_Div_1D(np.int_t N,
               + cp1[i]*u_hat[i+2])
         
         if i % 2 == 0:
-            sum_u0.real += u_hat[i+4].real
-            sum_u0.imag += u_hat[i+4].imag
-            b[i].real += sum_u0.real*cp3[i]
-            b[i].imag += sum_u0.imag*cp3[i]
+            sum_u0 += u_hat[i+4]
+            b[i] += sum_u0*cp3[i]
             
         else:
-            sum_u1.real += u_hat[i+4].real
-            sum_u1.imag += u_hat[i+4].imag
-            b[i].real += sum_u1.real*cp3[i]
-            b[i].imag += sum_u1.imag*cp3[i]
-            
+            sum_u1 += u_hat[i+4]
+            b[i] += sum_u1*cp3[i]
+
     b[0] = (cm1[0]*u_hat[0] 
               + cp1[0]*u_hat[2] 
               + 1j*(m*bii[0]*v_hat[1] + n*bii[0]*w_hat[1] 
               + m*bp2[0]*v_hat[3] + n*bp2[0]*w_hat[3]))
-    sum_u0.real += u_hat[4].real
-    sum_u0.imag += u_hat[4].imag
-    b[0].real += sum_u0.real*cp3[0]
-    b[0].imag += sum_u0.imag*cp3[0]
+    sum_u0 += u_hat[4]
+    b[0] += sum_u0*cp3[0]
 
 def Mult_CTD_3D(np.int_t N,
                 np.ndarray[complex_t, ndim=3] v_hat,
@@ -684,35 +678,23 @@ def Mult_CTD_1D(np.int_t N,
         bw[i] = -2.0*(i+1)*w_hat[i-1]
         
         if i % 2 == 0:
-            sum_u0.real += v_hat[i+1].real
-            sum_u0.imag += v_hat[i+1].imag
-            sum_u2.real += w_hat[i+1].real
-            sum_u2.imag += w_hat[i+1].imag
+            sum_u0 = sum_u0 + v_hat[i+1]
+            sum_u2 = sum_u2 + w_hat[i+1]
             
-            bv[i].real -= sum_u0.real*4
-            bv[i].imag -= sum_u0.imag*4
-            bw[i].real -= sum_u2.real*4
-            bw[i].imag -= sum_u2.imag*4
-            
+            bv[i] -= sum_u0*4
+            bw[i] -= sum_u2*4
+        
         else:
-            sum_u1.real += v_hat[i+1].real
-            sum_u1.imag += v_hat[i+1].imag
-            sum_u3.real += w_hat[i+1].real
-            sum_u3.imag += w_hat[i+1].imag
+            sum_u1 += v_hat[i+1]
+            sum_u3 += w_hat[i+1]
             
-            bv[i].real -= sum_u1.real*4
-            bv[i].imag -= sum_u1.imag*4
-            bw[i].real -= sum_u3.real*4
-            bw[i].imag -= sum_u3.imag*4
+            bv[i] -= sum_u1*4
+            bw[i] -= sum_u3*4
 
-    sum_u0.real += v_hat[1].real
-    sum_u0.imag += v_hat[1].imag
-    bv[0].real = -sum_u0.real*2
-    bv[0].imag = -sum_u0.imag*2
-    sum_u2.real += w_hat[1].real
-    sum_u2.imag += w_hat[1].imag
-    bw[0].real = -sum_u2.real*2
-    bw[0].imag = -sum_u2.imag*2
+    sum_u0 += v_hat[1]
+    bv[0] = -sum_u0*2
+    sum_u2 += w_hat[1]
+    bw[0] = -sum_u2*2
 
 
 def Mult_CTD_3D_n(np.int_t N,
@@ -745,38 +727,26 @@ def Mult_CTD_3D_n(np.int_t N,
                 bw[i, j, k] = -2.0*(i+1)*w_hat[i-1, j, k]
         
                 if i % 2 == 0:
-                    sum_u0[j, k].real += v_hat[i+1, j, k].real
-                    sum_u0[j, k].imag += v_hat[i+1, j, k].imag
-                    sum_u2[j, k].real += w_hat[i+1, j, k].real
-                    sum_u2[j, k].imag += w_hat[i+1, j, k].imag
+                    sum_u0[j, k] += v_hat[i+1, j, k]
+                    sum_u2[j, k] += w_hat[i+1, j, k]
                     
-                    bv[i, j, k].real -= sum_u0[j, k].real*4
-                    bv[i, j, k].imag -= sum_u0[j, k].imag*4
-                    bw[i, j, k].real -= sum_u2[j, k].real*4
-                    bw[i, j, k].imag -= sum_u2[j, k].imag*4
-                    
+                    bv[i, j, k] -= sum_u0[j, k]*4
+                    bw[i, j, k] -= sum_u2[j, k]*4
+                
                 else:
-                    sum_u1[j, k].real += v_hat[i+1, j, k].real
-                    sum_u1[j, k].imag += v_hat[i+1, j, k].imag
-                    sum_u3[j, k].real += w_hat[i+1, j, k].real
-                    sum_u3[j, k].imag += w_hat[i+1, j, k].imag
+                    sum_u1[j, k] += v_hat[i+1, j, k]
+                    sum_u3[j, k] += w_hat[i+1, j, k]
                     
-                    bv[i, j, k].real -= sum_u1[j, k].real*4
-                    bv[i, j, k].imag -= sum_u1[j, k].imag*4
-                    bw[i, j, k].real -= sum_u3[j, k].real*4
-                    bw[i, j, k].imag -= sum_u3[j, k].imag*4
+                    bv[i, j, k] -= sum_u1[j, k]*4
+                    bw[i, j, k] -= sum_u3[j, k]*4
 
     for j in range(v_hat.shape[1]):
         for k in range(v_hat.shape[2]):
-            sum_u0[j, k].real += v_hat[1, j, k].real
-            sum_u0[j, k].imag += v_hat[1, j, k].imag
-            bv[0, j, k].real = -sum_u0[j, k].real*2
-            bv[0, j, k].imag = -sum_u0[j, k].imag*2
-            sum_u2[j, k].real += w_hat[1, j, k].real
-            sum_u2[j, k].imag += w_hat[1, j, k].imag
-            bw[0, j, k].real = -sum_u2[j, k].real*2
-            bw[0, j, k].imag = -sum_u2[j, k].imag*2
-    
+            sum_u0[j, k] += v_hat[1, j, k]
+            bv[0, j, k] = -sum_u0[j, k]*2
+            sum_u2[j, k] += w_hat[1, j, k]
+            bw[0, j, k] = -sum_u2[j, k]*2
+
 
 def LU_Biharmonic_1D(np.float_t a, 
                      np.float_t b, 

@@ -38,7 +38,7 @@ You may also use precompiled binaries in the [*spectralDNS*](https://anaconda.or
     conda config --add channels spectralDNS
     conda install spectralDNS
 
-which installs both spectralDNS and mpiFFT4py
+which installs both spectralDNS and mpiFFT4py. There are binaries compiled for both OSX and linux.
 
 Usage
 -----
