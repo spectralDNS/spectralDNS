@@ -408,7 +408,7 @@ def test_FST(ST):
     assert np.all(abs((a - A[FST.real_local_slice()])/a.max()) < rtol)
     
 
-test_FST(ShenDirichletBasis("GL"))    
+#test_FST(ShenDirichletBasis("GL"))    
 
 def test_FST_padded(ST):
     FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), comm,

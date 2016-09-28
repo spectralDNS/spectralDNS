@@ -13,7 +13,7 @@ dt = array([ 1./2., 1./3., 1./4., 1./5., 1./6.])
 #dt = array([0.0025, 0.005, 0.01, 0.02])
 
 for i in range(len(dt)):
-    output = subprocess.check_output("python OrrSommerfeld.py --M 7 5 1 --dt %s --T %s --compute_energy 1000 --plot_step -1 --convection Vortex KMMRK3"%(str(dt[i]),str(2.0)), shell=True)    
+    output = subprocess.check_output("python OrrSommerfeld.py --M 7 5 1 --dt %s --T %s --compute_energy 1000 --plot_step -1 --convection Vortex KMM"%(str(dt[i]),str(4.0)), shell=True)
     match = re.search("Computed error = "+number+" "+number, output)
     err, h1 = [eval(j) for j in match.groups(0)]
     error.append(err)

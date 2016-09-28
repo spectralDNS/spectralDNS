@@ -71,3 +71,7 @@ def set_source(Source, **context):
     """Return the source term"""
     Source[:] = 0
     return Source
+
+def end_of_tstep(context):
+    """Function called at end of time step"""
+    pass

@@ -36,6 +36,12 @@ def get_context():
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
     K = FST.get_scaled_local_wavenumbermesh()
+    
+    K[1, :, -params.N[1]/2, 0] = 0
+    K[1, :, -params.N[1]/2, -1] = 0
+    K[2, :, 0, -1] = 0
+    K[2, :, -params.N[1]/2, -1] = 0
+    
     K2 = K[1]*K[1]+K[2]*K[2]
     K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)
 

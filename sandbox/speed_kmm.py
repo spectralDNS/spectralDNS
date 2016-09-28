@@ -16,6 +16,7 @@ config.update(
     'L': [2, 2*pi, pi],
     'optimization': 'cython',
     'make_profile': 1,
+    'dealias': '3/2-rule',
     'M': [5, 5, 5]
     },  "channel"
 )

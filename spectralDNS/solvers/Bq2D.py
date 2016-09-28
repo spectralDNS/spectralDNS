@@ -4,7 +4,7 @@ __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from .spectralinit import *
-from NS2D import get_curl, get_velocity, get_pressure
+from NS2D import get_curl, get_velocity, get_pressure, end_of_tstep
 
 def get_context():
     """Set up context for Bq2D solver"""

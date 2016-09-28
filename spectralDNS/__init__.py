@@ -78,11 +78,7 @@ def solve(solver, context):
             #Enable profiling after first step is finished
             solver.profiler.enable()
 
-        # Make sure that the last step hits T exactly.
-        if params.t + params.dt >= params.T:
-            params.dt = params.T - params.t
-            if params.dt <= 1.e-14:
-                break
+        solver.end_of_tstep(context)
 
     params.dt = dt_in
 

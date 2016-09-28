@@ -5,6 +5,7 @@ FIXME Should use Shen basis for fourth order problem
 
 """
 from scipy.linalg import eig
+#from numpy.linalg import eig
 from numpy import ones, cos, arange, pi, dot, eye, real, imag, resize, transpose, \
     float, newaxis, sum, abs, max, complex, linspace, argmax, argmin, zeros, squeeze, \
     seterr, array, hstack, argpartition
@@ -116,8 +117,8 @@ class OrrSommerfeld(object):
 
     def solve(self):
         self.assemble()
-        #return eig(self.A,self.B)
-        return eig(dot(inv(self.B), self.A))
+        return eig(self.A,self.B)
+        #return eig(dot(inv(self.B), self.A))
         
     def interp(self, x):
         """Barycentric interpolation from self.y to a point x."""

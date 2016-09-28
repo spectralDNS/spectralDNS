@@ -21,7 +21,6 @@ install:
     # Useful for debugging any issues with conda
     - conda info -a
     - conda config --add channels spectralDNS
-    - conda config --add channels mikaem/label/ubuntu1604-host-gcc
     - conda create -q -n test-environment mpi4py scipy pytest cython mpifft4py sympy h5py-parallel nodepy
     - source activate test-environment
     - python setup.py install

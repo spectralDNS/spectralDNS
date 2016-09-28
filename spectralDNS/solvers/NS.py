@@ -78,6 +78,14 @@ def backward_transform(a_hat, a, FFT):
         a[i] = FFT.ifftn(a_hat[i], a[i])
     return a
 
+def end_of_tstep(context):
+    # Make sure that the last step hits T exactly.
+    # Used by adaptive solvers
+    if params.t + params.dt >= params.T:
+        params.dt = params.T - params.t
+        if params.dt <= 1.e-12:
+            break
+
 def compute_curl(c, a, work, FFT, K, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
     curl_hat = work[(a, 0, False)]
