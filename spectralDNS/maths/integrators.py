@@ -411,6 +411,70 @@ def getDP5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True,predictivecontroller=Fa
         return adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,U_hat,ComputeRHS,dt,tstep,additional_args,predictivecontroller=predictivecontroller)
     return DP5
 
+@optimizer
+def getKCL5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True,predictivecontroller=False):
+    if not (context.solver_name in ["Bq2D","Bq3D"]):
+        U = context.mesh_vars["U"]
+        U_hat = context.mesh_vars["U_hat"]
+    else:
+        U = context.mesh_vars["Ur"]
+        U_hat = context.mesh_vars["Ur_hat"]
+
+    A = np.zeros((8,8),dtype=np.float64)
+    b = np.zeros(8,dtype=np.float64)
+    bhat = np.zeros(8,dtype=np.float64)
+
+    a[2,1] = 967290102210./6283494269639.
+    a[3,2] = 852959821520./5603806251467.
+    a[4,3] = 8043261511347./8583649637008
+    a[5,4] = -115941139189./8015933834062.
+    a[6,5] = 2151445634296./7749920058933.
+    a[7,6] = 15619711431787./74684159414562.
+    a[8,7] = 12444295717883./11188327299274.
+    a[3,1] = 475331134681./7396070923784.
+    a[4,2] = −8677837986029./16519245648862.
+    a[5,3] = 2224500752467./10812521810777.
+    a[6,4] = 1245361422071./3717287139065. 
+    a[7,5] = 1652079198131./3788458824028.
+    a[8,6] = -5225103653628./8584162722535.
+    b[1] = 83759458317./1018970565139.
+    b[2] = 0
+    b[3] = 0
+    b[4] = 0
+    b[5] = 6968891091250./16855527649349.
+    b[6] = 783521911849./8570887289572.
+    b[7] = 3686104854613./11232032898210.
+    b[8] = 517396786175./6104475356879.
+    bhat[1] = -2632078767757./9365288548818.
+    bhat[2] = 0
+    bhat[3] = 138832778584802./30360463697573.
+    bhat[4] = 7424139574315./5603229049946.
+    bhat[5] = -32993229351515./6883415042289.
+    bhat[6] = -3927384735361./7982454543710.
+    bhat[7] = 9224293159931./15708162311543.
+    bhat[8] = 624338737541./7691046757191.
+
+
+    err_order = 4
+    errnorm = "2"
+    fsal = True
+
+    #Offset for fsal stuff. #TODO: infer this from tstep
+    offset = [0]
+
+    s = A.shape[0]
+    U_tmp = np.zeros(U.shape, dtype=U.dtype)
+    fY_hat = np.zeros((s,) + U_hat.shape, dtype = U_hat.dtype)
+    sc = np.zeros(U_hat.shape,dtype=U_hat.dtype)
+    err = np.zeros(U_hat.shape,dtype=U_hat.dtype)
+    U_hat_new = np.zeros(U_hat.shape,dtype=U_hat.dtype)
+
+    #@wraps(adaptiveRK)
+    def KCL5(t,tstep,dt,additional_args = {}):
+        return adaptiveRK(context,A,b,bhat,err_order, fY_hat,U_tmp,U_hat_new,sc,err, fsal,offset, aTOL,rTOL,adaptive,errnorm,dU,U_hat,ComputeRHS,dt,tstep,additional_args,predictivecontroller=predictivecontroller)
+    return KCL5
+
+
 
 @optimizer
 def RK4(context,u0, u1, u2, dU, a, b, dt, ComputeRHS,kw):
@@ -491,6 +555,9 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None,hphi=None
     elif context.time_integrator["time_integrator_name"] == "DP5_adaptive":
         TOL = context.time_integrator["TOL"]
         return getDP5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=True)
+    elif context.time_integrator["time_integrator_name"] == "KCL5_adaptive":
+        TOL = context.time_integrator["TOL"]
+        return getKCL5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=True)
     elif context.time_integrator["time_integrator_name"] == "BS5_adaptive_p": 
         TOL = context.time_integrator["TOL"]
         return getBS5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=True,predictivecontroller=True)
@@ -500,6 +567,9 @@ def getintegrator(context,ComputeRHS,f=None,g=None,ginv=None,gexp=None,hphi=None
     elif context.time_integrator["time_integrator_name"] == "DP5_fixed":
         TOL = 100 #This shouldn't get used
         return getDP5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=False)
+    elif context.time_integrator["time_integrator_name"] == "KCL5_fixed":
+        TOL = 100 #This shouldn't get used
+        return getKCL5(context,dU,ComputeRHS,aTOL=TOL,rTOL=TOL,adaptive=False)
     elif context.time_integrator["time_integrator_name"] == "AB2":
         multistep_dt = [-1]
         @wraps(AB2)
