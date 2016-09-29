@@ -457,7 +457,7 @@ def getKCL5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True,predictivecontroller=F
 
     err_order = 4
     errnorm = "2"
-    fsal = True
+    fsal = False
 
     #Offset for fsal stuff. #TODO: infer this from tstep
     offset = [0]
