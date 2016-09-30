@@ -453,6 +453,10 @@ def getKCL5(context,dU,ComputeRHS,aTOL,rTOL,adaptive=True,predictivecontroller=F
     bhat[5] = -3927384735361./7982454543710.
     bhat[6] = 9224293159931./15708162311543.
     bhat[7] = 624338737541./7691046757191.
+    
+    for i in range(2,8):
+        for j in range(0,i-2):
+            A[i,j] = b[j]
 
 
     err_order = 4
