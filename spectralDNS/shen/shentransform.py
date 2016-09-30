@@ -170,17 +170,23 @@ class ChebyshevTransform(object):
 
 class ShenDirichletBasis(ChebyshevTransform):
     
-    def __init__(self, quad="GL", fast_transform=True, threads=1, planner_effort="FFTW_MEASURE"):
+    def __init__(self, quad="GL", fast_transform=True, threads=1, planner_effort="FFTW_MEASURE",
+                 bc=(0., 0.)):
         ChebyshevTransform.__init__(self, quad=quad, fast_transform=fast_transform,
                                     planner_effort=planner_effort)
         self.N = -1
         self.Solver = TDMA(quad, False)
+        self.bc = bc
         
     def init(self, N):
         """Vandermonde matrix is used just for verification"""
         self.points, self.weights = self.points_and_weights(N)
-        # Build Vandermonde matrix. Note! N points in real space gives N-2 bases in spectral space
-        self.V = n_cheb.chebvander(self.points, N-3).T - n_cheb.chebvander(self.points, N-1)[:, 2:].T
+        # Build Vandermonde matrix.
+        self.V = np.zeros((N, N))
+        V = n_cheb.chebvander(self.points, N-1)
+        self.V[:N-2, :] = V[:, :-2].T - V[:, 2:].T
+        self.V[N-2, :] = 0.5*(V[:, 0] + V[:, 1])
+        self.V[N-1, :] = 0.5*(V[:, 0] - V[:, 1])
 
     def wavenumbers(self, N):
         if isinstance(N, tuple):
@@ -198,11 +204,16 @@ class ShenDirichletBasis(ChebyshevTransform):
                 
         if self.fast_transform:
             fk = self.fastChebScalar(fj, fk)
+            c0 = 0.5*(fk[0] + fk[1])
+            c1 = 0.5*(fk[0] - fk[1])
             fk[:-2] -= fk[2:]
+            fk[-2] = c0
+            fk[-1] = c1
         else:
             if not self.points.shape == (fj.shape[0],): self.init(fj.shape[0])
-            fk[:-2] = np.dot(self.V, fj*self.weights)
-        fk[-2:] = 0     # Last two not used by Shen
+            fk[:] = np.dot(self.V, fj*self.weights)
+
+        #fk[-2:] = 0     # Last two not used by Shen for homogeneous Dirichlet
         return fk
         
     #@profile
@@ -215,8 +226,8 @@ class ShenDirichletBasis(ChebyshevTransform):
             w_hat = work[(fk, 0)]
             w_hat[:-2] = fk[:-2] 
             w_hat[2:] -= fk[:-2] 
-            #w_hat[:2] = fk[:2]
-            #w_hat[2:] = fk[2:]-fk[:-2]  
+            w_hat[0] += 0.5*(self.bc[0] + self.bc[1])
+            w_hat[1] += 0.5*(self.bc[0] - self.bc[1])
             
             fj = self.ifct(w_hat, fj)
             return fj
@@ -230,6 +241,8 @@ class ShenDirichletBasis(ChebyshevTransform):
         """Fast Shen transform
         """
         fk = self.fastShenScalar(fj, fk)
+        fk[0] -= pi/2*(self.bc[0] + self.bc[1])
+        fk[1] -= pi/4*(self.bc[0] - self.bc[1])
         fk = self.Solver(fk)
         return fk
     
