@@ -175,8 +175,7 @@ def test_BNNmat(ST):
         f_hat = ST.fct(fj, f_hat)
 
     u2 = B.matvec(f_hat)
-    #from IPython import embed; embed()
-    assert np.allclose(u2, u0)
+    assert np.allclose(u2[:-2], u0[:-2])
     
     # Multidimensional version
     fj = fj.repeat(16).reshape((N, 4, 4)) + 1j*fj.repeat(16).reshape((N, 4, 4))
@@ -189,9 +188,10 @@ def test_BNNmat(ST):
         u0 = ST.fastShenScalar(fj, u0)
         f_hat = ST.fst(fj, f_hat)
     u2 = B.matvec(f_hat)
-    assert np.allclose(u2, u0)
+    #from IPython import embed; embed()
+    assert np.allclose(u2[:-2], u0[:-2])
 
-#test_BNNmat(ShenBiharmonicBasis("GL"))
+#test_BNNmat(ShenDirichletBasis("GC"))
 
 def test_BDNmat(S1S2):
     S1, S2 = S1S2

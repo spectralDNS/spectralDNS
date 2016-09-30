@@ -13,7 +13,7 @@ from spectralDNS.shen.la import Helmholtz
 """
 Solve Helmholtz equation on (-1, 1) with homogeneous bcs
 
-    -\nabla^2 u + kx^2u = f, u(-1) = a, u(1) = b
+    -\nabla^2 u + kx^2u = f, u(1) = a, u(-1) = b
 
 where kx is some integer wavenumber.
 
@@ -45,7 +45,7 @@ kx = np.sqrt(5)
 f = -u.diff(x, 2) + kx**2*u
 
 # Choices
-solver = "sparse"
+solver = "lu"
 N = 64
 
 quad = "GC"
