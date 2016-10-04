@@ -47,7 +47,7 @@ def add_pressure_diffusion(context,dUr,Ur_hat):
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat  = np.sum(dUr[:2]*K_over_K2, 0, out=P_hat)
     
-    P_hat += Ri*rho_hat*K_over_K2[1]
+    P_hat -= Ri*rho_hat*K_over_K2[1]
     
     # Add pressure gradient
     dUr[:2] -= P_hat*K
@@ -55,7 +55,8 @@ def add_pressure_diffusion(context,dUr,Ur_hat):
     # Add contribution from diffusion                      
     dUr[0] -= nu*K2*Ur_hat[0]
     
-    dUr[1] -= (nu*K2*Ur_hat[1] - Ri*rho_hat)
+    dUr[1] -= nu*K2*Ur_hat[1]
+    dUr[1] -= Ri*rho_hat
     dUr[2] -= nu * K2 * rho_hat/Pr  
     return dUr
 
