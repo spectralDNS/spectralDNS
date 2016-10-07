@@ -139,7 +139,7 @@ try:
             dim = str(self.dim)+"D"
             N = params.N
             s = FFT.real_local_slice()
-            if params.tstep % params.write_result == 0:                
+            if params.tstep % params.write_result == 0:
                 for comp, val in self.components.iteritems():
                     self.f[dim+"/"+comp].create_dataset(str(params.tstep), shape=N, dtype=val.dtype)
                     self.f[dim+"/%s/%d"%(comp, params.tstep)][s] = val

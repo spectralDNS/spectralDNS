@@ -174,7 +174,7 @@ class ShenDirichletBasis(ChebyshevTransform):
         quad        ('GL', 'GC')  Gauss-Lobatto or Gauss-Chebyshev points
         threads          1        Number of threads used by pyfftw
         planner_effort            Planner effort for FFTs. 
-        bc               (a, b)   Boundary conditions at y=(1, -1)
+        bc             (a, b)     Boundary conditions at x=(1,-1)
 
     """
     
@@ -227,6 +227,7 @@ class ShenDirichletBasis(ChebyshevTransform):
     #@profile
     def ifst(self, fk, fj, fast_transform=True):
         """Fast inverse Shen transform
+        
         Transform needs to take into account that phi_k = T_k - T_{k+2}
         fk contains Shen coefficients in the first fk.shape[0]-2 positions
         """
@@ -458,13 +459,13 @@ class SlabShen_R2C(Slab_R2C):
         x0, x1, x2 = self.get_mesh_dims(ST)
 
         # Get grid for velocity points
-        X = array(meshgrid(x0[self.rank*self.Np[0]:(self.rank+1)*self.Np[0]], 
+        X = array(meshgrid(x0[int(self.rank*self.Np[0]):int((self.rank+1)*self.Np[0])], 
                            x1, x2, indexing='ij'), dtype=self.float)
         return X
     
     def get_local_wavenumbermesh(self):
         kx = arange(self.N[0]).astype(self.float)
-        ky = fftfreq(self.N[1], 1./self.N[1])[self.rank*self.Np[1]:(self.rank+1)*self.Np[1]]
+        ky = fftfreq(self.N[1], 1./self.N[1])[int(self.rank*self.Np[1]):int((self.rank+1)*self.Np[1])]
         kz = fftfreq(self.N[2], 1./self.N[2])[:self.Nf]
         kz[-1] *= -1.0
         return array(meshgrid(kx, ky, kz, indexing='ij'), dtype=self.float) 

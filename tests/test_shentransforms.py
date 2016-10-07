@@ -898,9 +898,8 @@ def test_ABBmat(SB):
     z0 = SB.ifst(z0_hat.real, z0)
     #from IPython import embed; embed()
     assert np.allclose(z0, u0)
-    
 
-#test_ABBmat(ShenBiharmonicBasis("GC"))
+test_ABBmat(ShenBiharmonicBasis("GC"))
 
 #@profile
 def test_Helmholtz(ST2):

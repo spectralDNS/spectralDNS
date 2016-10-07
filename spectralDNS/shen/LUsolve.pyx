@@ -1,9 +1,12 @@
 #cython: boundscheck=False
 #cython: wraparound=False
+#####cython: linetrace=True
+
 import numpy as np
 cimport numpy as np
 cimport cython
 from libcpp.vector cimport vector
+from libcpp.algorithm cimport copy
 
 ctypedef np.complex128_t complex_t
 ctypedef np.float64_t real_t
@@ -1385,3 +1388,244 @@ def Solve_Biharmonic_3D_n(np.ndarray[T, ndim=3] fk,
                 o1[j, k] += uk[jo, j, k]/(jo+3.)
                 o2[j, k] += (uk[jo, j, k]/(jo+3.))*((jo+2.)*(jo+2.))
                 uk[ko, j, k] = (y[ko, j, k] - u1[1, kk, j, k]*uk[ko+2, j, k] - u2[1, kk, j, k]*uk[ko+4, j, k] - a[1, kk, j, k]*ac*o1[j, k] - b[1, kk, j, k]*ac*o2[j, k]) / u0[1, kk, j, k]
+
+@cython.cdivision(True)
+#@cython.binding(True)
+def LU_Biharmonic_3D_n(np.float_t a,
+                     np.ndarray[real_t, ndim=2] alfa, 
+                     np.ndarray[real_t, ndim=2] beta, 
+                     # 3 upper diagonals of SBB
+                     np.ndarray[real_t, ndim=1] sii,
+                     np.ndarray[real_t, ndim=1] siu,
+                     np.ndarray[real_t, ndim=1] siuu,
+                     # All 3 diagonals of ABB
+                     np.ndarray[real_t, ndim=1] ail,
+                     np.ndarray[real_t, ndim=1] aii,
+                     np.ndarray[real_t, ndim=1] aiu,
+                     # All 5 diagonals of BBB
+                     np.ndarray[real_t, ndim=1] bill,
+                     np.ndarray[real_t, ndim=1] bil,
+                     np.ndarray[real_t, ndim=1] bii,
+                     np.ndarray[real_t, ndim=1] biu,
+                     np.ndarray[real_t, ndim=1] biuu,
+                     np.ndarray[real_t, ndim=4] u0,
+                     np.ndarray[real_t, ndim=4] u1,
+                     np.ndarray[real_t, ndim=4] u2,
+                     np.ndarray[real_t, ndim=4] l0,
+                     np.ndarray[real_t, ndim=4] l1):
+    cdef:
+        unsigned int ii, jj, Ny, Nz, odd, i, j, k, kk, M, ll
+        long long int m, n, p, dd, w0
+        double b, c, pp
+        double pi = np.pi
+        vector[double] c0, c1, c2
+        #double* pc0, pc1, pc2
+        #np.ndarray[real_t, ndim=1] c0 = np.zeros(sii.shape[0]/2)
+        #np.ndarray[real_t, ndim=1] c1 = np.zeros(sii.shape[0]/2)
+        #np.ndarray[real_t, ndim=1] c2 = np.zeros(sii.shape[0]/2)
+        
+    M = sii.shape[0]/2
+    Ny = alfa.shape[0]
+    Nz = alfa.shape[1]
+
+    c0.resize(M)
+    c1.resize(M)
+    c2.resize(M)
+    
+    for j in xrange(Ny):
+        for k in xrange(Nz):
+            b = alfa[j, k]
+            c = beta[j, k]
+            for odd in xrange(2):
+                c0[0] = a*sii[odd] + b*aii[odd] + c*bii[odd]
+                c0[1] = a*siu[odd] + b*aiu[odd] + c*biu[odd]
+                c0[2] = a*siuu[odd] + c*biuu[odd]
+                m = 8*(odd+1)*(odd+2)*(odd*(odd+4)+3*(6+odd+2)*(6+odd+2))
+                c0[3] = m*a*pi/(6+odd+3.)
+                m = 8*(odd+1)*(odd+2)*(odd*(odd+4)+3*(8+odd+2)*(8+odd+2))
+                c0[4] = m*a*pi/(8+odd+3.)
+                
+                c1[0] = b*ail[odd] + c*bil[odd]
+                c1[1] = a*sii[2+odd] + b*aii[2+odd] + c*bii[2+odd]
+                c1[2] = a*siu[2+odd] + b*aiu[2+odd] + c*biu[2+odd]
+                c1[3] = a*siuu[2+odd] + c*biuu[2+odd]
+                m = 8*(odd+3)*(odd+4)*((odd+2)*(odd+6)+3*(8+odd+2)*(8+odd+2))
+                c1[4] = m*a*pi/(8+odd+3.)
+                
+                c2[0] = c*bill[odd]
+                c2[1] = b*ail[2+odd] + c*bil[2+odd]
+                c2[2] = a*sii[4+odd] + b*aii[4+odd] + c*bii[4+odd]
+                c2[3] = a*siu[4+odd] + b*aiu[4+odd] + c*biu[4+odd]
+                c2[4] = a*siuu[4+odd] + c*biuu[4+odd]
+                
+                for i in xrange(5, M):
+                    p = 2*i+odd
+                    pp = pi/(p+3.)
+                    m = 8*(odd+1)*(odd+2)*(odd*(odd+4)+3*(p+2)*(p+2))
+                    c0[i] = m*a*pp
+                    m = 8*(odd+3)*(odd+4)*((odd+2)*(odd+6)+3*(p+2)*(p+2))
+                    c1[i] = m*a*pp
+                    m = 8*(odd+5)*(odd+6)*((odd+4)*(odd+8)+3*(p+2)*(p+2))
+                    c2[i] = m*a*pp
+            
+                u0[odd, 0, j, k] = c0[0]
+                u1[odd, 0, j, k] = c0[1]
+                u2[odd, 0, j, k] = c0[2]
+                for kk in xrange(1, M):
+                    l0[odd, kk-1, j, k] = c1[kk-1]/u0[odd, kk-1, j, k]
+                    if kk < M-1:
+                        l1[odd, kk-1, j, k] = c2[kk-1]/u0[odd, kk-1, j, k]
+                        
+                    for i in xrange(kk, M):
+                        c1[i] -= l0[odd, kk-1, j, k]*c0[i]
+                    
+                    if kk < M-1:
+                        for i in xrange(kk, M):
+                            c2[i] -= l1[odd, kk-1, j, k]*c0[i]
+                                        
+                    copy(c1.begin()+kk, c1.end(), c0.begin()+kk)
+                    copy(c2.begin()+kk, c2.end(), c1.begin()+kk)
+                    
+                    if kk < M-2:
+                        ll = 2*kk+odd
+                        c2[kk] = c*bill[ll]
+                        c2[kk+1] = b*ail[ll+2] + c*bil[ll+2]
+                        c2[kk+2] = a*sii[ll+4] + b*aii[ll+4] + c*bii[ll+4]
+                        if kk < M-3:
+                            c2[kk+3] = a*siu[ll+4] + b*aiu[ll+4] + c*biu[ll+4]
+                        if kk < M-4:
+                            c2[kk+4] = a*siuu[ll+4] + c*biuu[ll+4]
+                        if kk < M-5:
+                            n = 2*(kk+2)+odd
+                            dd = 8*(n+1)*(n+2)
+                            w0 = dd*n*(n+4)
+                            for i in xrange(kk+5, M):
+                                p = 2*i+odd
+                                c2[i] = (w0 + dd*3*(p+2)*(p+2))*a*pi/(p+3.)
+
+                    u0[odd, kk, j, k] = c0[kk]
+                    if kk < M-1:
+                        u1[odd, kk, j, k] = c0[kk+1]
+                    if kk < M-2:
+                        u2[odd, kk, j, k] = c0[kk+2]
+
+#@cython.cdivision(True)
+#def LU_Biharmonic_3D_p(np.float_t a,
+                     #np.ndarray[real_t, ndim=2] alfa, 
+                     #np.ndarray[real_t, ndim=2] beta, 
+                     ## 3 upper diagonals of SBB
+                     #np.ndarray[real_t, ndim=1] sii,
+                     #np.ndarray[real_t, ndim=1] siu,
+                     #np.ndarray[real_t, ndim=1] siuu,
+                     ## All 3 diagonals of ABB
+                     #np.ndarray[real_t, ndim=1] ail,
+                     #np.ndarray[real_t, ndim=1] aii,
+                     #np.ndarray[real_t, ndim=1] aiu,
+                     ## All 5 diagonals of BBB
+                     #np.ndarray[real_t, ndim=1] bill,
+                     #np.ndarray[real_t, ndim=1] bil,
+                     #np.ndarray[real_t, ndim=1] bii,
+                     #np.ndarray[real_t, ndim=1] biu,
+                     #np.ndarray[real_t, ndim=1] biuu,
+                     #np.ndarray[real_t, ndim=4] u0,
+                     #np.ndarray[real_t, ndim=4] u1,
+                     #np.ndarray[real_t, ndim=4] u2,
+                     #np.ndarray[real_t, ndim=4] l0,
+                     #np.ndarray[real_t, ndim=4] l1):
+    #cdef:
+        #unsigned int ii, jj, Ny, Nz, odd, i, j, k, kk, M, ll
+        #long int w0, w1, w2, w3, w4, w5, p0
+        #long long int m, n, p, dd
+        #double b, c, pp
+        #double pi = np.pi
+        #vector[double] c0, c1, c2
+        
+    #M = sii.shape[0]/2
+    #Ny = alfa.shape[0]
+    #Nz = alfa.shape[1]
+
+    #c0.resize(M)
+    #c1.resize(M)
+    #c2.resize(M)
+
+    #for j in xrange(Ny):
+        #for k in xrange(Nz):
+            #b = alfa[j, k]
+            #c = beta[j, k]
+            #for odd in xrange(2):
+                #c0[0] = a*sii[odd] + b*aii[odd] + c*bii[odd]
+                #c0[1] = a*siu[odd] + b*aiu[odd] + c*biu[odd]
+                #c0[2] = a*siuu[odd] + c*biuu[odd]
+                #m = 8*(odd+1)*(odd+2)*(odd*(odd+4)+3*(6+odd+2)*(6+odd+2))
+                #c0[3] = m*a*pi/(6+odd+3.)
+                #m = 8*(odd+1)*(odd+2)*(odd*(odd+4)+3*(8+odd+2)*(8+odd+2))
+                #c0[4] = m*a*pi/(8+odd+3.)
+                
+                #c1[0] = b*ail[odd] + c*bil[odd]
+                #c1[1] = a*sii[2+odd] + b*aii[2+odd] + c*bii[2+odd]
+                #c1[2] = a*siu[2+odd] + b*aiu[2+odd] + c*biu[2+odd]
+                #c1[3] = a*siuu[2+odd] + c*biuu[2+odd]
+                #m = 8*(odd+3)*(odd+4)*((odd+2)*(odd+6)+3*(8+odd+2)*(8+odd+2))
+                #c1[4] = m*a*pi/(8+odd+3.)
+                
+                #c2[0] = c*bill[odd]
+                #c2[1] = b*ail[2+odd] + c*bil[2+odd]
+                #c2[2] = a*sii[4+odd] + b*aii[4+odd] + c*bii[4+odd]
+                #c2[3] = a*siu[4+odd] + b*aiu[4+odd] + c*biu[4+odd]
+                #c2[4] = a*siuu[4+odd] + c*biuu[4+odd]
+                
+                #w0 = 8*(odd+1)*(odd+2)
+                #w1 = 8*(odd+3)*(odd+4)
+                #w2 = 8*(odd+5)*(odd+6)
+                #w3 = w0*odd*(odd+4)
+                #w4 = w1*(odd+2)*(odd+6)
+                #w5 = w2*(odd+4)*(odd+8)
+                #for i in xrange(5, M):
+                    #p = 2*i+odd
+                    #p0 = 3*(p+2)*(p+2)
+                    #pp = pi/(p+3.)
+                    #c0[i] = (w3 + w0*p0)*a*pp
+                    #c1[i] = (w4 + w1*p0)*a*pp
+                    #c2[i] = (w5 + w2*p0)*a*pp
+            
+                #u0[odd, 0, j, k] = c0[0]
+                #u1[odd, 0, j, k] = c0[1]
+                #u2[odd, 0, j, k] = c0[2]
+                #for kk in xrange(1, M):
+                    #l0[odd, kk-1, j, k] = c1[kk-1]/u0[odd, kk-1, j, k]
+                    #if kk < M-1:
+                        #l1[odd, kk-1, j, k] = c2[kk-1]/u0[odd, kk-1, j, k]
+                        
+                    #for i in xrange(kk, M):
+                        #c1[i] = c1[i] - l0[odd, kk-1, j, k]*c0[i]
+                    
+                    #if kk < M-1:
+                        #for i in xrange(kk, M):
+                            #c2[i] = c2[i] - l1[odd, kk-1, j, k]*c0[i]
+                    
+                    #for i in xrange(kk, M):
+                        #c0[i] = c1[i]
+                        #c1[i] = c2[i]
+                    
+                    #if kk < M-2:
+                        #ll = 2*kk+odd
+                        #c2[kk] = c*bill[ll]
+                        #c2[kk+1] = b*ail[ll+2] + c*bil[ll+2]
+                        #c2[kk+2] = a*sii[ll+4] + b*aii[ll+4] + c*bii[ll+4]
+                        #if kk < M-3:
+                            #c2[kk+3] = a*siu[ll+4] + b*aiu[ll+4] + c*biu[ll+4]
+                        #if kk < M-4:
+                            #c2[kk+4] = a*siuu[ll+4] + c*biuu[ll+4]
+                        #if kk < M-5:
+                            #n = 2*(kk+2)+odd
+                            #dd = 8*(n+1)*(n+2)
+                            #for i in xrange(kk+5, M):
+                                #p = 2*i+odd
+                                #m = dd*(n*(n+4)+3*(p+2)*(p+2))
+                                #c2[i] = m*a*pi/(p+3.)
+
+                    #u0[odd, kk, j, k] = c0[kk]
+                    #if kk < M-1:
+                        #u1[odd, kk, j, k] = c0[kk+1]
+                    #if kk < M-2:
+                        #u2[odd, kk, j, k] = c0[kk+2]
