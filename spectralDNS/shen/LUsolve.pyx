@@ -1,6 +1,5 @@
 #cython: boundscheck=False
 #cython: wraparound=False
-#####cython: linetrace=True
 
 import numpy as np
 cimport numpy as np
@@ -1318,24 +1317,24 @@ def Solve_oe_Biharmonic_1D(bint odd,
 
 # This one is fastest by far
 @cython.cdivision(True)
-def Solve_Biharmonic_3D_n(np.ndarray[T, ndim=3] fk,
-                        np.ndarray[T, ndim=3] uk,
-                        np.ndarray[real_t, ndim=4] u0,
-                        np.ndarray[real_t, ndim=4] u1,
-                        np.ndarray[real_t, ndim=4] u2,
-                        np.ndarray[real_t, ndim=4] l0,
-                        np.ndarray[real_t, ndim=4] l1,
-                        np.ndarray[real_t, ndim=4] a,
-                        np.ndarray[real_t, ndim=4] b,
-                        np.float_t ac):
+def Solve_Biharmonic_3D_n(np.ndarray[T, ndim=3, mode='c'] fk,
+                          np.ndarray[T, ndim=3, mode='c'] uk,
+                          np.ndarray[real_t, ndim=4, mode='c'] u0,
+                          np.ndarray[real_t, ndim=4, mode='c'] u1,
+                          np.ndarray[real_t, ndim=4, mode='c'] u2,
+                          np.ndarray[real_t, ndim=4, mode='c'] l0,
+                          np.ndarray[real_t, ndim=4, mode='c'] l1,
+                          np.ndarray[real_t, ndim=4, mode='c'] a,
+                          np.ndarray[real_t, ndim=4, mode='c'] b,
+                          np.float_t ac):
     
     cdef:
         int i, j, k, kk, m, M, ke, ko, jj, je, jo
-        np.ndarray[T, ndim=2] s1 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
-        np.ndarray[T, ndim=2] s2 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
-        np.ndarray[T, ndim=2] o1 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
-        np.ndarray[T, ndim=2] o2 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
-        np.ndarray[T, ndim=3] y = np.zeros((fk.shape[0], fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+        np.ndarray[T, ndim=2, mode='c'] s1 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+        np.ndarray[T, ndim=2, mode='c'] s2 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+        np.ndarray[T, ndim=2, mode='c'] o1 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+        np.ndarray[T, ndim=2, mode='c'] o2 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+        np.ndarray[T, ndim=3, mode='c'] y = np.zeros((fk.shape[0], fk.shape[1], fk.shape[2]), dtype=fk.dtype)
 
 
     M = u0.shape[1]
@@ -1389,30 +1388,32 @@ def Solve_Biharmonic_3D_n(np.ndarray[T, ndim=3] fk,
                 o2[j, k] += (uk[jo, j, k]/(jo+3.))*((jo+2.)*(jo+2.))
                 uk[ko, j, k] = (y[ko, j, k] - u1[1, kk, j, k]*uk[ko+2, j, k] - u2[1, kk, j, k]*uk[ko+4, j, k] - a[1, kk, j, k]*ac*o1[j, k] - b[1, kk, j, k]*ac*o2[j, k]) / u0[1, kk, j, k]
 
+
 @cython.cdivision(True)
+#@cython.linetrace(True)
 #@cython.binding(True)
 def LU_Biharmonic_3D_n(np.float_t a,
-                     np.ndarray[real_t, ndim=2] alfa, 
-                     np.ndarray[real_t, ndim=2] beta, 
+                     np.ndarray[real_t, ndim=2, mode='c'] alfa, 
+                     np.ndarray[real_t, ndim=2, mode='c'] beta, 
                      # 3 upper diagonals of SBB
-                     np.ndarray[real_t, ndim=1] sii,
-                     np.ndarray[real_t, ndim=1] siu,
-                     np.ndarray[real_t, ndim=1] siuu,
+                     np.ndarray[real_t, ndim=1, mode='c'] sii,
+                     np.ndarray[real_t, ndim=1, mode='c'] siu,
+                     np.ndarray[real_t, ndim=1, mode='c'] siuu,
                      # All 3 diagonals of ABB
-                     np.ndarray[real_t, ndim=1] ail,
-                     np.ndarray[real_t, ndim=1] aii,
-                     np.ndarray[real_t, ndim=1] aiu,
+                     np.ndarray[real_t, ndim=1, mode='c'] ail,
+                     np.ndarray[real_t, ndim=1, mode='c'] aii,
+                     np.ndarray[real_t, ndim=1, mode='c'] aiu,
                      # All 5 diagonals of BBB
-                     np.ndarray[real_t, ndim=1] bill,
-                     np.ndarray[real_t, ndim=1] bil,
-                     np.ndarray[real_t, ndim=1] bii,
-                     np.ndarray[real_t, ndim=1] biu,
-                     np.ndarray[real_t, ndim=1] biuu,
-                     np.ndarray[real_t, ndim=4] u0,
-                     np.ndarray[real_t, ndim=4] u1,
-                     np.ndarray[real_t, ndim=4] u2,
-                     np.ndarray[real_t, ndim=4] l0,
-                     np.ndarray[real_t, ndim=4] l1):
+                     np.ndarray[real_t, ndim=1, mode='c'] bill,
+                     np.ndarray[real_t, ndim=1, mode='c'] bil,
+                     np.ndarray[real_t, ndim=1, mode='c'] bii,
+                     np.ndarray[real_t, ndim=1, mode='c'] biu,
+                     np.ndarray[real_t, ndim=1, mode='c'] biuu,
+                     np.ndarray[real_t, ndim=4, mode='c'] u0,
+                     np.ndarray[real_t, ndim=4, mode='c'] u1,
+                     np.ndarray[real_t, ndim=4, mode='c'] u2,
+                     np.ndarray[real_t, ndim=4, mode='c'] l0,
+                     np.ndarray[real_t, ndim=4, mode='c'] l1):
     cdef:
         unsigned int ii, jj, Ny, Nz, odd, i, j, k, kk, M, ll
         long long int m, n, p, dd, w0

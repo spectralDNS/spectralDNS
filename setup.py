@@ -8,9 +8,6 @@ from numpy import get_include
 from Cython.Distutils import build_ext
 from Cython.Build import cythonize
 
-#from Cython.Compiler.Options import directive_defaults
-#directive_defaults['linetrace'] = True
-#directive_defaults['binding'] = True
 #define_macros=[('CYTHON_TRACE', '1')]
 
 # Version number
