@@ -78,8 +78,7 @@ class TDMA(object):
             self.L = zeros(N-4)
             self.s = slice(0, N-2) 
             SFTc.TDMA_SymLU(self.dd, self.ud, self.L)
-    
-    #@profile
+
     def __call__(self, u):
         N = u.shape[0]
         if not self.dd.shape[0] == u.shape[0]:
@@ -197,7 +196,7 @@ class PDMA(object):
         return u
 
 class Biharmonic(object):
-    
+
     def __init__(self, N, a0, alfa, beta, quad="GL", solver="scipy"):
         self.quad = quad
         self.solver = solver
@@ -238,7 +237,7 @@ class Biharmonic(object):
                 self.l1 = zeros((2, M, Ny, Nz))
                 self.ak = zeros((2, M, Ny, Nz))
                 self.bk = zeros((2, M, Ny, Nz))
-                SFTc.LU_Biharmonic_3D(a0, alfa, beta, sii, siu, siuu, ail, aii, aiu, bill, bil, bii, biu, biuu, self.u0, self.u1, self.u2, self.l0, self.l1)
+                SFTc.LU_Biharmonic_3D_n(a0, alfa, beta, sii, siu, siuu, ail, aii, aiu, bill, bil, bii, biu, biuu, self.u0, self.u1, self.u2, self.l0, self.l1)
                 SFTc.Biharmonic_factor_pr_3D(self.ak, self.bk, self.l0, self.l1)
 
         else:

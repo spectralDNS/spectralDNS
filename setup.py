@@ -7,8 +7,9 @@ import subprocess
 from numpy import get_include
 from Cython.Distutils import build_ext
 from Cython.Build import cythonize
- 
-    
+
+#define_macros=[('CYTHON_TRACE', '1')]
+
 # Version number
 major = 2
 minor = 0
@@ -42,7 +43,9 @@ if not "sdist" in sys.argv:
     
     ext = []
     for s in ("LUsolve", "TDMA", "PDMA", "Matvec"):
-        ext += cythonize(Extension("spectralDNS.shen.{0}".format(s), sources = [os.path.join(sdir, '{0}.pyx'.format(s))], language="c++"))
+        ext += cythonize(Extension("spectralDNS.shen.{0}".format(s),
+                                   sources = [os.path.join(sdir, '{0}.pyx'.format(s))],
+                                   language="c++"))
         
     for s in ("Cheb", "HelmholtzMHD"):
         ext += cythonize(Extension("spectralDNS.shen.{0}".format(s), sources = [os.path.join(sdir, '{0}.pyx'.format(s))]))    

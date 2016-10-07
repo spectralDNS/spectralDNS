@@ -43,9 +43,8 @@ work = work_arrays()
 
 class ChebyshevTransform(object):
     
-    def __init__(self, quad="GL", fast_transform=True, threads=1, planner_effort="FFTW_MEASURE"): 
+    def __init__(self, quad="GL", threads=1, planner_effort="FFTW_MEASURE"): 
         self.quad = quad
-        self.fast_transform = fast_transform
         self.threads = threads
         self.planner_effort = planner_effort
         self.points = zeros(0)
@@ -148,10 +147,10 @@ class ChebyshevTransform(object):
         return cj
     
     #@profile
-    def fastChebScalar(self, fj, fk):
+    def fastChebScalar(self, fj, fk, fast_transform=True):
         """Fast Chebyshev scalar product."""
         N = fj.shape[0]
-        if self.fast_transform:
+        if fast_transform:
             if self.quad == "GC":
                 fk = dct(fj, fk, type=2, axis=0, threads=self.threads, planner_effort=self.planner_effort)
                 fk *= (pi/(2*N))
@@ -169,18 +168,33 @@ class ChebyshevTransform(object):
         return slice(0, N)
 
 class ShenDirichletBasis(ChebyshevTransform):
+    """Shen basis for Dirichlet boundary conditions
     
-    def __init__(self, quad="GL", fast_transform=True, threads=1, planner_effort="FFTW_MEASURE"):
-        ChebyshevTransform.__init__(self, quad=quad, fast_transform=fast_transform,
-                                    planner_effort=planner_effort)
+    args:
+        quad        ('GL', 'GC')  Gauss-Lobatto or Gauss-Chebyshev points
+        threads          1        Number of threads used by pyfftw
+        planner_effort            Planner effort for FFTs. 
+        bc             (a, b)     Boundary conditions at x=(1,-1)
+
+    """
+    
+    
+    def __init__(self, quad="GL", threads=1, planner_effort="FFTW_MEASURE",
+                 bc=(0., 0.)):
+        ChebyshevTransform.__init__(self, quad=quad, planner_effort=planner_effort)
         self.N = -1
         self.Solver = TDMA(quad, False)
+        self.bc = bc
         
     def init(self, N):
         """Vandermonde matrix is used just for verification"""
         self.points, self.weights = self.points_and_weights(N)
-        # Build Vandermonde matrix. Note! N points in real space gives N-2 bases in spectral space
-        self.V = n_cheb.chebvander(self.points, N-3).T - n_cheb.chebvander(self.points, N-1)[:, 2:].T
+        # Build Vandermonde matrix.
+        self.V = np.zeros((N, N))
+        V = n_cheb.chebvander(self.points, N-1)
+        self.V[:N-2, :] = V[:, :-2].T - V[:, 2:].T
+        self.V[N-2, :] = 0.5*(V[:, 0] + V[:, 1])
+        self.V[N-1, :] = 0.5*(V[:, 0] - V[:, 1])
 
     def wavenumbers(self, N):
         if isinstance(N, tuple):
@@ -194,29 +208,35 @@ class ShenDirichletBasis(ChebyshevTransform):
             return kk[0]
 
     #@profile
-    def fastShenScalar(self, fj, fk):
+    def fastShenScalar(self, fj, fk, fast_transform=True):
                 
-        if self.fast_transform:
+        if fast_transform:
             fk = self.fastChebScalar(fj, fk)
+            #c0 = 0.5*(fk[0] + fk[1])
+            #c1 = 0.5*(fk[0] - fk[1])
             fk[:-2] -= fk[2:]
+            #fk[-2] = c0
+            #fk[-1] = c1
         else:
             if not self.points.shape == (fj.shape[0],): self.init(fj.shape[0])
-            fk[:-2] = np.dot(self.V, fj*self.weights)
-        fk[-2:] = 0     # Last two not used by Shen
+            fk[:] = np.dot(self.V, fj*self.weights)
+
+        fk[-2:] = 0     # Last two not used, so set to zero. Even for nonhomogeneous bcs, where they are technically non-zero
         return fk
         
     #@profile
-    def ifst(self, fk, fj):
+    def ifst(self, fk, fj, fast_transform=True):
         """Fast inverse Shen transform
+        
         Transform needs to take into account that phi_k = T_k - T_{k+2}
         fk contains Shen coefficients in the first fk.shape[0]-2 positions
         """
-        if self.fast_transform:
+        if fast_transform:
             w_hat = work[(fk, 0)]
-            w_hat[:-2] = fk[:-2] 
+            w_hat[:-2] = fk[:-2]
             w_hat[2:] -= fk[:-2] 
-            #w_hat[:2] = fk[:2]
-            #w_hat[2:] = fk[2:]-fk[:-2]  
+            w_hat[0] += 0.5*(self.bc[0] + self.bc[1])
+            w_hat[1] += 0.5*(self.bc[0] - self.bc[1])
             
             fj = self.ifct(w_hat, fj)
             return fj
@@ -230,7 +250,11 @@ class ShenDirichletBasis(ChebyshevTransform):
         """Fast Shen transform
         """
         fk = self.fastShenScalar(fj, fk)
+        fk[0] -= pi/2*(self.bc[0] + self.bc[1])
+        fk[1] -= pi/4*(self.bc[0] - self.bc[1])
         fk = self.Solver(fk)
+        fk[-2] = self.bc[0]
+        fk[-1] = self.bc[1]
         return fk
     
     def slice(self, N):
@@ -238,8 +262,8 @@ class ShenDirichletBasis(ChebyshevTransform):
 
 class ShenNeumannBasis(ShenDirichletBasis):
     
-    def __init__(self, quad="GC", fast_transform=True, threads=1, planner_effort="FFTW_MEASURE"): 
-        ShenDirichletBasis.__init__(self, quad, fast_transform, threads, planner_effort)
+    def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"): 
+        ShenDirichletBasis.__init__(self, quad, threads, planner_effort)
         self.factor = None        
         self.k = None
         self.Solver = TDMA(quad, True)
@@ -267,12 +291,12 @@ class ShenNeumannBasis(ShenDirichletBasis):
                 k = self.wavenumbers(v.shape[0])
             self.factor = (k[1:]/(k[1:]+2))**2
 
-    def fastShenScalar(self, fj, fk):
+    def fastShenScalar(self, fj, fk, fast_transform=True):
         """Fast Shen scalar product.
         Chebyshev transform taking into account that phi_k = T_k - (k/(k+2))**2*T_{k+2}
         Note, this is the non-normalized scalar product
         """        
-        if self.fast_transform:
+        if fast_transform:
             self.set_factor_array(fk)
             fk = self.fastChebScalar(fj, fk)
             fk[1:-2] -= self.factor * fk[3:]
@@ -300,8 +324,8 @@ class ShenNeumannBasis(ShenDirichletBasis):
 
 class ShenBiharmonicBasis(ShenDirichletBasis):
     
-    def __init__(self, quad="GC", fast_transform=True, threads=1, planner_effort="FFTW_MEASURE"):
-        ShenDirichletBasis.__init__(self, quad, fast_transform, threads, planner_effort)
+    def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"):
+        ShenDirichletBasis.__init__(self, quad, threads, planner_effort)
         self.factor1 = zeros(0)
         self.factor2 = zeros(0)
         self.Solver = PDMA(quad)
@@ -334,10 +358,10 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
             self.factor1 = (-2*(k+2)/(k+3)).astype(float)
             self.factor2 = ((k+1)/(k+3)).astype(float)
 
-    def fastShenScalar(self, fj, fk):
+    def fastShenScalar(self, fj, fk, fast_transform=True):
         """Fast Shen scalar product.
         """        
-        if self.fast_transform:
+        if fast_transform:
             self.set_factor_arrays(fk)
             Tk = work[(fk, 0)]
             Tk = self.fastChebScalar(fj, Tk)
@@ -435,13 +459,13 @@ class SlabShen_R2C(Slab_R2C):
         x0, x1, x2 = self.get_mesh_dims(ST)
 
         # Get grid for velocity points
-        X = array(meshgrid(x0[self.rank*self.Np[0]:(self.rank+1)*self.Np[0]], 
+        X = array(meshgrid(x0[int(self.rank*self.Np[0]):int((self.rank+1)*self.Np[0])], 
                            x1, x2, indexing='ij'), dtype=self.float)
         return X
     
     def get_local_wavenumbermesh(self):
         kx = arange(self.N[0]).astype(self.float)
-        ky = fftfreq(self.N[1], 1./self.N[1])[self.rank*self.Np[1]:(self.rank+1)*self.Np[1]]
+        ky = fftfreq(self.N[1], 1./self.N[1])[int(self.rank*self.Np[1]):int((self.rank+1)*self.Np[1])]
         kz = fftfreq(self.N[2], 1./self.N[2])[:self.Nf]
         kz[-1] *= -1.0
         return array(meshgrid(kx, ky, kz, indexing='ij'), dtype=self.float) 
@@ -877,7 +901,7 @@ if __name__ == "__main__":
     u1 = CT.ifct(u0, u1)
     assert np.allclose(u1, fj)    
         
-    ST = ShenDirichletBasis(quad="GC", fast_transform=True)
+    ST = ShenDirichletBasis(quad="GC")
     points, weights = ST.points_and_weights(N)
     fj = np.array([f.subs(x, j) for j in points], dtype=float)    
     u0 = zeros(N, dtype=float)
@@ -897,7 +921,7 @@ if __name__ == "__main__":
     assert np.allclose(u1, fj)
 
     N = 30
-    SB = ShenBiharmonicBasis(quad="GL", fast_transform=False)
+    SB = ShenBiharmonicBasis(quad="GL")
     points, weights = SB.points_and_weights(N)
     f = (1-x**2)*sin(2*pi*x)    
     fj = np.array([f.subs(x, j) for j in points], dtype=float)    
