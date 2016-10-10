@@ -1,7 +1,9 @@
-cimport numpy as np
 #cython: boundscheck=False
 #cython: wraparound=False
+
 import numpy as np
+cimport numpy as np
+from cython.view cimport array as cvarray
 
 ctypedef np.complex128_t complex_t
 ctypedef np.float64_t real_t
@@ -40,54 +42,85 @@ def TDMA_SymLU(np.ndarray[real_t, ndim=1, mode='c'] d,
     for i in range(2, n):
         l[i-2] = a[i-2]/d[i-2]
         d[i] = d[i] - l[i-2]*a[i-2]
+
+#def TDMA_SymLU(real_t[:] d, 
+               #real_t[:] a,
+               #real_t[:] l):
+    #cdef:
+        #unsigned int n = d.shape[0]
+        #int i
         
+    #for i in range(2, n):
+        #l[i-2] = a[i-2]/d[i-2]
+        #d[i] = d[i] - l[i-2]*a[i-2]
+
 def TDMA_SymSolve(np.ndarray[real_t, ndim=1, mode='c'] d, 
                   np.ndarray[real_t, ndim=1, mode='c'] a,
                   np.ndarray[real_t, ndim=1, mode='c'] l,
                   np.ndarray[T, ndim=1, mode='c'] x):
     cdef:
         unsigned int n = d.shape[0]
-        int i
-        np.ndarray[T, ndim=1, mode='c'] y = np.zeros_like(x)
+        np.intp_t i
         
-    y[0] = x[0]
-    y[1] = x[1]
     for i in range(2, n):
-        y[i] = x[i] - l[i-2]*y[i-2]
+        x[i] -= l[i-2]*x[i-2]
         
-    x[n-1] = y[n-1]/d[n-1]
-    x[n-2] = y[n-2]/d[n-2]
+    x[n-1] = x[n-1]/d[n-1]
+    x[n-2] = x[n-2]/d[n-2]
     for i in range(n - 3, -1, -1):
-        x[i] = (y[i] - a[i]*x[i+2])/d[i]    
+        x[i] = (x[i] - a[i]*x[i+2])/d[i]    
 
-def TDMA_SymSolve3D(np.ndarray[real_t, ndim=1, mode='c'] d, 
-                    np.ndarray[real_t, ndim=1, mode='c'] a,
-                    np.ndarray[real_t, ndim=1, mode='c'] l,
-                    np.ndarray[T, ndim=3, mode='c'] x):
+def TDMA_SymSolve3D(real_t[::1] d, 
+                    real_t[::1] a,
+                    real_t[::1] l,
+                    T[:, :, ::1] x):
     cdef:
         unsigned int n = d.shape[0]
-        int i, j, k
-        np.ndarray[T, ndim=3, mode='c'] y = np.zeros_like(x)
-        
-    for j in range(x.shape[1]):
-        for k in range(x.shape[2]):
-            y[0, j, k] = x[0, j, k]
-            y[1, j, k] = x[1, j, k]
-    
+        np.intp_t i, j, k
+
     for i in range(2, n):
         for j in range(x.shape[1]):
             for k in range(x.shape[2]):
-                y[i, j, k] = x[i, j, k] - l[i-2]*y[i-2, j, k]
-
+                x[i, j, k] -= l[i-2]*x[i-2, j, k]
+                
     for j in range(x.shape[1]):
         for k in range(x.shape[2]):        
-            x[n-1, j, k] = y[n-1, j, k]/d[n-1]
-            x[n-2, j, k] = y[n-2, j, k]/d[n-2]
+            x[n-1, j, k] = x[n-1, j, k]/d[n-1]
+            x[n-2, j, k] = x[n-2, j, k]/d[n-2]
     
     for i in range(n - 3, -1, -1):
         for j in range(x.shape[1]):
             for k in range(x.shape[2]):            
-                x[i, j, k] = (y[i, j, k] - a[i]*x[i+2, j, k])/d[i]
+                x[i, j, k] = (x[i, j, k] - a[i]*x[i+2, j, k])/d[i]
+
+#def TDMA_SymSolve3D(np.ndarray[real_t, ndim=1, mode='c'] d, 
+                    #np.ndarray[real_t, ndim=1, mode='c'] a,
+                    #np.ndarray[real_t, ndim=1, mode='c'] l,
+                    #np.ndarray[T, ndim=3, mode='c'] x):
+    #cdef:
+        #unsigned int n = d.shape[0]
+        #int i, j, k
+        #np.ndarray[T, ndim=3, mode='c'] y = np.zeros_like(x)
+    
+    #for j in range(x.shape[1]):
+        #for k in range(x.shape[2]):
+            #y[0, j, k] = x[0, j, k]
+            #y[1, j, k] = x[1, j, k]
+    
+    #for i in range(2, n):
+        #for j in range(x.shape[1]):
+            #for k in range(x.shape[2]):
+                #y[i, j, k] = x[i, j, k] - l[i-2]*y[i-2, j, k]
+
+    #for j in range(x.shape[1]):
+        #for k in range(x.shape[2]):        
+            #x[n-1, j, k] = y[n-1, j, k]/d[n-1]
+            #x[n-2, j, k] = y[n-2, j, k]/d[n-2]
+    
+    #for i in range(n - 3, -1, -1):
+        #for j in range(x.shape[1]):
+            #for k in range(x.shape[2]):            
+                #x[i, j, k] = (y[i, j, k] - a[i]*x[i+2, j, k])/d[i]
 
 def TDMA_1D(np.ndarray[real_t, ndim=1, mode='c'] a, 
             np.ndarray[real_t, ndim=1, mode='c'] b, 

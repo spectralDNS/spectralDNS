@@ -154,6 +154,7 @@ def get_convection(H_hat, U_hat, g, K, FST, SB, ST, work, mat, la, **context):
     ##P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
     ##return P_hat
 
+#@profile
 def Cross(c, a, b, S, FST, work):
     Uc = work[(a, 2, False)]
     Uc = cross1(Uc, a, b)
@@ -167,7 +168,7 @@ def mult_K1j(K, a, f):
     f[0] = 1j*K[2]*a
     f[1] = -1j*K[1]*a
     return f
-    
+
 def compute_curl(c, u_hat, g, K, FST, SB, ST, work):
     F_tmp = work[(u_hat, 0, False)]
     F_tmp2 = work[(u_hat, 2, False)]
@@ -329,7 +330,7 @@ def getConvection(convection):
             return rhs
 
     elif convection == "Vortex":
-        
+        #@profile
         def Conv(rhs, u_hat, g_hat, K, FST, SB, ST, work, mat, la):
             
             u_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
@@ -366,8 +367,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
     rhs[0] += diff_u
     rhs[1] += diff_g
     return rhs
-    
-#@profile
+
 def ComputeRHS(rhs, u_hat, g_hat, solver,
                H_hat, H_hat1, H_hat0, FST, ST, SB, work, K, K2, K4, hv, hg,
                mat, la, **context):
@@ -402,6 +402,13 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
 
     return rhs
 
+@optimizer
+def compute_vw(u_hat, f_hat, g_hat, K_over_K2):
+    u_hat[1] = -1j*(K_over_K2[1]*f_hat - K_over_K2[2]*g_hat)
+    u_hat[2] = -1j*(K_over_K2[2]*f_hat + K_over_K2[1]*g_hat)
+    return u_hat
+
+#@profile
 def solve_linear(u_hat, g_hat, rhs,
                  work, la, mat, K_over_K2, H_hat0, U_hat0, Sk, **context):
     """"""
@@ -411,10 +418,9 @@ def solve_linear(u_hat, g_hat, rhs,
     g_hat = la.HelmholtzSolverG(g_hat, rhs[1])
     
     # Compute v_hat and w_hat from u_hat and g_hat
-    f_hat[:] = -mat.CDB.matvec(u_hat[0])
+    f_hat -= mat.CDB.matvec(u_hat[0])
     f_hat = la.TDMASolverD(f_hat)
-    u_hat[1] = -1j*(K_over_K2[1]*f_hat - K_over_K2[2]*g_hat)
-    u_hat[2] = -1j*(K_over_K2[2]*f_hat + K_over_K2[1]*g_hat)
+    u_hat = compute_vw(u_hat, f_hat, g_hat, K_over_K2)
 
     # Remains to fix wavenumber 0
     if rank == 0:
@@ -442,7 +448,7 @@ def solve_linear(u_hat, g_hat, rhs,
         u_hat[2, :, 0, 0] = u0_hat[1]
         
     return u_hat, g_hat
-#@profile
+
 def integrate(u_hat, g_hat, rhs, dt, solver, context):
     """Regular implicit solver for KMM channel solver"""
     rhs[:] = 0

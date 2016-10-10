@@ -5,8 +5,8 @@ cimport numpy as np
 {0}
 
 def add_linear_KMM(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
-        diff_u = work[(g, 0)]
-        diff_g = work[(g, 1)]
+        diff_u = work[(g, 0, False)]
+        diff_g = work[(g, 1, False)]
         
         # Compute diffusion for g-equation
         diff_g = AB.matvec(g, diff_g)
@@ -99,3 +99,16 @@ def add_pressure_diffusion_NS2D(np.ndarray[complex_t, ndim=3] du,
             du[0,i,j] = du[0,i,j] - (p_hat[i,j]*k0+u_hat[0,i,j]*z)
             du[1,i,j] = du[1,i,j] - (p_hat[i,j]*k1+u_hat[1,i,j]*z)
     return du
+
+def compute_vw_KMM(np.ndarray[complex_t, ndim=4] u_hat,
+                   np.ndarray[complex_t, ndim=3] f_hat,
+                   np.ndarray[complex_t, ndim=3] g_hat,
+                   np.ndarray[real_t, ndim=4] k_over_k2):
+    cdef int i, j, k, l
+
+    for i in range(u_hat.shape[1]):
+        for j in range(u_hat.shape[2]):
+            for k in range(u_hat.shape[3]):
+                u_hat[1, i, j, k] = -1j*(k_over_k2[1, i, j, k]*f_hat[i, j, k] - k_over_k2[2, i, j, k]*g_hat[i, j, k])
+                u_hat[2, i, j, k] = -1j*(k_over_k2[2, i, j, k]*f_hat[i, j, k] + k_over_k2[1, i, j, k]*g_hat[i, j, k])
+    return u_hat

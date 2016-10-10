@@ -384,7 +384,6 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
         w_hat[4:]   += f2*fk[:-4]
         return w_hat
     
-    #@profile
     def ifst(self, fk, fj):
         """Fast inverse Shen scalar transform
         """

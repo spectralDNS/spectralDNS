@@ -519,6 +519,63 @@ def CBD_matvec(np.ndarray[T, ndim=1] v,
     i = N
     b[i] = ld[i-1]* v[i-1] + ud[i]*v[i+1]
 
+def CDB_matvec3D(T [:, :, ::1] v, 
+                 T [:, :, ::1] b,
+                 real_t [::1] lld,
+                 real_t [::1] ld,
+                 real_t [::1] ud):
+    cdef:
+        int i, j, k
+        int N = ud.shape[0]
+        
+    for i in range(v.shape[1]):
+        for j in range(v.shape[2]):
+            b[0, i, j] = ud[0]*v[1, i, j]
+
+    for k in xrange(1, 3):
+        for i in range(v.shape[1]):
+            for j in range(v.shape[2]):            
+                b[k, i, j] = ld[k-1]*v[k-1, i, j] + ud[k]*v[k+1, i, j]
+
+    for k in xrange(3, N):
+        for i in range(v.shape[1]):
+            for j in range(v.shape[2]):            
+                b[k, i, j] = lld[k-3]*v[k-3, i, j] + ld[k-1]* v[k-1, i, j] + ud[k]*v[k+1, i, j]
+
+    for k in xrange(N, N+2):
+        for i in range(v.shape[1]):
+            for j in range(v.shape[2]):            
+                b[k, i, j] = lld[k-3]*v[k-3, i, j] + ld[k-1]* v[k-1, i, j]
+                
+    for i in range(v.shape[1]):
+        for j in range(v.shape[2]):
+            b[N+2, i, j] = lld[N-1]* v[N-1, i, j]
+
+def BBD_matvec3D(np.ndarray[T, ndim=3] v, 
+                 np.ndarray[T, ndim=3] b,
+                 real_t ld,
+                 np.ndarray[real_t, ndim=1] dd,
+                 np.ndarray[real_t, ndim=1] ud,
+                 np.ndarray[real_t, ndim=1] uud):
+    cdef:
+        int i, j, k
+        
+    for i in range(v.shape[1]):
+        for j in range(v.shape[2]):
+            b[0, i, j] = dd[0]*v[0, i, j] + ud[0]*v[2, i, j] + uud[0]*v[4, i, j]
+            b[1, i, j] = dd[1]*v[1, i, j] + ud[1]*v[3, i, j] + uud[1]*v[5, i, j]
+
+    for k in range(2, uud.shape[0]):
+        for i in range(v.shape[1]):
+            for j in range(v.shape[2]):
+                b[k, i, j] = ld*v[k-2, i, j] + dd[k]*v[k, i, j] + ud[k]*v[k+2, i, j] + uud[k]*v[k+4, i, j]
+                
+    for k in range(uud.shape[0], dd.shape[0]):
+        for i in range(v.shape[1]):
+            for j in range(v.shape[2]):
+                b[k, i, j] = ld*v[k-2, i, j] + dd[k]*v[k, i, j] + ud[k]*v[k+2, i, j]    
+
+
 def Helmholtz_matvec(np.ndarray[T, ndim=1] v, 
                      np.ndarray[T, ndim=1] b,
                      real_t alfa, 
@@ -556,13 +613,13 @@ def Helmholtz_matvec(np.ndarray[T, ndim=1] v,
     b[k-1] = (dd[k-1]*alfa + bd[k-1]*beta)*v[k-1] - pi_half*beta*v[k+1] + ud[k-1]*alfa*s2
 
 
-def Helmholtz_matvec3D(np.ndarray[T, ndim=3] v, 
-                       np.ndarray[T, ndim=3] b,
+def Helmholtz_matvec3D(np.ndarray[T, ndim=3, mode='c'] v, 
+                       np.ndarray[T, ndim=3, mode='c'] b,
                        real_t alfa, 
-                       np.ndarray[real_t, ndim=2] beta,
-                       np.ndarray[real_t, ndim=1] dd,
-                       np.ndarray[real_t, ndim=1] ud,
-                       np.ndarray[real_t, ndim=1] bd):
+                       np.ndarray[real_t, ndim=2, mode='c'] beta,
+                       np.ndarray[real_t, ndim=1, mode='c'] dd,
+                       np.ndarray[real_t, ndim=1, mode='c'] ud,
+                       np.ndarray[real_t, ndim=1, mode='c'] bd):
     # b = (alfa*A + beta*B)*v 
     # For B matrix ld = ud = -pi/2
     cdef:
@@ -597,4 +654,3 @@ def Helmholtz_matvec3D(np.ndarray[T, ndim=3] v,
             s2[i, j] += v[k+1, i, j]
             b[k, i, j] = (dd[k]*alfa + bd[k]*beta[i, j])*v[k, i, j] - pi_half*beta[i, j]*v[k+2, i, j] + ud[k]*alfa*s1[i, j]
             b[k-1, i, j] = (dd[k-1]*alfa + bd[k-1]*beta[i, j])*v[k-1, i, j] - pi_half*beta[i, j]*v[k+1, i, j] + ud[k-1]*alfa*s2[i, j]
-

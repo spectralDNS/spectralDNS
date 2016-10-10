@@ -1,5 +1,9 @@
 import numpy as np
-from SFTc import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, SBBmat_matvec3D, Biharmonic_matvec, Biharmonic_matvec3D, Tridiagonal_matvec, Tridiagonal_matvec3D, Pentadiagonal_matvec, Pentadiagonal_matvec3D, CBD_matvec3D, CBD_matvec, ADDmat_matvec, Helmholtz_matvec3D, Helmholtz_matvec
+from SFTc import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, \
+    SBBmat_matvec3D, Biharmonic_matvec, Biharmonic_matvec3D, Tridiagonal_matvec, \
+    Tridiagonal_matvec3D, Pentadiagonal_matvec, Pentadiagonal_matvec3D, \
+    CBD_matvec3D, CBD_matvec, CDB_matvec3D, ADDmat_matvec, Helmholtz_matvec3D, \
+    Helmholtz_matvec, BBD_matvec3D
 from scipy.sparse import diags
 
 pi, zeros, ones, array = np.pi, np.zeros, np.ones, np.array
@@ -390,11 +394,12 @@ class BBDmat(BaseMatrix):
         c[:] = 0
         N = self.shape[0]
         if len(v.shape) > 1:
-            vv = v[:-2]
-            c[:N] = self.dd.repeat(array(v.shape[1:]).prod()).reshape(vv[:-2].shape) * vv[:-2]
-            c[:N] += self.ud.repeat(array(v.shape[1:]).prod()).reshape(vv[2:].shape) * vv[2:]
-            c[:N-2] += self.uud.repeat(array(v.shape[1:]).prod()).reshape(vv[4:].shape) * vv[4:]
-            c[2:N]  += self.ld * vv[:-4]
+            #vv = v[:-2]
+            #c[:N] = self.dd.repeat(array(v.shape[1:]).prod()).reshape(vv[:-2].shape) * vv[:-2]
+            #c[:N] += self.ud.repeat(array(v.shape[1:]).prod()).reshape(vv[2:].shape) * vv[2:]
+            #c[:N-2] += self.uud.repeat(array(v.shape[1:]).prod()).reshape(vv[4:].shape) * vv[4:]
+            #c[2:N]  += self.ld * vv[:-4]
+            BBD_matvec3D(v, c, self.ld, self.dd, self.ud, self.uud)
             
         else:
             vv = v[:-2]
@@ -616,9 +621,10 @@ class CDBmat(BaseMatrix):
         N, M = self.shape
         c = self.get_return_array(v)
         if len(v.shape) > 1:
-            c[3:N] = self.lld.repeat(array(v.shape[1:]).prod()).reshape(v[:M-1].shape) * v[:M-1]
-            c[1:N-1] += self.ld[:M].repeat(array(v.shape[1:]).prod()).reshape(v[:M].shape) * v[:M]
-            c[:N-3] += self.ud.repeat(array(v.shape[1:]).prod()).reshape(v[1:M].shape) * v[1:M]
+            #c[3:N] = self.lld.repeat(array(v.shape[1:]).prod()).reshape(v[:M-1].shape) * v[:M-1]
+            #c[1:N-1] += self.ld[:M].repeat(array(v.shape[1:]).prod()).reshape(v[:M].shape) * v[:M]
+            #c[:N-3] += self.ud.repeat(array(v.shape[1:]).prod()).reshape(v[1:M].shape) * v[1:M]
+            CDB_matvec3D(v, c, self.lld, self.ld, self.ud)
             
         else:
             c[3:N] = self.lld * v[:M-1]
