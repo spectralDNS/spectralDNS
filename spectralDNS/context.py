@@ -13,7 +13,7 @@ import spectralDNS.mesh.doublyperiodic
 import spectralDNS.config
 from mpi4py import MPI
 import numpy as np
-from mpiFFT4py import slab_FFT, pencil_FFT, line_FFT, work_arrays
+from mpiFFT4py import Slab_R2C, Pencil_R2C, Line_R2C, work_arrays
 
 class Context:
     """
@@ -171,11 +171,11 @@ class Context:
 
         if self.mesh in ('doublyperiodic', 'triplyperiodic'):
             if decomposition == 'slab':
-                FFT = slab_FFT(self.model_params["N"], self.model_params["L"], MPI, precision,threads=self.threads)
+                FFT = Slab_R2C(self.model_params["N"], self.model_params["L"], MPI.COMM_WORLD, precision,threads=self.threads)
             elif decomposition == 'pencil':
-                FFT = pencil_FFT(self.model_params["N"], self.model_params["L"], MPI, precision, P1=kwargs["P1"], alignment=kwargs["alignment"],threads=self.threads)
+                FFT = Pencil_R2C(self.model_params["N"], self.model_params["L"], MPI.COMM_WORLD, precision, P1=kwargs["P1"], alignment=kwargs["alignment"],threads=self.threads)
             elif decomposition == 'line':
-                FFT = line_FFT(self.model_params["N"], self.model_params["L"], MPI, precision,threads=self.threads)
+                FFT = Line_R2C(self.model_params["N"], self.model_params["L"], MPI.COMM_WORLD, precision,threads=self.threads)
 
         self.MPI = MPI
         self.FFT = FFT
