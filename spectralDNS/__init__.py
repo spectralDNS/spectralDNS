@@ -11,6 +11,27 @@ def get_solver(update=None,
                regression_test=None,
                additional_callback=None,
                mesh="triplyperiodic", parse_args=None):
+    """Return solver based on global config (see spectralDNS/config.py)
+    
+    args:
+        update               Update function called on each timestep.
+                             Typically used for plotting or computing
+                             intermediate results
+        regression_test      Function called at the end of simulations.
+                             Typically used for checking results
+        additional_callback  Function used by some integrators that require
+                             additional callback
+        mesh                 Type of problem ('triplyperiodic',
+                                              'doublyperiodic',
+                                              'channel')
+        parse_args           Used to specify arguments to config.
+                             If parse_args is None then Commandline arguments
+                             are used.
+                             
+    global args:
+        config               See spectralDNS/config.py for details.
+        
+    """
     assert parse_args is None or isinstance(parse_args, list)
     args = getattr(eval('.'.join(('config', mesh))),
                     'parse_args')(parse_args)
@@ -37,7 +58,7 @@ def get_solver(update=None,
     return solver
 
 def solve(solver, context):
-    """Solve triply periodic Navier Stokes equations
+    """Generic solver for spectralDNS
 
     args:
         solver       The solver (e.g., NS or VV) module

@@ -46,6 +46,7 @@ try:
             self.f.attrs.create("dt", params.dt)
             self.f.attrs.create("N", params.N)
             self.f.attrs.create("L", params.L)    
+            self.f.attrs.create("Sk", 0.0)
             if params.has_key('write_yz_slice'):
                 self.f["2D/yz"].attrs.create("i", params.write_yz_slice[0])
                 self.f["2D/xy"].attrs.create("j", params.write_xy_slice[0])
@@ -125,6 +126,11 @@ try:
                         self.f["3D/checkpoint/{}/0".format(key)][s] = val
                     else:
                         self.f["3D/checkpoint/{}/0".format(key)][:, s[0], s[1], s[2]] = val
+            
+            # For channel solver with dynamic pressure
+            z0 = kw['Sk'][1,0,0,0].real
+            z0 = FFT.comm.bcast(z0)
+            self.f.attrs["Sk"] = z0
             self.f.close()
 
         def _write(self, params, **kw):
@@ -179,6 +185,10 @@ try:
                     for comp, val in self.components.iteritems():
                         self.f["2D/xy/%s/%d"%(comp, params.tstep)][s[0], s[1]] = val[:, :, k]
 
+            # For channel solver with dynamic pressure
+            z0 = kw['Sk'][1,0,0,0].real
+            z0 = FFT.comm.bcast(z0)
+            self.f.attrs["Sk"] = z0
             self.f.close()
 
         def update_components(self, **kw):

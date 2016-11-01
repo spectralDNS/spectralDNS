@@ -98,7 +98,7 @@ def compute_curl(c, a, work, FFT, K, dealias=None):
     c[1] = FFT.ifftn(curl_hat[1], c[1], dealias)
     c[2] = FFT.ifftn(curl_hat[2], c[2], dealias)
     return c
-
+#@profile
 def Cross(c, a, b, work, FFT, dealias=None):
     """c_k = F_k(a x b)"""
     Uc = work[(a, 2, False)]
@@ -171,7 +171,6 @@ def getConvection(convection):
 
     elif convection == "Vortex":
 
-        #@profile
         def Conv(rhs, u_hat, work, FFT, K):
             u_dealias = work[((3,)+FFT.work_shape(params.dealias),
                             float, 0, False)]

@@ -929,5 +929,3 @@ if __name__ == "__main__":
     u1 = u0.copy()
     u1 = SB.ifst(u0, u1)
     assert np.allclose(u1, fj)
-    
-

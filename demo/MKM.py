@@ -1,4 +1,5 @@
 """Turbulent channel"""
+import pyfftw
 from spectralDNS import config, get_solver, solve
 from numpy import dot, real, pi, exp, sum, complex, float, zeros, arange, imag, \
     cos, where, pi, random, exp, sin, log, array, zeros_like
@@ -7,7 +8,7 @@ from mpiFFT4py import dct
 import matplotlib.pyplot as plt
 import warnings
 import matplotlib.cbook
-from OrrSommerfeld_eig import OrrSommerfeld
+#from OrrSommerfeld_eig import OrrSommerfeld
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 from spectralDNS.utilities import reset_profile
 
@@ -202,7 +203,11 @@ def update(context):
 
     if params.tstep % params.sample_stats == 0:
         solver.stats(U)
-        
+     
+    #if params.tstep == 2:
+        #solver.fastest_timestep = 1e8
+        #solver.slowest_timestep = 0
+
     #if params.tstep == 1:
         #print "Reset profile"
         #reset_profile(profile)

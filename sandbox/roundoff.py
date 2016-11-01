@@ -2,8 +2,8 @@ from numpy import *
 from spectralDNS.shen.shentransform import ShenBiharmonicBasis, ShenDirichletBasis
 from spectralDNS.shen.la import Helmholtz, TDMA, Biharmonic
 
-nu = 1./1200.
-dt = 0.0001
+nu = 1./5200.
+dt = 0.00001
 
 #HelmholtzSolverG = Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST.quad, False),
 #BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0],
@@ -11,14 +11,14 @@ dt = 0.0001
                                     #solver="cython")
 
 N = array([64, 128, 256, 512, 1024, 2048, 4096])
-Z = array([0, 200, 5600])
+Z = array([0, 200, 1800, 5400])
 M = 100
 
 print "\hline"
 print "z & " + " & ".join([str(n) for n in N]) + " \\\ "
 print "\hline"
 for z in Z:
-    err = str(z) + " & "
+    err = str(z) 
     for n in N:
         errb = 0
         vb = zeros(n)
@@ -30,13 +30,13 @@ for z in Z:
             vb = BH.matvec(u, vb)
             sb = BH(sb, vb)
             errb += max(abs(sb-u)) / max(abs(u))
-        err += "{:2.2e} & ".format(errb/M)
+        err += " & {:2.2e} ".format(errb/M)
     err += " \\\ "
     print err
 
 print "\hline"        
 for z in Z:
-    err = str(z) + " & "
+    err = str(z)
     for n in N:
         errh = 0
         vh = zeros(n)
@@ -49,7 +49,7 @@ for z in Z:
             vh = HS.matvec(u, vh)
             sh = HS(sh, vh)
             errh += max(abs(sh-u)) / max(abs(u))
-        err += "{:2.2e} & ".format(errh/M)
+        err += " & {:2.2e} ".format(errh/M)
     err += " \\\ "
     print err
 

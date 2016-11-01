@@ -1,6 +1,8 @@
-from numpy import array, pi, log, arange
+import pyfftw
 from MKM import config, get_solver, solve, initialize, set_Source
+from numpy import array, pi, log, arange
 from mpi4py import MPI
+import collections
 
 comm = MPI.COMM_WORLD
 
@@ -16,7 +18,8 @@ config.update(
     'L': [2, 2*pi, pi],
     'optimization': 'cython',
     'make_profile': 1,
-    'dealias': '3/2-rule',
+    'dealias': '2/3-rule',
+    'planner_effort': collections.defaultdict(lambda: 'FFTW_MEASURE'),
     'M': [5, 5, 5]
     },  "channel"
 )
@@ -26,7 +29,7 @@ params = config.params
 
 t = []
 for n in N:
-    params.M = [n, 4, 4]
+    params.M = [n, 5, 5]
     context = solver.get_context()
     initialize(solver, context)
     params.t = 0

@@ -1,7 +1,9 @@
 """Orr-Sommerfeld"""
+import pyfftw  # Hack because of https://github.com/pyFFTW/pyFFTW/issues/40
 from spectralDNS import config, get_solver, solve
 from OrrSommerfeld_eig import OrrSommerfeld
-from numpy import dot, real, pi, cos, vstack, flipud, hstack, floor, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose
+from numpy import dot, real, pi, cos, vstack, flipud, hstack, floor, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose, inf
+from numpy.linalg import norm
 from mpiFFT4py import dct
 from scipy.fftpack import ifft
 import warnings
@@ -133,7 +135,8 @@ def update(context):
         #X[:] = FST.get_local_mesh(ST)
         
         if solver.rank == 0:
-            print "Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2))
+            #print "Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2))
+            print "Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(sum(pert)))
 
 def regression_test(context):
     global OS, e0
@@ -156,7 +159,7 @@ def refinement_test(context):
     e1 = 0.5*c.FST.dx(pert, c.ST.quad)
     exact = exp(2*imag(OS.eigval)*params.t)
     #if solver.rank == 0:
-        #print "Computed error = %2.8e %2.8e " %(sqrt(abs(e1/e0-exact)), params.dt)
+        #print "Computed error = %2.8e %2.8e " %((abs(e1/e0-exact)), params.dt)
         
     c.U0[:] = 0
     initOS(OS, c.U0, c.X, t=params.t)

@@ -7,8 +7,8 @@ nu = 1./1200.
 dt = 0.0001
 
 
-N = array([64, 128, 256, 512, 1024])  #, 2048, 4096, 8192
-M = 10
+N = array([64, 128, 256, 512, 1024, 2048, 4096, 8192])
+M = 5
 
 Z = array([0, 64, 64])
 ky, kz = (fft.fftfreq(Z[1], 1./Z[1]),
@@ -25,7 +25,7 @@ t22 = 1
 print "\hline"
 print "Nx & Biharmonic & Helmholtz \\\ "
 print "\hline"
-@profile
+#@profile
 def main():
     for n in N:
         err = str(n)
