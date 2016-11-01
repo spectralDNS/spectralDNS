@@ -16,6 +16,7 @@ requirements:
     - numpy
     - hdf5-parallel
     - h5py-parallel
+    - pyfftw
 
   run:
     - python
@@ -26,6 +27,7 @@ requirements:
     - mpifft4py
     - sympy
     - nodepy
+    - pyfftw
 
 test:
     requires:

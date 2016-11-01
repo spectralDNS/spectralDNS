@@ -24,7 +24,7 @@ dependencies:
     - conda config --add channels spectralDNS
     - conda update -q conda
     - conda info -a
-    - conda install -y mpi4py scipy pytest cython mpifft4py sympy h5py-parallel nodepy conda-build
+    - conda install -y pyfftw mpi4py scipy pytest cython mpifft4py sympy h5py-parallel nodepy conda-build
 
 ## Customize test commands
 test:
