@@ -20,6 +20,7 @@ install:
     - conda update -q conda
     # Useful for debugging any issues with conda
     - conda info -a
+    #- conda config --add channels conda-forge
     - conda config --add channels spectralDNS
     - conda create -q -n test-environment mpi4py scipy pytest cython mpifft4py sympy h5py-parallel nodepy
     - source activate test-environment
