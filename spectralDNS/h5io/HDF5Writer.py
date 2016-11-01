@@ -59,7 +59,6 @@ try:
                 self.f["3D/mesh/"+key][:] = val
 
         def update(self, params, **kw):
-            #from IPython import embed; embed()
             if (self.check_if_write(params) or 
                   params.tstep % params.checkpoint == 0):
                 self.update_components(**kw)
@@ -128,9 +127,10 @@ try:
                         self.f["3D/checkpoint/{}/0".format(key)][:, s[0], s[1], s[2]] = val
             
             # For channel solver with dynamic pressure
-            z0 = kw['Sk'][1,0,0,0].real
-            z0 = FFT.comm.bcast(z0)
-            self.f.attrs["Sk"] = z0
+            if 'Sk' in kw:
+                z0 = kw['Sk'][1,0,0,0].real
+                z0 = FFT.comm.bcast(z0)
+                self.f.attrs["Sk"] = z0
             self.f.close()
 
         def _write(self, params, **kw):
@@ -186,9 +186,11 @@ try:
                         self.f["2D/xy/%s/%d"%(comp, params.tstep)][s[0], s[1]] = val[:, :, k]
 
             # For channel solver with dynamic pressure
-            z0 = kw['Sk'][1,0,0,0].real
-            z0 = FFT.comm.bcast(z0)
-            self.f.attrs["Sk"] = z0
+            if 'Sk' in kw:
+                z0 = kw['Sk'][1,0,0,0].real
+                z0 = FFT.comm.bcast(z0)
+                self.f.attrs["Sk"] = z0
+
             self.f.close()
 
         def update_components(self, **kw):
