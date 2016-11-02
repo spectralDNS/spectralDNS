@@ -2,7 +2,7 @@ import pytest
 from spectralDNS import config, get_solver, solve
 from OrrSommerfeld import initialize, regression_test, set_Source, pi
 
-@pytest.fixture(params=('KMM', 'IPCS', 'IPCSR', 'KMMRK3'))
+@pytest.fixture(params=('KMMRK3', 'KMM', 'IPCS', 'IPCSR'))
 def sol(request):
     """Check for uniform and non-uniform cube"""
     return request.param
