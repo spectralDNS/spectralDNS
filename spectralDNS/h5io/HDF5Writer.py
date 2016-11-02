@@ -126,11 +126,11 @@ try:
                     else:
                         self.f["3D/checkpoint/{}/0".format(key)][:, s[0], s[1], s[2]] = val
             
-            # For channel solver with dynamic pressure
-            if 'Sk' in kw:
-                z0 = kw['Sk'][1,0,0,0].real
-                z0 = FFT.comm.bcast(z0)
-                self.f.attrs["Sk"] = z0
+            ## For channel solver with dynamic pressure
+            #if 'Sk' in kw:
+                #z0 = kw['Sk'][1,0,0,0].real
+                #z0 = FFT.comm.bcast(z0)
+                #self.f.attrs["Sk"] = z0
             self.f.close()
 
         def _write(self, params, **kw):
@@ -185,11 +185,11 @@ try:
                     for comp, val in self.components.iteritems():
                         self.f["2D/xy/%s/%d"%(comp, params.tstep)][s[0], s[1]] = val[:, :, k]
 
-            # For channel solver with dynamic pressure
-            if 'Sk' in kw:
-                z0 = kw['Sk'][1,0,0,0].real
-                z0 = FFT.comm.bcast(z0)
-                self.f.attrs["Sk"] = z0
+            ## For channel solver with dynamic pressure
+            #if 'Sk' in kw:
+                #z0 = kw['Sk'][1,0,0,0].real
+                #z0 = FFT.comm.bcast(z0)
+                #self.f.attrs["Sk"] = z0
 
             self.f.close()
 
