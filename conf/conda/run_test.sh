@@ -1,2 +1,2 @@
-# cd $SRC_DIR/tests
-# py.test
+cd $SRC_DIR/tests
+py.test
