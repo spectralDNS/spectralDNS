@@ -32,11 +32,11 @@ def test_channel(sol):
     initialize(solver, context)
     solve(solver, context)
 
-    config.params.dealias_cheb = True
-    config.params.checkpoint = 5
-    config.params.write_result = 2
-    initialize(solver, context)
-    solve(solver, context)
+    #config.params.dealias_cheb = True
+    #config.params.checkpoint = 5
+    #config.params.write_result = 2
+    #initialize(solver, context)
+    #solve(solver, context)
 
 if __name__=='__main__':
     test_channel('KMM')
