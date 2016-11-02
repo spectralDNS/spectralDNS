@@ -2,7 +2,7 @@ import pytest
 from spectralDNS import config, get_solver, solve
 from OrrSommerfeld import initialize, regression_test, set_Source, pi
 
-@pytest.fixture(params=('KMM', 'KMMRK3', 'IPCS', 'IPCSR'))
+@pytest.fixture(params=('KMM', 'IPCS', 'IPCSR', 'KMMRK3'))
 def sol(request):
     """Check for uniform and non-uniform cube"""
     return request.param
@@ -32,11 +32,11 @@ def test_channel(sol):
     initialize(solver, context)
     solve(solver, context)
 
-    #config.params.dealias_cheb = True
-    #config.params.checkpoint = 5
-    #config.params.write_result = 2
-    #initialize(solver, context)
-    #solve(solver, context)
+    config.params.dealias_cheb = True
+    config.params.checkpoint = 5
+    config.params.write_result = 2
+    initialize(solver, context)
+    solve(solver, context)
 
 if __name__=='__main__':
     test_channel('KMM')
