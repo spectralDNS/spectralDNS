@@ -11,7 +11,7 @@ from Cython.Build import cythonize
 #define_macros=[('CYTHON_TRACE', '1')]
 
 # Version number
-major = 2
+major = 1
 minor = 0
 
 cwd = os.path.abspath(os.path.dirname(__file__))
