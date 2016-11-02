@@ -68,6 +68,16 @@ def get_context():
     b = (0.0, -17./60., -5./12.)
     
     print "M2"
+    HelmholtzSolverG = [Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[rk]+b[rk])/dt),
+                                ST.quad, False) for rk in range(3)],
+    print "M3"
+    BiharmonicSolverU = [Biharmonic(N[0], -nu*(a[rk]+b[rk])*dt/2., 1.+nu*(a[rk]+b[rk])*dt*K2[0],
+                                    -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)],
+    print "M4"
+    HelmholtzSolverU0 = [Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST.quad, False) for rk in range(3)],
+    print "M5"
+    TDMASolverD = TDMA(ST.quad, False)
+    print "M6"
     
     # Collect all linear algebra solvers
     # RK 3 requires three solvers because of the three different coefficients
