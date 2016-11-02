@@ -32,12 +32,12 @@ requirements:
     #- nodepy
     - pyfftw
 
-#test:
-  ##imports:
-    ##- spectralDNS
-    ##- nodepy
-    ##- mpiFFT4py
+test:
+  imports:
+    - spectralDNS
+    - nodepy
+    - mpiFFT4py
 
-  #requires:
-    #- python
-    #- pytest
+  requires:
+    - python
+    - pytest
