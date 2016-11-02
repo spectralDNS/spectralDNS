@@ -9,9 +9,13 @@ build:
   number: 14
 
 requirements:
+  commands:
+    - pip install --no-deps --no-binary :all: -r "${RECIPE_DIR}/component-requirements.txt"
+
   build:
     - toolchain #[osx]
     - python
+    - pip
     - cython
     - numpy
     - hdf5-parallel

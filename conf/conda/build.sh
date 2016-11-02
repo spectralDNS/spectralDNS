@@ -8,7 +8,5 @@ then
     export LDFLAGS="-Wl,-rpath,$PREFIX/lib"
 fi
 
-pip install --no-deps --no-binary :all: -r "${RECIPE_DIR}/component-requirements.txt"
-
 # $PYTHON setup.py install --prefix=$PREFIX
 pip install .
