@@ -9,7 +9,7 @@ from numpy import all
 from numpy.linalg import norm
 
 __all__ = ['HDF5Writer']
-import h5py
+
 try:
     import h5py
     class HDF5Writer(object):
