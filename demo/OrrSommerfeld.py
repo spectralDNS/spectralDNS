@@ -2,10 +2,8 @@
 import pyfftw  # Hack because of https://github.com/pyFFTW/pyFFTW/issues/40
 from spectralDNS import config, get_solver, solve
 from OrrSommerfeld_eig import OrrSommerfeld
-from numpy import dot, real, pi, cos, vstack, flipud, hstack, floor, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose, inf
-from numpy.linalg import norm
-from mpiFFT4py import dct
-from scipy.fftpack import ifft
+from numpy import dot, real, pi, cos, vstack, flipud, hstack, floor, exp, \
+    sum, zeros, arange, imag, sqrt, array, zeros_like, allclose, inf
 import warnings
 
 try:

@@ -25,8 +25,11 @@ dependencies:
     - conda update -q conda
     - conda info -a
     - conda install -y pyfftw mpi4py scipy pytest cython sympy h5py-parallel conda-build
+    - pip install git+https://github.com/spectralDNS/mpiFFT4py.git@master nodepy
+    - python setup.py install
 
 ## Customize test commands
 test:
   override:
-    - conda build conf/conda
+    - cd $PWD/tests; python test_channel.py
+    #- conda build conf/conda
