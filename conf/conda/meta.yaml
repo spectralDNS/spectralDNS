@@ -34,9 +34,9 @@ requirements:
 
 test:
   imports:
-    - mpiFFT4py
-    - nodepy
     - spectralDNS
+    - nodepy
+    - mpiFFT4py
 
   requires:
     - python
