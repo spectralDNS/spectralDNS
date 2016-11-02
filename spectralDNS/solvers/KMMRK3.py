@@ -43,6 +43,8 @@ def get_context():
     
     # primary variable
     u = (U_hat, g)
+    
+    nu, dt, N = params.nu, params.dt, params.N
 
     H_hat  = zeros((3,)+FST.complex_shape(), dtype=complex)
     H_hat0 = zeros((3,)+FST.complex_shape(), dtype=complex)
@@ -58,7 +60,6 @@ def get_context():
 
     work = work_arrays()
     
-    nu, dt, N = params.nu, params.dt, params.N
     K4 = K2**2
     kx = K[0, :, 0, 0]
     
