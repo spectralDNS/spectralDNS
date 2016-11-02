@@ -27,9 +27,7 @@ requirements:
     - h5py-parallel
     - mpi4py
     - scipy
-    #- mpifft4py
     - sympy
-    #- nodepy
     - pyfftw
 
 test:
