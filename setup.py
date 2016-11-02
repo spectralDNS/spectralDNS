@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import os, sys, platform
-#from setuptools import setup, Extension
 from distutils.core import setup, Extension
 import subprocess
 from numpy import get_include

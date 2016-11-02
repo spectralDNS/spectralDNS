@@ -197,7 +197,7 @@ class PDMA(object):
 
 class Biharmonic(object):
 
-    def __init__(self, N, a0, alfa, beta, quad="GL", solver="scipy"):
+    def __init__(self, N, a0, alfa, beta, quad="GL", solver="cython"):
         self.quad = quad
         self.solver = solver
         k = arange(N)
