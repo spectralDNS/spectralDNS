@@ -25,7 +25,7 @@ install:
     - conda create -q -n test-environment pip pyfftw mpi4py scipy pytest cython sympy h5py-parallel
     - source activate test-environment
     - pip install git+https://github.com/spectralDNS/mpiFFT4py.git@master nodepy
-    - python setup.py install
+    - pip install .
     
 script: cd $PWD/tests; python test_channel.py; py.test -v
 
