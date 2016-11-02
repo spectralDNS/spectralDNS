@@ -51,8 +51,8 @@ def get_context():
     H_hat1 = zeros((3,)+FST.complex_shape(), dtype=complex)
 
     dU = zeros((3,)+FST.complex_shape(), dtype=complex)
-    hv = zeros((2,)+FST.complex_shape(), dtype=complex),
-    hg = zeros((2,)+FST.complex_shape(), dtype=complex),
+    hv = zeros((2,)+FST.complex_shape(), dtype=complex)
+    hg = zeros((2,)+FST.complex_shape(), dtype=complex)
     h1 = zeros((2, 2, N[0]), dtype=complex)
     
     Source = zeros((3,)+FST.real_shape(), dtype=float)
@@ -62,6 +62,10 @@ def get_context():
     
     K4 = K2**2
     kx = K[0, :, 0, 0]
+
+    # RK parameters
+    a = (8./15., 5./12., 3./4.)
+    b = (0.0, -17./60., -5./12.)
     
     # Collect all linear algebra solvers
     # RK 3 requires three solvers because of the three different coefficients
@@ -100,10 +104,7 @@ def get_context():
                          chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
                          filename=params.solver+".h5",
                          mesh={"x": x0, "y": x1, "z": x2})
-    
-    # RK parameters
-    a = (8./15., 5./12., 3./4.)
-    b = (0.0, -17./60., -5./12.)
+    del rk
     return config.AttributeDict(locals())
 
 
