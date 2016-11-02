@@ -30,13 +30,7 @@ def get_context():
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
     K = FST.get_scaled_local_wavenumbermesh()
-    
-    # Remove oddball Nyquist
-    #K[1, :, -params.N[1]/2, 0] = 0
-    #K[1, :, -params.N[1]/2, -1] = 0
-    #K[2, :, 0, -1] = 0
-    #K[2, :, -params.N[1]/2, -1] = 0
-    
+        
     K2 = K[1]*K[1]+K[2]*K[2]
     K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)
 
@@ -55,9 +49,9 @@ def get_context():
     H_hat1 = zeros((3,)+FST.complex_shape(), dtype=complex)
 
     dU = zeros((3,)+FST.complex_shape(), dtype=complex)
-    hv = zeros((2,)+d.FST.complex_shape(), dtype=complex),
-    hg = zeros((2,)+d.FST.complex_shape(), dtype=complex),
-    h1 = zeros((2, 2, N[0]), dtype=d.complex)
+    hv = zeros((2,)+FST.complex_shape(), dtype=complex),
+    hg = zeros((2,)+FST.complex_shape(), dtype=complex),
+    h1 = zeros((2, 2, N[0]), dtype=complex)
     
     Source = zeros((3,)+FST.real_shape(), dtype=float)
     Sk = zeros((3,)+FST.complex_shape(), dtype=complex)
@@ -71,11 +65,11 @@ def get_context():
     # Collect all linear algebra solvers
     # RK 3 requires three solvers because of the three different coefficients
     la = config.AttributeDict(dict(
-        HelmholtzSolverG = [Helmholtz(N[0], np.sqrt(d.K[1, 0]**2+d.K[2, 0]**2+2.0/nu/(a[rk]+b[rk])/dt),
-                                    d.ST.quad, False) for rk in range(3)],
-        BiharmonicSolverU = [Biharmonic(N[0], -nu*(a[rk]+b[rk])*dt/2., 1.+nu*(a[rk]+b[rk])*dt*d.K2[0],
-                                        -(d.K2[0] + nu*(a[rk]+b[rk])*dt/2.*d.K4[0]), d.SB.quad) for rk in range(3)],
-        HelmholtzSolverU0 = [Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), d.ST.quad, False) for rk in range(3)],
+        HelmholtzSolverG = [Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[rk]+b[rk])/dt),
+                                    ST.quad, False) for rk in range(3)],
+        BiharmonicSolverU = [Biharmonic(N[0], -nu*(a[rk]+b[rk])*dt/2., 1.+nu*(a[rk]+b[rk])*dt*K2[0],
+                                        -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)],
+        HelmholtzSolverU0 = [Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST.quad, False) for rk in range(3)],
         TDMASolverD = TDMA(ST.quad, False)
         )
     )
@@ -84,9 +78,9 @@ def get_context():
     # Collect all matrices
     mat = config.AttributeDict(dict(
         CDD = CDDmat(kx),
-        AC = [BiharmonicCoeff(d.K[0, :, 0, 0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*d.K2[0]),
-                            -(d.K2[0] - nu*(a[rk]+b[rk])*dt/2.*d.K4[0]), d.SB.quad) for rk in range(3)],
-        AB = [HelmholtzCoeff(d.K[0, :, 0, 0], -1.0, -(d.K2[0] - 2.0/nu/dt/(a[rk]+b[rk])), d.ST.quad) for rk in range(3)],
+        AC = [BiharmonicCoeff(K[0, :, 0, 0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2[0]),
+                            -(K2[0] - nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)],
+        AB = [HelmholtzCoeff(K[0, :, 0, 0], -1.0, -(K2[0] - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)],
 
         # Matrices for biharmonic equation
         CBD = CBDmat(kx),
