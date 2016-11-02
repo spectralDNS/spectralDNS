@@ -5,9 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from KMM import *
 
-#get_context_KMM = get_context
 def get_context():
-    #d = get_context_KMM()
     # Get points and weights for Chebyshev weighted integrals
     ST = ShenDirichletBasis(quad=params.Dquad, threads=params.threads,
                             planner_effort=params.planner_effort["dct"])
@@ -106,7 +104,6 @@ def get_context():
                          mesh={"x": x0, "y": x1, "z": x2})
     del rk
     return config.AttributeDict(locals())
-
 
 @optimizer
 def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
