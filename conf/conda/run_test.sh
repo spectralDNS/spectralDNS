@@ -1,2 +1,2 @@
 cd $SRC_DIR/tests
-py.test -v
+python test_channel.py
