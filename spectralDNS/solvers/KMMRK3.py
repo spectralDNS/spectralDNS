@@ -16,13 +16,11 @@ def get_context():
     Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
     u_slice = slice(0, Nu)
     v_slice = slice(0, Nb)
-    print "M0"
 
     FST = SlabShen_R2C(params.N, params.L, comm, threads=params.threads,
                        communication=params.communication,
                        planner_effort=params.planner_effort,
                        dealias_cheb=params.dealias_cheb)
-    print "M1"
 
     float, complex, mpitype = datatypes("double")
 
@@ -66,31 +64,18 @@ def get_context():
     # RK parameters
     a = (8./15., 5./12., 3./4.)
     b = (0.0, -17./60., -5./12.)
-    
-    print "M2"
-    HelmholtzSolverG = [Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[rk]+b[rk])/dt),
-                                ST.quad, False) for rk in range(3)],
-    print "M3"
-    BiharmonicSolverU = [Biharmonic(N[0], -nu*(a[rk]+b[rk])*dt/2., 1.+nu*(a[rk]+b[rk])*dt*K2[0],
-                                    -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)],
-    print "M4"
-    HelmholtzSolverU0 = [Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST.quad, False) for rk in range(3)],
-    print "M5"
-    TDMASolverD = TDMA(ST.quad, False)
-    print "M6"
-    
+        
     # Collect all linear algebra solvers
     # RK 3 requires three solvers because of the three different coefficients
     la = config.AttributeDict(dict(
         HelmholtzSolverG = [Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[rk]+b[rk])/dt),
                                     ST.quad, False) for rk in range(3)],
         BiharmonicSolverU = [Biharmonic(N[0], -nu*(a[rk]+b[rk])*dt/2., 1.+nu*(a[rk]+b[rk])*dt*K2[0],
-                                        -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)],
+                                        -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad, solver="cython") for rk in range(3)],
         HelmholtzSolverU0 = [Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST.quad, False) for rk in range(3)],
         TDMASolverD = TDMA(ST.quad, False)
         )
     )
-    print "M3"
 
     alfa = K2[0] - 2.0/nu/dt
     # Collect all matrices
@@ -112,13 +97,11 @@ def get_context():
         CDB = CDBmat(kx)
         )
     )
-    print "M4"
 
     hdf5file = KMMWriter({"U":U[0], "V":U[1], "W":U[2]},
                          chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
                          filename=params.solver+".h5",
                          mesh={"x": x0, "y": x1, "z": x2})
-    print "M5"
 
     del rk
     return config.AttributeDict(locals())
