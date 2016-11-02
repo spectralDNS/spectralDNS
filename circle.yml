@@ -20,7 +20,7 @@ dependencies:
           echo "Using cached Miniconda install";
       fi
     - conda config --set always_yes yes
-    - conda config --add channels conda-forge
+    #- conda config --add channels conda-forge
     - conda config --add channels spectralDNS
     - conda update -q conda
     - conda info -a

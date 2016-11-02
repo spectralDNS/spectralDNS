@@ -24,12 +24,18 @@ requirements:
     - hdf5-parallel
     - h5py-parallel
     - mpi4py
-    - mpifft4py
+    - scipy
+    #- mpifft4py
     - sympy
-    - nodepy
+    #- nodepy
     - pyfftw
 
 test:
-    requires:
-      - python
-      - pytest
+  imports:
+    - mpiFFT4py
+    - nodepy
+    - spectralDNS
+
+  requires:
+    - python
+    - pytest
