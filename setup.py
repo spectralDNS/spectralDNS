@@ -23,13 +23,13 @@ ext = None
 cmdclass = {}
 class build_ext_subclass(build_ext):
     def build_extensions(self):
-        extra_compile_args = ['-w', '-Ofast']
+        extra_compile_args = ['-w', '-O']
         cmd = "echo | %s -E - %s &>/dev/null" % (
             self.compiler.compiler[0], " ".join(extra_compile_args))
         try:
             subprocess.check_call(cmd, shell=True)
         except:
-            extra_compile_args = ['-w', '-O3']
+            extra_compile_args = ['-w', '-O1']
         for e in self.extensions:
             e.extra_compile_args = extra_compile_args
         build_ext.build_extensions(self)
