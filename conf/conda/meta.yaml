@@ -33,10 +33,10 @@ requirements:
     - pyfftw
 
 test:
-  imports:
-    - spectralDNS
-    - nodepy
-    - mpiFFT4py
+  #imports:
+    #- spectralDNS
+    #- nodepy
+    #- mpiFFT4py
 
   requires:
     - python
