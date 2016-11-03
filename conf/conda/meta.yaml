@@ -6,23 +6,20 @@ source:
   git_url: ../../  
   
 build:
-  number: 15
+  number: 17
 
 requirements:
 
   build:
-    - toolchain #[osx]
+    - toolchain  # [osx]
     - python
-    - pip
     - cython
     - numpy
-    - hdf5-parallel
-    - h5py-parallel
-    - pyfftw
 
   run:
     - python
     - numpy
+    - cython
     - hdf5-parallel
     - h5py-parallel
     - mpi4py

@@ -2,32 +2,39 @@
 
 language: python
 
-python:
-    - 2.7
-    
-branches:
-  only:
-    - master
+matrix:
+    include:
+        - os: osx
+          language: generic
+          osx_image: xcode7.2
+          env: TOXENV=py27
+        - os: osx
+          osx_image: xcode7.2
+          language: generic
+          env: TOXENV=py32
 
-sudo: false
+before_install:
+    # Remove homebrew.
+    - brew remove --force $(brew list)
+    - brew cleanup -s
+    - rm -rf $(brew --cache)
 
 install:
-    - wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
-    - bash miniconda.sh -b -p $HOME/miniconda
-    - export PATH="$HOME/miniconda/bin:$PATH"
-    - hash -r
-    - conda config --set always_yes yes
-    - conda update -q conda
-    # Useful for debugging any issues with conda
-    - conda info -a
-    - conda config --add channels conda-forge
-    - conda config --add channels spectralDNS
-    - conda create -q -n test-environment pip pyfftw mpi4py scipy pytest cython sympy h5py-parallel
-    - source activate test-environment
-    - pip install git+https://github.com/spectralDNS/mpiFFT4py.git@master nodepy
-    - python setup.py install
-    
-script: cd $PWD/tests; py.test -v
+    - |
+      MINICONDA_URL="https://repo.continuum.io/miniconda"
+      MINICONDA_FILE="Miniconda3-latest-MacOSX-x86_64.sh"
+      curl -L -O "${MINICONDA_URL}/${MINICONDA_FILE}"
+      bash $MINICONDA_FILE -b
+      source /Users/travis/miniconda3/bin/activate root
+      conda config --add channels conda-forge
+      conda config --add channels spectralDNS
+      conda config --add channels mpi4py        # Using this since conda-forge's mpich pulls in libgcc 
+      conda config --set show_channel_urls true
+      conda config --set always_yes yes
+      conda install conda-build
+      conda create -q -n test-environment pip pyfftw mpi4py scipy pytest cython sympy h5py-parallel
+      source activate test-environment
+      #pip install git+https://github.com/spectralDNS/mpiFFT4py.git@master nodepy
 
-#notifications:
-#  email: false
+script:
+  - conda build conf/conda

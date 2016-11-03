@@ -82,7 +82,7 @@ def solve(solver, context):
 
     dt_in = params.dt
 
-    while params.t + params.dt <= params.T+1e-15:
+    while params.t + params.dt <= params.T+1e-12:
 
         u, params.dt, dt_took = integrate()
 
