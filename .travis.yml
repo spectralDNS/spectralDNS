@@ -1,17 +1,14 @@
 # http://travis-ci.org/spectralDNS/spectralDNS
 
-language: python
+language: generic
 
-matrix:
-    include:
-        - os: osx
-          language: generic
-          osx_image: xcode7.2
-          env: TOXENV=py27
-        - os: osx
-          osx_image: xcode7.2
-          language: generic
-          env: TOXENV=py32
+os: osx
+osx_image: xcode7.2
+
+env:
+  matrix:    
+    - CONDA_PY=27
+    - CONDA_PY=34
 
 before_install:
     # Remove homebrew.
