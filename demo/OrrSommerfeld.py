@@ -135,8 +135,8 @@ def update(context):
         #X[:] = FST.get_local_mesh(ST)
         
         if solver.rank == 0:
-            #print "Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2))
-            print "Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(sum(pert)))
+            #print("Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2)))
+            print("Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(sum(pert))))
 
 def regression_test(context):
     global OS, e0
@@ -159,14 +159,14 @@ def refinement_test(context):
     e1 = 0.5*c.FST.dx(pert, c.ST.quad)
     exact = exp(2*imag(OS.eigval)*params.t)
     #if solver.rank == 0:
-        #print "Computed error = %2.8e %2.8e " %((abs(e1/e0-exact)), params.dt)
+        #print("Computed error = %2.8e %2.8e " %((abs(e1/e0-exact)), params.dt))
         
     c.U0[:] = 0
     initOS(OS, c.U0, c.X, t=params.t)
     pert = (U[0] - c.U0[0])**2 + (U[1]-c.U0[1])**2
     e2 = 0.5*c.FST.dx(pert, c.ST.quad)
     if solver.rank == 0:
-        print "Computed error = %2.8e %2.8e " %(sqrt(abs(e2)), params.dt)
+        print("Computed error = %2.8e %2.8e " %(sqrt(abs(e2)), params.dt))
         
 if __name__ == "__main__":
     config.update(

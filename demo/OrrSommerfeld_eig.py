@@ -14,6 +14,7 @@ from scipy.special import orthogonal
 from numpy.polynomial import chebyshev as n_cheb
 from scipy.sparse.linalg import LinearOperator
 from scipy.sparse import diags
+import six
 import warnings
 seterr(divide='ignore')
 
@@ -44,7 +45,7 @@ class OrrSommerfeld(object):
                   'eigval':1,
                   'order':None}
         self.par.update(**kwargs)
-        [setattr(self, name, val) for name, val in self.par.iteritems()]
+        [setattr(self, name, val) for name, val in six.iteritems(self.par)]
         if(self.order == None):
             self.order = self.N
         self.y = -cos(arange(self.N)*1./(self.N - 1.)*pi)
@@ -62,13 +63,13 @@ class OrrSommerfeld(object):
         self.S = self.S*1./(1. - hstack((0, self.y[1:-1], 0))**2)
         self.S[0, 0]=0
         self.S[-1, -1]=0
-        print 'Solving the Orr-Sommerfeld eigenvalue problem...'
-        print 'Re = ', self.par['Re'], ' and alfa = ', self.par['alfa']
+        print('Solving the Orr-Sommerfeld eigenvalue problem...')
+        print('Re = ', self.par['Re'], ' and alfa = ', self.par['alfa'])
         self.eigvals, self.eigvectors = self.solve()
         self.nx = [argpartition(imag(self.eigvals), -1)[-self.par['eigval']]]
         self.eigval = self.eigvals[self.nx][0]
         #print 'Least stable eigenvalue = ', self.eigval
-        print 'Eigenvalue = ', self.eigval
+        print('Eigenvalue = ', self.eigval)
         self.create_interpolation_arrays()
         
     def create_interpolation_arrays(self):
@@ -249,7 +250,7 @@ class OrrSommerfeldShen(object):
                   'N':20,
                   'order':None}
         self.par.update(**kwargs)
-        [setattr(self, name, val) for name, val in self.par.iteritems()]
+        [setattr(self, name, val) for name, val in six.iteritems(self.par)]
         
     def assemble(self):
         k = arange(self.N).astype(float)
@@ -284,11 +285,11 @@ def ploteig(an,ev,nd=20):
     return x, v
 
 if __name__=='__main__':
-    print 'Solving the Orr-Sommerfeld eigenvalue problem...'
+    print('Solving the Orr-Sommerfeld eigenvalue problem...')
     # This needs to be solved with relatively high resolution
     z = OrrSommerfeld(N=60, Re=8000., alfa=1.0)
     sol = z.solve()
     nx = find(imag(sol[0]) > 0)
     eigval = sol[0][nx] # Eigenvalue of least stable mode
     eigv = sol[1][:, nx[-1]]
-    print 'Least stable eigenvalue = ',eigval	
+    print('Least stable eigenvalue = ', eigval)

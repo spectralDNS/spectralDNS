@@ -30,7 +30,7 @@ class build_ext_subclass(build_ext):
         except:
             extra_compile_args = ['-w', '-O3']
         for e in self.extensions:
-            e.extra_compile_args = extra_compile_args
+            e.extra_compile_args += extra_compile_args
         build_ext.build_extensions(self)
 
 args = ""
@@ -43,9 +43,10 @@ if not "sdist" in sys.argv:
     ext = []
     for s in ("LUsolve", "TDMA", "PDMA", "Matvec"):
         ext += cythonize(Extension("spectralDNS.shen.{0}".format(s),
-                                   sources = [os.path.join(sdir, '{0}.pyx'.format(s))],
+                                   sources=[os.path.join(sdir, '{0}.pyx'.format(s))],
                                    language="c++"))
-        
+    [e.extra_link_args.extend(["-std=c++11"]) for e in ext]
+    
     for s in ("Cheb", "HelmholtzMHD"):
         ext += cythonize(Extension("spectralDNS.shen.{0}".format(s),
                                    sources = [os.path.join(sdir, '{0}.pyx'.format(s))]))

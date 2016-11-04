@@ -1,6 +1,6 @@
 from numpy import zeros, ones, arange, pi, float, complex, int, complex128, array
-from Matrices import BBBmat, SBBmat, ABBmat, BDDmat, BNNmat, ADDmat
-import SFTc
+from .Matrices import BBBmat, SBBmat, ABBmat, BDDmat, BNNmat, ADDmat
+from . import SFTc
 from scipy.linalg import lu_factor, lu_solve, solve, solve_banded, decomp_cholesky
 import scipy.sparse.linalg as la_solve
 import decimal

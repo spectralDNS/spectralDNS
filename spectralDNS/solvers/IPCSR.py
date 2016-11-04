@@ -3,7 +3,7 @@ __date__ = "2015-10-29"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from IPCS import *
+from .IPCS import *
 from ..shen.Matrices import CDTmat, CTDmat, BDTmat, BTDmat, BTTmat, BTNmat, CNDmat, BNDmat
 
 get_context_IPCS = get_context

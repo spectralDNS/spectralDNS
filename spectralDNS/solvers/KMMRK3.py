@@ -3,7 +3,7 @@ __date__ = "2015-10-29"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from KMM import *
+from .KMM import *
 
 def get_context():
     # Get points and weights for Chebyshev weighted integrals
@@ -67,6 +67,7 @@ def get_context():
     
     # Collect all linear algebra solvers
     # RK 3 requires three solvers because of the three different coefficients
+    rk = 0
     la = config.AttributeDict(dict(
         HelmholtzSolverG = [Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/(a[rk]+b[rk])/dt),
                                     ST.quad, False) for rk in range(3)],
@@ -97,12 +98,13 @@ def get_context():
         CDB = CDBmat(kx)
         )
     )
+    del rk
     
     hdf5file = KMMWriter({"U":U[0], "V":U[1], "W":U[2]},
                          chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
                          filename=params.solver+".h5",
                          mesh={"x": x0, "y": x1, "z": x2})
-    del rk
+
     return config.AttributeDict(locals())
 
 @optimizer

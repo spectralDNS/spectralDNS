@@ -442,12 +442,12 @@ def integrate(u_hat, p_hat, rhs, dt, solver, context):
         # Pressure correction
         p_hat, p_corr = solver.solve_pressure_correction(p_hat, u_hat, solver, **context)
 
-        comm.Allreduce(np.linalg.norm(p_corr), pressure_error)
+        comm.Allreduce([np.linalg.norm(p_corr), MPI.DOUBLE], pressure_error)
         if jj == 0 and params.print_divergence_progress and rank == 0:
-            print "   Divergence error"
+            print("   Divergence error")
         if params.print_divergence_progress:
             if rank == 0:                
-                print "         Pressure correction norm %6d  %2.6e" %(jj, pressure_error[0])
+                print("         Pressure correction norm %6d  %2.6e" %(jj, pressure_error[0]))
         if pressure_error[0] < params.divergence_tol:
             break
             

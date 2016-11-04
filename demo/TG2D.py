@@ -46,7 +46,7 @@ def regression_test(context):
     U[1] = sin(context.X[0])*cos(context.X[1])*exp(-2*params.nu*params.t)
     ke = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
     if solver.rank == 0:
-        print "Error", k-ke
+        print("Error {}".format(k-ke))
         assert round(k - ke, params.ntol) == 0
 
 if __name__ == '__main__':

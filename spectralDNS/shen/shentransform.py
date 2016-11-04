@@ -4,7 +4,7 @@ from numpy import array, zeros_like, sum, hstack, meshgrid, abs, pi, uint8, \
 from numpy.polynomial import chebyshev as n_cheb
 from mpiFFT4py import dct, work_arrays, Slab_R2C, fftfreq, rfftfreq, rfft2, \
     irfft2, rfft, irfft, fft, ifft
-import SFTc
+from . import SFTc
 import scipy.sparse.linalg as la
 from ..shen.la import TDMA, PDMA
 from ..shen.Matrices import BBBmat

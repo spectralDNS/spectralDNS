@@ -40,4 +40,3 @@ def test_channel(sol):
 
 if __name__=='__main__':
     test_channel('KMMRK3')
-    test_channel('KMM')

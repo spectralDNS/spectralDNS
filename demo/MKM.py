@@ -66,7 +66,7 @@ def initialize(solver, context):
     #solver.comm.Bcast(flux)
     
     if solver.rank == 0:
-        print "Flux", flux[0]
+        print("Flux {}".format(flux[0]))
     
     if not params.solver in ("KMM", "KMMRK3"):
         P_hat = solver.compute_pressure(**context)
@@ -153,8 +153,8 @@ def update(context):
         #Sk[i] = FST.fss(Source[i], Sk[i], ST)
         
     if params.tstep % params.print_energy0 == 0 and solver.rank == 0:        
-        print (c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 2))
-        print (c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 1))
+        print(c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 2))
+        print(c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 1))
         
     if (params.tstep % params.compute_energy == 0 or 
         params.tstep % params.plot_result == 0 and params.plot_result > 0 or
@@ -199,7 +199,7 @@ def update(context):
         e2 = c.FST.dx(U[2]*U[2], c.ST.quad)
         q = c.FST.dx(U[1], c.ST.quad)
         if solver.rank == 0:
-            print "Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.6e Q %2.6e %2.6e %2.6e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, c.Sk[1,0,0,0], flux[0]/beta[0]-1)
+            print("Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.6e Q %2.6e %2.6e %2.6e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, c.Sk[1,0,0,0], flux[0]/beta[0]-1))
 
     if params.tstep % params.sample_stats == 0:
         solver.stats(U)

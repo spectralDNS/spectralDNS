@@ -67,13 +67,13 @@ def update(context):
         im2.autoscale()
         plt.pause(1e-6)
         if solver.rank == 0:
-            print params.tstep
+            print(params.tstep)
 
     if params.tstep % params.compute_energy == 0:
         U = solver.get_velocity(**context)
         kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
         if solver.rank == 0:
-            print params.tstep, kk
+            print(params.tstep, kk)
 
 if __name__ == "__main__":
     config.update(

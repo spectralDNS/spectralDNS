@@ -66,7 +66,7 @@ def update(context):
         im2.autoscale()
         plt.pause(1e-6)
     
-    print "Time = ", params.t
+    print("Time = ", params.t)
     
 def regression_test(context):
     global im

@@ -1,8 +1,9 @@
+#cython: boundscheck=False
+#cython: wraparound=False
+
 import numpy as np
 cimport cython
 cimport numpy as np
-#cython: boundscheck=False
-#cython: wraparound=False
 from libcpp.vector cimport vector
 
 ctypedef np.complex128_t complex_t

@@ -89,7 +89,7 @@ def update(context):
             u_exact = exact(x0, params.Re, params.t)
             #print u_exact-uall
             #u_exact = reference(params.Re, params.t)
-            print "Time %2.5f Error %2.12e " %(params.t, sqrt(sum((u_exact-uall)**2)/params.N[0]))
+            print("Time %2.5f Error %2.12e " %(params.t, sqrt(sum((u_exact-uall)**2)/params.N[0])))
 
 def regression_test(context):
     params = config.params

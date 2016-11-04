@@ -60,7 +60,7 @@ def update(context):
         im2.autoscale()
         plt.pause(1e-6)
         if solver.rank == 0:
-            print params.tstep            
+            print(params.tstep)
 
 if __name__ == "__main__":
     config.update(
