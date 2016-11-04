@@ -1,3 +1,4 @@
+from __future__ import print_function
 from spectralDNS import config, get_solver, solve
 from numpy import array, pi, zeros, sum, float64, sin, cos
 from numpy.linalg import norm
@@ -128,7 +129,7 @@ if __name__ == "__main__":
     )
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=2)
     config.triplyperiodic.add_argument("--plot_step", type=int, default=2)
-    sol = get_solver(regression_test=regression_test,
+    sol = get_solver(update=update, regression_test=regression_test,
                      mesh="triplyperiodic")
 
     context = sol.get_context()

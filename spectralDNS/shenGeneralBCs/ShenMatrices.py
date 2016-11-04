@@ -38,7 +38,7 @@ class B_matrix(object):
         if len(v.shape) > 1:
             B_matvec1(self.uud, self.ud, self.lld, self.ld, self.dd, v, c)
         else:
-	    c[:(N-1)]  = self.uud*v[2:]
+            c[:(N-1)]  = self.uud*v[2:]
             c[:N]     += self.ud*v[1:]
             c[:]      += self.dd*v[:]
             c[1:]     += self.ld*v[:N]

@@ -72,9 +72,9 @@ def wavenumbers(N):
 
 def chebNormalizationFactor(N, quad):
     if quad == "GC":
-	ck = ones(N[0]-2); ck[0] = 2
+        ck = ones(N[0]-2); ck[0] = 2
     elif quad == "GL":
-	ck = ones(N[0]-2); ck[0] = 2; ck[-1] = 2
+        ck = ones(N[0]-2); ck[0] = 2; ck[-1] = 2
     return ck
 
 def shenCoefficients(k, BC):
