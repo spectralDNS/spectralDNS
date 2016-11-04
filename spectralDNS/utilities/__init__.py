@@ -32,9 +32,9 @@ class Timer(object):
         
         toc = time() - self.tic
         if rank == 0:
-            print "Time = ", toc
-            print "Fastest = ", fast
-            print "Slowest = ", slow
+            print("Time = ", toc)
+            print("Fastest = ", fast)
+            print("Slowest = ", slow)
 
 def reset_profile(prof):
     prof.code_map = {}

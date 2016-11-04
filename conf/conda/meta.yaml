@@ -6,7 +6,7 @@ source:
   git_url: ../../  
   
 build:
-  number: 17
+  number: 18
 
 requirements:
 
@@ -34,5 +34,4 @@ test:
     - mpiFFT4py
 
   requires:
-    - python
     - pytest

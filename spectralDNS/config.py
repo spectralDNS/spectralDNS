@@ -131,7 +131,7 @@ class Params(AttributeDict):
     def __getattr__(self, key):
         # Called if key is missing in __getattribute__
         if key == 'dx':
-            assert self.has_key('M') and self.has_key('L')
+            assert ('M' in self) and ('L' in self)
             val = self['L']/2**self['M']
             return val
         
@@ -394,4 +394,4 @@ def update(new, mesh="triplyperiodic"):
     if 'planner_effort' in new:
         fft_plans.update(new['planner_effort'])
         new['planner_effort'] = fft_plans
-    exec mesh + ".set_defaults(**new)"
+    exec(mesh + ".set_defaults(**new)")

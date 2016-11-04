@@ -1,2 +1,3 @@
 git+https://github.com/spectralDNS/mpiFFT4py.git@master
-https://github.com/ketch/nodepy/archive/0.6.1.tar.gz
+git+https://github.com/mikaem/nodepy.git@master
+##https://github.com/ketch/nodepy/archive/0.6.1.tar.gz

@@ -26,7 +26,7 @@ class MemoryUsage:
         self.memory_vm = self.comm.reduce(_getMemoryUsage(False))
         if self.comm.Get_rank() == 0 and verbose:
             if self.first:
-                print 'Memory usage                    RSS accum     RSS total   Virtual  Virtual total'
+                print("Memory usage                    RSS accum     RSS total   Virtual  Virtual total")
                 self.first = False
-            print '{0:26s}  {1:10d} MB {2:10d} MB {3:10d} MB {4:10d} MB'.format(s, 
-                   self.memory-self.prev, self.memory, self.memory_vm-self.prev_vm, self.memory_vm)
+            print("{0:26s}  {1:10d} MB {2:10d} MB {3:10d} MB {4:10d} MB".format(s, 
+                   self.memory-self.prev, self.memory, self.memory_vm-self.prev_vm, self.memory_vm))

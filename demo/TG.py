@@ -93,7 +93,7 @@ def update(context):
         if solver.rank == 0:
             k.append(kk)
             w.append(ww)
-            print params.t, float(kk), float(ww)
+            print(params.t, float(kk), float(ww))
     #if params.tstep % params.compute_energy == 1:
         #if 'NS' in params.solver:
             #kk2 = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)        

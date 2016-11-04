@@ -6,7 +6,7 @@ os: osx
 osx_image: xcode7.2
 
 env:
-  matrix:    
+  matrix:
     - CONDA_PY=27
     - CONDA_PY=34
 
@@ -25,7 +25,7 @@ install:
       source /Users/travis/miniconda3/bin/activate root
       conda config --add channels conda-forge
       conda config --add channels spectralDNS
-      conda config --add channels mpi4py        # Using this since conda-forge's mpich pulls in libgcc 
+      conda config --add channels mpi4py        # Using this since conda-forge's mpich pulls in libgcc
       conda config --set show_channel_urls true
       conda config --set always_yes yes
       conda install conda-build
