@@ -5,6 +5,8 @@ language: generic
 os: osx
 osx_image: xcode7.2
 
+sudo: False
+
 env:
   matrix:
     - CONDA_PY=27
@@ -25,7 +27,8 @@ install:
       source /Users/travis/miniconda3/bin/activate root
       conda config --set show_channel_urls true --set always_yes yes
       conda info -a
-      conda create env -f tests/test-environment.yml
+      conda install conda-build
+      conda create env -f ./tests/test-environment.yml
       source activate spectralDNS
 
 script:
