@@ -153,31 +153,31 @@ class ShenBasis(ChebyshevTransform):
         return ck
     
     def shenCoefficients(self, k, BC):
-	"""
-	Shen basis functions given by
-	phi_k = T_k + a_k*T_{k+1} + b_k*T_{k+2},
-	satisfy the imposed boundary conditions for a unique set of {a_k, b_k}.  
-	"""
-	am = BC[0]; bm = BC[1]; cm = BC[2]
-	ap = BC[3]; bp = BC[4]; cp = BC[5]
-	
-	detk = 2*am*ap + ((k + 1.)**2 + (k + 2.)**2)*(am*bp - ap*bm) - 2.*bm*bp*(k + 1.)**2*(k + 2.)**2
+        """
+        Shen basis functions given by
+        phi_k = T_k + a_k*T_{k+1} + b_k*T_{k+2},
+        satisfy the imposed boundary conditions for a unique set of {a_k, b_k}.  
+        """
+        am = BC[0]; bm = BC[1]; cm = BC[2]
+        ap = BC[3]; bp = BC[4]; cp = BC[5]
+        
+        detk = 2*am*ap + ((k + 1.)**2 + (k + 2.)**2)*(am*bp - ap*bm) - 2.*bm*bp*(k + 1.)**2*(k + 2.)**2
 
-	Aa = am - bm*(k + 2.)**2; Ab= -ap - bp*(k + 2.)**2  
-	Ac = am - bm*(k + 1.)**2; Ad= ap + bp*(k + 1.)**2
-	
-	y1 = -ap - bp*k**2 + cp; y2= -am + bm*k**2 + cm/((-1)**k) 
-	
-	ak = (1./detk)*(Aa*y1 + Ab*y2)
-	bk = (1./detk)*(Ac*y1 + Ad*y2)
-	
-	return ak, bk
+        Aa = am - bm*(k + 2.)**2; Ab= -ap - bp*(k + 2.)**2  
+        Ac = am - bm*(k + 1.)**2; Ad= ap + bp*(k + 1.)**2
+        
+        y1 = -ap - bp*k**2 + cp; y2= -am + bm*k**2 + cm/((-1)**k) 
+        
+        ak = (1./detk)*(Aa*y1 + Ab*y2)
+        bk = (1./detk)*(Ac*y1 + Ad*y2)
+        
+        return ak, bk
 
     def fastShenScalar(self, fj, fk):
         """Fast Shen scalar product 
         B u_hat = sum_{j=0}{N} u_j phi_k(x_j) w_j,
         for Shen basis functions given by
-	phi_k = T_k + a_k*T_{k+1} + b_k*T_{k+2}
+        phi_k = T_k + a_k*T_{k+1} + b_k*T_{k+2}
         """
         k  = self.wavenumbers(fj.shape)
         fk = self.fastChebScalar(fj, fk)
@@ -227,17 +227,17 @@ class ShenBasis(ChebyshevTransform):
         c = ones(N-4)*(pi/2)* bk[:-2]
 
         if len(fk.shape) == 3:
-	    if self.BC[0]==0 and self.BC[1]==1 and self.BC[2]==0 and self.BC[3]==0 and self.BC[4]==1 and self.BC[5]==0:
-		fk[1:-2] = SFTc.PDMA_3D_complex(a[1:], b[1:], c[1:], fk[1:-2])
-	    else:
-		fk[:-2] = SFTc.PDMA_3D_complex(a, b, c, fk[:-2])
+            if self.BC[0]==0 and self.BC[1]==1 and self.BC[2]==0 and self.BC[3]==0 and self.BC[4]==1 and self.BC[5]==0:
+                fk[1:-2] = SFTc.PDMA_3D_complex(a[1:], b[1:], c[1:], fk[1:-2])
+            else:
+                fk[:-2] = SFTc.PDMA_3D_complex(a, b, c, fk[:-2])
         elif len(fk.shape) == 1:
-	    if self.BC[0]==0 and self.BC[1]==1 and self.BC[2]==0 and self.BC[3]==0 and self.BC[4]==1 and self.BC[5]==0:
-		fk[1:-2] = SFTc.PDMA_1D(a[1:], b[1:], c[1:], fk[1:-2])
-	    else:
-		fk[:-2] = SFTc.PDMA_1D(a, b, c, fk[:-2])
+            if self.BC[0]==0 and self.BC[1]==1 and self.BC[2]==0 and self.BC[3]==0 and self.BC[4]==1 and self.BC[5]==0:
+                fk[1:-2] = SFTc.PDMA_1D(a[1:], b[1:], c[1:], fk[1:-2])
+            else:
+                fk[:-2] = SFTc.PDMA_1D(a, b, c, fk[:-2])
         
-	return fk    
+        return fk    
 
   
 if __name__ == "__main__":

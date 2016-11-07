@@ -285,9 +285,9 @@ def solve():
             P_hat[:] += Pcorr[:]
 
             if jj == 0 and config.print_divergence_progress:
-                print "   Divergence error"
+                print("   Divergence error")
             if config.print_divergence_progress:
-                print "         Pressure correction norm %2.6e" %(linalg.norm(Pcorr))
+                print("         Pressure correction norm %2.6e" %(linalg.norm(Pcorr)))
                      
         # Update velocity
         dU[:] = 0

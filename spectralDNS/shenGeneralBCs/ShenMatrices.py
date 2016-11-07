@@ -74,11 +74,10 @@ class C_matrix(object):
         if len(v.shape) > 1:
             C_matvec(self.K, self.ck, self.a_j, self.b_j, self.a_k, self.b_k, v, c)
         else:
-	    b = zeros(self.shape)
-	    self.mat(b)
-	    c = dot(b,v)
+            b = zeros(self.shape)
+            self.mat(b)
+            c = dot(b,v)
         return c
-
 
 
 class A_matrix(object):    
@@ -103,11 +102,11 @@ class A_matrix(object):
     def matvec(self, v):
         c = zeros(v.shape, dtype=complex)
         if len(v.shape) > 1:
-	    A_matvec(self.K, self.ck, self.a_j, self.b_j, self.a_k, self.b_k, v, c)
+            A_matvec(self.K, self.ck, self.a_j, self.b_j, self.a_k, self.b_k, v, c)
         else:
             b = zeros(self.shape)
-	    self.mat(b)
-	    c = dot(b,v)
+            self.mat(b)
+            c = dot(b,v)
         return c
 
         
@@ -138,7 +137,7 @@ class D_matrix(object):
         c = zeros(v.shape, dtype=complex)
         v *= (2./pi) 
         if len(v.shape) > 1:
-	    UTDMA(self.a_k, self.b_k, v, c)
+            UTDMA(self.a_k, self.b_k, v, c)
         else:
             UTDMA_1D(self.a_k, self.b_k, v, c)
         return c        

@@ -86,10 +86,10 @@ class PDMA(Shen):
         self.a0[2:], self.b0[1:], self.c0, self.d0, self.e0 = self.Bm.diags()
 
     def __call__(self, u, b):
-	if self.dim=="1":
-	    SFTc.PDMA_1D(self.a0, self.b0, self.c0, self.d0, self.e0, u, b)
+        if self.dim=="1":
+            SFTc.PDMA_1D(self.a0, self.b0, self.c0, self.d0, self.e0, u, b)
         elif self.dim=="3":
-	    SFTc.PDMA(self.a0, self.b0, self.c0, self.d0, self.e0, u, b)
+            SFTc.PDMA(self.a0, self.b0, self.c0, self.d0, self.e0, u, b)
         return b
     
 

@@ -1,0 +1,17 @@
+name: spectralDNS
+
+channels:
+  - mpi4py  # Using this since conda-forge's mpich pulls in libgcc
+  - conda-forge
+  - spectralDNS # for h5py-parallel
+
+dependencies:
+  - pip 
+  - pyfftw
+  - mpi4py
+  - scipy
+  - pytest
+  - cython
+  - sympy
+  - hdf5-parallel
+  - h5py-parallel
