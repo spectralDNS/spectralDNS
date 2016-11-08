@@ -28,10 +28,8 @@ install:
       conda config --set show_channel_urls true --set always_yes yes
       conda info -a
       conda install conda-build
-      cd tests
-      conda create env -f test-environment.yml
+      conda env create -f tests/test-environment.yml
       source activate spectralDNS
-      cd ..
 
 script:
   - conda build conf/conda
