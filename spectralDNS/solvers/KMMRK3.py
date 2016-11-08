@@ -4,6 +4,7 @@ __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from .KMM import *
+from spectralinit import end_of_tstep
 
 def get_context():
     # Get points and weights for Chebyshev weighted integrals

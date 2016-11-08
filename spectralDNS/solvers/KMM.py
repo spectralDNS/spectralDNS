@@ -120,6 +120,17 @@ class KMMWriter(HDF5Writer):
 
 assert params.precision == "double"
 
+def end_of_tstep(context):
+    """Function called at end of time step. 
+    
+    If returning True, the while-loop in time breaks free. Used by adaptive solvers
+    to modify the time stepsize.
+    """
+    # Rotate solutions
+    context.U_hat0[:] = context.U_hat
+    context.H_hat1[:] = context.H_hat
+    return False
+
 def get_velocity(U, U_hat, FST, ST, SB, **context):
     """Compute velocity from context"""
     U[0] = FST.ifst(U_hat[0], U[0], SB)
@@ -454,11 +465,6 @@ def integrate(u_hat, g_hat, rhs, dt, solver, context):
     rhs[:] = 0
     rhs = solver.ComputeRHS(rhs, u_hat, g_hat, solver, **context)
     u_hat, g_hat = solver.solve_linear(u_hat, g_hat, rhs, **context)
-    
-    # Rotate solutions
-    context.U_hat0[:] = u_hat
-    context.H_hat1[:] = context.H_hat
-    
     return (u_hat, g_hat), dt, dt
 
 def getintegrator(rhs, u0, solver, context):
