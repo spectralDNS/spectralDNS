@@ -32,6 +32,4 @@ install:
       source activate spectralDNS
 
 script:
-  - conda config --get channels
-  - conda config --set channels conda-forge
   - conda build conf/conda
