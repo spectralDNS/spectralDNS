@@ -12,6 +12,7 @@ requirements:
 
   build:
     - toolchain  # [osx]
+    - mpi4py
     - python
     - cython
     - numpy
