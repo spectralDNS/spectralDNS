@@ -32,4 +32,6 @@ install:
       source activate spectralDNS
 
 script:
+  - conda list
+  - source activate spectralDNS
   - conda build conf/conda
