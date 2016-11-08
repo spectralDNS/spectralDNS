@@ -29,7 +29,7 @@ install:
       conda info -a
       conda install conda-build
       conda env create -f tests/test-environment.yml
-      source activate spectralDNS
 
 script:
+  - source activate spectralDNS
   - conda build conf/conda
