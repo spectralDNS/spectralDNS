@@ -29,16 +29,19 @@ spectralDNS requires that [mpiFFT4py](https://github.com/spectralDNS/mpiFFT4py) 
 
 To install using Anaconda, you may compile it yourselves using (from the main directory)
 
-    conda build conf/conda
+    conda build -c conda-forge -c spectralDNS conf/conda
     conda install spectralDNS --use-local
 
-which requires that mpiFFT4py has already been installed.
-You may also use precompiled binaries in the [*spectralDNS*](https://anaconda.org/spectralDNS/mpifft4py) channel on Anaconda cloud
+which will also build and install mpiFFT4py.
+You may also use precompiled binaries in the [*spectralDNS*](https://anaconda.org/spectralDNS/mpifft4py) channel on Anaconda cloud. Use for exampel
 
-    conda config --add channels spectralDNS
-    conda install spectralDNS
+    conda create --name spectralDNS -c conda-forge -c spectralDNS spectralDNS
+    source activate spectralDNS
 
-which installs both spectralDNS and mpiFFT4py. There are binaries compiled for both OSX and linux.
+which installs both spectralDNS, mpiFFT4py and all required dependencies, most of which are pulled in from the conda-forge channel. There are binaries compiled for both OSX and linux, for either Python version 2.7 or 3.4. To use Python 3.4 
+
+    conda create --name spectralDNS_py3 -c conda-forge -c spectralDNS python=3 spectralDNS
+    source activate spectralDNS_py3
 
 Usage
 -----
