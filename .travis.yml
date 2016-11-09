@@ -10,6 +10,9 @@ env:
     - CONDA_PY=27
     - CONDA_PY=34
 
+  global:
+    - secure: "q3eTmrI7PV+uTbE7uqvwEZxBUvDSv5eCPc4iAxr6RcTccIDfAAFmyS0oasWQWpiNQuHyOUPhwK8T04AMwDcH6TUWsLcrrKuc2BNFibRzvytPyRBqkODqsGcog8/xABbCQ95Vr3xAogU2/a3BSFm9cOgjI1O/kwQlLSPQKVCv45XoOyItkQ4FMmARbLF9fU6hC7VGADQtirkhRi5DqwHZffla00JfH8rBbEmRkK5/1SOv0b9/Kb1/mboVljmDkN46kbFQqn1/o8eA9xlyS7LOZBPqbuojWR96GTub1FMo5kVabkFxqdm5MrMCkhSpFN8TF4xCX0ICDtEdIpKOhGFpZ1jd86Ir3qWeG9TioOzi+3oz1RK8Qu6PTMtgM8v764jru5Xsze4BstSllDdL4GYztjGoua0HL3TAmYaWAqCE39XXyoCJ82X34Ntz3+j/N+UHeg4KRpZoKYf4ZDp0mGzFappCE6uWLzGVkU9t3opd2uLK/h+3eDKjvV26ABDpPLtGUct1p+MuU9MPsFvFaXRLIoBpjl4MBiC895VE3e6xgipKpwmgW80aAyJRlPwOAU3H8SSRTlFeQeAMannFgtN8tMkFf4FE61hy283orCegsRcudp06z+cgtjsAxgDBLKvJTd2Uqqn7lF7/4Lg0quu85YwbmhAI8HlQTVOj/A+zq8o="
+
 before_install:
     # Remove homebrew.
     - brew remove --force $(brew list)
@@ -25,8 +28,11 @@ install:
       source /Users/travis/miniconda3/bin/activate root
       conda config --set show_channel_urls true --set always_yes yes
       conda config --add channels conda-forge
-      conda info -a
-      conda install conda-build
+      conda install --yes --quiet conda-forge-build-setup
+      source run_conda_forge_build_setup
 
 script:
   - conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
+
+after_success:
+    - upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1

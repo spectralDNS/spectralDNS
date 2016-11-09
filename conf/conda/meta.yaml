@@ -6,7 +6,7 @@ source:
   git_url: ../../  
   
 build:
-  number: 18
+  number: 19
 
 requirements:
 
@@ -15,7 +15,6 @@ requirements:
     - python
     - cython
     - numpy
-    - mpi4py
 
   run:
     - python

@@ -21,13 +21,11 @@ dependencies:
       fi
     - conda config --set always_yes yes
     - conda config --add channels conda-forge
-    - conda config --add channels spectralDNS
-    - conda config --add channels mpi4py        # Using this since conda-forge's mpich pulls in libgcc     
-    - conda update -q conda
-    - conda info -a
-    - conda install -y pyfftw mpi4py scipy pytest cython sympy h5py-parallel conda-build
+    - conda install --yes --quiet conda-forge-build-setup
+    - source run_conda_forge_build_setup
 
 ## Customize test commands
 test:
   override:
-    - conda build conf/conda
+    - conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
+    - upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
