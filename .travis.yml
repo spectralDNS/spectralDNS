@@ -32,7 +32,7 @@ install:
       source run_conda_forge_build_setup
 
 script:
-  - conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
+    - conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
 
 after_success:
     - upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
