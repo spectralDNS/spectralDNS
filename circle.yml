@@ -1,11 +1,8 @@
-## Customize the test machine
 machine:
-  # Add some environment variables
   environment:
     CONDA_ROOT: /home/ubuntu/miniconda
     PATH: ${CONDA_ROOT}/bin:${PATH}
 
-## Customize dependencies
 dependencies:
   cache_directories:
     - /home/ubuntu/miniconda
@@ -24,12 +21,11 @@ dependencies:
     - conda install --yes --quiet conda-forge-build-setup
     - source run_conda_forge_build_setup
 
-## Customize test commands
 test:
   override:
-    - export CONDA_PY=27
-    - conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
-    - upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
-    - export CONDA_PY=34
-    - conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
-    - upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
+    - | 
+      conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
+      upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
+      conda build --python 3.4 -c mpi4py -c conda-forge -c spectralDNS conf/conda
+      export CONDA_PY=34
+      upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
