@@ -26,7 +26,7 @@ Generic parameters for all solvers::
 Parameters for 3D solvers in triply periodic domain::
     convection       (str)           ('Standard', 'Divergence', 'Skewed', 'Vortex')
     decomposition    (str)           ('slab', 'pencil')
-    communication    (str)           ('Alltoallw', 'alltoall', 'sendrecv_replace')
+    communication    (str)           ('Alltoallw', 'Alltoall', 'Sendrecv_replace', 'AlltoallN')
     pencil_alignment (str)           ('X', 'Y') Final alignment direction for spectral data 
     P1               (int)           Pencil decomposition in first direction
     write_yz_slice   (int, int)      Store yz slice at x index (*0) every (*1) time step
@@ -225,9 +225,9 @@ triplyperiodic = argparse.ArgumentParser(parents=[parser])
 triplyperiodic.add_argument('--convection', default='Vortex',
                             choices=('Standard', 'Divergence', 'Skewed', 'Vortex'),
                             help='Choose method for computing the nonlinear convective term')
-triplyperiodic.add_argument('--communication', default='Alltoallw',
-                            choices=('Alltoallw', 'alltoall', 'Sendrecv_replace', 'Swap', 'Nyquist'),
-                            help='Choose method for communication. sendrecv_replace is only for slab without padding. Swap and Nyquist are only for pencil decomposition.')
+triplyperiodic.add_argument('--communication', default='Alltoall',
+                            choices=('Alltoallw', 'Alltoall', 'Sendrecv_replace', 'AlltoallN'),
+                            help='Choose method for communication. Sendrecv_replace is only for slab without padding. AlltoallN is only for pencil decomposition.')
 triplyperiodic.add_argument('--L', default=[2*pi, 2*pi, 2*pi], metavar=("Lx", "Ly", "Lz"), nargs=3,
                             help='Physical mesh size')
 triplyperiodic.add_argument('--Pencil_alignment', default='Y', choices=('X', 'Y'),

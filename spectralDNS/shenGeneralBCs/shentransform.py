@@ -253,6 +253,6 @@ if __name__ == "__main__":
     af = SR.fst(a, af)
     a0 = a.copy()
     a0 = SR.ifst(af, a0)
-    print "Error in Shen-Robin transform: ",linalg.norm((a - a0), inf) 
+    print("Error in Shen-Robin transform: {}".format(linalg.norm((a - a0), inf))) 
     # Out: Error in Shen-Robin transform: 4.57966997658e-16
     assert np.allclose(a0, a)

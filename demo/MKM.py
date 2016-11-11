@@ -84,6 +84,10 @@ def init_from_file(filename, solver, context):
     U[:] = f["3D/checkpoint/U/0"][:, s]
     U_hat = solver.set_velocity(**context)
     context.U_hat0[:] = U_hat
+    # Set g, which is used in computing convection
+    if "KMM" in config.params.solver:
+        context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
+    # Compute convection at previous timestep
     context.H_hat1[:] = solver.get_convection(**context)
     U[:] = f["3D/checkpoint/U/1"][:, s]
     U_hat = solver.set_velocity(**context)
