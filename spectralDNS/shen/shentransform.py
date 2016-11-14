@@ -398,7 +398,7 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
 
 class SlabShen_R2C(Slab_R2C):
     
-    def __init__(self, N, L, comm, padsize=1.5, threads=1, communication='Alltoallw', dealias_cheb=False,
+    def __init__(self, N, L, comm, padsize=1.5, threads=1, communication='Alltoall', dealias_cheb=False,
                  planner_effort=defaultdict(lambda: "FFTW_MEASURE", {"dct": "FFTW_EXHAUSTIVE"})):
         Slab_R2C.__init__(self, N, L, comm, "double", padsize=padsize, threads=threads,
                           communication=communication, planner_effort=planner_effort)
@@ -559,20 +559,36 @@ class SlabShen_R2C(Slab_R2C):
             return fu
 
         if not dealias == '3/2-rule':
-            Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
 
-            if self.communication == 'alltoall':
-                Uc_mpi  = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
-                Uc_hatT = rfft2(u, Uc_hatT, axes=(1,2), threads=self.threads, planner_effort=self.planner_effort['rfft2'])
-                Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
-                self.comm.Alltoall(MPI.IN_PLACE, [Uc_hat, self.mpitype])
+            Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
+            Uc_hat = self.work_arrays[(fu, 0, False)]
+
+            if self.communication == 'Alltoall':
+                #Uc_mpi  = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
+                #Uc_hatT = rfft2(u, Uc_hatT, axes=(1,2), threads=self.threads, planner_effort=self.planner_effort['rfft2'])
+                #Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
+                #self.comm.Alltoall(MPI.IN_PLACE, [Uc_hat, self.mpitype])
+
+                # Intermediate work array required for transform
+                U_mpi = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0, False)]
+
+                # Do 2 ffts in y-z directions on owned data
+                Uc_hatT = rfft2(u, Uc_hatT, axes=(1, 2), threads=self.threads, planner_effort=self.planner_effort['rfft2'])
+
+                #Transform data to align with x-direction
+                U_mpi[:] = np.rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
+
+                #Communicate all values
+                self.comm.Alltoall([U_mpi, self.mpitype], [Uc_hat, self.mpitype])
+                
                 
             elif self.communication == 'Alltoallw':
                 if len(self._subarraysA) == 0:
                     self._subarraysA, self._subarraysB, self._counts_displs = self.get_subarrays()
                     
                 # Do 2 ffts in y-z directions on owned data
-                Uc_hatT = rfft2(u, Uc_hatT, axes=(1,2), threads=self.threads, planner_effort=self.planner_effort['rfft2'])
+                Uc_hatT = rfft2(u, Uc_hatT, axes=(1,2), threads=self.threads,
+                                planner_effort=self.planner_effort['rfft2'])
 
                 self.comm.Alltoallw(
                     [Uc_hatT, self._counts_displs, self._subarraysB],
@@ -582,7 +598,7 @@ class SlabShen_R2C(Slab_R2C):
             
         else:
             Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
-            Uc_mpi  = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
+            
             if not self.dealias_cheb:
                 Upad_hatT = self.work_arrays[(self.complex_shape_padded_T(), self.complex, 0, False)]
                 Upad_hat_z = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0, False)]
@@ -592,10 +608,15 @@ class SlabShen_R2C(Slab_R2C):
                 Upad_hat_z[:] = fft(Upad_hat_z, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])   
                 Uc_hatT = SlabShen_R2C.copy_from_padded(Upad_hat_z, Uc_hatT, self.N, 1)                
                 
-                if self.communication == 'alltoall':
+                if self.communication == 'Alltoall':
+                    #Uc_mpi  = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
+                    #Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
+                    #self.comm.Alltoall(MPI.IN_PLACE, [Uc_hat, self.mpitype])
+                    
+                    Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 2, False)]
                     Uc_mpi[:] = rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
-                    self.comm.Alltoall(MPI.IN_PLACE, [Uc_hat, self.mpitype])
-                
+                    self.comm.Alltoall([Uc_mpi, self.mpitype], [Uc_hat, self.mpitype])
+
                 elif self.communication == 'Alltoallw':
                     if len(self._subarraysA) == 0:
                         self._subarraysA, self._subarraysB, self._counts_displs = self.get_subarrays()
@@ -622,7 +643,7 @@ class SlabShen_R2C(Slab_R2C):
                 Upad_hat2[:] = fft(Upad_hat2, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 Upad_hat1 = SlabShen_R2C.copy_from_padded(Upad_hat2, Upad_hat1, self.N, 1)
                 
-                if self.communication == 'alltoall':
+                if self.communication == 'Alltoall':
                     # Transpose and commuincate data
                     U_mpi = Upad_hat.reshape(self.complex_shape_padded_0_I())
                     U_mpi[:] = rollaxis(Upad_hat1.reshape(self.complex_shape_padded_I()), 1)
@@ -700,7 +721,7 @@ class SlabShen_R2C(Slab_R2C):
                 
             Uc_hat = fun(fu, Uc_hat)
             
-            if self.communication == 'alltoall':
+            if self.communication == 'Alltoall':
                 self.comm.Alltoall(MPI.IN_PLACE, [Uc_hat, self.mpitype])
                 Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())                
                 #Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0, False)]
@@ -724,8 +745,13 @@ class SlabShen_R2C(Slab_R2C):
                 Upad_hat_z = self.work_arrays[((self.Np[0], int(self.padsize*self.N[1]), self.Nf), self.complex, 0)]
                 
                 Uc_hat = fun(fu*self.padsize**2, Uc_hat)
-                if self.communication == 'alltoall':
-                    self.comm.Alltoall(MPI.IN_PLACE, [Uc_hat, self.mpitype])
+                if self.communication == 'Alltoall':
+                    # In-place
+                    #self.comm.Alltoall(MPI.IN_PLACE, [Uc_hat, self.mpitype])
+                    # Not in-place
+                    Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0, False)]
+                    self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
+                    
                     Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
                     
                 elif self.communication == 'Alltoallw':
@@ -755,7 +781,7 @@ class SlabShen_R2C(Slab_R2C):
                 Upad_hat0 = SlabShen_R2C.copy_to_padded(fu*self.padsize**2, Upad_hat0, self.N, 0)
                 Upad_hat = fun(Upad_hat0, Upad_hat) 
                 
-                if self.communication == 'alltoall':
+                if self.communication == 'Alltoall':
                     # Communicate to distribute first dimension (like Fig. 2b but padded in x-dir)
                     self.comm.Alltoall(MPI.IN_PLACE, [Upad_hat, self.mpitype])
                     

@@ -303,7 +303,7 @@ dealias_cheb_parser.add_argument('--dealias_cheb', dest='dealias_cheb', action='
 channel.set_defaults(dealias_cheb=False)
 channel.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'),
                      help="Choose 3D decomposition between slab and pencil.")
-channel.add_argument('--communication', default='Alltoallw', choices=('Alltoallw', 'alltoall'),
+channel.add_argument('--communication', default='Alltoallw', choices=('Alltoallw', 'Alltoall'),
                      help='Choose method for communication.')
 channel.add_argument('--Pencil_alignment', default='X', choices=('X',),
                      help='Alignment of the complex data for pencil decomposition')

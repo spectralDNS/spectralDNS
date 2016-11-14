@@ -411,13 +411,14 @@ def test_FST(ST):
 #test_FST(ShenDirichletBasis("GL"))    
 
 def test_FST_padded(ST):
-    FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), comm,
-                       communication='Alltoallw')
-    FST_SELF = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]),
+    M = np.array([N, 2*N, 4*N])
+    FST = SlabShen_R2C(M, np.array([2*pi, 2*pi, 2*pi]), comm,
+                       communication='Alltoall')
+    FST_SELF = SlabShen_R2C(M, np.array([2*pi, 2*pi, 2*pi]),
                             MPI.COMM_SELF)
     
     if FST.rank == 0:
-        A = np.random.random((N, N, N)).astype(FST.float)
+        A = np.random.random(M).astype(FST.float)
         A_hat = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
         
         if not ST.__class__.__name__ == "ChebyshevTransform":
@@ -427,7 +428,7 @@ def test_FST_padded(ST):
         else:
             A_hat = FST_SELF.fct(A, A_hat, ST)
         
-        A_hat[:, -N/2] = 0
+        A_hat[:, -M[1]/2] = 0
         
         A_pad = np.zeros(FST_SELF.real_shape_padded(), dtype=FST.float)
         if not ST.__class__.__name__ == "ChebyshevTransform":
