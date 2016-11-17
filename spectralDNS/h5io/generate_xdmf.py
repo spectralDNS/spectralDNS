@@ -56,10 +56,10 @@ isotropic2D = """
         
 channel2D =  """
         <Geometry Type="VXVY">
-          <DataItem Format="HDF" NumberType="Float" Precision="{0}" Dimensions="{2}">
+          <DataItem Format="HDF" NumberType="Float" Precision="{0}" Dimensions="{1}">
            {3}:/mesh/{4}
           </DataItem>
-          <DataItem Format="HDF" NumberType="Float" Precision="{0}" Dimensions="{1}">
+          <DataItem Format="HDF" NumberType="Float" Precision="{0}" Dimensions="{2}">
            {3}:/mesh/{5}
           </DataItem>
         </Geometry>"""
