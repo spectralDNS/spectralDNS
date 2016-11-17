@@ -139,7 +139,7 @@ def generate_xdmf(h5filename):
             xf2d += """
       <Grid GridType="Uniform">"""
             
-            if "mesh" in f["/3D"].keys():
+            if "mesh" in f.keys():
                 xf2d += channel2D.format(prec, N[0], N[1], h5filename, 'x', 'y')
                 xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DRectMesh"/>""".format(N[0], N[1])
@@ -176,7 +176,7 @@ def generate_xdmf(h5filename):
             xf2d += """
       <Grid GridType="Uniform">"""
             
-            if "mesh" in f["/3D"].keys():
+            if "mesh" in f.keys():
                 xf2d += channel2D.format(prec, N[1], N[2], h5filename, 'y', 'z')
                 xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DRectMesh"/>""".format(N[1], N[2])
@@ -214,7 +214,7 @@ def generate_xdmf(h5filename):
             xf2d += """
       <Grid GridType="Uniform">"""
             
-            if "mesh" in f["/3D"].keys():
+            if "mesh" in f.keys():
                 xf2d += channel2D.format(prec, N[0], N[2], h5filename, 'x', 'z')
                 xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DRectMesh"/>""".format(N[0], N[2])
@@ -252,7 +252,7 @@ def generate_xdmf(h5filename):
             xf2d += """
       <Grid GridType="Uniform">"""
             
-            if "mesh" in f["/3D"].keys():
+            if "mesh" in f.keys():
                 xf2d += channel2D.format(prec, N[0], N[1], h5filename, 'x', 'y')
                 xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DRectMesh"/>""".format(N[0], N[1])
