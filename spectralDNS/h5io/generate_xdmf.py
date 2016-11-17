@@ -129,6 +129,8 @@ def generate_xdmf(h5filename):
         xf2d = copy.copy(xdmffile)
         timesteps = f["/".join(("2D", comps[0]))].keys()
         dtype = f["/".join(("2D", comps[0]))].values()[0].dtype
+        prec = 4 if dtype is float32 else 8
+        
         tt = ""
         for i in timesteps:
             tt += "%s " %i
@@ -148,7 +150,6 @@ def generate_xdmf(h5filename):
                 xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DCoRectMesh"/>""".format(N[0], N[1])
 
-            prec = 4 if dtype is float32 else 8
             for comp in comps:
                 xf2d += attribute2D.format(comp, N[0], N[1], h5filename, comp, tstep, prec)
             xf2d += """  
@@ -166,6 +167,7 @@ def generate_xdmf(h5filename):
         xf2d = copy.copy(xdmffile)
         timesteps = f["/".join(("2D/yz", comps[0]))].keys()
         dtype = f["/".join(("2D/yz", comps[0]))].values()[0].dtype
+        prec = 4 if dtype is float32 else 8
         tt = ""
         for i in timesteps:
             tt += "%s " %i
@@ -185,7 +187,6 @@ def generate_xdmf(h5filename):
                 xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DCoRectMesh"/>""".format(N[1], N[2])
         
-            prec = 4 if dtype is float32 else 8
             if len(f["/".join(("2D/yz", comps[0]))]) > 0:
                 for comp in f["2D/yz"]:
                     xf2d += attribute2Dslice.format(comp, N[1], N[2], h5filename, comp, tstep, prec, 'yz')
@@ -204,6 +205,7 @@ def generate_xdmf(h5filename):
         xf2d = copy.copy(xdmffile)
         timesteps = f["/".join(("2D/xz", comps[0]))].keys()
         dtype = f["/".join(("2D/xz", comps[0]))].values()[0].dtype
+        prec = 4 if dtype is float32 else 8
         tt = ""
         for i in timesteps:
             tt += "%s " %i
@@ -223,7 +225,6 @@ def generate_xdmf(h5filename):
                 xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DCoRectMesh"/>""".format(N[0], N[2])
         
-            prec = 4 if dtype is float32 else 8
             if len(f["/".join(("2D/xz", comps[0]))]) > 0:
                 for comp in f["2D/xz"]:
                     xf2d += attribute2Dslice.format(comp, N[0], N[2], h5filename, comp, tstep, prec, 'xz')
@@ -242,6 +243,7 @@ def generate_xdmf(h5filename):
         xf2d = copy.copy(xdmffile)
         timesteps = f["/".join(("2D/xy", comps[0]))].keys()
         dtype = f["/".join(("2D/xy", comps[0]))].values()[0].dtype
+        prec = 4 if dtype is float32 else 8
         tt = ""
         for i in timesteps:
             tt += "%s " %i
@@ -261,7 +263,6 @@ def generate_xdmf(h5filename):
                 xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DCoRectMesh"/>""".format(N[0], N[1])
 
-            prec = 4 if dtype is float32 else 8
             if len(f["/".join(("2D/xy", comps[0]))]) > 0:
                 for comp in f["2D/xy"]:
                     xf2d += attribute2Dslice.format(comp, N[0], N[1], h5filename, comp, tstep, prec, 'xy')
