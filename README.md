@@ -88,10 +88,10 @@ Results also from the old Shaheen BlueGene/P:
 </p>
 
 <p align="center">
-    <img src="https://www.dropbox.com/s/f8woa063lls8cbp/channel_white_395.gif?dl=1" width="800" height="266" alt="Channel flow"/>
+    <img src="https://www.dropbox.com/s/fsk7xolb2yk60re/Re2000_5.gif?dl=1" width="800" height="266" alt="Channel flow"/>
 </p>
 <p align="center">
-    Turbulent channel flow at Re_tau = 395. Simulations are performed using 128 cores on Shaheen II with the KMM channel flow solver (solvers/ShenKMM.py) using 256^3 points in real physical space.
+    Turbulent channel flow at Re_tau = 2000. Simulations are performed using 512 cores on Shaheen II with the KMM channel flow solver (solvers/ShenKMM.py) using 512x1024x1024 points in real physical space.
 </p>
 
 <p align="center">
