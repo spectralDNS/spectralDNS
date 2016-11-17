@@ -1484,6 +1484,9 @@ def LU_Biharmonic_3D_n(np.float_t a,
                         for i in xrange(kk, M):
                             c2[i] -= l1[odd, kk-1, j, k]*c0[i]
                                         
+                    #for i in xrange(kk, M):
+                        #c0[i] = c1[i]
+                        #c1[i] = c2[i]
                     copy(c1.begin()+kk, c1.end(), c0.begin()+kk)
                     copy(c2.begin()+kk, c2.end(), c1.begin()+kk)
                     

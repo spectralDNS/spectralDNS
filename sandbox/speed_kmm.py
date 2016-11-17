@@ -48,6 +48,6 @@ print "\hline"
 for i, n in enumerate(N):
     err = str(2**n)
     err += " & {:2.3f} ({:2.2f}) & {:2.2e} ({:2.2f}) & {:2.2e} ({:2.2f}) \\\ ".format(t[i][0], 0 if i == 0 else t[i][0]/t[i-1][0]/(2.*log(n)/log(n-1)), 
-                                                                                      t[i][1], 0 if i == 0 else t[i][1]/t[i-1][1]/(2.*log(n)/log(n-1)),
-                                                                                      t[i][2], 0 if i == 0 else t[i][2]/t[i-1][2]/2.)
+                                                                                      t[i][1]/10, 0 if i == 0 else t[i][1]/t[i-1][1]/(2.*log(n)/log(n-1)),
+                                                                                      t[i][2]/10, 0 if i == 0 else t[i][2]/t[i-1][2]/2.)
     print err

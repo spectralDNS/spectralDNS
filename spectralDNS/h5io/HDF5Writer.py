@@ -29,6 +29,12 @@ try:
             self.f = h5py.File(self.fname, "w", driver="mpio", comm=comm)
             self.f.create_group("3D")
             self.f.create_group("2D")
+            if len(self.mesh) > 0:
+                self.f.create_group("mesh")
+                for key, val in six.iteritems(self.mesh):
+                    self.f["/mesh/"].create_dataset(key, shape=(len(val),), dtype=val.dtype)
+                    self.f["/mesh/"+key][:] = val
+
             self.f["2D"].create_group("xy") # For slices in 3D geometries
             self.f["2D"].create_group("xz")
             self.f["2D"].create_group("yz")
@@ -53,12 +59,6 @@ try:
                 self.f["2D/yz"].attrs.create("i", params.write_yz_slice[0])
                 self.f["2D/xy"].attrs.create("j", params.write_xy_slice[0])
                 self.f["2D/xz"].attrs.create("k", params.write_xz_slice[0])
-
-            if len(self.mesh) > 0:
-                self.f["3D"].create_group("mesh")
-            for key, val in six.iteritems(self.mesh):
-                self.f["3D/mesh/"].create_dataset(key, shape=(len(val),), dtype=val.dtype)
-                self.f["3D/mesh/"+key][:] = val
 
         def update(self, params, **kw):
             if (self.check_if_write(params) or 
