@@ -95,11 +95,11 @@ Results also from the old Shaheen BlueGene/P:
 </p>
 
 <p align="center">
-    <img src="https://www.dropbox.com/s/8oayxts0ix359hi/KHmovie1.gif?dl=1" width="600" height="400" alt="Kelvin Helmholtz instability"/>
+    <img src="https://www.dropbox.com/s/7mwy70gwul79i3i/KHmovie_3.gif?dl=1" width="600" height="400" alt="Kelvin Helmholtz instability"/>
 </p>
 
 <p align="center">
-    Evolution of vorticity. Two-dimensional simulation of Kelvin Helmholtz shear instability using a Boussinesq formulation (solvers/spectralDNS2D_Boussinesq.py)
+    Evolution of vorticity. Two-dimensional simulation of Kelvin Helmholtz shear instability using a 2D solver (solvers/NS2D.py)
 </p>
 
 Authors
