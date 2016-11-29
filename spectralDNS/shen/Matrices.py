@@ -468,7 +468,7 @@ class CDDmat(BaseMatrix):
         return c
 
     def diags(self):
-        return diags([self.ld, self.dd, self.ud], [-1, 0, 1], shape=self.shape)
+        return diags([self.ld, self.ud], [-1, 1], shape=self.shape)
 
 class CNDmat(BaseMatrix):
     """Matrix for inner product (u', phi_N) = (phi', phi_N) u_hat =  CNDmat * u_hat
@@ -652,7 +652,7 @@ class ABBmat(BaseMatrix):
         i = -4*(ki+1)*(k+2)**2
         self.dd = i * pi / (k+3.)
         i = 2*(ki[:-2]+1)*(ki[:-2]+2)
-        self.ud = i*pi
+        self.ud = i * pi
         i = 2*(ki[2:]-1)*(ki[2:]+2)
         self.ld = i * pi
         #self.dd = -4*(k+1)/(k+3)*(k+2)**2*pi

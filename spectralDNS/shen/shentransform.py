@@ -53,15 +53,13 @@ class ChebyshevTransform(object):
     def points_and_weights(self, N):
         self.N = N
         if self.quad == "GL":
-            points = (n_cheb.chebpts2(N)[::-1]).astype(float)
-            #points = (n_cheb.chebpts2(N)).astype(float)
+            points = -(n_cheb.chebpts2(N)).astype(float)
             weights = zeros(N)+pi/(N-1)
             weights[0] /= 2
             weights[-1] /= 2
 
         elif self.quad == "GC":
             points, weights = n_cheb.chebgauss(N)
-            #points = points[::-1]
             points = points.astype(float)
             weights = weights.astype(float)
             
@@ -197,15 +195,11 @@ class ShenDirichletBasis(ChebyshevTransform):
         self.V[N-1, :] = 0.5*(V[:, 0] - V[:, 1])
 
     def wavenumbers(self, N):
-        if isinstance(N, tuple):
-            if len(N) == 1:
-                N = N[0]
-        if isinstance(N, int): 
-            return np.arange(N-2).astype(float)
-        
-        else:
-            kk = np.mgrid[:N[0]-2, :N[1], :N[2]].astype(float)
-            return kk[0]
+        N = list(N) if np.ndim(N) else [N]
+        s = [self.slice(N[0])]
+        for n in N[1:]:
+            s.append(slice(0, n))
+        return np.mgrid.__getitem__(s).astype(float)[0]
 
     #@profile
     def fastShenScalar(self, fj, fk, fast_transform=True):
@@ -291,6 +285,13 @@ class ShenNeumannBasis(ShenDirichletBasis):
                 k = self.wavenumbers(v.shape[0])
             self.factor = (k[1:]/(k[1:]+2))**2
 
+    def wavenumbers(self, N):
+        N = list(N) if np.ndim(N) else [N]
+        s = [slice(0, N[0]-2)]
+        for n in N[1:]:
+            s.append(slice(0, n))
+        return np.mgrid.__getitem__(s).astype(float)[0]
+
     def fastShenScalar(self, fj, fk, fast_transform=True):
         """Fast Shen scalar product.
         Chebyshev transform taking into account that phi_k = T_k - (k/(k+2))**2*T_{k+2}
@@ -336,20 +337,9 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
         # Build Vandermonde matrix.
         self.V = n_cheb.chebvander(self.points, N-5).T - (2*(k+2)/(k+3))[:, np.newaxis]*n_cheb.chebvander(self.points, N-3)[:, 2:].T + ((k+1)/(k+3))[:, np.newaxis]*n_cheb.chebvander(self.points, N-1)[:, 4:].T
         
-    def wavenumbers(self, N):
-        if isinstance(N, tuple):
-            if len(N) == 1:
-                N = N[0]
-        if isinstance(N, int): 
-            return np.arange(N-4).astype(float)
-        
-        else:
-            kk = np.mgrid[:N[0]-4, :N[1], :N[2]].astype(float)
-            return kk[0]
-        
     def set_factor_arrays(self, v):
         if not self.factor1.shape == v[:-4].shape:
-            if len(v.shape)==3:
+            if len(v.shape) > 1:
                 k = self.wavenumbers(v.shape)                
             elif len(v.shape)==1:
                 k = self.wavenumbers(v.shape[0])

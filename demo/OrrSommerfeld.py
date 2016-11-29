@@ -1,8 +1,10 @@
 """Orr-Sommerfeld"""
 import pyfftw  # Hack because of https://github.com/pyFFTW/pyFFTW/issues/40
 from spectralDNS import config, get_solver, solve
-from OrrSommerfeld_eig import OrrSommerfeld
-from numpy import dot, real, pi, cos, vstack, flipud, hstack, floor, exp, sum, zeros, arange, imag, sqrt, array, zeros_like, allclose, inf
+from OrrSommerfeld_shen import OrrSommerfeld
+#from OrrSommerfeld_eig import OrrSommerfeld
+from numpy import dot, real, pi, cos, exp, sum, zeros, arange, imag, sqrt, \
+    array, zeros_like
 from numpy.linalg import norm
 from mpiFFT4py import dct
 from scipy.fftpack import ifft
@@ -18,23 +20,35 @@ except ImportError:
     plt = None
 
 eps = 1e-6
+#def initOS(OS, U, X, t=0.):
+    #for i in range(U.shape[1]):
+        #x = X[0, i, 0, 0]
+        #OS.interp(x, 1)
+        #for j in range(U.shape[2]):
+            #y = X[1, i, j, 0]
+            #v = (1-x**2) + eps*dot(OS.f, real(OS.dphidy*exp(1j*(y-OS.eigval*t))))
+            #u = -eps*dot(OS.f, real(1j*OS.phi*exp(1j*(y-OS.eigval*t))))  
+            #U[0, i, j, :] = u
+            #U[1, i, j, :] = v
+    #U[2] = 0
+
 def initOS(OS, U, X, t=0.):
-    for i in range(U.shape[1]):
-        x = X[0, i, 0, 0]
-        OS.interp(x)
-        for j in range(U.shape[2]):
-            y = X[1, i, j, 0]
-            v = (1-x**2) + eps*dot(OS.f, real(OS.dphidy*exp(1j*(y-OS.eigval*t))))
-            u = -eps*dot(OS.f, real(1j*OS.phi*exp(1j*(y-OS.eigval*t))))  
-            U[0, i, j, :] = u
-            U[1, i, j, :] = v
+    x = X[0, :, 0, 0]
+    phi, dphidy = OS.interp(x, 1, same_mesh=False, verbose=False)
+    for j in range(U.shape[2]):
+        y = X[1, 0, j, 0]
+        v = (1-x**2) + eps*real(dphidy*exp(1j*(y-OS.eigval*t)))
+        u = -eps*real(1j*phi*exp(1j*(y-OS.eigval*t)))
+        U[0, :, j, :] = u.repeat(U.shape[3]).reshape((len(x), U.shape[3]))
+        U[1, :, j, :] = v.repeat(U.shape[3]).reshape((len(x), U.shape[3]))
     U[2] = 0
 
 OS, e0 = None, None
 def initialize(solver, context):
     global OS, e0
     params = config.params
-    OS = OrrSommerfeld(Re=params.Re, N=160, eigval=1)
+    OS = OrrSommerfeld(Re=params.Re, N=context.N[0])
+    OS.solve(True)
     U = context.U
     X = context.X
     FST = context.FST
@@ -135,8 +149,8 @@ def update(context):
         #X[:] = FST.get_local_mesh(ST)
         
         if solver.rank == 0:
-            #print("Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2)))
-            print("Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(sum(pert))))
+            print("Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2)))
+            #print("Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(sum(pert))))
 
 def regression_test(context):
     global OS, e0
@@ -166,7 +180,7 @@ def refinement_test(context):
     pert = (U[0] - c.U0[0])**2 + (U[1]-c.U0[1])**2
     e2 = 0.5*c.FST.dx(pert, c.ST.quad)
     if solver.rank == 0:
-        print("Computed error = %2.8e %2.8e " %(sqrt(abs(e2)), params.dt))
+        print("Computed error = %2.8e %2.8e " %(sqrt(e2), params.dt))
         
 if __name__ == "__main__":
     config.update(
@@ -176,7 +190,7 @@ if __name__ == "__main__":
         'dt': 0.001,                 # Time step
         'T': 0.01,                   # End time
         'L': [2, 2*pi, 4*pi/3.],
-        'M': [7, 5, 2]
+        'M': [7, 5, 1]
         },  "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)

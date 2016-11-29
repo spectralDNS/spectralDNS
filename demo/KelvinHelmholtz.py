@@ -16,8 +16,9 @@ def initialize(X, U, U_hat, FFT, **context):
         U_hat[i] = FFT.fft2(U[i], U_hat[i])
 
 im, im2 = None, None
+count = 0
 def update(context):
-    global im, im2
+    global im, im2, count
     c = context
     params = config.params
     solver = config.solver
@@ -53,12 +54,14 @@ def update(context):
         globals().update(dict(im=im, im2=im2))
 
     if params.tstep % params.plot_result == 0 and params.plot_result > 0:
+        count += 1
         im.set_data(P[:, :].T)
         im.autoscale()
         plt.pause(1e-6)
         im2.set_data(curl[:,:].T)
         im2.autoscale()
         plt.pause(1e-6)
+        plt.savefig("KH_{}.png".format(count))
         if solver.rank == 0:
             print(params.tstep)
 
@@ -77,8 +80,8 @@ if __name__ == "__main__":
         }, 'doublyperiodic'
     )
     # Adding new arguments required here to allow overloading through commandline
-    config.doublyperiodic.add_argument('--plot_result', type=int, default=10)    
-    config.doublyperiodic.add_argument('--compute_energy', type=int, default=10)
+    config.doublyperiodic.add_argument('--plot_result', type=int, default=50)    
+    config.doublyperiodic.add_argument('--compute_energy', type=int, default=50)
     solver = get_solver(update=update, mesh='doublyperiodic')
     assert config.params.solver == 'NS2D'
     context = solver.get_context()
