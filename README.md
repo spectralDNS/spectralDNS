@@ -88,18 +88,18 @@ Results also from the old Shaheen BlueGene/P:
 </p>
 
 <p align="center">
-    <img src="https://www.dropbox.com/s/f8woa063lls8cbp/channel_white_395.gif?dl=1" width="800" height="266" alt="Channel flow"/>
+    <img src="https://www.dropbox.com/s/fsk7xolb2yk60re/Re2000_5.gif?dl=1" width="800" height="266" alt="Channel flow"/>
 </p>
 <p align="center">
-    Turbulent channel flow at Re_tau = 395. Simulations are performed using 128 cores on Shaheen II with the KMM channel flow solver (solvers/ShenKMM.py) using 256^3 points in real physical space.
-</p>
-
-<p align="center">
-    <img src="https://www.dropbox.com/s/8oayxts0ix359hi/KHmovie1.gif?dl=1" width="600" height="400" alt="Kelvin Helmholtz instability"/>
+    Turbulent channel flow at Re_tau = 2000. Simulations are performed using 512 cores on Shaheen II with the KMM channel flow solver (solvers/KMM.py) using 512x1024x1024 points in real physical space.
 </p>
 
 <p align="center">
-    Evolution of vorticity. Two-dimensional simulation of Kelvin Helmholtz shear instability using a Boussinesq formulation (solvers/spectralDNS2D_Boussinesq.py)
+    <img src="https://www.dropbox.com/s/7mwy70gwul79i3i/KHmovie_3.gif?dl=1" width="600" height="400" alt="Kelvin Helmholtz instability"/>
+</p>
+
+<p align="center">
+    Evolution of vorticity. Two-dimensional simulation of Kelvin Helmholtz shear instability using a 2D solver (solvers/NS2D.py)
 </p>
 
 Authors
