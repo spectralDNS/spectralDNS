@@ -239,7 +239,7 @@ if __name__ == "__main__":
     #U0[2] = s.FST.ifst(s.U_hat[2], U0[2], s.ST, dealias="3/2-rule")
     #config.params.eps = 1e-6
     config.params.verbose=False
-    print "Test"
+    print("Test")
     solver.update = lambda x: None
     for eps in [1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11, 1e-12]:
         config.params.eps = eps
