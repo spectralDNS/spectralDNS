@@ -2,6 +2,7 @@ from numpy.polynomial import chebyshev as n_cheb
 from sympy import chebyshevt, Symbol, sin, cos
 import numpy as np
 import sys
+from pylab import plot, spy, show
 
 """
 Solve Helmholtz equation on (-1, 1) with homogeneous bcs
@@ -12,9 +13,9 @@ where kx is some integer wavenumber.
 
 Use Shen basis
 
-  \phi_k = T_k - T_{k+2}, k=0, 1, ..., N-2
-  \phi_{N-1} = 0.5*(T_0 + T_1)
-  \phi_{N} = 0.5*(T_0 - T_1)
+  \phi_{0} = 0.5*(T_0 - T_1)
+  \phi_k = T_{k-1} - T_{k+1}, k = 1, ..., N-1
+  \phi_{N} = 0.5*(T_0 + T_1)
 
 where T_k is k'th Chebyshev
 polynomial of first kind. Solve using spectral Galerkin and the
@@ -79,6 +80,7 @@ Pxx[:,0] = (Vxx[:,0] - Vxx[:,1])/2
 Pxx[:,1:-1] = Vxx[:,:-2] - Vxx[:,2:]
 Pxx[:,-1] = (Vxx[:,0] + Vxx[:,1])/2
 
+############################ Solve first in one domain ########################
 
 # Mass Matrix
 M = np.dot(w*P.T, P)
@@ -129,9 +131,10 @@ uq2 = np.dot(P, u_hat2)
 assert np.allclose(uq2, uj, 0, 1e-4)
 
 
-# Now do two domains [-1, 0] x [0, 1]
+####################### Now with domain [-1, 0] x [0, 1] ######################
+
 # Assemble Helmholtz
-scl = 2.0 # Map domains to [-1, 1]
+scl = 2.0
 
 fj = np.zeros((2, (n+1)))
 uj = np.zeros((2, (n+1)))
@@ -185,7 +188,9 @@ uq[1] = np.dot(P, u_hat[n:])
 x1 = np.hstack([0.5*points-0.5,0.5*points+0.5])
 assert np.allclose(uq, uj)
 
-# Now do four domains [-1, -0.5] x [-0.5, 0] x [0, 0.5] x [0, 1]
+
+######### Now do four domains [-1, -0.5] x [-0.5, 0] x [0, 0.5] x [0, 1] ######
+
 # Assemble Helmholtz
 scl = 4.0
 
@@ -199,7 +204,6 @@ uj[0] = np.array([u.subs(x, 0.25*j-0.75) for j in points], dtype=float)
 uj[1] = np.array([u.subs(x, 0.25*j-0.25) for j in points], dtype=float)
 uj[2] = np.array([u.subs(x, 0.25*j+0.25) for j in points], dtype=float)
 uj[3] = np.array([u.subs(x, 0.25*j+0.75) for j in points], dtype=float)
-
 
 # Assemble Helmholtz
 A = K*scl**2 + kx**2*M
@@ -257,7 +261,6 @@ xx = np.hstack([0.25*points+(2*i-3)*0.25 for i in range(4)])
 
 assert np.allclose(uq, uj)
 
-from pylab import *
 plot(xx, uq.flatten())
 
 spy(A_t, precision=1e-8)
