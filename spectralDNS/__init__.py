@@ -12,7 +12,7 @@ def get_solver(update=None,
                additional_callback=None,
                mesh="triplyperiodic", parse_args=None):
     """Return solver based on global config (see spectralDNS/config.py)
-    
+
     args:
         update               Update function called on each timestep.
                              Typically used for plotting or computing
@@ -27,16 +27,16 @@ def get_solver(update=None,
         parse_args           Used to specify arguments to config.
                              If parse_args is None then Commandline arguments
                              are used.
-                             
+
     global args:
         config               See spectralDNS/config.py for details.
-        
+
     """
     assert parse_args is None or isinstance(parse_args, list)
     args = getattr(eval('.'.join(('config', mesh))),
                     'parse_args')(parse_args)
     config.params.update(vars(args))
-    
+
     try:
         solver = importlib.import_module('.'.join(('spectralDNS.solvers',
                                                    config.params.solver)))
@@ -51,7 +51,7 @@ def get_solver(update=None,
 
     if additional_callback:
         solver.additional_callback = additional_callback
-        
+
     # Create link to solver module in config
     config.solver = solver
 
@@ -69,12 +69,12 @@ def solve(solver, context):
                      that control the integration.
                      See spectralDNS.config.py for details
     """
-    
+
     solver.timer = solver.Timer()
     params = solver.params
-    
+
     solver.conv = solver.getConvection(params.convection)
-    
+
     integrate = solver.getintegrator(context.dU, # rhs array
                                      context.u,  # primary variable
                                      solver,
@@ -104,7 +104,7 @@ def solve(solver, context):
 
     params.dt = dt_in
 
-    solver.timer.final(solver.MPI, solver.rank)
+    solver.timer.final(solver.MPI, solver.rank, params.verbose)
 
     if params.make_profile:
         solver.results = solver.create_profile(solver.profiler, solver.comm,

@@ -15,10 +15,11 @@ def test_channel(sol):
             'dt': 0.001,                 # Time step
             'T': 0.01,                   # End time
             'L': [2, 2*pi, 4*pi/3.],
-            'M': [7, 5, 2]
+            'M': [7, 5, 2],
+            'eps': 1e-7
         },  "channel"
     )
-    
+
     solver = get_solver(regression_test=regression_test,
                         mesh="channel",
                         parse_args=[sol])

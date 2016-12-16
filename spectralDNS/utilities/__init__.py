@@ -14,7 +14,7 @@ class Timer(object):
         self.slowest_timestep = 0
         self.t0 = time()
         self.tic = self.t0
-        
+
     def __call__(self):
         self.t1 = time()
         dt = self.t1 - self.t0
@@ -22,16 +22,16 @@ class Timer(object):
         self.slowest_timestep = max(dt, self.slowest_timestep)
         self.t0 = self.t1
 
-    def final(self, MPI, rank):
+    def final(self, MPI, rank, verbose=True):
         # Get min/max of fastest and slowest process
         comm = MPI.COMM_WORLD
         fast = (comm.reduce(self.fastest_timestep, op=MPI.MIN, root=0),
                 comm.reduce(self.slowest_timestep, op=MPI.MIN, root=0))
         slow = (comm.reduce(self.fastest_timestep, op=MPI.MAX, root=0),
                 comm.reduce(self.slowest_timestep, op=MPI.MAX, root=0))
-        
+
         toc = time() - self.tic
-        if rank == 0:
+        if rank == 0 and verbose:
             print("Time = {}".format(toc))
             print("Fastest = {}".format(fast))
             print("Slowest = {}".format(slow))

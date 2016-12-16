@@ -6,19 +6,19 @@ import collections
 
 comm = MPI.COMM_WORLD
 
-N = arange(5, 13)
+N = arange(5, 12)
 M = 1
 
 config.update(
     {
     'nu': 1./590.,                  # Viscosity
-    'Re_tau': 590., 
+    'Re_tau': 590.,
     'dt': 0.001,                    # Time step
     'T': 0.01,                       # End time
     'L': [2, 2*pi, pi],
     'optimization': 'cython',
     'make_profile': 1,
-    'dealias': '2/3-rule',
+    'dealias': '3/2-rule',
     'planner_effort': collections.defaultdict(lambda: 'FFTW_MEASURE'),
     'M': [5, 5, 5]
     },  "channel"
@@ -41,13 +41,14 @@ for n in N:
               solver.results['solve_linear'][2]
               ])
     solver.profiler.clear()
-    
+    del context
+
 print t
 print "$N_x$ & Total ($\\frac{t_k }{t_{k-1}} \\frac{\log N-1}{2 \log N}$) & Assemble ($\\frac{t_k }{t_{k-1}} \\frac{\log N-1}{2 \log N}$) & Solve ($\\frac{t_k}{t_{k-1}} \\frac{1}{2}$) \\\ "
 print "\hline"
 for i, n in enumerate(N):
     err = str(2**n)
-    err += " & {:2.3f} ({:2.2f}) & {:2.2e} ({:2.2f}) & {:2.2e} ({:2.2f}) \\\ ".format(t[i][0], 0 if i == 0 else t[i][0]/t[i-1][0]/(2.*log(n)/log(n-1)), 
+    err += " & {:2.3f} ({:2.2f}) & {:2.2e} ({:2.2f}) & {:2.2e} ({:2.2f}) \\\ ".format(t[i][0], 0 if i == 0 else t[i][0]/t[i-1][0]/(2.*log(n)/log(n-1)),
                                                                                       t[i][1]/10, 0 if i == 0 else t[i][1]/t[i-1][1]/(2.*log(n)/log(n-1)),
                                                                                       t[i][2]/10, 0 if i == 0 else t[i][2]/t[i-1][2]/2.)
     print err

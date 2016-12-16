@@ -42,7 +42,18 @@ pi, zeros, ones = np.pi, np.zeros, np.ones
 work = work_arrays()
 
 class ChebyshevTransform(object):
+    """Basis for regular Chebyshev series
     
+    args:
+        quad        ('GL', 'GC')  Gauss-Lobatto or Gauss-Chebyshev points
+        threads          1        Number of threads used by pyfftw
+        planner_effort            Planner effort for FFTs. 
+
+    Transforms are performed along the first dimension of a multidimensional
+    array.
+
+    """
+
     def __init__(self, quad="GL", threads=1, planner_effort="FFTW_MEASURE"): 
         self.quad = quad
         self.threads = threads
@@ -173,10 +184,12 @@ class ShenDirichletBasis(ChebyshevTransform):
         threads          1        Number of threads used by pyfftw
         planner_effort            Planner effort for FFTs. 
         bc             (a, b)     Boundary conditions at x=(1,-1)
+        
+    Transforms are performed along the first dimension of a multidimensional
+    array.
 
     """
-    
-    
+
     def __init__(self, quad="GL", threads=1, planner_effort="FFTW_MEASURE",
                  bc=(0., 0.)):
         ChebyshevTransform.__init__(self, quad=quad, planner_effort=planner_effort)
@@ -255,6 +268,17 @@ class ShenDirichletBasis(ChebyshevTransform):
         return slice(0, N-2)
 
 class ShenNeumannBasis(ShenDirichletBasis):
+    """Shen basis for homogeneous Neumann boundary conditions
+    
+    args:
+        quad        ('GL', 'GC')  Gauss-Lobatto or Gauss-Chebyshev points
+        threads          1        Number of threads used by pyfftw
+        planner_effort            Planner effort for FFTs. 
+
+    Transforms are performed along the first dimension of a multidimensional
+    array.
+
+    """
     
     def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"): 
         ShenDirichletBasis.__init__(self, quad, threads, planner_effort)
@@ -324,7 +348,19 @@ class ShenNeumannBasis(ShenDirichletBasis):
         return slice(1, N-2)
 
 class ShenBiharmonicBasis(ShenDirichletBasis):
+    """Shen biharmonic basis for homogeneous Dirichlet and Neumann boundary
+    conditions.
     
+    args:
+        quad        ('GL', 'GC')  Gauss-Lobatto or Gauss-Chebyshev points
+        threads          1        Number of threads used by pyfftw
+        planner_effort            Planner effort for FFTs. 
+        
+    Transforms are performed along the first dimension of a multidimensional
+    array.
+
+    """
+
     def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"):
         ShenDirichletBasis.__init__(self, quad, threads, planner_effort)
         self.factor1 = zeros(0)

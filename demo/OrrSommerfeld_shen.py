@@ -43,7 +43,7 @@ class OrrSommerfeld(object):
         nx, eigval = self.get_eigval(eigval, verbose)
         phi_hat = np.zeros(N, np.complex)
         phi_hat[:-4] = np.squeeze(self.eigvectors[:, nx])
-        if same_mesh:            
+        if same_mesh:
             phi = np.zeros_like(phi_hat)
             dphidy = np.zeros_like(phi_hat)
             if self.SB is None:
@@ -55,7 +55,7 @@ class OrrSommerfeld(object):
             dphidy_hat = self.CDB.matvec(phi_hat)
             dphidy_hat = self.SD.Solver(dphidy_hat)
             dphidy = self.SD.ifst(dphidy_hat, dphidy)
-            
+
         else:
             # Recompute interpolation matrices if necessary
             if not len(self.P4) == len(y):
@@ -94,7 +94,7 @@ class OrrSommerfeld(object):
         P4 = np.zeros((N, N))
         P4[:, :-4] = V[:, :-4] - (2*(k+2)/(k+3))*V[:, 2:-2] + ((k+1)/(k+3))*V[:, 4:]
 
-        # Second derivatives 
+        # Second derivatives
         T2x = np.zeros((N, N))
         T2x[:, :-4] = T2[:, :-4] - (2*(k+2)/(k+3))*T2[:, 2:-2] + ((k+1)/(k+3))*T2[:, 4:]
 
@@ -115,13 +115,13 @@ class OrrSommerfeld(object):
         K1 = np.zeros((N, N))
         K1 = SB.fastShenScalar(xx*P4, K1)
         #K1 = extract_diagonal_matrix(K1) # For improved roundoff
-        
+
         # ((1-x**2)u'', v)
         #K2 = np.dot(w*P4.T, xx*T2x)
         K2 = np.zeros((N, N))
         K2 = SB.fastShenScalar(xx*T2x, K2)
         #K2 = extract_diagonal_matrix(K2) # For improved roundoff
-        
+
         # (u'''', v)
         #Q = np.dot(w*P4.T, T4x)
         Q = np.zeros((self.N, self.N))
@@ -131,7 +131,7 @@ class OrrSommerfeld(object):
         #M = np.dot(w*P4.T, P4)
         M = np.zeros((self.N, self.N))
         M[:-4, :-4] = BBBmat(np.arange(N).astype(np.float), self.quad).diags().toarray()
-        
+
         Re = self.Re
         a = self.alfa
         self.B = -Re*a*1j*(K-a**2*M)
@@ -149,7 +149,7 @@ class OrrSommerfeld(object):
 
     def get_eigval(self, nx, verbose=False):
         """Get the chosen eigenvalue
-        
+
         Args:
             nx       The chosen eigenvalue. nx=1 corresponds to the one with the
                      largest imaginary part, nx=2 the second largest etc.
@@ -182,7 +182,7 @@ def extract_diagonal_matrix(M, tol=1e-8):
             du.append((i, u))
         if abs(l).max() > tol:
             dl.append((i, l))
-    
+
     np.fill_diagonal(Mc, dd)
     for (i, ud) in du:
         np.fill_diagonal(Mc[:, i:], ud)
@@ -203,15 +203,17 @@ if __name__=='__main__':
     parser.add_argument('--quad', default='GC', type=str, choices=('GC', 'GL'),
                         help='Discretization points: GC: Gauss-Chebyshev, GL: Gauss-Lobatto')
     parser.add_argument('--plot', dest='plot', action='store_true', help='Plot eigenvalues')
+    parser.add_argument('--verbose', dest='verbose', action='store_true', help='Print results')
     parser.set_defaults(plot=False)
+    parser.set_defaults(verbose=False)
     args = parser.parse_args()
     #z = OrrSommerfeld(N=120, Re=5772.2219, alfa=1.02056)
     z = OrrSommerfeld(**vars(args))
-    z.solve()
+    z.solve(args.verbose)
+    d = z.get_eigval(1, args.verbose)
     if args.Re == 8000.0 and args.alfa == 1.0 and args.N > 80:
-        d = z.get_eigval(1)
         assert abs(d[1] - (0.24707506017508621+0.0026644103710965817j)) < 1e-12
-    
+
     if args.plot:
         plt.figure()
         ev = z.eigvals*z.alfa

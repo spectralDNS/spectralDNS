@@ -1,12 +1,12 @@
 """Parameters for the spectralDNS solvers
 
-The parameters are kept in dictionary 'params'. The values of this 
-dictionary may be accessed as attributes, e.g., 
+The parameters are kept in dictionary 'params'. The values of this
+dictionary may be accessed as attributes, e.g.,
 
 M = config.params.M  does the same thing as M = config.params['M']
 
 Generic parameters for all solvers::
-    precision        (str)           ('double', 'single') 
+    precision        (str)           ('double', 'single')
     optimization     (str)           ('cython', 'numba', None)
     make_profile     (int)           Whether on not to enable profiling
     dt               (float)         Time step for fixed time step integrators
@@ -22,19 +22,20 @@ Generic parameters for all solvers::
     ntol             (int)           Tolerance (number of accurate digits used in tests)
     threads          (int)           Number of threads used for FFTs
     h5filename       (str)           Filename for storing HDF5 results
+    verbose          (bool)          Print some timings in the end
 
 Parameters for 3D solvers in triply periodic domain::
     convection       (str)           ('Standard', 'Divergence', 'Skewed', 'Vortex')
     decomposition    (str)           ('slab', 'pencil')
     communication    (str)           ('Alltoallw', 'Alltoall', 'Sendrecv_replace', 'AlltoallN')
-    pencil_alignment (str)           ('X', 'Y') Final alignment direction for spectral data 
+    pencil_alignment (str)           ('X', 'Y') Final alignment direction for spectral data
     P1               (int)           Pencil decomposition in first direction
     write_yz_slice   (int, int)      Store yz slice at x index (*0) every (*1) time step
     write_xz_slice   (int, int)      Store xz slice at y index (*0) every (*1) time step
     write_xy_slice   (int, int)      Store xy slice at z index (*0) every (*1) time step
     integrator       (str)           ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
     TOL              (float)         Accuracy used in BS5_adaptive
-        
+
 Parameters for 3D solvers in channel domain::
     convection       (str)           ('Standard', 'Divergence', 'Skewed', 'Vortex')
     dealias_cheb     (bool)          Whether or not to dealias in inhomogeneous direction
@@ -42,27 +43,27 @@ Parameters for 3D solvers in channel domain::
     write_yz_slice   (int, int)      Store yz slice at x index (*0) every (*1) time step
     write_xz_slice   (int, int)      Store xz slice at y index (*0) every (*1) time step
     write_xy_slice   (int, int)      Store xy slice at z index (*0) every (*1) time step
-    
+
 Parameters for 2D solvers in doubly periodic domain::
     integrator       (str)           ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
     decomposition    (str)           ('line')
-        
+
 Solver specific parameters triply periodic domain::
     MHD::
         eta          (float)         Model parameter
-        
+
 Solver specific parameters doubly periodic domain::
     Bq2D::
         Ri           (float)         Model parameter (Richardson number)
         Pr           (float)         Model parameter (Prandtl number)
         integrator   (str)           ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
-        
+
 Solver specifi parameters channel domain::
     IPCS, IPCSR::
         velocity_pressure_iters   (int)   Number of inner velocity pressure iterations
         print_divergence_progress (bool)  Print the norm of the pressure correction on inner iterations
         divergence_tol            (float) Tolerance on divergence error for pressure velocity coupling
-        
+
 """
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2015-04-08"
@@ -94,22 +95,22 @@ class AttributeDict(collections.MutableMapping, dict):
 
     def __setattr__(self, key, val):
         dict.__setattr__(self, key, val)
-        
+
     def __getitem__(self, key):
         return dict.__getitem__(self, key)
-    
+
     def __setitem__(self, key, val):
         dict.__setitem__(self, key, val)
-         
+
     def __delitem__(self, key):
         dict.__delitem__(self, key)
-        
+
     def __iter__(self):
         return dict.__iter__(self)
-    
+
     def __len__(self):
         return dict.__len__(self)
-    
+
     def __contains__(self, x):
         return dict.__contains__(self, x)
 
@@ -127,14 +128,14 @@ class Params(AttributeDict):
     """
     def __init__(self, *args, **kwargs):
         AttributeDict.__init__(self, *args, **kwargs)
-        
+
     def __getattr__(self, key):
         # Called if key is missing in __getattribute__
         if key == 'dx':
             assert ('M' in self) and ('L' in self)
             val = self['L']/2**self['M']
             return val
-        
+
         elif key == 'N':
             mval = self['M']
             val = 2**mval
@@ -155,18 +156,18 @@ class Params(AttributeDict):
             self.__setitem__(key, val)
         else:
             dict.__setattr__(self, key, val)
-        
+
     def __setitem__(self, key, val):
         if key == 'M':
             val = array([eval(str(f)) for f in val], dtype=int)
             val.flags.writeable = False
             dict.__setitem__(self, key, val)
-            
+
         elif key == 'L':
             val = array([eval(str(f)) for f in val], dtype=float)
             val.flags.writeable = False
             dict.__setitem__(self, key, val)
-        
+
         else:
             dict.__setitem__(self, key, val)
 
@@ -210,14 +211,17 @@ parser.add_argument('--tstep', default=0, type=int,
 parser.add_argument('--dealias', default='2/3-rule',
                     choices=('2/3-rule', '3/2-rule', 'None'),
                     help='Choose dealiasing method')
-parser.add_argument('--ntol', default=7, type=int, 
+parser.add_argument('--ntol', default=7, type=int,
                     help='Tolerance - number of accurate digits')
-parser.add_argument('--threads', default=1, type=int, 
+parser.add_argument('--threads', default=1, type=int,
                     help='Number of threads used for FFTs')
-parser.add_argument('--planner_effort', action=PlanAction, default=fft_plans, 
+parser.add_argument('--planner_effort', action=PlanAction, default=fft_plans,
                     help="""Planning effort for FFTs. Usage, e.g., --planner_effort '{"dct":"FFTW_EXHAUSTIVE"}' """)
 parser.add_argument('--h5filename', default='results', type=str,
                     help='Filename of HDF5 datafile used to store intermediate checkpoint data or timeseries results')
+parser.add_argument('--verbose', dest='verbose', action='store_true', help='Print timings in the end')
+parser.add_argument('--no-verbose', dest='verbose', action='store_false', help='Do not print timings in the end')
+parser.set_defaults(verbose=True)
 
 # Arguments for 3D isotropic solvers
 triplyperiodic = argparse.ArgumentParser(parents=[parser])
@@ -238,15 +242,15 @@ triplyperiodic.add_argument('--decomposition', default='slab', choices=('slab', 
                             help="Choose 3D decomposition between slab and pencil.")
 triplyperiodic.add_argument('--M', default=[6, 6, 6], metavar=("Mx", "My", "Mz"), nargs=3,
                             help='Mesh size is pow(2, M[i]) in direction i')
-triplyperiodic.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'), 
+triplyperiodic.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'),
                             help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
-triplyperiodic.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'), 
+triplyperiodic.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'),
                             help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
-triplyperiodic.add_argument('--write_xy_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'), 
+triplyperiodic.add_argument('--write_xy_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'),
                             help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
-triplyperiodic.add_argument('--TOL', type=float, default=1e-6, 
+triplyperiodic.add_argument('--TOL', type=float, default=1e-6,
                             help='Tolerance for adaptive time integrator')
-triplyperiodic.add_argument('--integrator', default='RK4', 
+triplyperiodic.add_argument('--integrator', default='RK4',
                             choices=('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed'),
                             help='Integrator for triply periodic domain')
 
@@ -309,7 +313,7 @@ channel.add_argument('--Pencil_alignment', default='X', choices=('X',),
                      help='Alignment of the complex data for pencil decomposition')
 channel.add_argument('--M', default=[6, 6, 6], nargs=3, metavar=('Mx', 'My', 'Mz'),
                      help='Mesh size is pow(2, M[i]) in direction i')
-channel.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'), 
+channel.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'),
                      help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
 channel.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'),
                      help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
@@ -355,12 +359,12 @@ print_div_parser.add_argument('--no-print_divergence_progress',
                               dest='print_divergence_progress',
                               action='store_false',
                               help='Do not print the norm of the pressure correction on inner iterations for IPCSR')
-print_div_parser.add_argument('--print_divergence_progress', 
-                              dest='print_divergence_progress', 
-                              action='store_true', 
+print_div_parser.add_argument('--print_divergence_progress',
+                              dest='print_divergence_progress',
+                              action='store_true',
                               help='Print the norm of the pressure correction on inner iterations for IPCSR')
 IPCSR.set_defaults(print_divergence_progress=False)
-IPCSR.add_argument('--divergence_tol', default=1e-7, type=float, 
+IPCSR.add_argument('--divergence_tol', default=1e-7, type=float,
                    help='Tolerance on divergence error for pressure velocity coupling for IPCS')
 
 #from IPython import embed; embed()
