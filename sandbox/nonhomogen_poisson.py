@@ -1,8 +1,8 @@
 from numpy.polynomial import chebyshev as n_cheb
-from sympy import chebyshevt, Symbol, sin, cos
+from sympy import chebyshevt, Symbol, sin, cos, lambdify
 import numpy as np
 import sys
-from pylab import plot, spy, show
+from pylab import plot, spy, show, figure
 
 """
 Solve Helmholtz equation on (-1, 1) with homogeneous bcs
@@ -38,8 +38,10 @@ x = Symbol("x")
 u = (1.0-x**2)**2*cos(np.pi*4*x)*(x-0.25)**3 + b*(1 + x)/2. + a*(1 - x)/2.
 kx = np.sqrt(5)
 f = -u.diff(x, 2) + kx**2*u
+fl = lambdify(x, f, "numpy")
+ul = lambdify(x, u, "numpy")
 
-n = 24
+n = 25
 domain = sys.argv[-1] if len(sys.argv) == 2 else "C1"
 
 # Chebyshev-Gauss nodes and weights
@@ -92,8 +94,8 @@ C = np.dot(w*P.T, Px)
 K = -np.dot(w*P.T, Pxx)
 
 # Gauss-Chebyshev quadrature to compute rhs
-fj = np.array([f.subs(x, j) for j in points], dtype=float)     # Get f on quad points
-uj = np.array([u.subs(x, j) for j in points], dtype=float)
+fj = fl(points)
+uj = ul(points)
 
 # Compute rhs
 f_hat = np.dot(w*P.T, fj)
@@ -136,12 +138,9 @@ assert np.allclose(uq2, uj, 0, 1e-4)
 # Assemble Helmholtz
 scl = 2.0
 
-fj = np.zeros((2, (n+1)))
-uj = np.zeros((2, (n+1)))
-fj[0] = np.array([f.subs(x, 0.5*(j-1)) for j in points], dtype=float)
-fj[1] = np.array([f.subs(x, 0.5*(j+1)) for j in points], dtype=float)
-uj[0] = np.array([u.subs(x, 0.5*(j-1)) for j in points], dtype=float)
-uj[1] = np.array([u.subs(x, 0.5*(j+1)) for j in points], dtype=float)
+xx = np.array([0.5*points-0.5+i for i in range(2)])
+fj = fl(xx)
+uj = ul(xx)
 
 # Assemble Helmholtz
 A = K*scl**2 + kx**2*M
@@ -160,24 +159,30 @@ f_hat[0] = a
 f_hat[-1] = b
 
 # Use continuity across
-left = -np.arange(n+1)*4.0
-left[0], left[-1] = -0.5, 0.5
-right = -np.arange(n+1)*4.0
-right[1::2] *= -1
-right[0], right[-1] = -0.5, 0.5
+S = n_cheb.chebvander((-1, 1), n) # Cheb polynomials at bnds
+Sx = np.dot(S, D1)  # Derivatives at bnds
+Tx = np.zeros_like(Sx)
+Tx[:, 0] = (Sx[:,0] - Sx[:, 1])/2.
+Tx[:, 1:-1] = Sx[:,:-2] - Sx[:, 2:]
+Tx[:, -1] = (Sx[:,0] + Sx[:, 1])/2.
+left, right = Tx[0], Tx[1]
 
 A_t[n, :] = 0
-if domain == "C1":
-    A_t[n, :n+1] = left
-    A_t[n, n:] -= right
-elif domain == "Ceven":
-    A_t[n, :n+1:2] = left[::2]
-    A_t[n, n::2] -= right[::2]
-else:
-    A_t[n, 1:n+1:2] = left[1::2]
-    A_t[n, n+1::2] -= right[1::2]
-
 f_hat[n] = 0
+if domain == "C1":
+    A_t[n, :n+1] = right
+    A_t[n, n:] -= left
+elif domain == "Ceven":
+    A_t[n, :n+1:2] = right[::2]
+    A_t[n, n::2] -= left[::2]
+else:
+    A_t[n, 1:n+1:2] = right[1::2]
+    A_t[n, n+1::2] -= left[1::2]
+
+#A_t[n] = 0
+#A_t[n, :n+1] = A[-1, :]
+#A_t[n, n:] += A[0, :]
+##f_hat[n] = 0
 
 u_hat = np.linalg.solve(A_t, f_hat)
 
@@ -185,7 +190,6 @@ uq = np.zeros((2, n+1))
 uq[0] = np.dot(P, u_hat[:(n+1)])
 uq[1] = np.dot(P, u_hat[n:])
 
-x1 = np.hstack([0.5*points-0.5,0.5*points+0.5])
 assert np.allclose(uq, uj)
 
 
@@ -196,14 +200,9 @@ scl = 4.0
 
 fj = np.zeros((4, (n+1)))
 uj = np.zeros((4, (n+1)))
-fj[0] = np.array([f.subs(x, 0.25*j-0.75) for j in points], dtype=float)
-fj[1] = np.array([f.subs(x, 0.25*j-0.25) for j in points], dtype=float)
-fj[2] = np.array([f.subs(x, 0.25*j+0.25) for j in points], dtype=float)
-fj[3] = np.array([f.subs(x, 0.25*j+0.75) for j in points], dtype=float)
-uj[0] = np.array([u.subs(x, 0.25*j-0.75) for j in points], dtype=float)
-uj[1] = np.array([u.subs(x, 0.25*j-0.25) for j in points], dtype=float)
-uj[2] = np.array([u.subs(x, 0.25*j+0.25) for j in points], dtype=float)
-uj[3] = np.array([u.subs(x, 0.25*j+0.75) for j in points], dtype=float)
+xx = np.array([0.25*points+(2*i-3)*0.25 for i in range(4)])
+fj = fl(xx)
+uj = ul(xx)
 
 # Assemble Helmholtz
 A = K*scl**2 + kx**2*M
@@ -228,22 +227,16 @@ f_hat[0] = a
 f_hat[-1] = b
 
 # Use continuity across
-left = -np.arange(n+1)*4.0
-left[0], left[-1] = -0.5, 0.5
-right = -np.arange(n+1)*4.0
-right[1::2] *= -1
-right[0], right[-1] = -0.5, 0.5
-
 A_t[n, :] = 0
 A_t[2*n, :] = 0
 A_t[3*n, :] = 0
 
-A_t[n, :n+1] = left
-A_t[n, n:2*n+1] -= right
-A_t[2*n, n:2*n+1] = left
-A_t[2*n, 2*n:3*n+1] -= right
-A_t[3*n, 2*n:3*n+1] = left
-A_t[3*n, 3*n:] -= right
+A_t[n, :n+1] = right
+A_t[n, n:2*n+1] -= left
+A_t[2*n, n:2*n+1] = right
+A_t[2*n, 2*n:3*n+1] -= left
+A_t[3*n, 2*n:3*n+1] = right
+A_t[3*n, 3*n:] -= left
 
 f_hat[n] = 0
 f_hat[2*n] = 0
@@ -251,18 +244,12 @@ f_hat[3*n] = 0
 
 u_hat = np.linalg.solve(A_t, f_hat)
 
-uq = np.zeros((4, n+1))
-uq[0] = np.dot(P, u_hat[:(n+1)])
-uq[1] = np.dot(P, u_hat[n:2*n+1])
-uq[2] = np.dot(P, u_hat[2*n:3*n+1])
-uq[3] = np.dot(P, u_hat[3*n:4*n+1])
-
-xx = np.hstack([0.25*points+(2*i-3)*0.25 for i in range(4)])
+uq = np.array([np.dot(P, u_hat[n*i:(i+1)*n+1]) for i in range(4)])
 
 assert np.allclose(uq, uj)
 
-plot(xx, uq.flatten())
-
+plot(xx.flatten(), uq.flatten())
+figure()
 spy(A_t, precision=1e-8)
 show()
 
