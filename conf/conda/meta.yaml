@@ -1,12 +1,12 @@
 package:
   name: spectraldns
   version: "1.0"
-  
+
 source:
-  git_url: ../../  
-  
+  git_url: ../../
+
 build:
-  number: 20
+  number: 21
 
 requirements:
 
