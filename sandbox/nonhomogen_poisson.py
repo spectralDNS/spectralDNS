@@ -41,12 +41,16 @@ f = -u.diff(x, 2) + kx**2*u
 fl = lambdify(x, f, "numpy")
 ul = lambdify(x, u, "numpy")
 
-n = 25
+n = 32
 domain = sys.argv[-1] if len(sys.argv) == 2 else "C1"
 
 # Chebyshev-Gauss nodes and weights
-points, w = n_cheb.chebgauss(n+1)
-points = points[::-1]
+from spectralDNS.shen.shentransform import ChebyshevTransform
+CT = ChebyshevTransform(quad="GL")
+points, w = CT.points_and_weights(n+1)
+
+#points, w = n_cheb.chebgauss(n+1)
+#points = -points
 
 # Chebyshev Vandermonde matrix
 V = n_cheb.chebvander(points, n)
@@ -115,7 +119,7 @@ u_hat = np.linalg.solve(A, f_hat)
 
 uq = np.dot(P, u_hat)
 
-#assert np.allclose(uq, uj)
+assert np.allclose(uq, uj)
 
 # Alternatively, solve only for j=1,2,...N-1
 f_hat = np.dot(w*P.T, fj)
@@ -130,25 +134,38 @@ u_hat2[-1] = b
 
 uq2 = np.dot(P, u_hat2)
 
-assert np.allclose(uq2, uj, 0, 1e-4)
-
+#assert np.allclose(uq2, uj, 0, 1e-4)
 
 ####################### Now with domain [-1, 0] x [0, 1] ######################
 
-# Assemble Helmholtz
 scl = 2.0
 
 xx = np.array([0.5*points-0.5+i for i in range(2)])
 fj = fl(xx)
 uj = ul(xx)
 
+# Get derivatives at boundary
+S = n_cheb.chebvander((-1, 1), n) # Cheb polynomials at bnds
+Sx = np.dot(S, D1)   # Derivatives at bnds
+
+Tx = np.zeros_like(Sx)
+Tx[:, 0] = (Sx[:,0] - Sx[:,1])/2.
+Tx[:, 1:-1] = Sx[:,:-2] - Sx[:, 2:]
+Tx[:, -1] = (Sx[:,0] + Sx[:,1])/2.
+left, right = Tx[0], Tx[1]
+
 # Assemble Helmholtz
+#KK = -np.dot(P[:, 1:-1].T, Pxx[:, 1:-1]*w[1:-1])
+#CC = -np.dot(P[:, 1:-1].T, Pxx[:, ::n]*w[::n])
+#BB = -np.dot(P[:, ::n].T, Pxx[:, 1:-1]*w[1:-1])
+#DD = -np.dot(P[:, ::n].T, Pxx[:, ::n]*w[::n])
+
 A = K*scl**2 + kx**2*M
 
 A_t = np.zeros((2*(n+1)-1, 2*(n+1)-1))
 A_t[0, 0] = 1
-A_t[1:n, :n+1] = A[1:-1, :]
-A_t[n+1:2*n, n:] = A[1:-1, :]
+A_t[1:n, :n+1] = A[1:-1]
+A_t[n+1:2*n, n:] = A[1:-1]
 A_t[-1, -1] = 1
 
 f_hat = np.zeros(2*(n+1)-1)
@@ -158,17 +175,7 @@ f_hat[n:] += np.dot(w*P.T, fj[1])
 f_hat[0] = a
 f_hat[-1] = b
 
-# Use continuity across
-S = n_cheb.chebvander((-1, 1), n) # Cheb polynomials at bnds
-Sx = np.dot(S, D1)  # Derivatives at bnds
-Tx = np.zeros_like(Sx)
-Tx[:, 0] = (Sx[:,0] - Sx[:, 1])/2.
-Tx[:, 1:-1] = Sx[:,:-2] - Sx[:, 2:]
-Tx[:, -1] = (Sx[:,0] + Sx[:, 1])/2.
-left, right = Tx[0], Tx[1]
-
-A_t[n, :] = 0
-f_hat[n] = 0
+A_t[n] = 0
 if domain == "C1":
     A_t[n, :n+1] = right
     A_t[n, n:] -= left
@@ -179,10 +186,10 @@ else:
     A_t[n, 1:n+1:2] = right[1::2]
     A_t[n, n+1::2] -= left[1::2]
 
+f_hat[n] = 0
 #A_t[n] = 0
 #A_t[n, :n+1] = A[-1, :]
 #A_t[n, n:] += A[0, :]
-##f_hat[n] = 0
 
 u_hat = np.linalg.solve(A_t, f_hat)
 
@@ -191,7 +198,6 @@ uq[0] = np.dot(P, u_hat[:(n+1)])
 uq[1] = np.dot(P, u_hat[n:])
 
 assert np.allclose(uq, uj)
-
 
 ######### Now do four domains [-1, -0.5] x [-0.5, 0] x [0, 0.5] x [0, 1] ######
 

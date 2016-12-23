@@ -16,7 +16,6 @@ minor = 0
 cwd = os.path.abspath(os.path.dirname(__file__))
 cdir = os.path.join(cwd, "spectralDNS", "optimization")
 sdir = os.path.join(cwd, "spectralDNS", "shen")
-sgdir = os.path.join(cwd, "spectralDNS", "shenGeneralBCs")
 
 ext = None
 cmdclass = {}
@@ -39,42 +38,36 @@ if not "sdist" in sys.argv:
         args = "build_ext --inplace"
     subprocess.call([sys.executable, os.path.join(cdir, "setup.py"),
                     args], cwd=cdir)
-    
+
     ext = []
     for s in ("LUsolve", "TDMA", "PDMA", "Matvec"):
         ext += cythonize(Extension("spectralDNS.shen.{0}".format(s),
                                    sources=[os.path.join(sdir, '{0}.pyx'.format(s))],
                                    language="c++"))
     [e.extra_link_args.extend(["-std=c++11"]) for e in ext]
-    
-    for s in ("Cheb", "HelmholtzMHD"):
+
+    for s in ("Cheb", ):
         ext += cythonize(Extension("spectralDNS.shen.{0}".format(s),
                                    sources = [os.path.join(sdir, '{0}.pyx'.format(s))]))
-    
-    #for s in ("LUsolve", "TDMA", "PDMA", "UTDMA"):
-        #ext += cythonize(Extension("spectralDNS.shenGeneralBCs.{0}".format(s), sources = [os.path.join(sgdir, '{0}.pyx'.format(s))], language="c++"))
-        
-    #for s in ("Matvec", "Matrices"):
-        #ext += cythonize(Extension("spectralDNS.shenGeneralBCs.{0}".format(s), sources = [os.path.join(sgdir, '{0}.pyx'.format(s))]))    
 
     [e.include_dirs.extend([get_include()]) for e in ext]
     ext0 = cythonize(os.path.join(cdir, "*.pyx"))
     [e.include_dirs.extend([get_include()]) for e in ext0]
     ext += ext0
     cmdclass = {'build_ext': build_ext_subclass}
-            
+
 else:
     # Remove generated files
     for name in os.listdir(cdir):
         if "single" in name or "double" in name:
             os.remove(os.path.join(cdir, name))
- 
+
 setup(name = "spectralDNS",
       version = "%d.%d" % (major, minor),
       description = "spectralDNS -- Spectral Navier-Stokes solvers framework",
       long_description = "",
       author = "Mikael Mortensen",
-      author_email = "mikaem@math.uio.no", 
+      author_email = "mikaem@math.uio.no",
       url = 'https://github.com/spectralDNS/spectralDNS',
       classifiers = [
           'Development Status :: 5 - Production/Stable',
@@ -92,7 +85,6 @@ setup(name = "spectralDNS",
                   "spectralDNS.utilities",
                   "spectralDNS.maths",
                   "spectralDNS.shen",
-                  "spectralDNS.shenGeneralBCs",
                   "spectralDNS.solvers",
                   "spectralDNS.optimization",
                   ],

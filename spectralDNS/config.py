@@ -367,31 +367,6 @@ IPCSR.set_defaults(print_divergence_progress=False)
 IPCSR.add_argument('--divergence_tol', default=1e-7, type=float,
                    help='Tolerance on divergence error for pressure velocity coupling for IPCS')
 
-#from IPython import embed; embed()
-
-## Arguments for Shen based solver for general bounday conditions
-#ShenGeneralBCs = argparse.ArgumentParser(parents=[parser])
-#ShenGeneralBCs.add_argument('--solver', default='IPCS_GeneralBCs', choices=('IPCS_GeneralBCs',), help="""Choose solver.""")
-#ShenGeneralBCs.add_argument('--convection', default='Standard', choices=('Standard', 'Divergence'))
-#ShenGeneralBCs.add_argument('--L', default=[2, 2*pi, 2*pi], nargs='+', help='Physical mesh size')
-#ShenGeneralBCs.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations')
-#ShenGeneralBCs.add_argument('--print_divergence_progress', default=False, help='Print the norm of the pressure correction on inner iterations')
-#ShenGeneralBCs.add_argument('--dealias', default='2/3-rule', choices=('3/2-rule', '2/3-rule', 'None'), help='Choose dealiasing method')
-#ShenGeneralBCs.add_argument('--Pencil_alignment', default='X', choices=('X',), help='Alignment of the complex data for pencil decomposition')
-
-## Arguments for Shen based solver for MHD
-#ShenMHD = argparse.ArgumentParser(parents=[parser])
-#ShenMHD.add_argument('--solver', default='IPCS_MHD', choices=('IPCS_MHD',), help='Choose solver')
-#ShenMHD.add_argument('--convection', default='Standard', choices=('Standard', 'Divergence'))
-#ShenMHD.add_argument('--L', default=[2, 2*pi, 2*pi], nargs='+', help='Physical mesh size')
-#ShenMHD.add_argument('--eta', default=0.0016666, type=float, help='Resistivity')
-#ShenMHD.add_argument('--Ha', default=0.0043817804600413289, type=float, help='Hartmann number')
-#ShenMHD.add_argument('--B_strength', default=0.000001, type=float, help='Magnetic strength')
-#ShenMHD.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations')
-#ShenMHD.add_argument('--print_divergence_progress', default=False, help='Print the norm of the pressure correction on inner iterations')
-#ShenMHD.add_argument('--dealias', default='2/3-rule', choices=('3/2-rule', '2/3-rule', 'None'), help='Choose dealiasing method')
-#ShenMHD.add_argument('--Pencil_alignment', default='X', choices=('X',), help='Alignment of the complex data for pencil decomposition')
-
 def update(new, mesh="triplyperiodic"):
     global fft_plans
     assert isinstance(new, dict)

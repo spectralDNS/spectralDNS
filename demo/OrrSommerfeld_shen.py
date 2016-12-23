@@ -106,21 +106,21 @@ class OrrSommerfeld(object):
         #K = np.dot(w*P4.T, T2x)
         SB = ShenBiharmonicBasis(quad=self.quad)
         K = np.zeros((N, N))
-        K = SB.fastShenScalar(T2x, K)
-        #K[:-4, :-4] = ABBmat(np.arange(N).astype(np.float)).diags().toarray()
+        #K = SB.fastShenScalar(T2x, K)
+        K[:-4, :-4] = ABBmat(np.arange(N).astype(np.float)).diags().toarray()
 
         # ((1-x**2)u, v)
         xx = (1-x**2).repeat(N).reshape((N, N))
         #K1 = np.dot(w*P4.T, xx*P4)  # Alternative: K1 = np.dot(w*P4.T, ((1-x**2)*P4.T).T)
         K1 = np.zeros((N, N))
         K1 = SB.fastShenScalar(xx*P4, K1)
-        #K1 = extract_diagonal_matrix(K1) # For improved roundoff
+        K1 = extract_diagonal_matrix(K1) # For improved roundoff
 
         # ((1-x**2)u'', v)
         #K2 = np.dot(w*P4.T, xx*T2x)
         K2 = np.zeros((N, N))
         K2 = SB.fastShenScalar(xx*T2x, K2)
-        #K2 = extract_diagonal_matrix(K2) # For improved roundoff
+        K2 = extract_diagonal_matrix(K2) # For improved roundoff
 
         # (u'''', v)
         #Q = np.dot(w*P4.T, T4x)

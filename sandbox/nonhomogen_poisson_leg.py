@@ -146,27 +146,6 @@ f_hat[n:] += np.dot(w*P.T, fj[1])
 f_hat[0] = a
 f_hat[-1] = b
 
-# Use continuity across
-S = leg.legvander((-1, 1), n) # Cheb polynomials at bnds
-Sx = np.dot(S, D1)  # Derivatives at bnds
-Tx = np.zeros_like(Sx)
-Tx[:, 0] = (Sx[:,0] - Sx[:, 1])/2.
-Tx[:, 1:-1] = Sx[:,:-2] - Sx[:, 2:]
-Tx[:, -1] = (Sx[:,0] + Sx[:, 1])/2.
-left, right = Tx[0], Tx[1]
-
-A_t[n, :] = 0
-if domain == "C1":
-    A_t[n, :n+1] = right
-    A_t[n, n:] -= left
-elif domain == "Ceven":
-    A_t[n, :n+1:2] = right[::2]
-    A_t[n, n::2] -= left[::2]
-else:
-    A_t[n, 1:n+1:2] = right[1::2]
-    A_t[n, n+1::2] -= left[1::2]
-
-#f_hat[n] = 0
 A_t[n] = 0
 A_t[n, :n+1] = A[-1, :]
 A_t[n, n:] += A[0, :]
@@ -196,12 +175,10 @@ A = K*scl**2 + kx**2*M
 
 A_t = np.zeros((4*(n+1)-3, 4*(n+1)-3))
 A_t[0, 0] = 1
-
 A_t[1:n+1, :n+1] = A[1:]
 A_t[n:2*n+1, n:2*n+1] += A[:]
 A_t[2*n:3*n+1, 2*n:3*n+1] += A[:]
 A_t[3*n:4*n, 3*n:4*n+1] += A[:-1]
-
 A_t[-1, -1] = 1
 
 f_hat = np.zeros(4*n+1)
@@ -223,4 +200,3 @@ plot(xx.flatten(), uq.flatten())
 figure()
 spy(A_t, precision=1e-8)
 show()
-
