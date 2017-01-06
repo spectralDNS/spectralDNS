@@ -56,19 +56,19 @@ class SPmat(OrderedDict):
             if format == 'python':
                 for key, val in six.iteritems(self):
                     if key < 0:
-                        for i in xrange(v.shape[1]):
-                            for j in xrange(v.shape[2]):
+                        for i in range(v.shape[1]):
+                            for j in range(v.shape[2]):
                                 c[-key:N,i,j] += val*v[:(M+key),i,j]
                     else:
-                        for i in xrange(v.shape[1]):
-                            for j in xrange(v.shape[2]):
+                        for i in range(v.shape[1]):
+                            for j in range(v.shape[2]):
                                 c[:(N-key),i,j] += val*v[key:M,i,j]
 
             else:
                 assert format in ('csr', 'dia', 'csc')
                 diags = self.diags(format=format)
-                for i in xrange(v.shape[1]):
-                    for j in xrange(v.shape[2]):
+                for i in range(v.shape[1]):
+                    for j in range(v.shape[2]):
                         c[:N, i, j] = diags.dot(v[:M, i, j])
 
         else:
@@ -94,10 +94,12 @@ class SPmat(OrderedDict):
 
         """
         if self._diags is None:
-            self._diags = diags(self.values(), self.keys(), shape=self.shape, format=format)
+            self._diags = diags(list(self.values()), list(self.keys()),
+                                shape=self.shape, format=format)
 
         if self._diags.format != format:
-            self._diags = diags(self.values(), self.keys(), shape=self.shape, format=format)
+            self._diags = diags(list(self.values()), list(self.keys()),
+                                shape=self.shape, format=format)
 
         return self._diags
 
@@ -206,7 +208,20 @@ class Shenmat(SPmat):
     where ('ShenDirichlet', 2) signals that we use the second derivative
     of this trial function.
 
-    The automatically created matrices may be overloaded with exact diagonals.
+    The automatically created matrices may be overloaded with more exactly
+    computed diagonals.
+
+    args:
+        d                      dictionary, where keys are the diagonal
+                               location and values the values
+        N                      Length of main diagonal
+        quad    ('GC', 'GL')   Quadrature points
+                               Chebyshev-Gauss : GC
+                               Chebyshev-Gauss-Lobatto : GL
+        trial   (basis, derivative)
+        test    (basis, derivative)
+        scale      float       Scale matrix with this constant
+
 
     """
     def __init__(self, d, N,  quad='GC', trial=('Chebyshev', 0), test=('Chebyshev', 0), scale=1.0):

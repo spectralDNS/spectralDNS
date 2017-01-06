@@ -121,13 +121,14 @@ def test_TDMA(T):
     else:
         B = BDDmat(np.arange(N).astype(np.float), T.quad)
         s = slice(0, N-2)
+    #from IPython import embed;embed()
+
     Ba = B.diags().toarray()[s, s]
     f = np.random.random(N)
     u = solve(Ba, f[s])
 
     u0 = f.copy()
     u0 = T(u0)
-    #from IPython import embed;embed()
 
     assert np.allclose(u0[s], u)
     # Again

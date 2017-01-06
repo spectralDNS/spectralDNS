@@ -129,7 +129,7 @@ class PDMA(object):
         m = e.shape[0]
         k = n - m
 
-        for i in xrange(n-2*k):
+        for i in range(n-2*k):
             lam = e[i]/d[i]
             d[i+k] -= lam*e[i]
             e[i+k] -= lam*f[i]
@@ -267,8 +267,8 @@ class Biharmonic(object):
                         u[:-4:2, i, j] = lu_solve(self.Le[i][j], b[:-4:2, i, j])
                         u[1:-4:2, i, j] = lu_solve(self.Lo[i][j], b[1:-4:2, i, j])
             else:
-                #SFTc.Solve_Biharmonic_3D_n(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
-                SFTc.Solve_Biharmonic_3D_com(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
+                SFTc.Solve_Biharmonic_3D_n(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
+                #SFTc.Solve_Biharmonic_3D_com(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
         else:
             if self.solver == "scipy":
                 u[:-4:2] = lu_solve(self.Le, b[:-4:2])
