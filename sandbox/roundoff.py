@@ -18,7 +18,7 @@ print "\hline"
 print "z & " + " & ".join([str(n) for n in N]) + " \\\ "
 print "\hline"
 for z in Z:
-    err = str(z) 
+    err = str(z)
     for n in N:
         errb = 0
         vb = zeros(n)
@@ -34,7 +34,7 @@ for z in Z:
     err += " \\\ "
     print err
 
-print "\hline"        
+print "\hline"
 for z in Z:
     err = str(z)
     for n in N:
@@ -54,4 +54,3 @@ for z in Z:
     print err
 
 
-        

@@ -36,13 +36,13 @@ def get_context():
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
     K = FST.get_scaled_local_wavenumbermesh()
-    
+
     # Remove oddball Nyquist
     #K[1, :, -params.N[1]/2, 0] = 0
     #K[1, :, -params.N[1]/2, -1] = 0
     #K[2, :, 0, -1] = 0
     #K[2, :, -params.N[1]/2, -1] = 0
-    
+
     K2 = K[1]*K[1]+K[2]*K[2]
     K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)
 
@@ -52,7 +52,7 @@ def get_context():
     U_hat  = zeros((3,)+FST.complex_shape(), dtype=complex)
     U_hat0 = zeros((3,)+FST.complex_shape(), dtype=complex)
     g = zeros(FST.complex_shape(), dtype=complex)
-    
+
     # primary variable
     u = (U_hat, g)
 
@@ -67,11 +67,11 @@ def get_context():
     Sk = zeros((3,)+FST.complex_shape(), dtype=complex)
 
     work = work_arrays()
-    
+
     nu, dt, N = params.nu, params.dt, params.N
     K4 = K2**2
     kx = K[0, :, 0, 0]
-    
+
     # Collect all linear algebra solvers
     la = config.AttributeDict(dict(
         HelmholtzSolverG = Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST.quad, False),
@@ -101,12 +101,12 @@ def get_context():
         CDB = CDBmat(kx)
         )
     )
-    
+
     hdf5file = KMMWriter({"U":U[0], "V":U[1], "W":U[2]},
                          chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
                          filename=params.solver+".h5",
                          mesh={"x": x0, "y": x1, "z": x2})
-    
+
     return config.AttributeDict(locals())
 
 class KMMWriter(HDF5Writer):
@@ -121,12 +121,11 @@ class KMMWriter(HDF5Writer):
 assert params.precision == "double"
 
 def end_of_tstep(context):
-    """Function called at end of time step. 
-    
-    If returning True, the while-loop in time breaks free. Used by adaptive solvers
-    to modify the time stepsize.
+    """Function called at end of time step.
+
+    If returning True, the while-loop in time breaks free. Used by adaptive
+    solvers to modify the time stepsize. Used here to rotate solutions.
     """
-    # Rotate solutions
     context.U_hat0[:] = context.U_hat
     context.H_hat1[:] = context.H_hat
     return False
@@ -160,7 +159,7 @@ def get_convection(H_hat, U_hat, g, K, FST, SB, ST, work, mat, la, **context):
     #"""Solve for pressure if Ni is fst of convection"""
     #pass
     ##F_tmp[0] = 0
-    ##SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])    
+    ##SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])
     ##HelmholtzSolverP = Helmholtz(N[0], sqrt(K2[0]), SN.quad, True)
     ##P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
     ##return P_hat
@@ -184,14 +183,14 @@ def compute_curl(c, u_hat, g, K, FST, SB, ST, work):
     F_tmp = work[(u_hat, 0, False)]
     F_tmp2 = work[(u_hat, 2, False)]
     Uc = work[(c, 2, False)]
-    # Mult_CTD_3D_n is projection to T of d(u_hat)/dx (for components 1 and 2 of u_hat) 
+    # Mult_CTD_3D_n is projection to T of d(u_hat)/dx (for components 1 and 2 of u_hat)
     # Corresponds to CTD.matvec(u_hat[1])/BTT.dd, CTD.matvec(u_hat[2])/BTT.dd
     SFTc.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST, dealias=params.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST, dealias=params.dealias)
     c[0] = FST.ifst(g, c[0], ST, dealias=params.dealias)
     F_tmp2[:2] = mult_K1j(K, u_hat[0], F_tmp2[:2])
-    
+
     c[1] = FST.ifst(F_tmp2[0], c[1], SB, dealias=params.dealias)
     c[1] -= dwdx
     c[2] = FST.ifst(F_tmp2[1], c[2], SB, dealias=params.dealias)
@@ -204,7 +203,7 @@ def compute_derivatives(duidxj, u_hat, FST, ST, SB, la, mat, work):
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
     F_tmp[0] = mat.CDB.matvec(U_hat[0])
-    F_tmp[0] = la.TDMASolverD(F_tmp[0])    
+    F_tmp[0] = la.TDMASolverD(F_tmp[0])
     duidxj[0, 0] = FST.ifst(F_tmp[0], duidxj[0, 0], ST)
     SFTc.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
     duidxj[1, 0] = dvdx = FST.ifct(F_tmp[1], duidxj[1, 0], ST)  # proj to Cheb
@@ -212,7 +211,7 @@ def compute_derivatives(duidxj, u_hat, FST, ST, SB, la, mat, work):
     duidxj[0, 1] = dudy = FST.ifst(1j*K[1]*u_hat[0], duidxj[0, 1], SB) # ShenB
     duidxj[0, 2] = dudz = FST.ifst(1j*K[2]*u_hat[0], duidxj[0, 2], SB)
     duidxj[1, 1] = dvdy = FST.ifst(1j*K[1]*u_hat[1], duidxj[1, 1], ST)
-    duidxj[1, 2] = dvdz = FST.ifst(1j*K[2]*u_hat[1], duidxj[1, 2], ST)    
+    duidxj[1, 2] = dvdz = FST.ifst(1j*K[2]*u_hat[1], duidxj[1, 2], ST)
     duidxj[2, 1] = dwdy = FST.ifst(1j*K[1]*u_hat[2], duidxj[2, 1], ST)
     duidxj[2, 2] = dwdz = FST.ifst(1j*K[2]*u_hat[2], duidxj[2, 2], ST)
     return duidxj
@@ -223,33 +222,33 @@ def standardConvection(rhs, u_dealias, u_hat, K, FST, SB, ST, work, mat, la):
     Uc = work[(U, 1)]
     Uc2 = work[(U, 2)]
     F_tmp = work[(rhs, 0)]
-    
+
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
     F_tmp[0] = mat.CDB.matvec(u_hat[0])
-    F_tmp[0] = la.TDMASolverD(F_tmp[0])    
-    dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], ST, dealias=params.dealias)   
-        
+    F_tmp[0] = la.TDMASolverD(F_tmp[0])
+    dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], ST, dealias=params.dealias)
+
     SFTc.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST, dealias=params.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST, dealias=params.dealias)
-    
-    dudy = Uc2[0] = FST.ifst(1j*K[1]*u_hat[0], Uc2[0], SB, dealias=params.dealias)    
+
+    dudy = Uc2[0] = FST.ifst(1j*K[1]*u_hat[0], Uc2[0], SB, dealias=params.dealias)
     dudz = Uc2[1] = FST.ifst(1j*K[2]*u_hat[0], Uc2[1], SB, dealias=params.dealias)
     rhs[0] = FST.fst(U[0]*dudx + U[1]*dudy + U[2]*dudz, rhs[0], ST, dealias=params.dealias)
-    
+
     Uc2[:] = 0
     dvdy = Uc2[0] = FST.ifst(1j*K[1]*u_hat[1], Uc2[0], ST, dealias=params.dealias)
-    
+
     dvdz = Uc2[1] = FST.ifst(1j*K[2]*u_hat[1], Uc2[1], ST, dealias=params.dealias)
     rhs[1] = FST.fst(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, rhs[1], ST, dealias=params.dealias)
-    
+
     Uc2[:] = 0
-    dwdy = Uc2[0] = FST.ifst(1j*K[1]*u_hat[2], Uc2[0], ST, dealias=params.dealias)    
+    dwdy = Uc2[0] = FST.ifst(1j*K[1]*u_hat[2], Uc2[0], ST, dealias=params.dealias)
     dwdz = Uc2[1] = FST.ifst(1j*K[2]*u_hat[2], Uc2[1], ST, dealias=params.dealias)
-    
+
     rhs[2] = FST.fst(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, rhs[2], ST, dealias=params.dealias)
-    
+
     return rhs
 
 def divergenceConvection(rhs, u_dealias, u_hat, K, FST, SB, ST, work, mat, la, add=False):
@@ -264,44 +263,44 @@ def divergenceConvection(rhs, u_dealias, u_hat, K, FST, SB, ST, work, mat, la, a
     #rhs[0] = fss(U_tmp[0], rhs[0], ST)
     #rhs[1] = fss(U_tmp[1], rhs[1], ST)
     #rhs[2] = fss(U_tmp[2], rhs[2], ST)
-    
+
     F_tmp[0] = FST.fst(U[0]*U[0], F_tmp[0], ST, dealias=params.dealias)
     F_tmp[1] = FST.fst(U[0]*U[1], F_tmp[1], ST, dealias=params.dealias)
     F_tmp[2] = FST.fst(U[0]*U[2], F_tmp[2], ST, dealias=params.dealias)
-    
-    F_tmp2[0] = mat.CDD.matvec(F_tmp[0])
-    F_tmp2[1] = mat.CDD.matvec(F_tmp[1])
-    F_tmp2[2] = mat.CDD.matvec(F_tmp[2])
+
+    F_tmp2[0] = mat.CDD.matvec(F_tmp[0], F_tmp2[0])
+    F_tmp2[1] = mat.CDD.matvec(F_tmp[1], F_tmp2[1])
+    F_tmp2[2] = mat.CDD.matvec(F_tmp[2], F_tmp2[2])
     F_tmp2[0] = la.TDMASolverD(F_tmp2[0])
     F_tmp2[1] = la.TDMASolverD(F_tmp2[1])
     F_tmp2[2] = la.TDMASolverD(F_tmp2[2])
     rhs[0] += F_tmp2[0]
     rhs[1] += F_tmp2[1]
     rhs[2] += F_tmp2[2]
-    
+
     F_tmp2[0] = FST.fst(U[0]*U[1], F_tmp2[0], ST, dealias=params.dealias)
-    F_tmp2[1] = FST.fst(U[0]*U[2], F_tmp2[1], ST, dealias=params.dealias)    
+    F_tmp2[1] = FST.fst(U[0]*U[2], F_tmp2[1], ST, dealias=params.dealias)
     rhs[0] += 1j*K[1]*F_tmp2[0] # duvdy
     rhs[0] += 1j*K[2]*F_tmp2[1] # duwdz
-    
+
     F_tmp[0] = FST.fst(U[1]*U[1], F_tmp[0], ST, dealias=params.dealias)
     F_tmp[1] = FST.fst(U[1]*U[2], F_tmp[1], ST, dealias=params.dealias)
     F_tmp[2] = FST.fst(U[2]*U[2], F_tmp[2], ST, dealias=params.dealias)
     rhs[1] += 1j*K[1]*F_tmp[0]  # dvvdy
-    rhs[1] += 1j*K[2]*F_tmp[1]  # dvwdz  
+    rhs[1] += 1j*K[2]*F_tmp[1]  # dvwdz
     rhs[2] += 1j*K[1]*F_tmp[1]  # dvwdy
     rhs[2] += 1j*K[2]*F_tmp[2]  # dwwdz
-    
+
     return rhs
 
 def getConvection(convection):
-    
+
     if convection == "Standard":
-        
+
         def Conv(rhs, u_hat, g_hat, K, FST, SB, ST, work, mat, la):
-            
+
             u_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
-            u_dealias[0] = FST.ifst(u_hat[0], u_dealias[0], SB, params.dealias) 
+            u_dealias[0] = FST.ifst(u_hat[0], u_dealias[0], SB, params.dealias)
             for i in range(1, 3):
                 u_dealias[i] = FST.ifst(u_hat[i], u_dealias[i], ST, params.dealias)
 
@@ -309,13 +308,13 @@ def getConvection(convection):
                                         work, mat, la)
             rhs[:] *= -1
             return rhs
-        
+
     elif convection == "Divergence":
-        
+
         def Conv(rhs, u_hat, g_hat, K, FST, SB, ST, work, mat, la):
-            
+
             u_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
-            u_dealias[0] = FST.ifst(u_hat[0], u_dealias[0], SB, params.dealias) 
+            u_dealias[0] = FST.ifst(u_hat[0], u_dealias[0], SB, params.dealias)
             for i in range(1, 3):
                 u_dealias[i] = FST.ifst(u_hat[i], u_dealias[i], ST, params.dealias)
 
@@ -323,33 +322,33 @@ def getConvection(convection):
                                         work, mat, la, False)
             rhs[:] *= -1
             return rhs
-        
+
     elif convection == "Skew":
-        
+
         def Conv(rhs, u_hat, g_hat, K, FST, SB, ST, work, mat, la):
-            
+
             u_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
-            u_dealias[0] = FST.ifst(u_hat[0], u_dealias[0], SB, params.dealias) 
+            u_dealias[0] = FST.ifst(u_hat[0], u_dealias[0], SB, params.dealias)
             for i in range(1, 3):
                 u_dealias[i] = FST.ifst(u_hat[i], u_dealias[i], ST, params.dealias)
 
             rhs = standardConvection(rhs, u_dealias, u_hat, K, FST, SB, ST,
                                         work, mat, la)
             rhs = divergenceConvection(rhs, u_dealias, u_hat, K, FST, SB, ST,
-                                        work, mat, la, True)            
+                                        work, mat, la, True)
             rhs *= -0.5
             return rhs
 
     elif convection == "Vortex":
         #@profile
         def Conv(rhs, u_hat, g_hat, K, FST, SB, ST, work, mat, la):
-            
+
             u_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             curl_dealias = work[((3,)+FST.work_shape(params.dealias), float, 1)]
-            u_dealias[0] = FST.ifst(u_hat[0], u_dealias[0], SB, params.dealias) 
+            u_dealias[0] = FST.ifst(u_hat[0], u_dealias[0], SB, params.dealias)
             for i in range(1, 3):
                 u_dealias[i] = FST.ifst(u_hat[i], u_dealias[i], ST, params.dealias)
-            
+
             curl_dealias = compute_curl(curl_dealias, u_hat, g_hat, K, FST, SB, ST, work)
             rhs = Cross(rhs, u_dealias, curl_dealias, ST, FST, work)
             return rhs
@@ -365,15 +364,16 @@ def assembleAB(H_hat0, H_hat, H_hat1):
 @optimizer
 def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
     diff_u = work[(g, 0)]
-    diff_g = work[(g, 1)]
-    
+    diff_g = work[(g, 1, False)]
+    u0 = work[(g, 2, False)]
+
     # Compute diffusion for g-equation
     diff_g = AB.matvec(g, diff_g)
 
     # Compute diffusion++ for u-equation
-    diff_u[:] = nu*dt/2.*SBB.matvec(u)
-    diff_u += (1. - nu*dt*K2)*ABB.matvec(u)
-    diff_u -= (K2 - nu*dt/2.*K4)*BBB.matvec(u)
+    diff_u[:] = nu*dt/2.*SBB.matvec(u, u0)
+    diff_u += (1. - nu*dt*K2)*ABB.matvec(u, u0)
+    diff_u -= (K2 - nu*dt/2.*K4)*BBB.matvec(u, u0)
 
     rhs[0] += diff_u
     rhs[1] += diff_g
@@ -383,7 +383,7 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
                H_hat, H_hat1, H_hat0, FST, ST, SB, work, K, K2, K4, hv, hg,
                mat, la, **context):
     """Compute right hand side of Navier Stokes
-    
+
     args:
         rhs         The right hand side to be returned
         u_hat       The FST of the velocity at current time
@@ -391,23 +391,25 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
         solver      The current solver module
 
     Remaining args are extracted from context
-    
+
     """
     # Nonlinear convection term at current u_hat
     H_hat = solver.conv(H_hat, u_hat, g_hat, K, FST, SB, ST, work, mat, la)
 
     # Assemble convection with Adams-Bashforth at time = n+1/2
     H_hat0 = solver.assembleAB(H_hat0, H_hat, H_hat1)
-    
+
     # Assemble hv, hg and remaining rhs
-    hv[:] = -K2*mat.BBD.matvec(H_hat0[0])
-    hv -= 1j*K[1]*mat.CBD.matvec(H_hat0[1])
-    hv -= 1j*K[2]*mat.CBD.matvec(H_hat0[2])        
-    hg[:] = 1j*K[1]*mat.BDD.matvec(H_hat0[2]) - 1j*K[2]*mat.BDD.matvec(H_hat0[1])
-    
+    w0 = work[(hv, 0, False)]
+    w1 = work[(hv, 1, False)]
+    hv[:] = -K2*mat.BBD.matvec(H_hat0[0], w0)
+    hv -= 1j*K[1]*mat.CBD.matvec(H_hat0[1], w0)
+    hv -= 1j*K[2]*mat.CBD.matvec(H_hat0[2], w0)
+    hg[:] = 1j*K[1]*mat.BDD.matvec(H_hat0[2], w0) - 1j*K[2]*mat.BDD.matvec(H_hat0[1], w1)
+
     rhs[0] = hv*params.dt
     rhs[1] = hg*2./params.nu
-    
+
     rhs = solver.add_linear(rhs, u_hat[0], g_hat, work, mat.AB, mat.AC, mat.SBB,
                             mat.ABB, mat.BBB, params.nu, params.dt, K2, K4)
 
@@ -424,12 +426,13 @@ def solve_linear(u_hat, g_hat, rhs,
                  work, la, mat, K_over_K2, H_hat0, U_hat0, Sk, **context):
     """"""
     f_hat = work[(u_hat[0], 0)]
-    
+    w0 = work[(u_hat[0], 1, False)]
+
     u_hat[0] = la.BiharmonicSolverU(u_hat[0], rhs[0])
     g_hat = la.HelmholtzSolverG(g_hat, rhs[1])
-    
+
     # Compute v_hat and w_hat from u_hat and g_hat
-    f_hat -= mat.CDB.matvec(u_hat[0])
+    f_hat -= mat.CDB.matvec(u_hat[0], w0)
     f_hat = la.TDMASolverD(f_hat)
     u_hat = compute_vw(u_hat, f_hat, g_hat, K_over_K2)
 
@@ -438,26 +441,27 @@ def solve_linear(u_hat, g_hat, rhs,
         u0_hat = work[((2, params.N[0]), complex, 0)]
         h0_hat = work[((2, params.N[0]), complex, 1)]
         w = work[((params.N[0], ), complex, 0, False)]
+        w1 = work[((params.N[0], ), complex, 1, False)]
 
         h0_hat[0] = H_hat0[1, :, 0, 0]
         h0_hat[1] = H_hat0[2, :, 0, 0]
         u0_hat[0] = U_hat0[1, :, 0, 0]
         u0_hat[1] = U_hat0[2, :, 0, 0]
 
-        w[:] = 2./params.nu * mat.BDD.matvec(h0_hat[0])
-        w -= 2./params.nu * Sk[1, :, 0, 0]        
-        w -= mat.ADD.matvec(u0_hat[0])
-        w += 2./params.nu/params.dt * mat.BDD.matvec(u0_hat[0])        
+        w[:] = 2./params.nu * mat.BDD.matvec(h0_hat[0], w1)
+        w -= 2./params.nu * Sk[1, :, 0, 0]
+        w -= mat.ADD.matvec(u0_hat[0], w1)
+        w += 2./params.nu/params.dt * mat.BDD.matvec(u0_hat[0], w1)
         u0_hat[0] = la.HelmholtzSolverU0(u0_hat[0], w)
-        
-        w[:] = 2./params.nu * mat.BDD.matvec(h0_hat[1])
-        w -= mat.ADD.matvec(u0_hat[1])
-        w += 2./params.nu/params.dt * mat.BDD.matvec(u0_hat[1])
+
+        w[:] = 2./params.nu * mat.BDD.matvec(h0_hat[1], w1)
+        w -= mat.ADD.matvec(u0_hat[1], w1)
+        w += 2./params.nu/params.dt * mat.BDD.matvec(u0_hat[1], w1)
         u0_hat[1] = la.HelmholtzSolverU0(u0_hat[1], w)
-        
+
         u_hat[1, :, 0, 0] = u0_hat[0]
         u_hat[2, :, 0, 0] = u0_hat[1]
-        
+
     return u_hat, g_hat
 
 def integrate(u_hat, g_hat, rhs, dt, solver, context):

@@ -6,8 +6,13 @@ import subprocess
 from numpy import get_include
 from Cython.Distutils import build_ext
 from Cython.Build import cythonize
+from Cython.Compiler.Options import get_directive_defaults
 
-#define_macros=[('CYTHON_TRACE', '1')]
+#directive_defaults = get_directive_defaults()
+#directive_defaults['linetrace'] = True
+#directive_defaults['binding'] = True
+
+define_macros=[('CYTHON_TRACE', '1')]
 
 # Version number
 major = 1
@@ -43,7 +48,7 @@ if not "sdist" in sys.argv:
     for s in ("LUsolve", "TDMA", "PDMA", "Matvec"):
         ext += cythonize(Extension("spectralDNS.shen.{0}".format(s),
                                    sources=[os.path.join(sdir, '{0}.pyx'.format(s))],
-                                   language="c++"))
+                                   language="c++"))  # , define_macros=define_macros
     [e.extra_link_args.extend(["-std=c++11"]) for e in ext]
 
     for s in ("Cheb", ):

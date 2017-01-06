@@ -121,7 +121,7 @@ def test_TDMA(T):
     else:
         B = BDDmat(np.arange(N).astype(np.float), T.quad)
         s = slice(0, N-2)
-    Ba = B.diags().toarray()
+    Ba = B.diags().toarray()[s, s]
     f = np.random.random(N)
     u = solve(Ba, f[s])
 
@@ -142,8 +142,9 @@ def test_TDMA(T):
     assert np.allclose(u0[s, 2, 2].real, u)
     assert np.allclose(u0[s, 2, 2].imag, u)
 
-#test_TDMA(TDMA("GC", True))
+test_TDMA(TDMA("GC", False))
 
+#@profile
 def test_BNNmat(ST):
     points, weights = ST.points_and_weights(N)
     f_hat = np.zeros(N)
@@ -174,7 +175,10 @@ def test_BNNmat(ST):
         u0 = ST.fastChebScalar(fj, u0)
         f_hat = ST.fct(fj, f_hat)
 
-    u2 = B.matvec(f_hat)
+    u2 = np.zeros_like(f_hat)
+    u2 = B.matvec(f_hat, u2)
+
+    #from IPython import embed; embed()
     assert np.allclose(u2[:-2], u0[:-2])
 
     # Multidimensional version
@@ -187,12 +191,14 @@ def test_BNNmat(ST):
     else:
         u0 = ST.fastShenScalar(fj, u0)
         f_hat = ST.fst(fj, f_hat)
-    u2 = B.matvec(f_hat)
+    u2 = np.zeros_like(f_hat)
+    u2 = B.matvec(f_hat, u2)
     #from IPython import embed; embed()
     assert np.allclose(u2[:-2], u0[:-2])
 
-#test_BNNmat(ShenDirichletBasis("GC"))
+#test_BNNmat(ShenBiharmonicBasis("GL"))
 
+#@profile
 def test_BDNmat(S1S2):
     S1, S2 = S1S2
 
@@ -207,10 +213,11 @@ def test_BDNmat(S1S2):
         B = BDNmat(np.arange(N).astype(np.float), S1.quad)
 
     f_hat = S2.fst(fj, f_hat)
-    u2 = B.matvec(f_hat)
+    u2 = np.zeros_like(f_hat)
+    u2 = B.matvec(f_hat, u2)
     u0 = np.zeros(N)
     u0 = S1.fastShenScalar(fj, u0)
-
+    #from IPython import embed; embed()
     assert np.allclose(u0, u2)
 
     # Multidimensional version
@@ -219,9 +226,11 @@ def test_BDNmat(S1S2):
 
     u0 = np.zeros((N, 4, 4), dtype=np.complex)
     u0 = S1.fastShenScalar(fj, u0)
-    u2 = B.matvec(f_hat)
+    u2 = np.zeros_like(f_hat)
+    u2 = B.matvec(f_hat, u2)
     assert np.linalg.norm(u2-u0)/(N*16) < 1e-12
 
+#test_BDNmat((ShenNeumannBasis("GL"), ShenDirichletBasis("GL")))
 
 def test_BDTmat(SDST):
     SD, ST = SDST
@@ -234,7 +243,11 @@ def test_BDTmat(SDST):
     B = BDTmat(np.arange(N).astype(np.float), SD.quad)
 
     f_hat = ST.fct(fj, f_hat)
-    u2 = B.matvec(f_hat)
+    u2 = np.zeros_like(f_hat)
+    u2 = B.matvec(f_hat, u2)
+    u2 = B.matvec(f_hat, u2, 'csr')
+    u2 = B.matvec(f_hat, u2, 'csc')
+    u2 = B.matvec(f_hat, u2, 'dia')
     u0 = np.zeros(N)
     u0 = SD.fastShenScalar(fj, u0)
 
@@ -247,7 +260,8 @@ def test_BDTmat(SDST):
 
     u0 = np.zeros((N, 4, 4), dtype=np.complex)
     u0 = SD.fastShenScalar(fj, u0)
-    u2 = B.matvec(f_hat)
+    u2 = np.zeros_like(f_hat)
+    u2 = B.matvec(f_hat, u2)
     assert np.linalg.norm(u2-u0)/(N*16) < 1e-12
 
 #test_BDTmat((ShenDirichletBasis("GL"), ShenNeumannBasis("GL")))
@@ -263,7 +277,8 @@ def test_BBDmat(SBSD):
     B = BBDmat(np.arange(N).astype(np.float), SB.quad)
 
     f_hat = SD.fst(fj, f_hat)
-    u2 = B.matvec(f_hat)
+    u2 = np.zeros_like(f_hat)
+    u2 = B.matvec(f_hat, u2)
     u0 = np.zeros(N)
     u0 = SB.fastShenScalar(fj, u0)
 
@@ -275,7 +290,8 @@ def test_BBDmat(SBSD):
 
     u0 = np.zeros((N, N, N), dtype=np.complex)
     u0 = SB.fastShenScalar(fj, u0)
-    u2 = B.matvec(f_hat)
+    u2 = np.zeros_like(f_hat)
+    u2 = B.matvec(f_hat, u2)
     assert np.linalg.norm(u2-u0)/(N*N*N) < 1e-12
 
     FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), MPI.COMM_SELF)
@@ -285,7 +301,8 @@ def test_BBDmat(SBSD):
     fj = FST.ifst(f_hat, fj, SD)
     f_hat = FST.fst(fj, f_hat, SD)
 
-    z0 = B.matvec(f_hat)
+    z0 = np.zeros_like(f_hat)
+    z0 = B.matvec(f_hat, z0)
     z1 = z0.copy()*0
     z1 = FST.fss(fj, z1, SB)
     assert np.linalg.norm(z1-z0)/(N*N*N) < 1e-12
@@ -306,7 +323,8 @@ def test_BTXmat(SXST):
         B = BTNmat(np.arange(N).astype(np.float), ST.quad)
 
     f_hat = SX.fst(fj, f_hat)
-    u2 = B.matvec(f_hat)
+    u2 = np.zeros_like(f_hat)
+    u2 = B.matvec(f_hat, u2)
     u0 = np.zeros(N)
     u0 = ST.fastChebScalar(fj, u0)
 
@@ -319,7 +337,8 @@ def test_BTXmat(SXST):
 
     u0 = np.zeros((N, 4, 4), dtype=np.complex)
     u0 = ST.fastChebScalar(fj, u0)
-    u2 = B.matvec(f_hat)
+    u2 = np.zeros_like(f_hat)
+    u2 = B.matvec(f_hat, u2)
     assert np.linalg.norm(u2-u0)/(N*16) < 1e-12
 
 #test_BTXmat((ShenDirichletBasis("GL"), ChebyshevTransform("GL")))
@@ -360,7 +379,7 @@ def test_transforms(ST):
 
     assert np.allclose(fj, u1)
 
-#test_transforms(ShenBiharmonicBasis("GC"))
+#test_transforms(ShenNeumannBasis("GC"))
 
 def test_FST(ST):
     FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), comm)
@@ -469,6 +488,7 @@ def test_FST_padded(ST):
 
 #test_FST_padded(ShenBiharmonicBasis("GC"))
 
+#@profile
 def test_CDDmat(SD):
     M = 256
     u = (1-x**2)*sin(np.pi*6*x)
@@ -491,7 +511,8 @@ def test_CDDmat(SD):
     Cm = CDDmat(np.arange(M).astype(np.float))
     TDMASolver = TDMA(SD.quad, False)
 
-    cs = Cm.matvec(u_hat)
+    cs = np.zeros_like(u_hat)
+    cs = Cm.matvec(u_hat, cs)
 
     # Should equal (but not exact so use extra resolution)
     cs2 = np.zeros(M)
@@ -507,7 +528,8 @@ def test_CDDmat(SD):
 
     # Multidimensional version
     u3_hat = u_hat.repeat(4*4).reshape((M, 4, 4)) + 1j*u_hat.repeat(4*4).reshape((M, 4, 4))
-    cs = Cm.matvec(u3_hat)
+    cs = np.zeros_like(u3_hat)
+    cs = Cm.matvec(u3_hat, cs)
     cs2 = np.zeros((M, 4, 4), dtype=np.complex)
     du3 = dudx_j.repeat(4*4).reshape((M, 4, 4)) + 1j*dudx_j.repeat(4*4).reshape((M, 4, 4))
     cs2 = SD.fastShenScalar(du3, cs2)
@@ -520,6 +542,8 @@ def test_CDDmat(SD):
 
     #from IPython import embed; embed()
     assert np.linalg.norm(du3-d3)/(M*16) < 1e-10
+
+#test_CDDmat(ShenDirichletBasis('GL'))
 
 def test_CXXmat(SXSX):
     S1, S2 = SXSX
@@ -539,7 +563,8 @@ def test_CXXmat(SXSX):
 
     # Check S1.fss(f) equals Cm*S2.fst(f)
     f_hat = S2.fst(fj, f_hat)
-    cs = Cm.matvec(f_hat)
+    cs = np.zeros_like(f_hat)
+    cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
     df = S2.fastChebDerivative(fj, df)
     cs2 = np.zeros(N)
@@ -551,12 +576,14 @@ def test_CXXmat(SXSX):
     # Multidimensional version
     f_hat = f_hat.repeat(4*4).reshape((N, 4, 4)) + 1j*f_hat.repeat(4*4).reshape((N, 4, 4))
     df = df.repeat(4*4).reshape((N, 4, 4)) + 1j*df.repeat(4*4).reshape((N, 4, 4))
-    cs = Cm.matvec(f_hat)
+    cs = np.zeros_like(f_hat)
+    cs = Cm.matvec(f_hat, cs)
     cs2 = np.zeros((N, 4, 4), dtype=np.complex)
     cs2 = S1.fastShenScalar(df, cs2)
 
     assert np.allclose(cs, cs2)
 
+#test_CXXmat((ShenDirichletBasis('GL'), ShenNeumannBasis('GL')))
 
 def test_CDTmat(SDST):
     SD, ST = SDST
@@ -571,7 +598,8 @@ def test_CDTmat(SDST):
 
     # Check SD.fss(f) equals Cm*ST.fst(f)
     f_hat = ST.fct(fj, f_hat)
-    cs = Cm.matvec(f_hat)
+    cs = np.zeros_like(f_hat)
+    cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
     df = ST.fastChebDerivative(fj, df)
     cs2 = np.zeros(N)
@@ -583,12 +611,14 @@ def test_CDTmat(SDST):
     # Multidimensional version
     f_hat = f_hat.repeat(4*4).reshape((N, 4, 4)) + 1j*f_hat.repeat(4*4).reshape((N, 4, 4))
     df = df.repeat(4*4).reshape((N, 4, 4)) + 1j*df.repeat(4*4).reshape((N, 4, 4))
-    cs = Cm.matvec(f_hat)
+    cs = np.zeros_like(f_hat)
+    cs = Cm.matvec(f_hat, cs)
     cs2 = np.zeros((N, 4, 4), dtype=np.complex)
     cs2 = SD.fastShenScalar(df, cs2)
 
     assert np.allclose(cs, cs2)
 
+#test_CDTmat((ShenDirichletBasis('GL'), ChebyshevTransform('GL')))
 
 def test_CTDmat(SDST):
     SD, ST = SDST
@@ -603,23 +633,26 @@ def test_CTDmat(SDST):
 
     # Check if ST.fcs(f') equals Cm*SD.fst(f)
     f_hat = SD.fst(fj, f_hat)
-    cs = Cm.matvec(f_hat)
+    cs = np.zeros_like(f_hat)
+    cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
     df = SD.fastChebDerivative(fj, df)
     cs2 = np.zeros(N)
     cs2 = ST.fastChebScalar(df, cs2)
 
-    #from IPython import embed; embed()
     assert np.allclose(cs, cs2)
 
     # Multidimensional version
     f_hat = f_hat.repeat(4*4).reshape((N, 4, 4)) + 1j*f_hat.repeat(4*4).reshape((N, 4, 4))
     df = df.repeat(4*4).reshape((N, 4, 4)) + 1j*df.repeat(4*4).reshape((N, 4, 4))
-    cs = Cm.matvec(f_hat)
+    cs = np.zeros_like(f_hat)
+    cs = Cm.matvec(f_hat, cs)
     cs2 = np.zeros((N, 4, 4), dtype=np.complex)
     cs2 = ST.fastChebScalar(df, cs2)
 
     assert np.allclose(cs, cs2)
+
+test_CTDmat((ShenDirichletBasis('GC'), ChebyshevTransform('GC')))
 
 def test_CDBmat(SBST):
     SB, SD = SBST
@@ -643,7 +676,8 @@ def test_CDBmat(SBST):
 
     # Check if SD.fss(f') equals Cm*SD.fst(f)
     f_hat = SB.fst(uj, f_hat)
-    cs = Cm.matvec(f_hat)
+    cs = np.zeros_like(f_hat)
+    cs = Cm.matvec(f_hat, cs)
 
     df = np.zeros(M)
     df = SB.fastChebDerivative(uj, df)
@@ -656,7 +690,8 @@ def test_CDBmat(SBST):
     # Multidimensional version
     f_hat = f_hat.repeat(4*4).reshape((M, 4, 4)) + 1j*f_hat.repeat(4*4).reshape((M, 4, 4))
     df = df.repeat(4*4).reshape((M, 4, 4)) + 1j*df.repeat(4*4).reshape((M, 4, 4))
-    cs = Cm.matvec(f_hat)
+    cs = np.zeros_like(f_hat)
+    cs = Cm.matvec(f_hat, cs)
     cs2 = np.zeros((M, 4, 4), dtype=np.complex)
     cs2 = SD.fastShenScalar(df, cs2)
 
@@ -686,7 +721,8 @@ def test_CBDmat(SBST):
 
     # Check if SB.fss(f') equals Cm*SD.fst(f)
     f_hat = SD.fst(uj, f_hat)
-    cs = Cm.matvec(f_hat)
+    cs = np.zeros_like(f_hat)
+    cs = Cm.matvec(f_hat, cs)
 
     df = np.zeros(M)
     df = SD.fastChebDerivative(uj, df)
@@ -699,7 +735,8 @@ def test_CBDmat(SBST):
     # Multidimensional version
     f_hat = f_hat.repeat(4*4).reshape((M, 4, 4)) + 1j*f_hat.repeat(4*4).reshape((M, 4, 4))
     df = df.repeat(4*4).reshape((M, 4, 4)) + 1j*df.repeat(4*4).reshape((M, 4, 4))
-    cs = Cm.matvec(f_hat)
+    cs = np.zeros_like(f_hat)
+    cs = Cm.matvec(f_hat, cs)
     cs2 = np.zeros((M, 4, 4), dtype=np.complex)
     cs2 = SB.fastShenScalar(df, cs2)
 
@@ -736,8 +773,11 @@ def test_Mult_Div():
 
     SFTc.Mult_Div_1D(N, 7, 7, uk0[:N-2], vk0[:N-2], wk0[:N-2], b[1:N-2])
 
-    uu = Cm.matvec(uk0)
-    uu += 1j*7*Bm.matvec(vk0) + 1j*7*Bm.matvec(wk0)
+    uu = np.zeros_like(uk0)
+    v0 = np.zeros_like(vk0)
+    w0 = np.zeros_like(wk0)
+    uu = Cm.matvec(uk0, uu)
+    uu += 1j*7*Bm.matvec(vk0, v0) + 1j*7*Bm.matvec(wk0, w0)
 
     #from IPython import embed; embed()
     assert np.allclose(uu, b)
@@ -750,12 +790,15 @@ def test_Mult_Div():
     n = np.zeros((4,4))+7
     SFTc.Mult_Div_3D(N, m, n, uk0[:N-2], vk0[:N-2], wk0[:N-2], b[1:N-2])
 
-    uu = Cm.matvec(uk0)
-    uu += 1j*7*Bm.matvec(vk0) + 1j*7*Bm.matvec(wk0)
+    uu = np.zeros_like(uk0)
+    v0 = np.zeros_like(vk0)
+    w0 = np.zeros_like(wk0)
+    uu = Cm.matvec(uk0, uu)
+    uu += 1j*7*Bm.matvec(vk0, v0) + 1j*7*Bm.matvec(wk0, w0)
 
     assert np.allclose(uu, b)
 
-#test_Mult_Div()
+test_Mult_Div()
 
 def test_ADDmat(ST2):
     M = 2*N
@@ -778,7 +821,7 @@ def test_ADDmat(ST2):
     f_hat = np.zeros(M)
     f_hat = ST2.fastShenScalar(fj, f_hat)
     u_hat = np.zeros(M)
-    u_hat[s] = la.spsolve(A.diags(), f_hat[s])
+    u_hat[s] = solve(A.diags().toarray()[s,s], f_hat[s])
 
     u0 = np.zeros(M)
     u0 = ST2.ifst(u_hat, u0)
@@ -788,11 +831,12 @@ def test_ADDmat(ST2):
 
     u1 = np.zeros(M)
     u1 = ST2.fst(uj, u1)
-    c = A.matvec(u1)
+    c = np.zeros_like(u1)
+    c = A.matvec(u1, c)
 
     assert np.allclose(c, f_hat)
 
-#test_ADDmat(ShenDirichletBasis("GL"))
+#test_ADDmat(ShenNeumannBasis("GL"))
 
 
 def test_SBBmat(SB):
@@ -818,7 +862,8 @@ def test_SBBmat(SB):
     u1 = np.zeros(M)
     u1 = SB.fst(uj, u1)
 
-    c = A.matvec(u1)
+    c = np.zeros_like(u1)
+    c = A.matvec(u1, c)
 
     #from IPython import embed; embed()
     assert np.all(abs(c-f_hat)/c.max() < 1e-10)
@@ -827,7 +872,8 @@ def test_SBBmat(SB):
     c2 = (c.repeat(16).reshape((M, 4, 4))+1j*c.repeat(16).reshape((M, 4, 4)))
     u1 = (u1.repeat(16).reshape((M, 4, 4))+1j*u1.repeat(16).reshape((M, 4, 4)))
 
-    c = A.matvec(u1)
+    c = np.zeros_like(u1)
+    c = A.matvec(u1, c)
 
     assert np.allclose(c, c2)
 
@@ -856,7 +902,8 @@ def test_ABBmat(SB):
 
     u1 = np.zeros(M)
     u1 = SB.fst(uj, u1)
-    c = A.matvec(u1)
+    c = np.zeros_like(u1)
+    c = A.matvec(u1, c)
 
     assert np.allclose(c, f_hat, 1e-6, 1e-6)
 
@@ -864,7 +911,8 @@ def test_ABBmat(SB):
     f_hat = (f_hat.repeat(16).reshape((M, 4, 4))+1j*f_hat.repeat(16).reshape((M, 4, 4)))
     u1 = (u1.repeat(16).reshape((M, 4, 4))+1j*u1.repeat(16).reshape((M, 4, 4)))
 
-    c = A.matvec(u1)
+    c = np.zeros_like(u1)
+    c = A.matvec(u1, c)
 
     assert np.allclose(c, f_hat, 1e-6, 1e-6)
 
@@ -875,7 +923,9 @@ def test_ABBmat(SB):
     u0 = SB.ifst(u0_hat, u0)
     b = np.zeros(M)
     k = 2.
-    b = A.matvec(u0_hat) - k**2*B.matvec(u0_hat)
+    c0 = np.zeros_like(u0_hat)
+    c1 = np.zeros_like(u0_hat)
+    b = A.matvec(u0_hat, c0) - k**2*B.matvec(u0_hat, c1)
     AA = A.diags().toarray() - k**2*B.diags().toarray()
     z0_hat = np.zeros(M)
     z0_hat[:-4] = solve(AA, b[:-4])
@@ -889,7 +939,9 @@ def test_ABBmat(SB):
     k2 = k**2
     u0_hat = u0_hat.repeat(16).reshape((M, 4, 4)) + 1j*u0_hat.repeat(16).reshape((M, 4, 4))
     u0 = u0.repeat(16).reshape((M, 4, 4))
-    b = A.matvec(u0_hat) - k**2*B.matvec(u0_hat)
+    c0 = np.zeros_like(u0_hat)
+    c1 = np.zeros_like(u0_hat)
+    b = A.matvec(u0_hat, c0) - k**2*B.matvec(u0_hat, c1)
     alfa = np.ones((M, 4, 4))
 
     BH = Biharmonic(M, 0, alfa[0], -k2[0], SB.quad, "cython")
@@ -900,7 +952,7 @@ def test_ABBmat(SB):
     #from IPython import embed; embed()
     assert np.allclose(z0, u0)
 
-test_ABBmat(ShenBiharmonicBasis("GC"))
+#test_ABBmat(ShenBiharmonicBasis("GC"))
 
 #@profile
 def test_Helmholtz(ST2):
@@ -927,12 +979,16 @@ def test_Helmholtz(ST2):
     f_hat = np.zeros(M)
     f_hat = ST2.fastShenScalar(fj, f_hat)
     u_hat = np.zeros(M)
-    u_hat[s] = la.spsolve(A.diags()+kx**2*B.diags(), f_hat[s])
+    H = A + kx**2*B
+    u_hat[s] = solve(H.diags().toarray()[s, s], f_hat[s])
     u1 = np.zeros(M)
     u1 = ST2.ifst(u_hat, u1)
-    c = A.matvec(u_hat)+kx**2*B.matvec(u_hat)
-    c2 = np.dot(A.diags().toarray(), u_hat[s]) + kx**2*np.dot(B.diags().toarray(), u_hat[s])
+    c0 = np.zeros_like(u_hat)
+    c1 = np.zeros_like(u_hat)
+    c = A.matvec(u_hat, c0)+kx**2*B.matvec(u_hat, c1)
+    c2 = np.dot(A.diags().toarray()[s, s], u_hat[s]) + kx**2*np.dot(B.diags().toarray()[s, s], u_hat[s])
 
+    #from IPython import embed; embed()
     assert np.allclose(c, f_hat)
     assert np.allclose(c[s], c2)
 
@@ -953,7 +1009,6 @@ def test_Helmholtz(ST2):
     u0_hat = H(u0_hat, f_hat)
     u0 = np.zeros((M, 4, 4), dtype=np.complex)
     u0 = ST2.ifst(u0_hat, u0)
-    #from IPython import embed; embed()
 
     assert np.linalg.norm(u0[:, 2, 2].real - u1)/(M*16) < 1e-12
     assert np.linalg.norm(u0[:, 2, 2].imag - u1)/(M*16) < 1e-12
@@ -975,7 +1030,9 @@ def test_Helmholtz2(SD):
 
     u1 = np.zeros(M)
     u1 = SD.fst(uj, u1)
-    c = A.matvec(u1)+kx**2*B.matvec(u1)
+    c0 = np.zeros_like(u1)
+    c1 = np.zeros_like(u1)
+    c = A.matvec(u1, c0)+kx**2*B.matvec(u1, c1)
 
     b = np.zeros(M)
     H = Helmholtz(M, kx, SD.quad, SD.__class__.__name__ == "ShenNeumannBasis")
@@ -1016,10 +1073,12 @@ def test_Mult_CTD(SD):
 
     SFTc.Mult_CTD_1D(N, vk0, wk0, bv, bw)
 
-    cv[:] = C.matvec(vk0)
-    cw[:] = C.matvec(wk0)
-    cv /= B.dd
-    cw /= B.dd
+    cv = np.zeros_like(vk0)
+    cw = np.zeros_like(wk0)
+    cv = C.matvec(vk0, cv)
+    cw = C.matvec(wk0, cw)
+    cv /= B[0]
+    cw /= B[0]
 
     #from IPython import embed; embed()
     assert np.allclose(cv, bv)
@@ -1052,10 +1111,12 @@ def test_Mult_CTD_3D(SD):
     #from IPython import embed; embed()
     SFTc.Mult_CTD_3D_n(N, vk0, wk0, bv, bw)
 
-    cv[:] = C.matvec(vk0)
-    cw[:] = C.matvec(wk0)
-    cv /= B.dd.repeat(np.array(bv.shape[1:]).prod()).reshape(bv.shape)
-    cw /= B.dd.repeat(np.array(bv.shape[1:]).prod()).reshape(bv.shape)
+    cv = np.zeros_like(vk0)
+    cw = np.zeros_like(wk0)
+    cv = C.matvec(vk0, cv)
+    cw = C.matvec(wk0, cw)
+    cv /= B[0].repeat(np.array(bv.shape[1:]).prod()).reshape(bv.shape)
+    cw /= B[0].repeat(np.array(bv.shape[1:]).prod()).reshape(bv.shape)
 
     assert np.allclose(cv, bv)
     assert np.allclose(cw, bw)
@@ -1110,7 +1171,9 @@ def test_Helmholtz_matvec(SD):
 
     u1 = np.zeros(M)
     u1 = SD.fst(uj, u1)
-    c = A.matvec(u1)+kx**2*B.matvec(u1)
+    c0 = np.zeros_like(u1)
+    c1 = np.zeros_like(u1)
+    c = A.matvec(u1, c0)+kx**2*B.matvec(u1, c1)
 
     b = np.zeros(M)
     #SFTc.Mult_Helmholtz_1D(M, SD.quad=="GL", 1, kx**2, u1, b)

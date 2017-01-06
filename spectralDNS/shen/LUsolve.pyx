@@ -804,6 +804,78 @@ def Solve_Biharmonic_3D_n(np.ndarray[T, ndim=3, mode='c'] fk,
                 uk[ko, j, k] = (y[ko, j, k] - u1[1, kk, j, k]*uk[ko+2, j, k] - u2[1, kk, j, k]*uk[ko+4, j, k] - a[1, kk, j, k]*ac*o1[j, k] - b[1, kk, j, k]*ac*o2[j, k]) / u0[1, kk, j, k]
 
 
+def Solve_Biharmonic_3D_com(np.ndarray[complex_t, ndim=3, mode='c'] fk,
+                          np.ndarray[complex_t, ndim=3, mode='c'] uk,
+                          np.ndarray[real_t, ndim=4, mode='c'] u0,
+                          np.ndarray[real_t, ndim=4, mode='c'] u1,
+                          np.ndarray[real_t, ndim=4, mode='c'] u2,
+                          np.ndarray[real_t, ndim=4, mode='c'] l0,
+                          np.ndarray[real_t, ndim=4, mode='c'] l1,
+                          np.ndarray[real_t, ndim=4, mode='c'] a,
+                          np.ndarray[real_t, ndim=4, mode='c'] b,
+                          np.float_t ac):
+
+    cdef:
+        int i, j, k, kk, m, M, ke, ko, jj, je, jo
+        np.ndarray[complex_t, ndim=2, mode='c'] s1 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+        np.ndarray[complex_t, ndim=2, mode='c'] s2 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+        np.ndarray[complex_t, ndim=2, mode='c'] o1 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+        np.ndarray[complex_t, ndim=2, mode='c'] o2 = np.zeros((fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+        np.ndarray[complex_t, ndim=3, mode='c'] y = np.zeros((fk.shape[0], fk.shape[1], fk.shape[2]), dtype=fk.dtype)
+
+
+    M = u0.shape[1]
+    for j in range(fk.shape[1]):
+        for k in range(fk.shape[2]):
+            y[0, j, k] = fk[0, j, k]
+            y[1, j, k] = fk[1, j, k]
+            y[2, j, k] = fk[2, j, k] - l0[0, 0, j, k]*y[0, j, k]
+            y[3, j, k] = fk[3, j, k] - l0[1, 0, j, k]*y[1, j, k]
+
+    for i in xrange(2, M):
+        ke = 2*i
+        ko = ke+1
+        for j in range(fk.shape[1]):
+            for k in range(fk.shape[2]):
+                y[ko, j, k] = fk[ko, j, k] - l0[1, i-1, j, k]*y[ko-2, j, k] - l1[1, i-2, j, k]*y[ko-4, j, k]
+                y[ke, j, k] = fk[ke, j, k] - l0[0, i-1, j, k]*y[ke-2, j, k] - l1[0, i-2, j, k]*y[ke-4, j, k]
+
+    ke = 2*(M-1)
+    ko = ke+1
+    for j in range(fk.shape[1]):
+        for k in range(fk.shape[2]):
+            uk[ke, j, k] = y[ke, j, k] / u0[0, M-1, j, k]
+            uk[ko, j, k] = y[ko, j, k] / u0[1, M-1, j, k]
+
+    ke = 2*(M-2)
+    ko = ke+1
+    for j in range(fk.shape[1]):
+        for k in range(fk.shape[2]):
+            uk[ke, j, k] = (y[ke, j, k] - u1[0, M-2, j, k]*uk[ke+2, j, k]) / u0[0, M-2, j, k]
+            uk[ko, j, k] = (y[ko, j, k] - u1[1, M-2, j, k]*uk[ko+2, j, k]) / u0[1, M-2, j, k]
+
+    ke = 2*(M-3)
+    ko = ke+1
+    for j in range(fk.shape[1]):
+        for k in range(fk.shape[2]):
+            uk[ke, j, k] = (y[ke, j, k] - u1[0, M-3, j, k]*uk[ke+2, j, k] - u2[0, M-3, j, k]*uk[ke+4, j, k]) / u0[0, M-3, j, k]
+            uk[ko, j, k] = (y[ko, j, k] - u1[1, M-3, j, k]*uk[ko+2, j, k] - u2[1, M-3, j, k]*uk[ko+4, j, k]) / u0[1, M-3, j, k]
+
+    for kk in xrange(M-4, -1, -1):
+        ke = 2*kk
+        ko = ke+1
+        je = ke+6
+        jo = ko+6
+        for j in range(fk.shape[1]):
+            for k in range(fk.shape[2]):
+                s1[j, k] += uk[je, j, k]/(je+3.)
+                s2[j, k] += (uk[je, j, k]/(je+3.))*((je+2.)*(je+2.))
+                uk[ke, j, k] = (y[ke, j, k] - u1[0, kk, j, k]*uk[ke+2, j, k] - u2[0, kk, j, k]*uk[ke+4, j, k] - a[0, kk, j, k]*ac*s1[j, k] - b[0, kk, j, k]*ac*s2[j, k]) / u0[0, kk, j, k]
+                o1[j, k] += uk[jo, j, k]/(jo+3.)
+                o2[j, k] += (uk[jo, j, k]/(jo+3.))*((jo+2.)*(jo+2.))
+                uk[ko, j, k] = (y[ko, j, k] - u1[1, kk, j, k]*uk[ko+2, j, k] - u2[1, kk, j, k]*uk[ko+4, j, k] - a[1, kk, j, k]*ac*o1[j, k] - b[1, kk, j, k]*ac*o2[j, k]) / u0[1, kk, j, k]
+
+
 @cython.cdivision(True)
 #@cython.linetrace(True)
 #@cython.binding(True)

@@ -113,15 +113,16 @@ class KMMRK3Writer(HDF5Writer):
 @optimizer
 def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
     diff_u = work[(g, 0)]
-    diff_g = work[(g, 1)]
+    diff_g = work[(g, 1, False)]
+    w0 = work[(g, 2, False)]
 
     # Compute diffusion for g-equation
     diff_g = AB.matvec(g, diff_g)
 
     # Compute diffusion++ for u-equation
-    diff_u[:] = nu*(a+b)*dt/2.*SBB.matvec(u)
-    diff_u += (1. - nu*(a+b)*dt*K2)*ABB.matvec(u)
-    diff_u -= (K2 - nu*(a+b)*dt/2.*K2**2)*BBB.matvec(u)
+    diff_u[:] = nu*(a+b)*dt/2.*SBB.matvec(u, w0)
+    diff_u += (1. - nu*(a+b)*dt*K2)*ABB.matvec(u, w0)
+    diff_u -= (K2 - nu*(a+b)*dt/2.*K2**2)*BBB.matvec(u, w0)
 
     rhs[0] += diff_u
     rhs[1] += diff_g
@@ -148,12 +149,14 @@ def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
     # Nonlinear convection term at current u_hat
     H_hat = solver.conv(H_hat, u_hat, g_hat, K, FST, SB, ST, work, mat, la)
 
-    hv[1] = -K2*mat.BBD.matvec(H_hat[0])
+    w0 = work[(H_hat[0], 0, False)]
+    w1 = work[(H_hat[0], 1, False)]
+    hv[1] = -K2*mat.BBD.matvec(H_hat[0], w0)
     #hv[:] = FST.fss(H[0], hv, SB)
     #hv *= -K2
-    hv[1] -= 1j*K[1]*mat.CBD.matvec(H_hat[1])
-    hv[1] -= 1j*K[2]*mat.CBD.matvec(H_hat[2])
-    hg[1] = 1j*K[1]*mat.BDD.matvec(H_hat[2]) - 1j*K[2]*mat.BDD.matvec(H_hat[1])
+    hv[1] -= 1j*K[1]*mat.CBD.matvec(H_hat[1], w0)
+    hv[1] -= 1j*K[2]*mat.CBD.matvec(H_hat[2], w0)
+    hg[1] = 1j*K[1]*mat.BDD.matvec(H_hat[2], w0) - 1j*K[2]*mat.BDD.matvec(H_hat[1], w1)
 
     rhs[0] = (hv[1]*a[rk] + hv[0]*b[rk])*params.dt
     rhs[1] = (hg[1]*a[rk] + hg[0]*b[rk])*2./params.nu/(a[rk]+b[rk])
@@ -170,6 +173,7 @@ def solve_linear(u_hat, g_hat, rhs, rk,
                  work, la, mat, H_hat, Sk, h1, a, b, K_over_K2, **context):
 
     f_hat = work[(u_hat[0], 0)]
+    w0 = work[(u_hat[0], 1, False)]
 
     u_hat[0] = la.BiharmonicSolverU[rk](u_hat[0], rhs[0])
     g_hat = la.HelmholtzSolverG[rk](g_hat, rhs[1])
@@ -181,30 +185,31 @@ def solve_linear(u_hat, g_hat, rhs, rk,
         u0_hat[1] = u_hat[2, :, 0, 0]
 
     # Compute v_hat and w_hat from u_hat and g_hat
-    f_hat -= mat.CDB.matvec(u_hat[0])
+    f_hat -= mat.CDB.matvec(u_hat[0], w0)
     f_hat = la.TDMASolverD(f_hat)
     u_hat = compute_vw(u_hat, f_hat, g_hat, K_over_K2)
 
     # Remains to fix wavenumber 0
     if rank == 0:
         w = work[((params.N[0], ), complex, 0)]
+        w1 = work[((params.N[0], ), complex, 1, False)]
 
         h0_hat[0] = H_hat[1, :, 0, 0]
         h0_hat[1] = H_hat[2, :, 0, 0]
 
-        h1[1, 0] = mat.BDD.matvec(h0_hat[0])
-        h1[1, 1] = mat.BDD.matvec(h0_hat[1])
+        h1[1, 0] = mat.BDD.matvec(h0_hat[0], h1[1, 0])
+        h1[1, 1] = mat.BDD.matvec(h0_hat[1], h1[1, 1])
         h1[1, 0] -= Sk[1, :, 0, 0]  # Subtract constant pressure gradient
 
         beta = 2./params.nu/(a[rk]+b[rk])
         w[:] = beta*(a[rk]*h1[1, 0] + b[rk]*h1[0, 0])
-        w -= mat.ADD.matvec(u0_hat[0])
-        w += beta/params.dt*mat.BDD.matvec(u0_hat[0])
+        w -= mat.ADD.matvec(u0_hat[0], w1)
+        w += beta/params.dt*mat.BDD.matvec(u0_hat[0], w1)
         u0_hat[0] = la.HelmholtzSolverU0[rk](u0_hat[0], w)
 
         w[:] = beta*(a[rk]*h1[1, 1] + b[rk]*h1[0, 1])
-        w -= mat.ADD.matvec(u0_hat[1])
-        w += beta/params.dt*mat.BDD.matvec(u0_hat[1])
+        w -= mat.ADD.matvec(u0_hat[1], w1)
+        w += beta/params.dt*mat.BDD.matvec(u0_hat[1], w1)
         u0_hat[1] = la.HelmholtzSolverU0[rk](u0_hat[1], w)
 
         h1[0] = h1[1]

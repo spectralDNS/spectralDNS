@@ -7,7 +7,6 @@ from mpiFFT4py import dct, work_arrays, Slab_R2C, fftfreq, rfftfreq, rfft2, \
 from . import SFTc
 import scipy.sparse.linalg as la
 from ..shen.la import TDMA, PDMA
-from ..shen.Matrices import BBBmat
 from ..optimization import optimizer
 from collections import defaultdict
 import decimal
@@ -344,6 +343,13 @@ class ShenNeumannBasis(ShenDirichletBasis):
         fj = self.ifct(w_hat, fj)
         return fj
 
+    def fst(self, fj, fk):
+        """Fast Shen transform
+        """
+        fk = self.fastShenScalar(fj, fk)
+        fk = self.Solver(fk)
+        return fk
+
     def slice(self, N):
         return slice(1, N-2)
 
@@ -418,6 +424,13 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
         w_hat = ShenBiharmonicBasis.set_w_hat(w_hat, fk, self.factor1, self.factor2)
         fj = self.ifct(w_hat, fj)
         return fj
+
+    def fst(self, fj, fk):
+        """Fast Shen transform
+        """
+        fk = self.fastShenScalar(fj, fk)
+        fk = self.Solver(fk)
+        return fk
 
     def slice(self, N):
         return slice(0, N-4)

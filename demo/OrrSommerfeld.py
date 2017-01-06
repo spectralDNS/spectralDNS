@@ -138,7 +138,7 @@ def update(context):
         acc[0] += abs(e1/e0-exact)
         #acc[0] += e1/e0
 
-        if solver.rank == 0:
+        if solver.rank == 0 and not config.params.spatial_refinement_test:
             print("Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2)))
 
 def compute_error(context):
@@ -174,7 +174,7 @@ def eps_refinement_test(context):
 def spatial_refinement_test(context):
     e1, e2, exact = compute_error(context)
     if config.solver.rank == 0:
-        print(" %2d & %2.8e & %2.8e \\\ " %(config.params.M[0], sqrt(e2)/config.params.eps, e1/e0-exact))
+        print(" %2d & %2.8e & %2.8e \\\ " %(2**config.params.M[0], sqrt(e2)/config.params.eps, acc[0]))
 
 if __name__ == "__main__":
     config.update(
@@ -210,7 +210,10 @@ if __name__ == "__main__":
 
     elif config.params.spatial_refinement_test:
         print("spatial refinement-test")
-        solver.update = lambda x: None
+        def update(con):
+            e1, e2, exact = compute_error(con)
+            acc[0] += abs(e1/e0-exact)
+        solver.update = update
         solver.regression_test = spatial_refinement_test
         config.params.verbose=False
         for M in [4, 5, 6, 7, 8]:
