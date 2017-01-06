@@ -28,20 +28,3 @@ def chebDerivativeCoefficients_3D(np.ndarray[T, ndim=3] fk, np.ndarray[T, ndim=3
         for j in xrange(fk.shape[2]):
             chebDerivativeCoefficients(fk[:, i, j], fl[:, i, j])
     return fl
-
-def Tridiagonal_matvec3(double[::1] v,
-                       double[::1] b,
-                       double[::1] ld,
-                       double[::1] dd,
-                       double[::1] ud):
-
-    cdef:
-        np.intp_t i
-        np.intp_t N = dd.shape[0]
-
-    for i in xrange(N-2):
-        b[i] = ud[i]*v[i+2]
-    for i in xrange(N):
-        b[i] += dd[i]*v[i]
-    for i in xrange(2, N):
-        b[i] += ld[i-2]*v[i-2]
