@@ -4,18 +4,20 @@ machine:
     PATH: ${CONDA_ROOT}/bin:${PATH}
 
 dependencies:
-  cache_directories:
-    - /home/ubuntu/miniconda
+  #cache_directories:
+    #- /home/ubuntu/miniconda
 
   override:
-    - >
-      if [[ ! -d ${CONDA_ROOT} ]]; then
-          echo "Installing Miniconda...";
-          wget --quiet https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh &&
-          bash Miniconda-latest-Linux-x86_64.sh -b -p ${CONDA_ROOT};
-      else
-          echo "Using cached Miniconda install";
-      fi
+    #- >
+      #if [[ ! -d ${CONDA_ROOT} ]]; then
+          #echo "Installing Miniconda...";
+          #wget --quiet https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh &&
+          #bash Miniconda-latest-Linux-x86_64.sh -b -p ${CONDA_ROOT};
+      #else
+          #echo "Using cached Miniconda install";
+      #fi
+    - wget --quiet https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh &&
+    - bash Miniconda-latest-Linux-x86_64.sh -b -p ${CONDA_ROOT};
     - conda config --set always_yes yes
     - conda config --add channels conda-forge
     - conda install -n root --yes --quiet conda-build=1

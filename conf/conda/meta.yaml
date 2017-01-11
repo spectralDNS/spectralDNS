@@ -29,6 +29,9 @@ requirements:
     - pyfftw
 
 test:
+  source_files:
+    - tests
+
   imports:
     - spectralDNS
     - nodepy
