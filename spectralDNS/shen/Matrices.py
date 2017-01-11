@@ -17,10 +17,10 @@ float, complex = np.float64, np.complex128
 
 Basis = {'Chebyshev':0, 'ShenDirichlet':1, 'ShenBiharmonic':2, 'ShenNeumann':3}
 
-class SPmat(OrderedDict):
+class SPmat(dict):
     """Base class for sparse matrices
 
-    The data is stored as an ordered dictionary, where keys and values are,
+    The data is stored as a dictionary, where keys and values are,
     respectively, the location and values of the diagonal.
 
     A tridiagonal matrix of shape N x N could be created as
@@ -44,7 +44,7 @@ class SPmat(OrderedDict):
     """
 
     def __init__(self, d, shape):
-        OrderedDict.__init__(self, sorted(d.items(), key=lambda t: t[0]))
+        dict.__init__(self, d)
         self.shape = shape
         self._diags = None
 
@@ -107,6 +107,11 @@ class SPmat(OrderedDict):
         """self *= alfa"""
         assert isinstance(alfa, (np.float, np.int))
         for key, val in six.iteritems(self):
+            # Check if symmetric
+            if key < 0 and (-key) in f:
+                if id(f[key]) == id(f[-key]):
+                    continue
+
             val *= alfa
         return self
 
@@ -115,6 +120,10 @@ class SPmat(OrderedDict):
         f = SPmat(deepcopy(dict(self)), self.shape)
         assert isinstance(alfa, (np.float, np.int))
         for key, val in six.iteritems(f):
+            # Check if symmetric
+            if key < 0 and (-key) in f:
+                if id(f[key]) == id(f[-key]):
+                    continue
             val *= alfa
         return f
 
@@ -126,6 +135,11 @@ class SPmat(OrderedDict):
         f = SPmat(deepcopy(dict(self)), self.shape)
         assert isinstance(alfa, (np.float, np.int))
         for key, val in six.iteritems(f):
+            # Check if symmetric
+            if key < 0 and (-key) in f:
+                if id(f[key]) == id(f[-key]):
+                    continue
+
             val /= alfa
         return f
 
@@ -136,6 +150,10 @@ class SPmat(OrderedDict):
             assert d.shape == self.shape
             for key, val in six.iteritems(d):
                 if key in f:
+                    # Check if symmetric and make copy if necessary
+                    if (-key) in f:
+                        if id(f[key]) == id(f[-key]):
+                            f[-key] = deepcopy(f[key])
                     f[key] += val
                 else:
                     f[key] = val
@@ -151,6 +169,10 @@ class SPmat(OrderedDict):
             assert d.shape == self.shape
             for key, val in six.iteritems(d):
                 if key in self:
+                    # Check if symmetric and make copy if necessary
+                    if (-key) in self:
+                        if id(self[key]) == id(self[-key]):
+                            self[-key] = deepcopy(self[key])
                     self[key] += val
                 else:
                     self[key] = val
@@ -163,8 +185,25 @@ class SPmat(OrderedDict):
 class Shenmat(SPmat):
     """Base class for Shen matrices
 
+    args:
+        d                            Dictionary, where keys are the diagonal
+                                       offsets and values the diagonals
+        N       integer              Length of main diagonal
+        quad    ('GC', 'GL')         Quadrature points
+                                       Chebyshev-Gauss : GC
+                                       Chebyshev-Gauss-Lobatto : GL
+        trial/test                   tuple, where basis is one of
+                (basis, derivative)    'Chebyshev'
+                                       'ShenDirichlet'
+                                       'ShenBiharmonic'
+                                       'ShenNeumann'
+                                     derivative is the number of derivatives
+                                     of the trial function
+        scale   float                Scale matrix with this constant
+
+
     Shen matrices are assumed to be sparse diagonal. The matrices are
-    scalar products of trial and test functions from one of three function
+    scalar products of trial and test functions from one of four function
     spaces
 
     Chebyshev basis and space of first kind
@@ -177,13 +216,19 @@ class Shenmat(SPmat):
         phi_k = T_k - T_{k+2},
         span(phi_k) for k = 0, 1, ..., N-2
 
+    For homogeneous Neumann boundary conditions:
+
+        phi_k = T_k - (k/(k+2))**2T_{k+2},
+        span(phi_k) for k = 1, 2, ..., N-2
+
     For Biharmonic basis with both homogeneous Dirichlet
     and Neumann:
 
         psi_k = T_k - 2(k+2)/(k+3)*T_{k+2} + (k+1)/(k+3)*T_{k+4},
         span(psi_k) for k = 0, 1, ..., N-4
 
-    The scalar product is computed as a weighted inner product
+    The scalar product is computed as a weighted inner product with
+    w=1/sqrt(1-x**2) the weights.
 
     Mass matrix for Dirichlet basis:
 
@@ -198,12 +243,12 @@ class Shenmat(SPmat):
     The matrix can be automatically created using, e.g., for the mass
     matrix of the Dirichelt space
 
-    M = Shenmat({}, 16, 'GC', ('ShenDirichlet', 0), ('ShenDirichlet', 0))
+      M = Shenmat({}, 16, 'GC', ('ShenDirichlet', 0), ('ShenDirichlet', 0))
 
     where the first ('ShenDirichlet', 0) represents the trial function and
     the second the test function. The stiffness matrix can be obtained as
 
-    A = Shenmat({}, 16, 'GC', ('ShenDirichlet', 2), ('ShenDirichlet', 0))
+      A = Shenmat({}, 16, 'GC', ('ShenDirichlet', 2), ('ShenDirichlet', 0))
 
     where ('ShenDirichlet', 2) signals that we use the second derivative
     of this trial function.
@@ -211,16 +256,34 @@ class Shenmat(SPmat):
     The automatically created matrices may be overloaded with more exactly
     computed diagonals.
 
-    args:
-        d                      dictionary, where keys are the diagonal
-                               location and values the values
-        N                      Length of main diagonal
-        quad    ('GC', 'GL')   Quadrature points
-                               Chebyshev-Gauss : GC
-                               Chebyshev-Gauss-Lobatto : GL
-        trial   (basis, derivative)
-        test    (basis, derivative)
-        scale      float       Scale matrix with this constant
+    Note that matrices with the Neumann basis are stored using index space
+    k = 0, 1, ..., N-2, i.e., including the zero index. This is used for
+    simplicity, and needs to be accounted for by users. For example, to
+    solve the Poisson equation
+
+        from spectralDNS.shen.shentransform import ShenNeumannBasis
+        import numpy as np
+        from sympy import Symbol, sin, pi
+        M = 32
+        SN = ShenNeumannBasis('GC')
+        x = Symbol("x")
+        u = (1-x**2)*sin(np.pi*x)
+        f = -u.diff(x, 2)
+        points, weights = SN.points_and_weights(M)
+        uj = np.array([u.subs(x, h) for h in points], dtype=np.float)
+        fj = np.array([f.subs(x, h) for h in points], dtype=np.float)
+        A = Shenmat({}, M, 'GC', ('ShenNeumann', 2), ('ShenNeumann', 0), scale=-1)
+        s = slice(1, M-2)
+        # Subtract mean
+        fj -= np.dot(fj, weights)/weights.sum()
+        uj -= np.dot(uj, weights)/weights.sum()
+        f_hat = np.zeros(M)
+        f_hat = SN.fastShenScalar(fj, f_hat)
+        u_hat = np.zeros(M)
+        u_hat[s] = np.linalg.solve(A.diags().toarray()[s, s], f_hat[s])
+        u0 = np.zeros(M)
+        u0 = SN.ifst(u_hat, u0)
+        assert np.allclose(u0, uj)
 
 
     """
@@ -263,6 +326,7 @@ class Shenmat(SPmat):
             V                    Vandermonde matrix, or its derivative
             base   (0, 1, 2, 3)  Basis
             N         integer    Size of problem in real space
+
         """
         if base == 0:
             return V

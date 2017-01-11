@@ -242,11 +242,12 @@ class Biharmonic(object):
 
         else:
             if solver == "scipy":
-                AA = a0*S.diags().toarray() + alfa*A.diags().toarray() + beta*B.diags().toarray()
-                Ae = AA[::2, ::2]
-                Ao = AA[1::2, 1::2]
-                self.Le = lu_factor(Ae)
-                self.Lo = lu_factor(Ao)
+                #AA = a0*S.diags().toarray() + alfa*A.diags().toarray() + beta*B.diags().toarray()
+                #Ae = AA[::2, ::2]
+                #Ao = AA[1::2, 1::2]
+                #self.Le = lu_factor(Ae)
+                #self.Lo = lu_factor(Ao)
+                self.AA = (a0*S + alfa*A + beta*B).diags()
             else:
                 self.u0 = zeros((2, M))
                 self.u1 = zeros((2, M))
@@ -271,8 +272,10 @@ class Biharmonic(object):
                 #SFTc.Solve_Biharmonic_3D_com(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
         else:
             if self.solver == "scipy":
-                u[:-4:2] = lu_solve(self.Le, b[:-4:2])
-                u[1:-4:2] = lu_solve(self.Lo, b[1:-4:2])
+                #u[:-4:2] = lu_solve(self.Le, b[:-4:2])
+                #u[1:-4:2] = lu_solve(self.Lo, b[1:-4:2])
+                u[:-4] = la_solve.spsolve(self.AA, b[:-4])
+                #u[:-4] = solve(self.AA, b[:-4])
             else:
                 SFTc.Solve_Biharmonic_1D(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
 

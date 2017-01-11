@@ -18,12 +18,13 @@ dependencies:
       fi
     - conda config --set always_yes yes
     - conda config --add channels conda-forge
+    - conda install -n root --yes --quiet conda-build=1
     - conda install --yes --quiet conda-forge-build-setup
     - source run_conda_forge_build_setup
 
 test:
   override:
-    - | 
+    - |
       conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
       upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
       conda build --python 3.4 -c mpi4py -c conda-forge -c spectralDNS conf/conda
