@@ -30,7 +30,7 @@ install:
       conda config --add channels conda-forge
       conda install -n root --yes --quiet conda-build=1
       conda install --yes --quiet conda-forge-build-setup
-      source run_conda_forge_build_setup
+      #source run_conda_forge_build_setup
 
 script:
     - conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
