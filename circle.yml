@@ -26,8 +26,8 @@ dependencies:
 test:
   override:
     - |
-      conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
+      conda build conf/conda
       upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
-      conda build --python 3.4 -c mpi4py -c conda-forge -c spectralDNS conf/conda
+      conda build --python 3.4 conf/conda
       export CONDA_PY=34
       upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
