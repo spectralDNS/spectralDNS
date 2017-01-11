@@ -17,8 +17,9 @@ dependencies:
           echo "Using cached Miniconda install";
       fi
     - conda config --set always_yes yes
+    - conda config --add channels spectralDNS
     - conda config --add channels conda-forge
-    - conda install -n root --yes --quiet conda-build=1
+    - conda config --add channels mpi4py
     - conda install --yes --quiet conda-forge-build-setup
     - source run_conda_forge_build_setup
 
