@@ -445,8 +445,8 @@ def Tridiagonal_matvec3D(T[:, :, ::1] v,
             k = N-1
             b[k, i, j] = ld[k-2]* v[k-2, i, j] + dd[k]*v[k, i, j]
 
-def Tridiagonal_matvec(T[::1] v,
-                       T[::1] b,
+def Tridiagonal_matvec(np.ndarray[T, ndim=1] v,
+                       np.ndarray[T, ndim=1] b,
                        real_t[::1] ld,
                        real_t[::1] dd,
                        real_t[::1] ud):

@@ -5,6 +5,9 @@ from .SFTc import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, \
     CBD_matvec3D, CBD_matvec, CDB_matvec3D, ADDmat_matvec, Helmholtz_matvec3D, \
     Helmholtz_matvec, BBD_matvec3D, Tridiagonal_matvec
 
+from shentransform import ChebyshevTransform, ShenDirichletBasis, ShenNeumannBasis, \
+    ShenBiharmonicBasis
+
 from . import points_and_weights
 import numpy.polynomial.chebyshev as cheb
 from scipy.sparse import diags
@@ -15,13 +18,11 @@ from copy import deepcopy
 pi, zeros, ones, array = np.pi, np.zeros, np.ones, np.array
 float, complex = np.float64, np.complex128
 
-Basis = {'Chebyshev':0, 'ShenDirichlet':1, 'ShenBiharmonic':2, 'ShenNeumann':3}
-
-class SPmat(dict):
+class SparseMatrix(dict):
     """Base class for sparse matrices
 
     The data is stored as a dictionary, where keys and values are,
-    respectively, the location and values of the diagonal.
+    respectively, the offsets and values of the diagonal.
 
     A tridiagonal matrix of shape N x N could be created as
 
@@ -29,17 +30,16 @@ class SPmat(dict):
               0: -2,
               1: 1}
 
-    >>> SPmat(d, (N, N))
+    >>> SparseMatrix(d, (N, N))
 
     In case of variable values, store the entire diagonal
-
     For an N x N matrix use:
 
     >>> d = {-1: np.ones(N-1),
               0: -2*np.ones(N),
               1: np.ones(N-1)}
 
-    >>> SPmat(d, (N, N))
+    >>> SparseMatrix(d, (N, N))
 
     """
 
@@ -58,11 +58,11 @@ class SPmat(dict):
                     if key < 0:
                         for i in range(v.shape[1]):
                             for j in range(v.shape[2]):
-                                c[-key:N,i,j] += val*v[:(M+key),i,j]
+                                c[-key:min(N, M-key), i, j] += val*v[:min(M, N+key), i, j]
                     else:
                         for i in range(v.shape[1]):
                             for j in range(v.shape[2]):
-                                c[:(N-key),i,j] += val*v[key:M,i,j]
+                                c[:min(N, M-key), i, j] += val*v[key:min(M, N+key), i, j]
 
             else:
                 assert format in ('csr', 'dia', 'csc')
@@ -75,9 +75,9 @@ class SPmat(dict):
             if format == 'python':
                 for key, val in six.iteritems(self):
                     if key < 0:
-                        c[-key:N] += val*v[:(M+key)]
+                        c[-key:min(N, M-key)] += val*v[:min(M, N+key)]
                     else:
-                        c[:(N-key)] += val*v[key:M]
+                        c[:min(N, M-key)] += val*v[key:min(M, N+key)]
 
             else:
                 assert format in ('csr', 'dia', 'csc')
@@ -108,16 +108,15 @@ class SPmat(dict):
         assert isinstance(alfa, (np.float, np.int))
         for key, val in six.iteritems(self):
             # Check if symmetric
-            if key < 0 and (-key) in f:
-                if id(f[key]) == id(f[-key]):
+            if key < 0 and (-key) in self:
+                if id(self[key]) == id(self[-key]):
                     continue
-
             val *= alfa
         return self
 
     def __mul__(self, alfa):
         """Return copy self*alfa"""
-        f = SPmat(deepcopy(dict(self)), self.shape)
+        f = SparseMatrix(deepcopy(dict(self)), self.shape)
         assert isinstance(alfa, (np.float, np.int))
         for key, val in six.iteritems(f):
             # Check if symmetric
@@ -132,20 +131,19 @@ class SPmat(dict):
 
     def __div__(self, alfa):
         """Return copy self/alfa"""
-        f = SPmat(deepcopy(dict(self)), self.shape)
+        f = SparseMatrix(deepcopy(dict(self)), self.shape)
         assert isinstance(alfa, (np.float, np.int))
         for key, val in six.iteritems(f):
             # Check if symmetric
             if key < 0 and (-key) in f:
                 if id(f[key]) == id(f[-key]):
                     continue
-
             val /= alfa
         return f
 
     def __add__(self, d):
         """Return copy of self+d"""
-        f = SPmat(deepcopy(dict(self)), self.shape)
+        f = SparseMatrix(deepcopy(dict(self)), self.shape)
         if isinstance(d, dict):
             assert d.shape == self.shape
             for key, val in six.iteritems(d):
@@ -182,23 +180,24 @@ class SPmat(dict):
                 val += d
         return self
 
-class Shenmat(SPmat):
+
+class ShenMatrix(SparseMatrix):
     """Base class for Shen matrices
 
     args:
         d                            Dictionary, where keys are the diagonal
                                        offsets and values the diagonals
         N       integer              Length of main diagonal
-        quad    ('GC', 'GL')         Quadrature points
-                                       Chebyshev-Gauss : GC
-                                       Chebyshev-Gauss-Lobatto : GL
-        trial/test                   tuple, where basis is one of
-                (basis, derivative)    'Chebyshev'
-                                       'ShenDirichlet'
-                                       'ShenBiharmonic'
-                                       'ShenNeumann'
-                                     derivative is the number of derivatives
-                                     of the trial function
+        trial  (basis, derivative)   tuple, where basis is an instance of
+                                     one of
+                                       - ChebyshevTransform
+                                       - ShenDirichletBasis
+                                       - ShenBiharmonicBasis
+                                       - ShenNeumannBasis
+                                     derivative is and integer, and represents
+                                     the number of times the trial function
+                                     should be differentiated
+        test   basis                 One of the above basis functions
         scale   float                Scale matrix with this constant
 
 
@@ -243,14 +242,14 @@ class Shenmat(SPmat):
     The matrix can be automatically created using, e.g., for the mass
     matrix of the Dirichelt space
 
-      M = Shenmat({}, 16, 'GC', ('ShenDirichlet', 0), ('ShenDirichlet', 0))
+      M = ShenMatrix({}, 16, (ShenDirichletBasis(), 0), ShenDirichletBasis())
 
-    where the first ('ShenDirichlet', 0) represents the trial function and
+    where the first (ShenDirichletBasis, 0) represents the trial function and
     the second the test function. The stiffness matrix can be obtained as
 
-      A = Shenmat({}, 16, 'GC', ('ShenDirichlet', 2), ('ShenDirichlet', 0))
+      A = ShenMatrix({}, 16, (ShenDirichletBasis(), 2), ShenDirichletBasis())
 
-    where ('ShenDirichlet', 2) signals that we use the second derivative
+    where (ShenDirichletBasis, 2) signals that we use the second derivative
     of this trial function.
 
     The automatically created matrices may be overloaded with more exactly
@@ -269,16 +268,16 @@ class Shenmat(SPmat):
         x = Symbol("x")
         u = (1-x**2)*sin(np.pi*x)
         f = -u.diff(x, 2)
-        points, weights = SN.points_and_weights(M)
+        points, weights = SN.points_and_weights(M, SN.quad)
         uj = np.array([u.subs(x, h) for h in points], dtype=np.float)
         fj = np.array([f.subs(x, h) for h in points], dtype=np.float)
-        A = Shenmat({}, M, 'GC', ('ShenNeumann', 2), ('ShenNeumann', 0), scale=-1)
+        A = ShenMatrix({}, M, (SN, 2), SN, scale=-1)
         s = slice(1, M-2)
         # Subtract mean
         fj -= np.dot(fj, weights)/weights.sum()
         uj -= np.dot(uj, weights)/weights.sum()
         f_hat = np.zeros(M)
-        f_hat = SN.fastShenScalar(fj, f_hat)
+        f_hat = SN.scalar_product(fj, f_hat)
         u_hat = np.zeros(M)
         u_hat[s] = np.linalg.solve(A.diags().toarray()[s, s], f_hat[s])
         u0 = np.zeros(M)
@@ -287,31 +286,22 @@ class Shenmat(SPmat):
 
 
     """
-    def __init__(self, d, N,  quad='GC', trial=('Chebyshev', 0), test=('Chebyshev', 0), scale=1.0):
-        self.trialfunction = trial
+    def __init__(self, d, N,  trial, test, scale=1.0):
+        self.trialfunction, self.derivative = trial
         self.testfunction = test
         self.N = N
-        self.quad = quad
         self.scale = scale
         shape = self.get_shape()
         if d == {}:
             D = self.get_dense_matrix()[:shape[0], :shape[1]]
             d = extract_diagonal_matrix(D)
-        SPmat.__init__(self, d, shape)
+        SparseMatrix.__init__(self, d, shape)
         if not round(scale-1.0, 8) == 0:
             self *= scale
 
     def get_shape(self):
-        d = {'Chebyshev': lambda n: n,
-             'ShenDirichlet': lambda n: n-2,
-             'ShenBiharmonic': lambda n: n-4,
-             'ShenNeumann': lambda n: n-2}
-        return (d[self.testfunction[0]](self.N),
-                d[self.trialfunction[0]](self.N))
-
-    def vandermonde(self, x, N):
-        """Chebyshev Vandermonde matrix"""
-        return cheb.chebvander(x, N-1)
+        return (self.testfunction.get_shape(self.N),
+                self.trialfunction.get_shape(self.N))
 
     def get_ck(self, N, quad):
         ck = ones(N, int)
@@ -319,57 +309,13 @@ class Shenmat(SPmat):
         if quad == "GL": ck[-1] = 2
         return ck
 
-    def get_basis(self, V, base, N):
-        """Return basis function evaluated at all points
-
-        args:
-            V                    Vandermonde matrix, or its derivative
-            base   (0, 1, 2, 3)  Basis
-            N         integer    Size of problem in real space
-
-        """
-        if base == 0:
-            return V
-
-        P = np.zeros((N, N))
-        if base == 1:
-            P[:,:-2] = V[:,:-2] - V[:,2:]
-            #P[:,-2] = (V[:,0] + V[:,1])/2
-            #P[:,-1] = (V[:,0] - V[:,1])/2
-
-        elif base == 2:
-            k = np.arange(N).astype(np.float)[:-4]
-            P[:, :-4] = V[:, :-4] - (2*(k+2)/(k+3))*V[:, 2:-2] + ((k+1)/(k+3))*V[:, 4:]
-
-        elif base == 3:
-            k = np.arange(N).astype(np.float)[:-2]
-            P[:, :-2] = V[:, :-2] - (k/(k+2))**2*V[:, 2:]
-
-        return P
-
-    def get_testfunction(self, V, base):
-        """Return testfunction"""
-        N = self.N
-        P = self.get_basis(V, base, N)
-        return P
-
-    def get_trialfunction(self, V, base, der=0):
-        """Return trialfunction"""
-        N = self.N
-        if der > 0:
-            D = np.zeros((N, N))
-            D[:-der, :] = cheb.chebder(np.eye(N), der)
-            V  = np.dot(V, D)
-        P = self.get_basis(V, base, N)
-        return P
-
     def get_dense_matrix(self):
         """Return dense matrix automatically computed from basis"""
         N = self.N
-        x, w = points_and_weights(N, self.quad)
-        V = self.vandermonde(x, N)
-        test = self.get_testfunction(V, Basis[self.testfunction[0]])
-        trial = self.get_trialfunction(V, Basis[self.trialfunction[0]], self.trialfunction[1])
+        x, w = points_and_weights(N, self.trialfunction.quad)
+        V = self.testfunction.vandermonde(x, N)
+        test = self.testfunction.get_vandermonde_basis(V)
+        trial = self.trialfunction.get_vandermonde_basis_derivative(V, self.derivative)
         return np.dot(w*test.T, trial)
 
     def test(self):
@@ -401,24 +347,25 @@ def extract_diagonal_matrix(M, tol=1e-8):
         if abs(l).max() > tol:
             d[-i] = l
 
-    return SPmat(d, M.shape)
+    return SparseMatrix(d, M.shape)
 
 
-class BDDmat(Shenmat):
+class BDDmat(ShenMatrix):
     """Matrix for inner product (u, phi)_w = BDDmat * u_hat
 
     where u_hat is a vector of coefficients for a Shen Dirichlet basis
     and phi is a Shen Dirichlet basis.
     """
 
-    def __init__(self, K, quad):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         ck = self.get_ck(N, quad)
         data = {-2: np.array([-pi/2.]),
                  0: pi/2*(ck[:-2]+ck[2:]),
                  2: np.array([-pi/2])}
-        Shenmat.__init__(self, data, N, quad, ('ShenDirichlet', 0), ('ShenDirichlet', 0))
+        trial = ShenDirichletBasis(quad=quad)
+        ShenMatrix.__init__(self, data, N, (trial, 0), trial)
 
     #@profile
     def matvec(self, v, c, format='cython'):
@@ -435,7 +382,7 @@ class BDDmat(Shenmat):
                 c[2:N]   += self[-2]*v[:(N-2)]
 
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         else:
             if format == 'cython':
@@ -448,42 +395,44 @@ class BDDmat(Shenmat):
                 c[2:N]   += self[-2]*v[:(M-2)]
 
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         return c
 
 
 ## Mass matrices
-class BNDmat(Shenmat):
-    """Matrix for inner product (p, phi)_w = BNDmat * p_hat
+class BNDmat(ShenMatrix):
+    """Matrix for inner product (u, phi)_w = BNDmat * u_hat
 
-    where p_hat is a vector of coefficients for a Shen Neumann basis
-    and phi is a Shen Dirichlet basis.
+    where u_hat is a vector of coefficients for a Shen Dirichlet basis
+    and phi is a Shen Neumann basis.
     """
 
-    def __init__(self, K, quad):
+    def __init__(self, K, quad='GC'):
         N = K.shape[0]
         ck = self.get_ck(N, quad)
         k = K[:N-2].astype(float)
         d = {-2: -pi/2,
               0: pi/2.*(ck[:-2]+ck[2:]*(k/(k+2))**2),
               2: -pi/2*(k[:N-4]/(k[:N-4]+2))**2}
-        Shenmat.__init__(self, d, N, quad, ('ShenDirichlet', 0), ('ShenNeumann', 0))
+        trial = ShenDirichletBasis(quad=quad)
+        test  = ShenNeumannBasis(quad=quad)
+        ShenMatrix.__init__(self, d, N, (trial, 0), test)
 
     def matvec(self, v, c, format='csr'):
-        c = Shenmat.matvec(self, v, c, format=format)
+        c = ShenMatrix.matvec(self, v, c, format=format)
         c[0] = 0
         return c
 
 
-class BDNmat(Shenmat):
-    """Matrix for inner product (p, phi_N)_w = BDNmat * u_hat
+class BDNmat(ShenMatrix):
+    """Matrix for inner product (p, phi)_w = BDNmat * p_hat
 
-    where u_hat is a vector of coefficients for a Shen Dirichlet basis
-    and phi_N is a Shen Neumann basis.
+    where p_hat is a vector of coefficients for a Shen Neumann basis
+    and phi is a Shen Dirichlet basis.
     """
 
-    def __init__(self, K, quad):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         ck = self.get_ck(N, quad)
@@ -491,48 +440,51 @@ class BDNmat(Shenmat):
         d = {-2: -pi/2*(k[:N-4]/(k[:N-4]+2))**2,
               0:  pi/2.*(ck[:-2]+ck[2:]*(k/(k+2))**2),
               2: -pi/2}
-        Shenmat.__init__(self, d, N, quad, ('ShenNeumann', 0), ('ShenDirichlet', 0))
+        trial = ShenNeumannBasis(quad=quad)
+        test  = ShenDirichletBasis(quad=quad)
+        ShenMatrix.__init__(self, d, N, (trial, 0), test)
 
 
-class BTTmat(Shenmat):
+class BTTmat(ShenMatrix):
     """Matrix for inner product (p, T)_w = BTTmat * p_hat
 
     where p_hat is a vector of coefficients for a Chebyshev basis
     and T is a Chebyshev basis.
     """
 
-    def __init__(self, K, quad):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         ck = self.get_ck(N, quad)
-        Shenmat.__init__(self, {0: pi/2*ck}, N, quad)
+        trial = ChebyshevTransform(quad)
+        ShenMatrix.__init__(self, {0: pi/2*ck}, N, (trial, 0), trial)
 
     def matvec(self, v, c, format='self'):
         N = self.shape[0]
         c.fill(0)
         if len(v.shape) > 1:
             if format == 'self':
-                c[:] = self[0].repeat(array(v.shape[1:]).prod()).reshape(v[:].shape)*v[:]
+                c[:] = self[0].repeat(array(v.shape[1:]).prod()).reshape(v[:].shape)*v
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         else:
             if format == 'self':
-                c[:] = self[0]*v[:]
+                c[:] = self[0]*v
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         return c
 
 
-class BNNmat(Shenmat):
+class BNNmat(ShenMatrix):
     """Matrix for inner product (p, phi_N)_w = BNNmat * p_hat
 
     where p_hat is a vector of coefficients for a Shen Neumann basis
     and phi_N is a Shen Neumann basis.
     """
 
-    def __init__(self, K, quad):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         ck = self.get_ck(N, quad)
@@ -540,65 +492,72 @@ class BNNmat(Shenmat):
         d = {-2: -pi/2*((k[2:]-2)/(k[2:]))**2,
               0: pi/2*(ck[:-2]+ck[2:]*(k[:]/(k[:]+2))**4),
               2: -pi/2*((k[2:]-2)/(k[2:]))**2}
-        Shenmat.__init__(self, d, N, quad, ('ShenNeumann', 0), ('ShenNeumann', 0))
+        trial = ShenNeumannBasis(quad)
+        ShenMatrix.__init__(self, d, N, (trial, 0), trial)
 
     def matvec(self, v, c, format='csr'):
-        c = Shenmat.matvec(self, v, c, format=format)
+        c = ShenMatrix.matvec(self, v, c, format=format)
         c[0] = 0
         return c
 
 
-class BDTmat(Shenmat):
+class BDTmat(ShenMatrix):
     """Matrix for inner product (u, phi)_w = BDTmat * u_hat
 
     where u_hat is a vector of coefficients for a Chebyshev basis
     and phi is a Shen Dirichlet basis.
     """
 
-    def __init__(self, K, quad):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         ck = self.get_ck(N, quad)
         d = {0: pi/2*ck[:N-2],
              2: -pi/2*ck[2:]}
-        Shenmat.__init__(self, d, N, quad, ('Chebyshev', 0), ('ShenDirichlet', 0))
+        trial = ChebyshevTransform(quad)
+        test = ShenDirichletBasis(quad)
+        ShenMatrix.__init__(self, d, N, (trial, 0), test)
 
 
-class BTDmat(Shenmat):
+class BTDmat(ShenMatrix):
     """Matrix for inner product (u, T)_w = BTDmat * u_hat
 
     where u_hat is a vector of coefficients for a Shen Dirichlet basis
     and T is a Chebyshev basis.
     """
 
-    def __init__(self, K, quad):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         ck = self.get_ck(N, quad)
         d = {-2: -pi/2*ck[2:],
               0: pi/2*ck[:N-2]}
-        Shenmat.__init__(self, d, N, quad, ('ShenDirichlet', 0), ('Chebyshev', 0))
+        test  = ChebyshevTransform(quad)
+        trial = ShenDirichletBasis(quad)
+        ShenMatrix.__init__(self, d, N, (trial, 0), test)
 
 
-class BTNmat(Shenmat):
+class BTNmat(ShenMatrix):
     """Matrix for inner product (u, T)_w = BTNmat * u_hat
 
     where u_hat is a vector of coefficients for a Shen Neumann basis
     and T is a Chebyshev basis.
     """
 
-    def __init__(self, K, quad):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         ck = self.get_ck(N, quad)
         d = {-2: -pi/2*ck[2:]*((K[2:]-2)/K[2:])**2,
-              0: pi/2}
-        Shenmat.__init__(self, d, N, quad, ('ShenNeumann', 0), ('Chebyshev', 0))
+              0: pi/2*ck[:-2]}
+        trial = ShenNeumannBasis(quad)
+        test = ChebyshevTransform(quad)
+        ShenMatrix.__init__(self, d, N, (trial, 0), test)
 
 
-class BBBmat(Shenmat):
+class BBBmat(ShenMatrix):
 
-    def __init__(self, K, quad):
+    def __init__(self, K, quad='GC'):
         N = K.shape[0]
         ck = self.get_ck(N, quad)
         k = K[:N-4].astype(float)
@@ -608,7 +567,8 @@ class BBBmat(Shenmat):
              0: (ck[:N-4] + 4*((k+2)/(k+3))**2 + ck[4:]*((k+1)/(k+3))**2)*pi/2.}
         d[-2] = d[2]
         d[-4] = d[4]
-        Shenmat.__init__(self, d, N, quad, ('ShenBiharmonic', 0), ('ShenBiharmonic', 0))
+        trial = ShenBiharmonicBasis(quad)
+        ShenMatrix.__init__(self, d, N, (trial, 0), trial)
 
     def matvec(self, v, c, format='cython'):
         c.fill(0)
@@ -626,7 +586,7 @@ class BBBmat(Shenmat):
                 Pentadiagonal_matvec3D(v, c, self[-4], self[-2], self[0], self[2], self[4])
 
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         else:
             if format == 'self':
@@ -641,7 +601,7 @@ class BBBmat(Shenmat):
                 Pentadiagonal_matvec(v, c, self[-4], self[-2], self[0], self[2], self[4])
 
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         return c
 
@@ -649,7 +609,7 @@ class BBBmat(Shenmat):
 #import decimal
 #class BBBmat(BaseMatrix):
 
-    #def __init__(self, K, quad):
+    #def __init__(self, K, quad='GC'):
         #BaseMatrix.__init__(self)
         #N = K.shape[0]-4
         #self.shape = (N, N)
@@ -715,9 +675,9 @@ class BBBmat(Shenmat):
     #def diags(self):
         #return diags([self.lld, self.ld, self.dd, self.ud, self.uud], range(-4, 6, 2), shape=self.shape)
 
-class BBDmat(Shenmat):
+class BBDmat(ShenMatrix):
 
-    def __init__(self, K, quad):
+    def __init__(self, K, quad='GC'):
         N = K.shape[0]
         ck = self.get_ck(N, quad)
         k = K[:N-4].astype(float)
@@ -727,7 +687,9 @@ class BBDmat(Shenmat):
               0: (ck[:N-4] + a)*pi/2,
               2: -(a+b*ck[4:])*pi/2,
               4: b[:-2]*pi/2}
-        Shenmat.__init__(self, d, N, quad, ('ShenDirichlet', 0), ('ShenBiharmonic', 0))
+        trial = ShenDirichletBasis(quad)
+        test = ShenBiharmonicBasis(quad)
+        ShenMatrix.__init__(self, d, N, (trial, 0), test)
 
     def matvec(self, v, c, format='cython'):
         c.fill(0)
@@ -744,7 +706,7 @@ class BBDmat(Shenmat):
                 BBD_matvec3D(v, c, self[-2], self[0], self[2], self[4])
 
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         else:
             if format == 'self':
@@ -755,25 +717,27 @@ class BBDmat(Shenmat):
                 c[2:N]  += self[-2] * vv[:-4]
             else:
                 if format == 'cython': format = 'csr'
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         return c
 
 # Derivative matrices
-class CDNmat(Shenmat):
+class CDNmat(ShenMatrix):
     """Matrix for inner product (p', phi)_w = CDNmat * p_hat
 
     where p_hat is a vector of coefficients for a Shen Neumann basis
     and phi is a Shen Dirichlet basis.
     """
 
-    def __init__(self, K):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         k = K[:N-2].astype(float)
         d = {-1: -((k[1:]-1)/(k[1:]+1))**2*(k[1:]+1)*pi,
               1: (k[:-1]+1)*pi}
-        Shenmat.__init__(self, d, N, 'GC', ('ShenNeumann', 1), ('ShenDirichlet', 0))
+        trial = ShenNeumannBasis()
+        test = ShenDirichletBasis()
+        ShenMatrix.__init__(self, d, N, (trial, 1), test)
 
     def matvec(self, v, c, format='cython'):
         N = self.shape[0]
@@ -781,27 +745,28 @@ class CDNmat(Shenmat):
             if format == 'cython':
                 CDNmat_matvec(self[1], self[-1][1:], v, c)
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
         else:
             if format == 'cython': format = 'csr'
-            c = Shenmat.matvec(self, v, c, format=format)
+            c = ShenMatrix.matvec(self, v, c, format=format)
 
         return c
 
 
-class CDDmat(Shenmat):
+class CDDmat(ShenMatrix):
     """Matrix for inner product (u', phi) = (phi', phi) u_hat =  CDDmat * u_hat
 
     where u_hat is a vector of coefficients for a Shen Dirichlet basis
     and phi is a Shen Dirichlet basis.
     """
 
-    def __init__(self, K):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         d = {-1: -(K[1:N-2]+1)*pi,
               1: (K[:(N-3)]+1)*pi}
-        Shenmat.__init__(self, d, N, 'GC', ('ShenDirichlet', 1), ('ShenDirichlet', 0))
+        trial = ShenDirichletBasis()
+        ShenMatrix.__init__(self, d, N, (trial, 1), trial)
 
     def matvec(self, v, c, format='cython'):
         N = self.shape[0]
@@ -813,26 +778,26 @@ class CDDmat(Shenmat):
             elif format == 'cython':
                 CDDmat_matvec(self[1], self[-1], v, c)
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
         else:
             if format == 'self':
                 c[:N-1] = self.ud*v[1:N]
                 c[1:N] += self.ld*v[:(N-1)]
             else:
                 if format == 'cython': format='csr'
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         return c
 
 
-class CNDmat(Shenmat):
+class CNDmat(ShenMatrix):
     """Matrix for inner product (u', phi_N) = (phi', phi_N) u_hat =  CNDmat * u_hat
 
     where u_hat is a vector of coefficients for a Shen Dirichlet basis
     and phi_N is a Shen Neumann basis.
     """
 
-    def __init__(self, K):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         k = K[:N-2].astype(float)
@@ -840,59 +805,67 @@ class CNDmat(Shenmat):
               1: -(2-k[:-1]**2/(k[:-1]+2)**2*(k[:-1]+3))*pi}
         for i in range(3, N-1, 2):
             d[i] = -(1-k[:-i]**2/(k[:-i]+2)**2)*2*pi
-        Shenmat.__init__(self, d, N, 'GC', ('ShenDirichlet', 1), ('ShenNeumann', 0))
+        trial = ShenDirichletBasis()
+        test = ShenNeumannBasis()
+        ShenMatrix.__init__(self, d, N, (trial, 1), test)
 
     def matvec(self, v, c, format='csr'):
-        c = Shenmat.matvec(self, v, c, format=format)
+        c = ShenMatrix.matvec(self, v, c, format=format)
         c[0] = 0
         return c
 
 
-class CTDmat(Shenmat):
+class CTDmat(ShenMatrix):
     """Matrix for inner product (u', T) = (phi', T) u_hat =  CTDmat * u_hat
 
     where u_hat is a vector of coefficients for a Shen Dirichlet basis
     and T is a Chebyshev basis.
     """
 
-    def __init__(self, K):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         d = {-1: -(K[1:N-1]+1)*pi,
               1: -2*pi}
         for i in range(3, N-2, 2):
             d[i] = -2*pi
-        Shenmat.__init__(self, d, N, 'GC', ('ShenDirichlet', 1), ('Chebyshev', 0))
+        trial = ShenDirichletBasis()
+        test = ChebyshevTransform()
+        ShenMatrix.__init__(self, d, N, (trial, 1), test)
 
 
-class CDTmat(Shenmat):
+class CDTmat(ShenMatrix):
     """Matrix for inner product (p', phi) = (T', phi) p_hat = CDTmat * p_hat
 
     where p_hat is a vector of coefficients for a Chebyshev basis
     and phi is a Shen Dirichlet basis.
     """
 
-    def __init__(self, K):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         d = {1: pi*(K[:N-2]+1)}
-        Shenmat.__init__(self, d, N, 'GC', ('Chebyshev', 1), ('ShenDirichlet', 0))
+        trial = ChebyshevTransform()
+        test = ShenDirichletBasis()
+        ShenMatrix.__init__(self, d, N, (trial, 1), test)
 
 
-class CBDmat(Shenmat):
+class CBDmat(ShenMatrix):
     """Matrix for inner product (u', psi) = (phi', psi) u_hat =  CBDmat * u_hat
 
     where u_hat is a vector of coefficients for a Shen Dirichlet basis
     and psi is a Shen Biharmonic basis.
     """
 
-    def __init__(self, K):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         d = {-1: -(K[1:N-4]+1)*pi,
               1: 2*(K[:N-4]+1)*pi,
               3: -(K[:N-5]+1)*pi}
-        Shenmat.__init__(self, d, N, 'GC', ('ShenDirichlet', 1), ('ShenBiharmonic', 0))
+        trial = ShenDirichletBasis()
+        test = ShenBiharmonicBasis()
+        ShenMatrix.__init__(self, d, N, (trial, 1), test)
 
     def matvec(self, v, c, format='cython'):
         N, M = self.shape
@@ -905,7 +878,7 @@ class CBDmat(Shenmat):
             elif format == 'cython':
                 CBD_matvec3D(v, c, self[-1], self[1], self[3])
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
         else:
             if format == 'self':
                 c[1:N] = self[-1] * v[:M-3]
@@ -913,23 +886,27 @@ class CBDmat(Shenmat):
                 c[:N-1] += self[3] * v[3:M]
             elif format == 'cython':
                 CBD_matvec(v, c, self[-1], self[1], self[3])
+            else:
+                c = ShenMatrix.matvec(self, v, c, format=format)
         return c
 
 
-class CDBmat(Shenmat):
+class CDBmat(ShenMatrix):
     """Matrix for inner product (u', psi) = (phi', psi) u_hat =  CDBmat * u_hat
 
     where u_hat is a vector of coefficients for a Shen Biharmonic basis
-    and psi is a Shen Dirichelt basis.
+    and psi is a Shen Dirichlet basis.
     """
 
-    def __init__(self, K):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
-        d = {-3: (K[3:N-2]-2)*(K[3:N-2]+1)/K[3:N-2]*pi,
-             -1: -2*(K[1:N-2]+1)**2/(K[1:N-2]+2)*pi,
-              1: (K[:N-5]+1)*pi}
-        Shenmat.__init__(self, d, N, 'GC', ('ShenBiharmonic', 1), ('ShenDirichlet', 0))
+        d = {-3: (K[3:-2]-2)*(K[3:-2]+1)/K[3:-2]*pi,
+             -1: -2*(K[1:-3]+1)**2/(K[1:-3]+2)*pi,
+              1: (K[:-5]+1)*pi}
+        trial = ShenBiharmonicBasis()
+        test = ShenDirichletBasis()
+        ShenMatrix.__init__(self, d, N, (trial, 1), test)
 
     def matvec(self, v, c, format='cython'):
         N, M = self.shape
@@ -942,7 +919,7 @@ class CDBmat(Shenmat):
             elif format == 'cython':
                 CDB_matvec3D(v, c, self[-3], self[-1], self[1])
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         else:
             if format == 'self':
@@ -951,26 +928,27 @@ class CDBmat(Shenmat):
                 c[:N-3] += self[1] * v[1:M]
             else:
                 if format == 'cython': format = 'csr'
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         return c
 
 
-class ABBmat(Shenmat):
+class ABBmat(ShenMatrix):
     """Matrix for inner product (u'', phi) = (phi'', phi) u_hat =  ABBmat * u_hat
 
     where u_hat is a vector of coefficients for a Shen Biharmonic basis
     and phi is a Shen Biharmonic basis.
     """
 
-    def __init__(self, K):
+    def __init__(self, K, quad='GC'):
         N = K.shape[0]
         ki = K[:N-4]
         k = K[:N-4].astype(float)
         d = {-2: 2*(ki[2:]-1)*(ki[2:]+2)*pi,
               0: -4*((ki+1)*(ki+2)**2)/(k+3)*pi,
               2: 2*(ki[:-2]+1)*(ki[:-2]+2)*pi}
-        Shenmat.__init__(self, d, N, 'GC', ('ShenBiharmonic', 2), ('ShenBiharmonic', 0))
+        trial = ShenBiharmonicBasis()
+        ShenMatrix.__init__(self, d, N, (trial, 2), trial)
 
     def matvec(self, v, c, format='cython'):
         N = self.shape[0]
@@ -983,7 +961,7 @@ class ABBmat(Shenmat):
             elif format == 'cython':
                 Tridiagonal_matvec3D(v, c, self[-2], self[0], self[2])
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         else:
             if format == 'self':
@@ -993,88 +971,91 @@ class ABBmat(Shenmat):
             elif format == 'cython':
                 Tridiagonal_matvec(v, c, self[-2], self[0], self[2])
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         return c
 
 
-class ADDmat(Shenmat):
+class ADDmat(ShenMatrix):
     """Matrix for inner product -(u'', phi) = -(phi'', phi) u_hat = ADDmat * u_hat
 
     where u_hat is a vector of coefficients for a Shen Dirichlet basis
     and phi is a Shen Dirichlet basis.
     """
 
-    def __init__(self, K):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         d = {0: -2*np.pi*(K[:N-2]+1)*(K[:N-2]+2)}
         for i in range(2, N-2, 2):
             d[i] = -4*np.pi*(K[:-(i+2)]+1)
-        Shenmat.__init__(self, d, N, 'GC', ('ShenDirichlet', 2), ('ShenDirichlet', 0), -1.0)
+        trial = ShenDirichletBasis()
+        ShenMatrix.__init__(self, d, N, (trial, 2), trial, -1.0)
 
     def matvec(self, v, c, format='cython'):
         N = self.shape[0]
         c = np.zeros(v.shape, dtype=v.dtype)
         if len(v.shape) > 1:
             if format == 'cython': format = 'csr'
-            c = Shenmat.matvec(self, v, c, format=format)
+            c = ShenMatrix.matvec(self, v, c, format=format)
 
         else:
             if format == 'cython':
                 ADDmat_matvec(v, c, self[0])
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         return c
 
 
-class ANNmat(Shenmat):
+class ANNmat(ShenMatrix):
     """Matrix for inner product -(u'', phi_N) = -(phi_N'', phi_N) p_hat = ANNmat * p_hat
 
     where u_hat is a vector of coefficients for a Shen Neumann basis
     and phi is a Shen Neumann basis.
     """
 
-    def __init__(self, K):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         k = K[:-2].astype(float)
         d = {0: -2*pi*k**2*(k+1)/(k+2)}
         for i in range(2, N-2, 2):
             d[i] = -4*np.pi*(k[:-i]+i)**2*(k[:-i]+1)/(k[:-i]+2)**2
-        Shenmat.__init__(self, d, N, 'GC', ('ShenNeumann', 2), ('ShenNeumann', 2), -1.0)
+        trial = ShenNeumannBasis()
+        ShenMatrix.__init__(self, d, N, (trial, 2), trial, -1.0)
 
     def matvec(self, v, c, format='csr'):
-        c = Shenmat.matvec(self, v, c, format=format)
+        c = ShenMatrix.matvec(self, v, c, format=format)
         c[0] = 0
         return c
 
 
-class ATTmat(Shenmat):
+class ATTmat(ShenMatrix):
     """Matrix for inner product -(u'', phi) = -(phi'', phi) p_hat = ATTmat * p_hat
 
     where p_hat is a vector of coefficients for a Chebyshev basis
     and phi is a Chebyshev basis.
     """
 
-    def __init__(self, K):
+    def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
         d = {}
         for j in range(2, N, 2):
-            d[j] = -K[j:]*(K[j:]**2-K[:-j]**2)*np.pi/2.
-        Shenmat.__init__(self, d, N, 'GC', ('Chebyshev', 2), ('Chebyshev', 0), -1.0)
+            d[j] = K[j:]*(K[j:]**2-K[:-j]**2)*np.pi/2.
+        trial = ChebyshevTransform()
+        ShenMatrix.__init__(self, d, N, (trial, 2), trial, -1.0)
 
 
-class SBBmat(Shenmat):
+class SBBmat(ShenMatrix):
     """Matrix for inner product (u'''', phi) = (phi'''', phi) u_hat =  SBBmat * u_hat
 
     where u_hat is a vector of coefficients for a Shen Biharmonic basis
     and phi is a Shen Biharmonic basis.
     """
 
-    def __init__(self, K):
+    def __init__(self, K, quad='GC'):
         N = K.shape[0]
         k = K[:N-4].astype(float)
         ki = K[:N-4]
@@ -1083,7 +1064,8 @@ class SBBmat(Shenmat):
         for j in range(2, N-4, 2):
             i = 8*(ki[:-j]+1)*(ki[:-j]+2)*(ki[:-j]*(ki[:-j]+4)+3*(ki[j:]+2)**2)
             d[j] = np.array(i*pi/(k[j:]+3))
-        Shenmat.__init__(self, d, N, 'GC', ('ShenBiharmonic', 4), ('ShenBiharmonic', 0))
+        trial = ShenBiharmonicBasis()
+        ShenMatrix.__init__(self, d, N, (trial, 4), trial)
 
     def matvec(self, v, c, format='cython'):
         N = self.shape[0]
@@ -1092,12 +1074,12 @@ class SBBmat(Shenmat):
             if format == 'cython':
                 SBBmat_matvec3D(v, c, self[0])
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
         else:
             if format == 'cython':
                 SBBmat_matvec(v, c, self[0])
             else:
-                c = Shenmat.matvec(self, v, c, format=format)
+                c = ShenMatrix.matvec(self, v, c, format=format)
 
         return c
 

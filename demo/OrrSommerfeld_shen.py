@@ -9,9 +9,10 @@ from scipy.linalg import eig
 import numpy as np
 from numpy.linalg import inv
 from numpy.polynomial import chebyshev as n_cheb
-from spectralDNS.shen.shentransform import ShenBiharmonicBasis, ShenDirichletBasis, \
-    ChebyshevTransform
-from spectralDNS.shen.Matrices import CDBmat, ABBmat, SBBmat, BBBmat
+from spectralDNS.shen.shentransform import ShenBiharmonicBasis, \
+    ShenDirichletBasis, ChebyshevTransform
+from spectralDNS.shen.Matrices import CDBmat, ABBmat, SBBmat, BBBmat, \
+    extract_diagonal_matrix
 import six
 import warnings
 np.seterr(divide='ignore')
@@ -78,7 +79,7 @@ class OrrSommerfeld(object):
     def assemble(self):
         N = self.N
         CT = ChebyshevTransform(quad=self.quad)
-        x, w = self.x, self.w = CT.points_and_weights(N)
+        x, w = self.x, self.w = CT.points_and_weights(N, self.quad)
         V = n_cheb.chebvander(x, N-1)
         D2 = np.zeros((N, N))
         D2[:-2, :] = n_cheb.chebder(np.eye(N), 2)
@@ -106,21 +107,21 @@ class OrrSommerfeld(object):
         #K = np.dot(w*P4.T, T2x)
         SB = ShenBiharmonicBasis(quad=self.quad)
         K = np.zeros((N, N))
-        #K = SB.fastShenScalar(T2x, K)
+        #K = SB.scalar_product(T2x, K)
         K[:-4, :-4] = ABBmat(np.arange(N).astype(np.float)).diags().toarray()
 
         # ((1-x**2)u, v)
         xx = (1-x**2).repeat(N).reshape((N, N))
         #K1 = np.dot(w*P4.T, xx*P4)  # Alternative: K1 = np.dot(w*P4.T, ((1-x**2)*P4.T).T)
         K1 = np.zeros((N, N))
-        K1 = SB.fastShenScalar(xx*P4, K1)
-        K1 = extract_diagonal_matrix(K1) # For improved roundoff
+        K1 = SB.scalar_product(xx*P4, K1)
+        K1 = extract_diagonal_matrix(K1).diags().toarray() # For improved roundoff
 
         # ((1-x**2)u'', v)
         #K2 = np.dot(w*P4.T, xx*T2x)
         K2 = np.zeros((N, N))
-        K2 = SB.fastShenScalar(xx*T2x, K2)
-        K2 = extract_diagonal_matrix(K2) # For improved roundoff
+        K2 = SB.scalar_product(xx*T2x, K2)
+        K2 = extract_diagonal_matrix(K2).diags().toarray() # For improved roundoff
 
         # (u'''', v)
         #Q = np.dot(w*P4.T, T4x)
@@ -166,29 +167,6 @@ class OrrSommerfeld(object):
             for i, (e, v) in enumerate(zip(ev, indi)):
                 print('Eigenvalue {} ({}) = {:2.16e}'.format(i+1, v, e))
         return indi, eigval
-
-
-def extract_diagonal_matrix(M, tol=1e-8):
-    """Return matrix with essentially zero diagonals nulled out
-    """
-    Mc = np.zeros_like(M)
-    du = []
-    dl = []
-    dd = M.diagonal()
-    for i in range(1, M.shape[1]):
-        u = M.diagonal(i)
-        l = M.diagonal(-i)
-        if abs(u).max() > tol:
-            du.append((i, u))
-        if abs(l).max() > tol:
-            dl.append((i, l))
-
-    np.fill_diagonal(Mc, dd)
-    for (i, ud) in du:
-        np.fill_diagonal(Mc[:, i:], ud)
-    for (i, ld) in dl:
-        np.fill_diagonal(Mc[i:, :], ld)
-    return Mc
 
 
 if __name__=='__main__':

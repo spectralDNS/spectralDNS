@@ -93,21 +93,21 @@ def SXST(request):
 
 def test_scalarproduct(ST):
     """Test fast scalar product against Vandermonde computed version"""
-    points, weights = ST.points_and_weights(N)
+    points, weights = ST.points_and_weights(N,  ST.quad)
     f = x*x+cos(pi*x)
     fj = np.array([f.subs(x, j) for j in points], dtype=float)
     u0 = np.zeros(N)
     u1 = np.zeros(N)
     ST.fast_transform = True
     if ST.__class__.__name__ == "ChebyshevTransform":
-        u0 = ST.fastChebScalar(fj, u0)
+        u0 = ST.scalar_product(fj, u0)
     else:
-        u0 = ST.fastShenScalar(fj, u0)
+        u0 = ST.scalar_product(fj, u0)
     ST.fast_transform = False
     if ST.__class__.__name__ == "ChebyshevTransform":
-        u1 = ST.fastChebScalar(fj, u1)
+        u1 = ST.scalar_product(fj, u1)
     else:
-        u1 = ST.fastShenScalar(fj, u1)
+        u1 = ST.scalar_product(fj, u1)
     assert np.allclose(u1, u0)
 
 #@profile
@@ -147,7 +147,7 @@ test_TDMA(TDMA("GC", False))
 
 #@profile
 def test_BNNmat(ST):
-    points, weights = ST.points_and_weights(N)
+    points, weights = ST.points_and_weights(N,  ST.quad)
     f_hat = np.zeros(N)
     fj = np.random.random(N)
     u0 = np.zeros(N)
@@ -155,25 +155,25 @@ def test_BNNmat(ST):
         B = BNNmat(np.arange(N).astype(np.float), ST.quad)
         f_hat = ST.fst(fj, f_hat)
         fj = ST.ifst(f_hat, fj)
-        u0 = ST.fastShenScalar(fj, u0)
+        u0 = ST.scalar_product(fj, u0)
         f_hat = ST.fst(fj, f_hat)
     elif ST.__class__.__name__ == "ShenDirichletBasis":
         B = BDDmat(np.arange(N).astype(np.float), ST.quad)
         f_hat = ST.fst(fj, f_hat)
         fj = ST.ifst(f_hat, fj)
-        u0 = ST.fastShenScalar(fj, u0)
+        u0 = ST.scalar_product(fj, u0)
         f_hat = ST.fst(fj, f_hat)
     elif ST.__class__.__name__ == "ShenBiharmonicBasis":
         B = BBBmat(np.arange(N).astype(np.float), ST.quad)
         f_hat = ST.fst(fj, f_hat)
         fj = ST.ifst(f_hat, fj)
-        u0 = ST.fastShenScalar(fj, u0)
+        u0 = ST.scalar_product(fj, u0)
         f_hat = ST.fst(fj, f_hat)
     else:
         B = BTTmat(np.arange(N).astype(np.float), ST.quad)
         f_hat = ST.fct(fj, f_hat)
         fj = ST.ifct(f_hat, fj)
-        u0 = ST.fastChebScalar(fj, u0)
+        u0 = ST.scalar_product(fj, u0)
         f_hat = ST.fct(fj, f_hat)
 
     u2 = np.zeros_like(f_hat)
@@ -187,10 +187,10 @@ def test_BNNmat(ST):
     u0 = np.zeros((N, 4, 4), dtype=np.complex)
     f_hat = np.zeros((N, 4, 4), dtype=np.complex)
     if ST.__class__.__name__ in ("ChebyshevTransform"):
-        u0 = ST.fastChebScalar(fj, u0)
+        u0 = ST.scalar_product(fj, u0)
         f_hat = ST.fct(fj, f_hat)
     else:
-        u0 = ST.fastShenScalar(fj, u0)
+        u0 = ST.scalar_product(fj, u0)
         f_hat = ST.fst(fj, f_hat)
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
@@ -217,7 +217,7 @@ def test_BDNmat(S1S2):
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
     u0 = np.zeros(N)
-    u0 = S1.fastShenScalar(fj, u0)
+    u0 = S1.scalar_product(fj, u0)
     #from IPython import embed; embed()
     assert np.allclose(u0, u2)
 
@@ -226,7 +226,7 @@ def test_BDNmat(S1S2):
     f_hat = f_hat.repeat(16).reshape((N, 4, 4)) + 1j*f_hat.repeat(16).reshape((N, 4, 4))
 
     u0 = np.zeros((N, 4, 4), dtype=np.complex)
-    u0 = S1.fastShenScalar(fj, u0)
+    u0 = S1.scalar_product(fj, u0)
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
     assert np.linalg.norm(u2-u0)/(N*16) < 1e-12
@@ -250,7 +250,7 @@ def test_BDTmat(SDST):
     u2 = B.matvec(f_hat, u2, 'csc')
     u2 = B.matvec(f_hat, u2, 'dia')
     u0 = np.zeros(N)
-    u0 = SD.fastShenScalar(fj, u0)
+    u0 = SD.scalar_product(fj, u0)
 
     #from IPython import embed; embed()
     assert np.allclose(u0, u2)
@@ -260,7 +260,7 @@ def test_BDTmat(SDST):
     f_hat = f_hat.repeat(16).reshape((N, 4, 4)) + 1j*f_hat.repeat(16).reshape((N, 4, 4))
 
     u0 = np.zeros((N, 4, 4), dtype=np.complex)
-    u0 = SD.fastShenScalar(fj, u0)
+    u0 = SD.scalar_product(fj, u0)
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
     assert np.linalg.norm(u2-u0)/(N*16) < 1e-12
@@ -281,7 +281,7 @@ def test_BBDmat(SBSD):
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
     u0 = np.zeros(N)
-    u0 = SB.fastShenScalar(fj, u0)
+    u0 = SB.scalar_product(fj, u0)
 
     assert np.allclose(u0, u2)
 
@@ -290,7 +290,7 @@ def test_BBDmat(SBSD):
     f_hat = f_hat.repeat(N*N).reshape((N, N, N)) + 1j*f_hat.repeat(N*N).reshape((N, N, N))
 
     u0 = np.zeros((N, N, N), dtype=np.complex)
-    u0 = SB.fastShenScalar(fj, u0)
+    u0 = SB.scalar_product(fj, u0)
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
     assert np.linalg.norm(u2-u0)/(N*N*N) < 1e-12
@@ -327,7 +327,7 @@ def test_BTXmat(SXST):
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
     u0 = np.zeros(N)
-    u0 = ST.fastChebScalar(fj, u0)
+    u0 = ST.scalar_product(fj, u0)
 
     #from IPython import embed; embed()
     assert np.allclose(u0, u2)
@@ -337,7 +337,7 @@ def test_BTXmat(SXST):
     f_hat = f_hat.repeat(16).reshape((N, 4, 4)) + 1j*f_hat.repeat(16).reshape((N, 4, 4))
 
     u0 = np.zeros((N, 4, 4), dtype=np.complex)
-    u0 = ST.fastChebScalar(fj, u0)
+    u0 = ST.scalar_product(fj, u0)
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
     assert np.linalg.norm(u2-u0)/(N*16) < 1e-12
@@ -345,7 +345,7 @@ def test_BTXmat(SXST):
 #test_BTXmat((ShenDirichletBasis("GL"), ChebyshevTransform("GL")))
 
 def test_transforms(ST):
-    points, weights = ST.points_and_weights(N)
+    points, weights = ST.points_and_weights(N,  ST.quad)
     fj = np.random.random(N)
 
     # Project function to space first
@@ -380,7 +380,7 @@ def test_transforms(ST):
 
     assert np.allclose(fj, u1)
 
-#test_transforms(ShenNeumannBasis("GC"))
+#test_transforms(ShenBiharmonicBasis("GC"))
 
 def test_FST(ST):
     FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), comm)
@@ -494,7 +494,7 @@ def test_CDDmat(SD):
     M = 256
     u = (1-x**2)*sin(np.pi*6*x)
     dudx = u.diff(x, 1)
-    points, weights = SD.points_and_weights(M)
+    points, weights = SD.points_and_weights(M,  SD.quad)
     dudx_j = np.array([dudx.subs(x, h) for h in points], dtype=np.float)
     uj = np.array([u.subs(x, h) for h in points], dtype=np.float)
 
@@ -507,7 +507,7 @@ def test_CDDmat(SD):
     uc_hat = np.zeros(M)
     uc_hat = SD.fct(uj, uc_hat)
     du_hat = np.zeros(M)
-    dudx_j = SD.fastChebDerivative(uj, dudx_j)
+    dudx_j = SD.fast_cheb_derivative(uj, dudx_j)
 
     Cm = CDDmat(np.arange(M).astype(np.float))
     TDMASolver = TDMA(SD.quad, False)
@@ -517,7 +517,7 @@ def test_CDDmat(SD):
 
     # Should equal (but not exact so use extra resolution)
     cs2 = np.zeros(M)
-    cs2 = SD.fastShenScalar(dudx_j, cs2)
+    cs2 = SD.scalar_product(dudx_j, cs2)
 
     assert np.allclose(cs, cs2)
 
@@ -533,7 +533,7 @@ def test_CDDmat(SD):
     cs = Cm.matvec(u3_hat, cs)
     cs2 = np.zeros((M, 4, 4), dtype=np.complex)
     du3 = dudx_j.repeat(4*4).reshape((M, 4, 4)) + 1j*dudx_j.repeat(4*4).reshape((M, 4, 4))
-    cs2 = SD.fastShenScalar(du3, cs2)
+    cs2 = SD.scalar_product(du3, cs2)
 
     assert np.allclose(cs, cs2, 1e-10)
 
@@ -567,9 +567,9 @@ def test_CXXmat(SXSX):
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
-    df = S2.fastChebDerivative(fj, df)
+    df = S2.fast_cheb_derivative(fj, df)
     cs2 = np.zeros(N)
-    cs2 = S1.fastShenScalar(df, cs2)
+    cs2 = S1.scalar_product(df, cs2)
 
     #from IPython import embed; embed()
     assert np.allclose(cs, cs2)
@@ -580,7 +580,7 @@ def test_CXXmat(SXSX):
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     cs2 = np.zeros((N, 4, 4), dtype=np.complex)
-    cs2 = S1.fastShenScalar(df, cs2)
+    cs2 = S1.scalar_product(df, cs2)
 
     assert np.allclose(cs, cs2)
 
@@ -602,9 +602,9 @@ def test_CDTmat(SDST):
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
-    df = ST.fastChebDerivative(fj, df)
+    df = ST.fast_cheb_derivative(fj, df)
     cs2 = np.zeros(N)
-    cs2 = SD.fastShenScalar(df, cs2)
+    cs2 = SD.scalar_product(df, cs2)
 
     #from IPython import embed; embed()
     assert np.allclose(cs, cs2)
@@ -615,7 +615,7 @@ def test_CDTmat(SDST):
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     cs2 = np.zeros((N, 4, 4), dtype=np.complex)
-    cs2 = SD.fastShenScalar(df, cs2)
+    cs2 = SD.scalar_product(df, cs2)
 
     assert np.allclose(cs, cs2)
 
@@ -637,10 +637,11 @@ def test_CTDmat(SDST):
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
-    df = SD.fastChebDerivative(fj, df)
+    df = SD.fast_cheb_derivative(fj, df)
     cs2 = np.zeros(N)
-    cs2 = ST.fastChebScalar(df, cs2)
+    cs2 = ST.scalar_product(df, cs2)
 
+    #from IPython import embed; embed()
     assert np.allclose(cs, cs2)
 
     # Multidimensional version
@@ -649,11 +650,11 @@ def test_CTDmat(SDST):
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     cs2 = np.zeros((N, 4, 4), dtype=np.complex)
-    cs2 = ST.fastChebScalar(df, cs2)
+    cs2 = ST.scalar_product(df, cs2)
 
     assert np.allclose(cs, cs2)
 
-test_CTDmat((ShenDirichletBasis('GC'), ChebyshevTransform('GC')))
+#test_CTDmat((ShenDirichletBasis('GC'), ChebyshevTransform('GC')))
 
 def test_CDBmat(SBST):
     SB, SD = SBST
@@ -665,7 +666,7 @@ def test_CDBmat(SBST):
     u = sin(2*pi*x)**2
     f = u.diff(x, 1)
 
-    points, weights = SB.points_and_weights(M)
+    points, weights = SB.points_and_weights(M,  SB.quad)
 
     uj = np.array([u.subs(x, j) for j in points], dtype=float)
     fj = np.array([f.subs(x, j) for j in points], dtype=float)     # Get f on quad points
@@ -681,9 +682,9 @@ def test_CDBmat(SBST):
     cs = Cm.matvec(f_hat, cs)
 
     df = np.zeros(M)
-    df = SB.fastChebDerivative(uj, df)
+    df = SB.fast_cheb_derivative(uj, df)
     cs2 = np.zeros(M)
-    cs2 = SD.fastShenScalar(df, cs2)
+    cs2 = SD.scalar_product(df, cs2)
 
     #from IPython import embed; embed()
     assert np.allclose(cs, cs2)
@@ -694,11 +695,11 @@ def test_CDBmat(SBST):
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     cs2 = np.zeros((M, 4, 4), dtype=np.complex)
-    cs2 = SD.fastShenScalar(df, cs2)
+    cs2 = SD.scalar_product(df, cs2)
 
     assert np.allclose(cs, cs2)
 
-#test_CDBmat((ShenBiharmonicBasis("GC"), ShenDirichletBasis("GC")))
+test_CDBmat((ShenBiharmonicBasis("GC"), ShenDirichletBasis("GC")))
 
 def test_CBDmat(SBST):
     SB, SD = SBST
@@ -710,7 +711,7 @@ def test_CBDmat(SBST):
     u = sin(12*pi*x)**2
     f = u.diff(x, 1)
 
-    points, weights = SD.points_and_weights(M)
+    points, weights = SD.points_and_weights(M,  SD.quad)
 
     uj = np.array([u.subs(x, j) for j in points], dtype=float)
     fj = np.array([f.subs(x, j) for j in points], dtype=float)     # Get f on quad points
@@ -726,9 +727,9 @@ def test_CBDmat(SBST):
     cs = Cm.matvec(f_hat, cs)
 
     df = np.zeros(M)
-    df = SD.fastChebDerivative(uj, df)
+    df = SD.fast_cheb_derivative(uj, df)
     cs2 = np.zeros(M)
-    cs2 = SB.fastShenScalar(df, cs2)
+    cs2 = SB.scalar_product(df, cs2)
 
     #from IPython import embed; embed()
     assert np.allclose(cs, cs2)
@@ -739,7 +740,7 @@ def test_CBDmat(SBST):
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     cs2 = np.zeros((M, 4, 4), dtype=np.complex)
-    cs2 = SB.fastShenScalar(df, cs2)
+    cs2 = SB.scalar_product(df, cs2)
 
     assert np.allclose(cs, cs2)
 
@@ -806,7 +807,7 @@ def test_ADDmat(ST2):
     u = (1-x**2)*sin(np.pi*x)
     f = -u.diff(x, 2)
 
-    points, weights = ST2.points_and_weights(M)
+    points, weights = ST2.points_and_weights(M,  ST2.quad)
     uj = np.array([u.subs(x, h) for h in points], dtype=np.float)
     fj = np.array([f.subs(x, h) for h in points], dtype=np.float)
 
@@ -820,7 +821,7 @@ def test_ADDmat(ST2):
         uj -= np.dot(uj, weights)/weights.sum()
 
     f_hat = np.zeros(M)
-    f_hat = ST2.fastShenScalar(fj, f_hat)
+    f_hat = ST2.scalar_product(fj, f_hat)
     u_hat = np.zeros(M)
     u_hat[s] = solve(A.diags().toarray()[s,s], f_hat[s])
 
@@ -845,13 +846,13 @@ def test_SBBmat(SB):
     u = sin(4*pi*x)**2
     f = u.diff(x, 4)
 
-    points, weights = SB.points_and_weights(M)
+    points, weights = SB.points_and_weights(M,  SB.quad)
     uj = np.array([u.subs(x, h) for h in points], dtype=np.float)
     fj = np.array([f.subs(x, h) for h in points], dtype=np.float)
 
     A = SBBmat(np.arange(M).astype(np.float))
     f_hat = np.zeros(M)
-    f_hat = SB.fastShenScalar(fj, f_hat)
+    f_hat = SB.scalar_product(fj, f_hat)
     u_hat = np.zeros(M)
     u_hat[:-4] = la.spsolve(A.diags(), f_hat[:-4])
 
@@ -885,14 +886,14 @@ def test_ABBmat(SB):
     u = sin(6*pi*x)**2
     f = u.diff(x, 2)
 
-    points, weights = SB.points_and_weights(M)
+    points, weights = SB.points_and_weights(M,  SB.quad)
     uj = np.array([u.subs(x, h) for h in points], dtype=np.float)
     fj = np.array([f.subs(x, h) for h in points], dtype=np.float)
 
     A = ABBmat(np.arange(M).astype(np.float))
 
     f_hat = np.zeros(M)
-    f_hat = SB.fastShenScalar(fj, f_hat)
+    f_hat = SB.scalar_product(fj, f_hat)
     u_hat = np.zeros(M)
     u_hat[:-4] = la.spsolve(A.diags(), f_hat[:-4])
 
@@ -960,7 +961,7 @@ def test_Helmholtz(ST2):
     M = 4*N
     kx = 12
 
-    points, weights = ST2.points_and_weights(M)
+    points, weights = ST2.points_and_weights(M,  ST2.quad)
 
     fj = np.random.randn(M)
     f_hat = np.zeros(M)
@@ -978,7 +979,7 @@ def test_Helmholtz(ST2):
         s = slice(1, M-2)
 
     f_hat = np.zeros(M)
-    f_hat = ST2.fastShenScalar(fj, f_hat)
+    f_hat = ST2.scalar_product(fj, f_hat)
     u_hat = np.zeros(M)
     H = A + kx**2*B
     u_hat[s] = solve(H.diags().toarray()[s, s], f_hat[s])
@@ -1019,7 +1020,7 @@ def test_Helmholtz(ST2):
 def test_Helmholtz2(SD):
     M = 2*N
     kx = 11
-    points, weights = SD.points_and_weights(M)
+    points, weights = SD.points_and_weights(M,  SD.quad)
     uj = np.random.randn(M)
     u_hat = np.zeros(M)
     u_hat = SD.fst(uj, u_hat)
@@ -1133,7 +1134,7 @@ def test_Biharmonic(SB):
     b = 1.0
     f = -u.diff(x, 4) + a*u.diff(x, 2) + b*u
 
-    points, weights = SB.points_and_weights(M)
+    points, weights = SB.points_and_weights(M,  SB.quad)
 
     uj = np.array([u.subs(x, j) for j in points], dtype=float)
     fj = np.array([f.subs(x, j) for j in points], dtype=float)     # Get f on quad points
@@ -1145,7 +1146,7 @@ def test_Biharmonic(SB):
 
     AA = -A.diags() + C.diags() + B.diags()
     f_hat = np.zeros(M)
-    f_hat = SB.fastShenScalar(fj, f_hat)
+    f_hat = SB.scalar_product(fj, f_hat)
     u_hat = np.zeros(M)
     u_hat[:-4] = la.spsolve(AA, f_hat[:-4])
     u1 = np.zeros(M)
@@ -1159,7 +1160,7 @@ def test_Biharmonic(SB):
 def test_Helmholtz_matvec(SD):
     M = 2*N
     kx = 11
-    points, weights = SD.points_and_weights(M)
+    points, weights = SD.points_and_weights(M,  SD.quad)
     uj = np.random.randn(M)
     u_hat = np.zeros(M)
     u_hat = SD.fst(uj, u_hat)

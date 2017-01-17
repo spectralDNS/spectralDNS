@@ -218,17 +218,21 @@ class Biharmonic(object):
             if solver == "scipy":
                 self.Le = Le = []
                 self.Lo = Lo = []
+                #self.AA = []
                 for i in range(Ny):
                     Lej = []
                     Loj = []
+                    #AA = []
                     for j in range(Nz):
                         AA = a0*S.diags().toarray() + alfa[i, j]*A.diags().toarray() + beta[i, j]*B.diags().toarray()
                         Ae = AA[::2, ::2]
                         Ao = AA[1::2, 1::2]
                         Lej.append(lu_factor(Ae))
                         Loj.append(lu_factor(Ao))
+                        #AA.append((a0*S + alfa*A + beta*B).diags('csr'))
                     Le.append(Lej)
                     Lo.append(Loj)
+                    #self.AA.append(AA)
             else:
                 self.u0 = zeros((2, M, Ny, Nz))
                 self.u1 = zeros((2, M, Ny, Nz))
@@ -247,7 +251,7 @@ class Biharmonic(object):
                 #Ao = AA[1::2, 1::2]
                 #self.Le = lu_factor(Ae)
                 #self.Lo = lu_factor(Ao)
-                self.AA = (a0*S + alfa*A + beta*B).diags()
+                self.AA = (a0*S + alfa*A + beta*B).diags('csr')
             else:
                 self.u0 = zeros((2, M))
                 self.u1 = zeros((2, M))
@@ -267,6 +271,9 @@ class Biharmonic(object):
                     for j in range(Nz):
                         u[:-4:2, i, j] = lu_solve(self.Le[i][j], b[:-4:2, i, j])
                         u[1:-4:2, i, j] = lu_solve(self.Lo[i][j], b[1:-4:2, i, j])
+                        #u[:-4, i, j].real = la_solve.spsolve(self.AA[i][j], b[:-4, i, j].real)
+                        #u[:-4, i, j].imag = la_solve.spsolve(self.AA[i][j], b[:-4, i, j].imag)
+
             else:
                 SFTc.Solve_Biharmonic_3D_n(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
                 #SFTc.Solve_Biharmonic_3D_com(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)

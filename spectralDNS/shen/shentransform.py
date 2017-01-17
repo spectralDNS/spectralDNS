@@ -6,7 +6,6 @@ from mpiFFT4py import dct, work_arrays, Slab_R2C, fftfreq, rfftfreq, rfft2, \
     irfft2, rfft, irfft, fft, ifft
 from . import SFTc
 import scipy.sparse.linalg as la
-from ..shen.la import TDMA, PDMA
 from ..optimization import optimizer
 from collections import defaultdict
 import decimal
@@ -57,105 +56,104 @@ class ChebyshevTransform(object):
         self.quad = quad
         self.threads = threads
         self.planner_effort = planner_effort
-        self.points = zeros(0)
-        self.weights = zeros(0)
+        self._points = zeros(0)
+        self._weights = zeros(0)
+        self._V = zeros(0)
 
-    def points_and_weights(self, N):
-        self.N = N
-        if self.quad == "GL":
+    def _points_and_weights(self, N, quad):
+        if quad == "GL":
             points = -(n_cheb.chebpts2(N)).astype(float)
             weights = zeros(N)+pi/(N-1)
             weights[0] /= 2
             weights[-1] /= 2
 
-        elif self.quad == "GC":
+        elif quad == "GC":
             points, weights = n_cheb.chebgauss(N)
             points = points.astype(float)
             weights = weights.astype(float)
 
         return points, weights
 
-    def init(self, N):
-        """Vandermonde matrix is used just for verification"""
-        self.points, self.weights = self.points_and_weights(N)
-        # Build Vandermonde matrix.
-        self.V = n_cheb.chebvander(self.points, N-1).T
+    def points_and_weights(self, N, quad):
+        if N == self._points.shape[0] and quad == self.quad:
+            return self._points, self._weights
+        self.quad = quad
+        self._points, self._weights = self._points_and_weights(N, quad)
+        return self._points, self._weights
 
-    def chebDerivativeCoefficients(self, fk, fj):
-        SFTc.chebDerivativeCoefficients(fk, fj)
+    def cheb_derivative_coefficients(self, fk, fj):
+        SFTc.cheb_derivative_coefficients(fk, fj)
         return fj
 
-    def chebDerivative_3D(self, fj, fd):
+    def cheb_derivative_3D(self, fj, fd):
         fk = work[(fj, 0)]
         fkd = work[(fj, 1)]
         fk = self.fct(fj, fk)
-        fkd = SFTc.chebDerivativeCoefficients_3D(fk, fkd)
+        fkd = SFTc.cheb_derivative_coefficients_3D(fk, fkd)
         fd = self.ifct(fkd, fd)
         return fd
 
-    def fastChebDerivative(self, fj, fd):
+    def fast_cheb_derivative(self, fj, fd):
         """Compute derivative of fj at the same points."""
         fk = work[(fj, 0)]
         fkd = work[(fj, 1)]
         fk = self.fct(fj, fk)
-        fkd = self.chebDerivativeCoefficients(fk, fkd)
+        fkd = self.cheb_derivative_coefficients(fk, fkd)
         fd  = self.ifct(fkd, fd)
         return fd
 
     @staticmethod
     @optimizer
-    def scale_fct(cj, quad):
-        N = cj.shape[0]
+    def scale_fct(fk, quad):
         if quad == 'GC':
-            cj /= N
-            cj[0] /= 2
+            fk *= (2/pi)
+            fk[0] /= 2
 
         elif quad == 'GL':
-            cj /= (N-1)
-            cj[0] /= 2
-            cj[-1] /= 2
+            fk *= (2/pi)
+            fk[0] /= 2
+            fk[-1] /= 2
 
-        return cj
-
-    #@profile
-    def fct(self, fj, cj):
-        """Fast Chebyshev transform."""
-        if self.quad == "GC":
-            cj = dct(fj, cj, type=2, axis=0, threads=self.threads, planner_effort=self.planner_effort)
-
-        elif self.quad == "GL":
-            cj = dct(fj, cj, type=1, axis=0, threads=self.threads, planner_effort=self.planner_effort)
-
-        cj = ChebyshevTransform.scale_fct(cj, self.quad)
-        return cj
+        return fk
 
     @staticmethod
     @optimizer
-    def scale_ifct(cj, fk, quad):
+    def scale_ifct(fj, fk, quad):
         if quad == 'GC':
-            cj *= 0.5
-            cj += fk[0]/2
+            fj *= 0.5
+            fj += fk[0]/2
         elif quad == 'GL':
-            cj *= 0.5
-            cj += fk[0]/2
-            cj[::2] += fk[-1]/2
-            cj[1::2] -= fk[-1]/2
-        return cj
+            fj *= 0.5
+            fj += fk[0]/2
+            fj[::2] += fk[-1]/2
+            fj[1::2] -= fk[-1]/2
+        return fj
 
-    #@profile
-    def ifct(self, fk, cj):
+    def fct(self, fj, fk):
+        """Fast Chebyshev transform."""
+        fk = ChebyshevTransform.scalar_product(self, fj, fk)
+        fk = ChebyshevTransform.scale_fct(fk, self.quad)
+        return fk
+
+    def ifct(self, fk, fj, fast_transform=True):
         """Inverse fast Chebyshev transform."""
+        if fast_transform:
+            fj = ChebyshevTransform.evaluate_basis_all(self, fk, fj)
+        else:
+            fj = ChebyshevTransform.vandermonde_evaluate_basis_all(self, fk, fj)
+        return fj
+
+    def evaluate_basis_all(self, fk, fj):
         if self.quad == "GC":
-            cj = dct(fk, cj, type=3, axis=0, threads=self.threads, planner_effort=self.planner_effort)
+            fj = dct(fk, fj, type=3, axis=0, threads=self.threads, planner_effort=self.planner_effort)
 
         elif self.quad == "GL":
-            cj = dct(fk, cj, type=1, axis=0, threads=self.threads, planner_effort=self.planner_effort)
+            fj = dct(fk, fj, type=1, axis=0, threads=self.threads, planner_effort=self.planner_effort)
 
-        cj = ChebyshevTransform.scale_ifct(cj, fk, self.quad)
-        return cj
+        fj = ChebyshevTransform.scale_ifct(fj, fk, self.quad)
+        return fj
 
-    #@profile
-    def fastChebScalar(self, fj, fk, fast_transform=True):
+    def scalar_product(self, fj, fk, fast_transform=True):
         """Fast Chebyshev scalar product."""
         N = fj.shape[0]
         if fast_transform:
@@ -167,13 +165,73 @@ class ChebyshevTransform(object):
                 fk = dct(fj, fk, type=1, axis=0, threads=self.threads, planner_effort=self.planner_effort)
                 fk *= (pi/(2*(N-1)))
         else:
-            if not self.points.shape == (N,): self.init(N)
-            fk[:] = np.dot(self.V, fj*self.weights)
+            fk = self.vandermonde_scalar_product(fj, fk)
 
         return fk
 
+    def vandermonde(self, x, N):
+        """Return Chebyshev Vandermonde matrix
+
+        args:
+            x               points for evaluation
+            N               Number of Chebyshev polynomials
+        """
+        if self._V.shape == (len(x), N):
+            return self._V
+
+        return n_cheb.chebvander(x, N-1)
+
+    def get_vandermonde_basis(self, V):
+        """Return basis as a Vandermonde matrix
+
+        V is a Vandermonde matrix
+
+        """
+        return V
+
+    def get_vandermonde_basis_derivative(self, V, der=0):
+        """Return derivatives of basis as a Vandermonde matrix
+
+        V is the Chebyshev Vandermonde matrix
+
+        """
+        N = V.shape[0]
+        if der > 0:
+            D = np.zeros((N, N))
+            D[:-der, :] = n_cheb.chebder(np.eye(N), der)
+            V  = np.dot(V, D)
+        return self.get_vandermonde_basis(V)
+
+    def get_testfunction(self, V):
+        """Return testfunction
+
+        V is Vandermonde matrix
+
+        """
+        return self.get_vandermonde_basis(V)
+
+    def vandermonde_scalar_product(self, fj, fk):
+        """Naive implementation of scalar product"""
+        N = fj.shape[0]
+        points, weights = self.points_and_weights(N, self.quad)
+        V = self.vandermonde(points, N)
+        P = self.get_vandermonde_basis(V)
+        fk[:] = np.dot(fj*weights, P)
+        return fk
+
+    def vandermonde_evaluate_basis_all(self, fk, fj):
+        N = fj.shape[0]
+        points, weights = self.points_and_weights(N, self.quad)
+        V = self.vandermonde(points, N)
+        P = self.get_vandermonde_basis(V)
+        fj[:] = np.dot(P, fk)
+        return fj
+
     def slice(self, N):
         return slice(0, N)
+
+    def get_shape(self, N):
+        return N
 
 class ShenDirichletBasis(ChebyshevTransform):
     """Shen basis for Dirichlet boundary conditions
@@ -191,20 +249,11 @@ class ShenDirichletBasis(ChebyshevTransform):
 
     def __init__(self, quad="GL", threads=1, planner_effort="FFTW_MEASURE",
                  bc=(0., 0.)):
+        from la import TDMA
         ChebyshevTransform.__init__(self, quad=quad, planner_effort=planner_effort)
         self.N = -1
         self.Solver = TDMA(quad, False)
         self.bc = bc
-
-    def init(self, N):
-        """Vandermonde matrix is used just for verification"""
-        self.points, self.weights = self.points_and_weights(N)
-        # Build Vandermonde matrix.
-        self.V = np.zeros((N, N))
-        V = n_cheb.chebvander(self.points, N-1)
-        self.V[:N-2, :] = V[:, :-2].T - V[:, 2:].T
-        self.V[N-2, :] = 0.5*(V[:, 0] + V[:, 1])
-        self.V[N-1, :] = 0.5*(V[:, 0] - V[:, 1])
 
     def wavenumbers(self, N):
         N = list(N) if np.ndim(N) else [N]
@@ -213,24 +262,36 @@ class ShenDirichletBasis(ChebyshevTransform):
             s.append(slice(0, n))
         return np.mgrid.__getitem__(s).astype(float)[0]
 
-    #@profile
-    def fastShenScalar(self, fj, fk, fast_transform=True):
+    def get_vandermonde_basis(self, V):
+        P = np.zeros(V.shape)
+        P[:, :-2] = V[:, :-2] - V[:, 2:]
+        P[:, -2] = (V[:, 0] + V[:, 1])/2*0
+        P[:, -1] = (V[:, 0] - V[:, 1])/2*0
+        return P
 
+    def scalar_product(self, fj, fk, fast_transform=True):
         if fast_transform:
-            fk = self.fastChebScalar(fj, fk)
+            fk = ChebyshevTransform.scalar_product(self, fj, fk)
             #c0 = 0.5*(fk[0] + fk[1])
             #c1 = 0.5*(fk[0] - fk[1])
             fk[:-2] -= fk[2:]
             #fk[-2] = c0
             #fk[-1] = c1
         else:
-            if not self.points.shape == (fj.shape[0],): self.init(fj.shape[0])
-            fk[:] = np.dot(self.V, fj*self.weights)
+            fk = self.vandermonde_scalar_product(fj, fk)
 
         fk[-2:] = 0     # Last two not used, so set to zero. Even for nonhomogeneous bcs, where they are technically non-zero
         return fk
 
-    #@profile
+    def evaluate_basis_all(self, fk, fj):
+        w_hat = work[(fk, 0)]
+        w_hat[:-2] = fk[:-2]
+        w_hat[2:] -= fk[:-2]
+        w_hat[0] += 0.5*(self.bc[0] + self.bc[1])
+        w_hat[1] += 0.5*(self.bc[0] - self.bc[1])
+        fj = ChebyshevTransform.evaluate_basis_all(self, w_hat, fj)
+        return fj
+
     def ifst(self, fk, fj, fast_transform=True):
         """Fast inverse Shen transform
 
@@ -238,24 +299,17 @@ class ShenDirichletBasis(ChebyshevTransform):
         fk contains Shen coefficients in the first fk.shape[0]-2 positions
         """
         if fast_transform:
-            w_hat = work[(fk, 0)]
-            w_hat[:-2] = fk[:-2]
-            w_hat[2:] -= fk[:-2]
-            w_hat[0] += 0.5*(self.bc[0] + self.bc[1])
-            w_hat[1] += 0.5*(self.bc[0] - self.bc[1])
-
-            fj = self.ifct(w_hat, fj)
-            return fj
-
+            fj = self.evaluate_basis_all(fk, fj)
         else:
-            if not self.points.shape == (fj.shape[0],): self.init(fj.shape[0])
-            return np.dot(self.V.T, fk[:-2])
+            fj = self.vandermonde_evaluate_basis_all(fk, fj)
+
+        return fj
 
     #@profile
     def fst(self, fj, fk):
         """Fast Shen transform
         """
-        fk = self.fastShenScalar(fj, fk)
+        fk = self.scalar_product(fj, fk)
         fk[0] -= pi/2*(self.bc[0] + self.bc[1])
         fk[1] -= pi/4*(self.bc[0] - self.bc[1])
         fk = self.Solver(fk)
@@ -265,6 +319,10 @@ class ShenDirichletBasis(ChebyshevTransform):
 
     def slice(self, N):
         return slice(0, N-2)
+
+    def get_shape(self, N):
+        return N-2
+
 
 class ShenNeumannBasis(ShenDirichletBasis):
     """Shen basis for homogeneous Neumann boundary conditions
@@ -280,17 +338,17 @@ class ShenNeumannBasis(ShenDirichletBasis):
     """
 
     def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"):
+        from la import TDMA
         ShenDirichletBasis.__init__(self, quad, threads, planner_effort)
         self.factor = None
         self.k = None
         self.Solver = TDMA(quad, True)
 
-    def init(self, N):
-        self.points, self.weights = self.points_and_weights(N)
-        k = self.wavenumbers(N)
-        # Build Vandermonde matrix. Note! N points in real space gives N-3 bases in spectral space
-        self.V = n_cheb.chebvander(self.points, N-3).T - ((k/(k+2))**2)[:, np.newaxis]*n_cheb.chebvander(self.points, N-1)[:, 2:].T
-        self.V = self.V[1:, :]
+    def get_vandermonde_basis(self, V):
+        P = np.zeros(V.shape)
+        k = np.arange(V.shape[1]).astype(np.float)[:-2]
+        P[:, :-2] = V[:, :-2] - (k/(k+2))**2*V[:, 2:]
+        return P
 
     def set_factor_array(self, v):
         recreate = False
@@ -315,43 +373,53 @@ class ShenNeumannBasis(ShenDirichletBasis):
             s.append(slice(0, n))
         return np.mgrid.__getitem__(s).astype(float)[0]
 
-    def fastShenScalar(self, fj, fk, fast_transform=True):
+    def scalar_product(self, fj, fk, fast_transform=True):
         """Fast Shen scalar product.
         Chebyshev transform taking into account that phi_k = T_k - (k/(k+2))**2*T_{k+2}
         Note, this is the non-normalized scalar product
         """
         if fast_transform:
             self.set_factor_array(fk)
-            fk = self.fastChebScalar(fj, fk)
+            fk = ChebyshevTransform.scalar_product(self, fj, fk)
             fk[1:-2] -= self.factor * fk[3:]
-            fk[0] = 0
 
         else:
-            if not self.points.shape == (fj.shape[0],): self.init(fj.shape[0])
-            fk[1:-2] = np.dot(self.V, fj*self.weights)
+            fk = self.vandermonde_scalar_product(fj, fk)
 
+        fk[0] = 0
         fk[-2:] = 0
         return fk
 
-    def ifst(self, fk, fj):
-        """Fast inverse Shen scalar transform
-        """
+    def evaluate_basis_all(self, fk, fj):
         w_hat = work[(fk, 0)]
         self.set_factor_array(fk)
         w_hat[1:-2] = fk[1:-2]
         w_hat[3:] -= self.factor*fk[1:-2]
-        fj = self.ifct(w_hat, fj)
+        fj = ChebyshevTransform.ifct(self, w_hat, fj)
+        return fj
+
+    def ifst(self, fk, fj, fast_transform=True):
+        """Fast inverse Shen scalar transform
+        """
+        if fast_transform:
+            fj = self.evaluate_basis_all(fk, fj)
+        else:
+            fj = self.vandermonde_evaluate_basis_all(fk, fj)
+
         return fj
 
     def fst(self, fj, fk):
         """Fast Shen transform
         """
-        fk = self.fastShenScalar(fj, fk)
+        fk = self.scalar_product(fj, fk)
         fk = self.Solver(fk)
         return fk
 
     def slice(self, N):
         return slice(1, N-2)
+
+    def get_shape(self, N):
+        return N-2
 
 class ShenBiharmonicBasis(ShenDirichletBasis):
     """Shen biharmonic basis for homogeneous Dirichlet and Neumann boundary
@@ -368,16 +436,17 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
     """
 
     def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"):
+        from la import PDMA
         ShenDirichletBasis.__init__(self, quad, threads, planner_effort)
         self.factor1 = zeros(0)
         self.factor2 = zeros(0)
         self.Solver = PDMA(quad)
 
-    def init(self, N):
-        self.points, self.weights = self.points_and_weights(N)
-        k = self.wavenumbers(N)
-        # Build Vandermonde matrix.
-        self.V = n_cheb.chebvander(self.points, N-5).T - (2*(k+2)/(k+3))[:, np.newaxis]*n_cheb.chebvander(self.points, N-3)[:, 2:].T + ((k+1)/(k+3))[:, np.newaxis]*n_cheb.chebvander(self.points, N-1)[:, 4:].T
+    def get_vandermonde_basis(self, V):
+        P = np.zeros_like(V)
+        k = np.arange(V.shape[1]).astype(np.float)[:-4]
+        P[:, :-4] = V[:, :-4] - (2*(k+2)/(k+3))*V[:, 2:-2] + ((k+1)/(k+3))*V[:, 4:]
+        return P
 
     def set_factor_arrays(self, v):
         if not self.factor1.shape == v[:-4].shape:
@@ -390,20 +459,19 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
             self.factor1 = (-2*(k+2)/(k+3)).astype(float)
             self.factor2 = ((k+1)/(k+3)).astype(float)
 
-    def fastShenScalar(self, fj, fk, fast_transform=True):
-        """Fast Shen scalar product.
+    def scalar_product(self, fj, fk, fast_transform=True):
+        """Shen scalar product.
         """
         if fast_transform:
             self.set_factor_arrays(fk)
             Tk = work[(fk, 0)]
-            Tk = self.fastChebScalar(fj, Tk)
-            fk[:] = Tk[:]
+            Tk = ChebyshevTransform.scalar_product(self, fj, Tk)
+            fk[:-4] = Tk[:-4]
             fk[:-4] += self.factor1 * Tk[2:-2]
             fk[:-4] += self.factor2 * Tk[4:]
 
         else:
-            if not self.points.shape == (fj.shape[0],): self.init(fj.shape[0])
-            fk[:-4] = np.dot(self.V, fj*self.weights)
+            fk = self.vandermonde_scalar_product(fj, fk)
 
         fk[-4:] = 0
         return fk
@@ -416,24 +484,36 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
         w_hat[4:]   += f2*fk[:-4]
         return w_hat
 
-    def ifst(self, fk, fj):
-        """Fast inverse Shen scalar transform
-        """
+    def evaluate_basis_all(self, fk, fj):
         w_hat = work[(fk, 0)]
         self.set_factor_arrays(fk)
         w_hat = ShenBiharmonicBasis.set_w_hat(w_hat, fk, self.factor1, self.factor2)
-        fj = self.ifct(w_hat, fj)
+        fj = ChebyshevTransform.ifct(self, w_hat, fj)
+        return fj
+
+    def ifst(self, fk, fj, fast_transform=True):
+        """Inverse Shen scalar transform
+        """
+        if fast_transform:
+            fj = self.evaluate_basis_all(fk, fj)
+        else:
+            fj = self.vandermonde_evaluate_basis_all(fk, fj)
+
         return fj
 
     def fst(self, fj, fk):
         """Fast Shen transform
         """
-        fk = self.fastShenScalar(fj, fk)
+        fk = self.scalar_product(fj, fk)
         fk = self.Solver(fk)
         return fk
 
     def slice(self, N):
         return slice(0, N-4)
+
+    def get_shape(self, N):
+        return N-4
+
 
 class SlabShen_R2C(Slab_R2C):
 
@@ -487,7 +567,7 @@ class SlabShen_R2C(Slab_R2C):
 
     def get_mesh_dim(self, ST, d):
         if d == 0:
-            return ST.points_and_weights(self.N[0])[0]
+            return ST.points_and_weights(self.N[0], ST.quad)[0]
         elif d == 1:
             return arange(self.N[1], dtype=self.float)*self.L[1]/self.N[1]
         elif d == 2:
@@ -846,7 +926,7 @@ class SlabShen_R2C(Slab_R2C):
 
     def fss(self, u, fu, S, dealias=None):
         """Fast Shen scalar product of x-direction, Fourier transform of y and z"""
-        fu = self.forward(u, fu, S.fastShenScalar, dealias=dealias)
+        fu = self.forward(u, fu, S.scalar_product, dealias=dealias)
         return fu
 
     def fst(self, u, fu, S, dealias=None):
@@ -908,11 +988,11 @@ class SlabShen_R2C(Slab_R2C):
         u[:] = rollaxis(U_mpi2, 1).reshape(u.shape)
         return u
 
-    def chebDerivative_3D0(self, fj, u0, S):
+    def cheb_derivative_3D0(self, fj, u0, S):
         UT = self.work_arrays[((2, self.N[0], self.Np[1], self.N[2]), self.float, 0)]
 
         UT[0] = self.fct0(fj, UT[0], S)
-        UT[1] = SFTc.chebDerivativeCoefficients_3D(UT[0], UT[1])
+        UT[1] = SFTc.cheb_derivative_coefficients_3D(UT[0], UT[1])
         u0 = self.ifct0(UT[1], u0, S)
         return u0
 

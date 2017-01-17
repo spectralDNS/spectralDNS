@@ -8,8 +8,8 @@ from six import iteritems
 nu = 1./1200.
 dt = 0.0001
 
-N = array([64, 128, 256, 512, 1024, 2048, 4096, 8192], dtype=int)
-#N = array([64, 128, 256, 512], dtype=int)
+#N = array([64, 128, 256, 512, 1024, 2048, 4096, 8192], dtype=int)
+N = array([64, 128, 256], dtype=int)
 M = 100
 
 Z = array([0, 32, 32], dtype=int)
@@ -24,6 +24,7 @@ SB = ShenBiharmonicBasis("GL")
 
 t11 = 1
 t22 = 1
+t71 = 1
 print("\hline")
 print("Nx & Biharmonic & Helmholtz \\\ ")
 print("\hline")
@@ -34,11 +35,15 @@ print("\hline")
 def main():
     for n in N:
         err = str(n)
+        err7 = str(n)
         Z[0] = n
         HS = Helmholtz(n, sqrt(K2+2.0/nu/dt), "GC", False)
         BS = Biharmonic(n, -nu*dt/2., 1.+nu*dt*K2,
                         -(K2 + nu*dt/2.*K4), quad="GC",
                         solver="cython")
+        BS2 = Biharmonic(n, -nu*dt/2., 1.+nu*dt*K2,
+                        -(K2 + nu*dt/2.*K4), quad="GC",
+                        solver="scipy")
 
         fb = random.random((Z[0], Z[1], Z[2]//2+1)) + random.random((Z[0], Z[1], Z[2]//2+1))*1j
         fb[-4:] = 0
@@ -49,6 +54,11 @@ def main():
             ub = BS(ub, fb)
         t1 = (time()-t0)/M/Z[1:].prod()
 
+        t0 = time()
+        for m in range(M):
+            ub = BS2(ub, fb)
+        t7 = (time()-t0)/M/Z[1:].prod()
+
         #cProfile.runctx("for m in range(M): ub = BS(ub, fb)", globals(), locals(), "res1.stats")
         #ps = pstats.Stats("res1.stats")
         #for key, val in iteritems(ps.stats):
@@ -58,7 +68,9 @@ def main():
         #t1 = results
 
         err += " & {:2.2e} ({:2.2f}) ".format(t1, 0 if n == N[0] else t1/t11/2.)
+        err += " & {:2.2e} ({:2.2f}) ".format(t7, 0 if n == N[0] else t7/t71/2.)
         t11 = t1
+        t71 = t7
 
         fh = random.random((Z[0], Z[1], Z[2]//2+1)) + random.random((Z[0], Z[1], Z[2]//2+1))*1j
         fh[-2:] = 0
