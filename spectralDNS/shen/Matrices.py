@@ -5,7 +5,7 @@ from .SFTc import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, \
     CBD_matvec3D, CBD_matvec, CDB_matvec3D, ADDmat_matvec, Helmholtz_matvec3D, \
     Helmholtz_matvec, BBD_matvec3D, Tridiagonal_matvec
 
-from shentransform import ChebyshevTransform, ShenDirichletBasis, ShenNeumannBasis, \
+from .shentransform import ChebyshevTransform, ShenDirichletBasis, ShenNeumannBasis, \
     ShenBiharmonicBasis
 
 from . import points_and_weights
@@ -186,19 +186,19 @@ class ShenMatrix(SparseMatrix):
 
     args:
         d                            Dictionary, where keys are the diagonal
-                                       offsets and values the diagonals
-        N       integer              Length of main diagonal
+                                         offsets and values the diagonals
+        N      integer               Length of main diagonal
         trial  (basis, derivative)   tuple, where basis is an instance of
                                      one of
-                                       - ChebyshevTransform
-                                       - ShenDirichletBasis
-                                       - ShenBiharmonicBasis
-                                       - ShenNeumannBasis
-                                     derivative is and integer, and represents
+                                         - ChebyshevTransform
+                                         - ShenDirichletBasis
+                                         - ShenBiharmonicBasis
+                                         - ShenNeumannBasis
+                                     derivative is an integer, and represents
                                      the number of times the trial function
                                      should be differentiated
         test   basis                 One of the above basis functions
-        scale   float                Scale matrix with this constant
+        scale  float                 Scale matrix with this constant
 
 
     Shen matrices are assumed to be sparse diagonal. The matrices are
@@ -240,7 +240,7 @@ class ShenMatrix(SparseMatrix):
     etc.
 
     The matrix can be automatically created using, e.g., for the mass
-    matrix of the Dirichelt space
+    matrix of the Dirichlet space
 
       M = ShenMatrix({}, 16, (ShenDirichletBasis(), 0), ShenDirichletBasis())
 
@@ -258,7 +258,7 @@ class ShenMatrix(SparseMatrix):
     Note that matrices with the Neumann basis are stored using index space
     k = 0, 1, ..., N-2, i.e., including the zero index. This is used for
     simplicity, and needs to be accounted for by users. For example, to
-    solve the Poisson equation
+    solve the Poisson equation:
 
         from spectralDNS.shen.shentransform import ShenNeumannBasis
         import numpy as np
