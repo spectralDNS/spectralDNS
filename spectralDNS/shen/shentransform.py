@@ -249,7 +249,7 @@ class ShenDirichletBasis(ChebyshevTransform):
 
     def __init__(self, quad="GL", threads=1, planner_effort="FFTW_MEASURE",
                  bc=(0., 0.)):
-        from la import TDMA
+        from .la import TDMA
         ChebyshevTransform.__init__(self, quad=quad, planner_effort=planner_effort)
         self.N = -1
         self.Solver = TDMA(quad, False)
@@ -338,7 +338,8 @@ class ShenNeumannBasis(ShenDirichletBasis):
     """
 
     def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"):
-        from la import TDMA
+        from .la import TDMA
+
         ShenDirichletBasis.__init__(self, quad, threads, planner_effort)
         self.factor = None
         self.k = None
@@ -436,7 +437,7 @@ class ShenBiharmonicBasis(ShenDirichletBasis):
     """
 
     def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"):
-        from la import PDMA
+        from .la import PDMA
         ShenDirichletBasis.__init__(self, quad, threads, planner_effort)
         self.factor1 = zeros(0)
         self.factor2 = zeros(0)

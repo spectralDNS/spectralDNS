@@ -351,10 +351,14 @@ def extract_diagonal_matrix(M, tol=1e-8):
 
 
 class BDDmat(ShenMatrix):
-    """Matrix for inner product (u, phi)_w = BDDmat * u_hat
+    """Matrix for inner product B_{kj}=(phi_j, phi_k)_w
 
-    where u_hat is a vector of coefficients for a Shen Dirichlet basis
+    where
+
+        j = 0, 1, ..., N-2 and k = 0, 1, ..., N-2
+
     and phi is a Shen Dirichlet basis.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -402,10 +406,16 @@ class BDDmat(ShenMatrix):
 
 ## Mass matrices
 class BNDmat(ShenMatrix):
-    """Matrix for inner product (u, phi)_w = BNDmat * u_hat
+    """Mass matrix for inner product B_{kj} = (phi_j, psi_k)_w
 
-    where u_hat is a vector of coefficients for a Shen Dirichlet basis
-    and phi is a Shen Neumann basis.
+    where
+
+        j = 0, 1, ..., N-2 and k = 1, 2, ..., N-2
+
+    psi is the Shen Dirichlet basis and phi is a Shen Neumann basis.
+
+    For simplicity, the matrix is stored including the zero index row (k=0)
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -426,10 +436,16 @@ class BNDmat(ShenMatrix):
 
 
 class BDNmat(ShenMatrix):
-    """Matrix for inner product (p, phi)_w = BDNmat * p_hat
+    """Mass matrix for inner product B_{kj} = (psi_j, phi_k)_w
 
-    where p_hat is a vector of coefficients for a Shen Neumann basis
-    and phi is a Shen Dirichlet basis.
+    where
+
+        j = 1, 2, ..., N-2 and k = 0, 1, ..., N-2
+
+    psi is the Shen Dirichlet basis and phi is a Shen Neumann basis.
+
+    For simplicity, the matrix is stored including the zero index column (j=0)
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -446,10 +462,14 @@ class BDNmat(ShenMatrix):
 
 
 class BTTmat(ShenMatrix):
-    """Matrix for inner product (p, T)_w = BTTmat * p_hat
+    """Mass matrix for inner product B_{kj} = (T_j, T_k)_w
 
-    where p_hat is a vector of coefficients for a Chebyshev basis
-    and T is a Chebyshev basis.
+    where
+
+        j = 0, 1, ..., N and k = 0, 1, ..., N
+
+    and T_j is the jth order Chebyshev function of the first kind.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -478,10 +498,16 @@ class BTTmat(ShenMatrix):
 
 
 class BNNmat(ShenMatrix):
-    """Matrix for inner product (p, phi_N)_w = BNNmat * p_hat
+    """Mass matrix for inner product B_{kj} = (phi_j, phi_k)_w
 
-    where p_hat is a vector of coefficients for a Shen Neumann basis
-    and phi_N is a Shen Neumann basis.
+    where
+
+        j = 1, 2, ..., N-2 and k = 1, 2, ..., N-2
+
+    and phi is the Shen Neumann basis.
+
+    The matrix is stored including the zero index row and column
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -502,10 +528,14 @@ class BNNmat(ShenMatrix):
 
 
 class BDTmat(ShenMatrix):
-    """Matrix for inner product (u, phi)_w = BDTmat * u_hat
+    """Mass matrix for inner product B_{kj} = (T_j, phi_k)_w
 
-    where u_hat is a vector of coefficients for a Chebyshev basis
-    and phi is a Shen Dirichlet basis.
+    where
+
+        j = 0, 1, ..., N and k = 0, 1, ..., N-2
+
+    phi is the Shen Dirichlet basis and T is the Chebyshev basis.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -520,10 +550,14 @@ class BDTmat(ShenMatrix):
 
 
 class BTDmat(ShenMatrix):
-    """Matrix for inner product (u, T)_w = BTDmat * u_hat
+    """Mass matrix for inner product B_{kj} = (phi_j, T_k)_w
 
-    where u_hat is a vector of coefficients for a Shen Dirichlet basis
-    and T is a Chebyshev basis.
+    where
+
+        j = 0, 1, ..., N-2 and k = 0, 1, ..., N
+
+    phi is the Shen Dirichlet basis and T is the Chebyshev basis.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -538,10 +572,14 @@ class BTDmat(ShenMatrix):
 
 
 class BTNmat(ShenMatrix):
-    """Matrix for inner product (u, T)_w = BTNmat * u_hat
+    """Mass matrix for inner product B_{kj} = (phi_j, T_k)_w
 
-    where u_hat is a vector of coefficients for a Shen Neumann basis
-    and T is a Chebyshev basis.
+    where
+
+        j = 1, 2, ..., N-2 and k = 0, 1, ..., N
+
+    phi is the Shen Neumann basis and T is the Chebyshev basis.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -556,6 +594,15 @@ class BTNmat(ShenMatrix):
 
 
 class BBBmat(ShenMatrix):
+    """Mass matrix for inner product B_{kj} = (psi_j, psi_k)_w
+
+    where
+
+        j = 0, 1, ..., N-4 and k = 0, 1, ..., N-4
+
+    and phi is the Shen Biharmonic basis.
+
+    """
 
     def __init__(self, K, quad='GC'):
         N = K.shape[0]
