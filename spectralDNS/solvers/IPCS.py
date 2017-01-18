@@ -201,8 +201,8 @@ def compute_curl(c, u_hat, K, FST, ST, work):
     F_tmp = work[(u_hat, 0)]
     Uc = work[(c, 2)]
     SFTc.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST, dealias=params.dealias)
-    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST, dealias=params.dealias)
+    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST.CT, dealias=params.dealias)
+    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST.CT, dealias=params.dealias)
     c[0] = FST.ifst((1j*K[1]*u_hat[2] - 1j*K[2]*u_hat[1]), c[0], ST, dealias=params.dealias)
     c[1] = FST.ifst(1j*K[2]*u_hat[0], c[1], ST, dealias=params.dealias)
     c[1] -= dwdx
@@ -250,8 +250,8 @@ def standardConvection(c, U, U_hat, K, FST, ST, work, mat, la):
     #dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], SN, dealias=params.dealias)
 
     SFTc.Mult_CTD_3D_n(params.N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST, dealias=params.dealias)
-    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST, dealias=params.dealias)
+    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST.CT, dealias=params.dealias)
+    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST.CT, dealias=params.dealias)
 
     #dudx = U_tmp[0] = chebDerivative_3D0(U[0], U_tmp[0])
     #dvdx = U_tmp[1] = chebDerivative_3D0(U[1], U_tmp[1])

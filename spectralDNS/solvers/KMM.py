@@ -19,6 +19,7 @@ def get_context():
                             planner_effort=params.planner_effort["dct"])
     SB = ShenBiharmonicBasis(quad=params.Bquad, threads=params.threads,
                              planner_effort=params.planner_effort["dct"])
+    CT = ST.CT  # Chebyshev transform
 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
     Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
@@ -186,8 +187,8 @@ def compute_curl(c, u_hat, g, K, FST, SB, ST, work):
     # Mult_CTD_3D_n is projection to T of d(u_hat)/dx (for components 1 and 2 of u_hat)
     # Corresponds to CTD.matvec(u_hat[1])/BTT.dd, CTD.matvec(u_hat[2])/BTT.dd
     SFTc.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST, dealias=params.dealias)
-    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST, dealias=params.dealias)
+    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST.CT, dealias=params.dealias)
+    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST.CT, dealias=params.dealias)
     c[0] = FST.ifst(g, c[0], ST, dealias=params.dealias)
     F_tmp2[:2] = mult_K1j(K, u_hat[0], F_tmp2[:2])
 
@@ -206,8 +207,8 @@ def compute_derivatives(duidxj, u_hat, FST, ST, SB, la, mat, work):
     F_tmp[0] = la.TDMASolverD(F_tmp[0])
     duidxj[0, 0] = FST.ifst(F_tmp[0], duidxj[0, 0], ST)
     SFTc.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
-    duidxj[1, 0] = dvdx = FST.ifct(F_tmp[1], duidxj[1, 0], ST)  # proj to Cheb
-    duidxj[2, 0] = dwdx = FST.ifct(F_tmp[2], duidxj[2, 0], ST)  # proj to Cheb
+    duidxj[1, 0] = dvdx = FST.ifct(F_tmp[1], duidxj[1, 0], ST.CT)  # proj to Cheb
+    duidxj[2, 0] = dwdx = FST.ifct(F_tmp[2], duidxj[2, 0], ST.CT)  # proj to Cheb
     duidxj[0, 1] = dudy = FST.ifst(1j*K[1]*u_hat[0], duidxj[0, 1], SB) # ShenB
     duidxj[0, 2] = dudz = FST.ifst(1j*K[2]*u_hat[0], duidxj[0, 2], SB)
     duidxj[1, 1] = dvdy = FST.ifst(1j*K[1]*u_hat[1], duidxj[1, 1], ST)
@@ -230,8 +231,8 @@ def standardConvection(rhs, u_dealias, u_hat, K, FST, SB, ST, work, mat, la):
     dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], ST, dealias=params.dealias)
 
     SFTc.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST, dealias=params.dealias)
-    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST, dealias=params.dealias)
+    dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST.CT, dealias=params.dealias)
+    dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST.CT, dealias=params.dealias)
 
     dudy = Uc2[0] = FST.ifst(1j*K[1]*u_hat[0], Uc2[0], SB, dealias=params.dealias)
     dudz = Uc2[1] = FST.ifst(1j*K[2]*u_hat[0], Uc2[1], SB, dealias=params.dealias)

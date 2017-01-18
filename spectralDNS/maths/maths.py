@@ -5,13 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from ..optimization import optimizer
 
-__all__ = ['dealias_rhs', 'project']
-
-@optimizer
-def dealias_rhs(dU, dealias):
-    """Dealias the nonlinear convection"""
-    dU *= dealias
-    return dU
+__all__ = ['project']
 
 def project(u, K, K_over_K2):
     """Project u onto divergence free space"""

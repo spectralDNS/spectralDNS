@@ -1,11 +1,11 @@
 """
-This setup file is called by the top setup and is used to generate 
+This setup file is called by the top setup and is used to generate
 files with different precision
 """
 import sys
 
 # Note to self. May be solved more elegantly using fused types,
-# but this leads to much heavier modules (templates) that are slower 
+# but this leads to much heavier modules (templates) that are slower
 # in tests
 #ctypedef np.int64_t int_t
 #ctypedef fused complex_t:
@@ -15,7 +15,7 @@ import sys
 #ctypedef fused real_t:
     #np.float64_t
     #np.float32_t
-    
+
 #ctypedef fused T:
     #np.float64_t
     #np.float32_t
@@ -32,10 +32,10 @@ ctypedef np.int64_t int_t
 ctypedef np.complex128_t complex_t
 ctypedef np.float64_t real_t
 ctypedef np.int64_t int_t
-"""      
+"""
 }
 
-for module in ("integrators", "maths", "solvers", "mpi"):
+for module in ("integrators", "maths", "solvers"):
     ff = open("cython_{0}.in".format(module)).read()
     fs = open("cython_single_{0}.pyx".format(module), "w")
     fs.write(ff.format(precision["single"]))

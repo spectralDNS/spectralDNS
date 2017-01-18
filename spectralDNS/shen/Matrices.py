@@ -723,6 +723,16 @@ class BBBmat(ShenMatrix):
         #return diags([self.lld, self.ld, self.dd, self.ud, self.uud], range(-4, 6, 2), shape=self.shape)
 
 class BBDmat(ShenMatrix):
+    """Mass matrix for inner product B_{kj} = (phi_j, psi_k)_w
+
+    where
+
+        j = 0, 1, ..., N-2 and k = 0, 1, ..., N-4
+
+    and phi is the Shen Dirichlet basis and psi the Shen Biharmonic basis.
+
+    """
+
 
     def __init__(self, K, quad='GC'):
         N = K.shape[0]
@@ -770,10 +780,16 @@ class BBDmat(ShenMatrix):
 
 # Derivative matrices
 class CDNmat(ShenMatrix):
-    """Matrix for inner product (p', phi)_w = CDNmat * p_hat
+    """Matrix for inner product C_{kj} = (psi'_j, phi_k)_w
 
-    where p_hat is a vector of coefficients for a Shen Neumann basis
-    and phi is a Shen Dirichlet basis.
+    where
+
+        j = 1, 2, ..., N-2 and k = 0, 1, ..., N-2
+
+    and phi is the Shen Dirichlet basis and psi the Shen Neumann basis.
+
+    For simplicity, the matrix is stored including the zero index row (k=0)
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -801,10 +817,14 @@ class CDNmat(ShenMatrix):
 
 
 class CDDmat(ShenMatrix):
-    """Matrix for inner product (u', phi) = (phi', phi) u_hat =  CDDmat * u_hat
+    """Matrix for inner product C_{kj} = (phi'_j, phi_k)_w
 
-    where u_hat is a vector of coefficients for a Shen Dirichlet basis
-    and phi is a Shen Dirichlet basis.
+    where
+
+        j = 0, 1, ..., N-2 and k = 0, 1, ..., N-2
+
+    and phi is the Shen Dirichlet basis.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -838,10 +858,16 @@ class CDDmat(ShenMatrix):
 
 
 class CNDmat(ShenMatrix):
-    """Matrix for inner product (u', phi_N) = (phi', phi_N) u_hat =  CNDmat * u_hat
+    """Matrix for inner product C_{kj} = (phi'_j, psi_k)_w
 
-    where u_hat is a vector of coefficients for a Shen Dirichlet basis
-    and phi_N is a Shen Neumann basis.
+    where
+
+        j = 0, 1, ..., N-2 and k = 1, 2, ..., N-2
+
+    and phi is the Shen Dirichlet basis and psi the Shen Neumann basis.
+
+    For simplicity, the matrix is stored including the zero index coloumn (j=0)
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -863,10 +889,14 @@ class CNDmat(ShenMatrix):
 
 
 class CTDmat(ShenMatrix):
-    """Matrix for inner product (u', T) = (phi', T) u_hat =  CTDmat * u_hat
+    """Matrix for inner product C_{kj} = (phi'_j, T_k)_w
 
-    where u_hat is a vector of coefficients for a Shen Dirichlet basis
-    and T is a Chebyshev basis.
+    where
+
+        j = 0, 1, ..., N-2 and k = 0, 1, ..., N
+
+    phi is the Shen Dirichlet basis and T is the Chebyshev basis.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -882,10 +912,14 @@ class CTDmat(ShenMatrix):
 
 
 class CDTmat(ShenMatrix):
-    """Matrix for inner product (p', phi) = (T', phi) p_hat = CDTmat * p_hat
+    """Matrix for inner product C_{kj} = (T'_j, phi_k)_w
 
-    where p_hat is a vector of coefficients for a Chebyshev basis
-    and phi is a Shen Dirichlet basis.
+    where
+
+        j = 0, 1, ..., N and k = 0, 1, ..., N-2
+
+    phi is the Shen Dirichlet basis and T is the Chebyshev basis.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -898,10 +932,14 @@ class CDTmat(ShenMatrix):
 
 
 class CBDmat(ShenMatrix):
-    """Matrix for inner product (u', psi) = (phi', psi) u_hat =  CBDmat * u_hat
+    """Matrix for inner product C_{kj} = (phi'_j, psi_k)_w
 
-    where u_hat is a vector of coefficients for a Shen Dirichlet basis
-    and psi is a Shen Biharmonic basis.
+    where
+
+        j = 0, 1, ..., N-2 and k = 0, 1, ..., N-4
+
+    phi is the Shen Dirichlet basis and psi the Shen Biharmonic basis.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -939,10 +977,14 @@ class CBDmat(ShenMatrix):
 
 
 class CDBmat(ShenMatrix):
-    """Matrix for inner product (u', psi) = (phi', psi) u_hat =  CDBmat * u_hat
+    """Matrix for inner product C_{kj} = (psi'_j, phi_k)_w
 
-    where u_hat is a vector of coefficients for a Shen Biharmonic basis
-    and psi is a Shen Dirichlet basis.
+    where
+
+        j = 0, 1, ..., N-4 and k = 0, 1, ..., N-2
+
+    phi is the Shen Dirichlet basis and psi the Shen Biharmonic basis.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -981,10 +1023,14 @@ class CDBmat(ShenMatrix):
 
 
 class ABBmat(ShenMatrix):
-    """Matrix for inner product (u'', phi) = (phi'', phi) u_hat =  ABBmat * u_hat
+    """Stiffness matrix for inner product A_{kj} = -(psi''_j, psi_k)_w
 
-    where u_hat is a vector of coefficients for a Shen Biharmonic basis
-    and phi is a Shen Biharmonic basis.
+    where
+
+        j = 0, 1, ..., N-4 and k = 0, 1, ..., N-4
+
+    and psi is the Shen Biharmonic basis.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -1024,10 +1070,14 @@ class ABBmat(ShenMatrix):
 
 
 class ADDmat(ShenMatrix):
-    """Matrix for inner product -(u'', phi) = -(phi'', phi) u_hat = ADDmat * u_hat
+    """Stiffness matrix for inner product A_{kj} = -(psi''_j, psi_k)_w
 
-    where u_hat is a vector of coefficients for a Shen Dirichlet basis
-    and phi is a Shen Dirichlet basis.
+    where
+
+        j = 0, 1, ..., N-2 and k = 0, 1, ..., N-2
+
+    and psi is the Shen Dirichlet basis.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -1056,10 +1106,14 @@ class ADDmat(ShenMatrix):
 
 
 class ANNmat(ShenMatrix):
-    """Matrix for inner product -(u'', phi_N) = -(phi_N'', phi_N) p_hat = ANNmat * p_hat
+    """Stiffness matrix for inner product A_{kj} = -(phi''_j, phi_k)_w
 
-    where u_hat is a vector of coefficients for a Shen Neumann basis
-    and phi is a Shen Neumann basis.
+    where
+
+        j = 1, 2, ..., N-2 and k = 1, 2, ..., N-2
+
+    and phi is the Shen Neumann basis.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -1079,10 +1133,14 @@ class ANNmat(ShenMatrix):
 
 
 class ATTmat(ShenMatrix):
-    """Matrix for inner product -(u'', phi) = -(phi'', phi) p_hat = ATTmat * p_hat
+    """Stiffness matrix for inner product A_{kj} = -(psi''_j, psi_k)_w
 
-    where p_hat is a vector of coefficients for a Chebyshev basis
-    and phi is a Chebyshev basis.
+    where
+
+        j = 0, 1, ..., N and k = 0, 1, ..., N
+
+    and psi is the Chebyshev basis.
+
     """
 
     def __init__(self, K, quad='GC'):
@@ -1096,10 +1154,14 @@ class ATTmat(ShenMatrix):
 
 
 class SBBmat(ShenMatrix):
-    """Matrix for inner product (u'''', phi) = (phi'''', phi) u_hat =  SBBmat * u_hat
+    """Biharmonic matrix for inner product S_{kj} = -(psi''''_j, psi_k)_w
 
-    where u_hat is a vector of coefficients for a Shen Biharmonic basis
-    and phi is a Shen Biharmonic basis.
+    where
+
+        j = 0, 1, ..., N-4 and k = 0, 1, ..., N-4
+
+    and psi is the Shen Biharmonic basis.
+
     """
 
     def __init__(self, K, quad='GC'):

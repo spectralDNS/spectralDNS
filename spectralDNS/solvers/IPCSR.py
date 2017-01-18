@@ -115,12 +115,12 @@ class IPCSRWriter(HDF5Writer):
 
 def get_pressure(P, P_hat, FST, SN, **context):
     """Compute pressure from context"""
-    P = FST.ifct(P_hat, P, SN)
+    P = FST.ifct(P_hat, P, SN.CT)
     return P
 
 def set_pressure(P_hat, P, FST, SN, **context):
     """Compute pressure from context"""
-    P_hat = FST.fct(P, P_hat, SN)
+    P_hat = FST.fct(P, P_hat, SN.CT)
     return P_hat
 
 def pressuregrad(rhs, p_hat, mat, work, K, Nu):
@@ -177,9 +177,9 @@ def compute_pressure(P_hat, H_hat, U_hat, U_hat0, K, FST, ST, work, mat, la,
 
     # P in Chebyshev basis for this solver
     P[:] = FST.ifst(P_hat, P, SN)
-    P_hat  = FST.fct(P, P_hat, SN)
-    P[:] = FST.ifct(P_hat, P, SN)
-    P_hat  = FST.fct(P, P_hat, SN)
+    P_hat  = FST.fct(P, P_hat, SN.CT)
+    P[:] = FST.ifct(P_hat, P, SN.CT)
+    P_hat  = FST.fct(P, P_hat, SN.CT)
     return P_hat
 
 def updatepressure(p_hat, p_corr, u_hat, K, mat, dd, work):

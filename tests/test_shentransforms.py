@@ -143,7 +143,7 @@ def test_TDMA(T):
     assert np.allclose(u0[s, 2, 2].real, u)
     assert np.allclose(u0[s, 2, 2].imag, u)
 
-test_TDMA(TDMA("GC", False))
+#test_TDMA(TDMA("GC", False))
 
 #@profile
 def test_BNNmat(ST):
@@ -197,7 +197,7 @@ def test_BNNmat(ST):
     #from IPython import embed; embed()
     assert np.allclose(u2[:-2], u0[:-2])
 
-#test_BNNmat(ShenBiharmonicBasis("GL"))
+#test_BNNmat(ShenNeumannBasis("GC"))
 
 #@profile
 def test_BDNmat(S1S2):
@@ -505,9 +505,9 @@ def test_CDDmat(SD):
     u_hat = SD.fst(uj, u_hat)
 
     uc_hat = np.zeros(M)
-    uc_hat = SD.fct(uj, uc_hat)
+    uc_hat = SD.CT.fct(uj, uc_hat)
     du_hat = np.zeros(M)
-    dudx_j = SD.fast_cheb_derivative(uj, dudx_j)
+    dudx_j = SD.CT.fast_cheb_derivative(uj, dudx_j)
 
     Cm = CDDmat(np.arange(M).astype(np.float))
     TDMASolver = TDMA(SD.quad, False)
@@ -567,7 +567,7 @@ def test_CXXmat(SXSX):
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
-    df = S2.fast_cheb_derivative(fj, df)
+    df = S2.CT.fast_cheb_derivative(fj, df)
     cs2 = np.zeros(N)
     cs2 = S1.scalar_product(df, cs2)
 
@@ -637,7 +637,7 @@ def test_CTDmat(SDST):
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
-    df = SD.fast_cheb_derivative(fj, df)
+    df = ST.fast_cheb_derivative(fj, df)
     cs2 = np.zeros(N)
     cs2 = ST.scalar_product(df, cs2)
 
@@ -682,7 +682,7 @@ def test_CDBmat(SBST):
     cs = Cm.matvec(f_hat, cs)
 
     df = np.zeros(M)
-    df = SB.fast_cheb_derivative(uj, df)
+    df = SB.CT.fast_cheb_derivative(uj, df)
     cs2 = np.zeros(M)
     cs2 = SD.scalar_product(df, cs2)
 
@@ -699,7 +699,7 @@ def test_CDBmat(SBST):
 
     assert np.allclose(cs, cs2)
 
-test_CDBmat((ShenBiharmonicBasis("GC"), ShenDirichletBasis("GC")))
+#test_CDBmat((ShenBiharmonicBasis("GC"), ShenDirichletBasis("GC")))
 
 def test_CBDmat(SBST):
     SB, SD = SBST
@@ -727,7 +727,7 @@ def test_CBDmat(SBST):
     cs = Cm.matvec(f_hat, cs)
 
     df = np.zeros(M)
-    df = SD.fast_cheb_derivative(uj, df)
+    df = SD.CT.fast_cheb_derivative(uj, df)
     cs2 = np.zeros(M)
     cs2 = SB.scalar_product(df, cs2)
 
@@ -800,7 +800,7 @@ def test_Mult_Div():
 
     assert np.allclose(uu, b)
 
-test_Mult_Div()
+#test_Mult_Div()
 
 def test_ADDmat(ST2):
     M = 2*N
