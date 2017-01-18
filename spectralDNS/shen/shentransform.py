@@ -58,6 +58,13 @@ class SpectralBasis(object):
         self.planner_effort = planner_effort
 
     def points_and_weights(self, N, quad):
+        """Return points and weights of quadrature
+
+        args:
+            N      integer      Number of points
+            quad ('GL', 'GC')   Chebyshev-Gauss-Lobatto or Chebyshev-Gauss
+
+        """
         if quad == "GL":
             points = -(n_cheb.chebpts2(N)).astype(float)
             weights = zeros(N)+pi/(N-1)
@@ -173,25 +180,27 @@ class ChebyshevTransform(SpectralBasis):
     def __init__(self, quad="GL", threads=1, planner_effort="FFTW_MEASURE"):
         SpectralBasis.__init__(self, quad, threads, planner_effort)
 
-    def cheb_derivative_coefficients(self, fk, fj):
-        SFTc.cheb_derivative_coefficients(fk, fj)
-        return fj
+    def cheb_derivative_coefficients(self, fk, ck):
+        """Return coefficients of Chebyshev series for c = f'(x)
 
-    def cheb_derivative_3D(self, fj, fd):
-        fk = work[(fj, 0)]
-        fkd = work[(fj, 1)]
-        fk = self.fct(fj, fk)
-        fkd = SFTc.cheb_derivative_coefficients_3D(fk, fkd)
-        fd = self.ifct(fkd, fd)
-        return fd
+        args:
+            fk            Coefficients of regular Chebyshev series
+            ck            Coefficients of derivative of fk-series
+
+        """
+        if len(fk.shape) == 1:
+            ck = SFTc.cheb_derivative_coefficients(fk, ck)
+        elif len(fk.shape) == 3:
+            ck = SFTc.cheb_derivative_coefficients_3D(fk, ck)
+        return ck
 
     def fast_cheb_derivative(self, fj, fd):
-        """Compute derivative of fj at the same points."""
+        """Return derivative of fj = f(x_j) at the same points."""
         fk = work[(fj, 0)]
-        fkd = work[(fj, 1)]
+        ck = work[(fj, 1)]
         fk = self.fct(fj, fk)
-        fkd = self.cheb_derivative_coefficients(fk, fkd)
-        fd  = self.ifct(fkd, fd)
+        ck = self.cheb_derivative_coefficients(fk, ck)
+        fd  = self.ifct(ck, fd)
         return fd
 
     def solver(self, fk):
@@ -208,23 +217,57 @@ class ChebyshevTransform(SpectralBasis):
         return fk
 
     def forward(self, fj, fk):
-        """Fast forward transform"""
+        """Fast forward transform
+
+        args:
+            fj   (input)     Function values on quadrature mesh
+            fk   (output)    Expansion coefficients
+
+        """
         fk = self.fct(fj, fk)
         return fk
 
     def backward(self, fk, fj):
-        """Fast backward transform"""
+        """Fast backward transform
+
+        args:
+            fk   (input)     Expansion coefficients
+            fj   (output)    Function values on quadrature mesh
+
+        """
         fj = self.ifct(fk, fj)
         return fj
 
     def fct(self, fj, fk, fast_transform=True):
-        """Fast Chebyshev transform."""
+        """Fast Chebyshev transform.
+
+
+        args:
+            fj   (input)     Function values on quadrature mesh
+            fk   (output)    Expansion coefficients
+
+        kwargs:
+            fast_transform   bool - If True use fast transforms,
+                             if False use Vandermonde type
+
+
+        """
         fk = self.scalar_product(fj, fk, fast_transform)
         fk = self.solver(fk)
         return fk
 
     def ifct(self, fk, fj, fast_transform=True):
-        """Inverse fast Chebyshev transform."""
+        """Inverse fast Chebyshev transform.
+
+        args:
+            fk   (input)     Expansion coefficients
+            fj   (output)    Function values on quadrature mesh
+
+        kwargs:
+            fast_transform   bool - If True use fast transforms,
+                             if False use Vandermonde type
+
+        """
         if fast_transform:
             fj = self.evaluate_basis_all(fk, fj)
         else:
@@ -234,11 +277,11 @@ class ChebyshevTransform(SpectralBasis):
     def evaluate_basis_all(self, fk, fj):
         """Evaluate basis on entire mesh
 
-           f(x_j) = \sum_k \f_k \T_k(x_j)  \forall j = 0, 1, ..., N
+           f(x_j) = \sum_k f_k \T_k(x_j)  for all j = 0, 1, ..., N
 
         args:
-            fk         Expansion coefficients
-            fj         f(x_j)
+            fk   (input)     Expansion coefficients
+            fj   (output)    Function values on quadrature mesh
 
         """
         if self.quad == "GC":
@@ -258,8 +301,12 @@ class ChebyshevTransform(SpectralBasis):
     def scalar_product(self, fj, fk, fast_transform=True):
         """Chebyshev scalar product
 
-          f_k = (f, \phi_k)_w      \forall k = 0, 1, ..., N
+          f_k = (f, \phi_k)_w      for all k = 0, 1, ..., N
               = \sum_j f(x_j) \phi_k(x_j) \sigma(x_j)
+
+        args:
+            fj   (input)     Function values on quadrature mesh
+            fk   (output)    Expansion coefficients
 
         """
         N = fj.shape[0]
@@ -277,9 +324,11 @@ class ChebyshevTransform(SpectralBasis):
         return fk
 
     def slice(self, N):
+        """Return dofs of current basis, with N points in real space"""
         return slice(0, N)
 
     def get_shape(self, N):
+        """Return shape of current basis"""
         return N
 
 class ShenDirichletBasis(SpectralBasis):

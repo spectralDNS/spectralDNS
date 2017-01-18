@@ -2,7 +2,7 @@
 This setup file is called by the top setup and is used to generate
 files with different precision
 """
-import sys
+import sys, os
 
 # Note to self. May be solved more elegantly using fused types,
 # but this leads to much heavier modules (templates) that are slower
@@ -36,23 +36,37 @@ ctypedef np.int64_t int_t
 }
 
 for module in ("integrators", "maths", "solvers"):
-    ff = open("cython_{0}.in".format(module)).read()
-    fs = open("cython_single_{0}.pyx".format(module), "w")
-    fs.write(ff.format(precision["single"]))
-    fs.close()
-
-    fd = open("cython_double_{0}.pyx".format(module), "w")
-    fd.write(ff.format(precision["double"]))
-    fd.close()
+    # Use timestamp to determine if recompilation is required
+    t0 = os.path.getmtime("cython_{0}.in".format(module))
+    compile_new = False
+    if not os.path.exists("cython_single_{0}.pyx".format(module)):
+        compile_new = True
+    elif os.path.getmtime("cython_single_{0}.pyx".format(module)) < t0:
+        compile_new = True
+    if compile_new:
+        ff = open("cython_{0}.in".format(module)).read()
+        fs = open("cython_single_{0}.pyx".format(module), "w")
+        fs.write(ff.format(precision["single"]))
+        fs.close()
+        fd = open("cython_double_{0}.pyx".format(module), "w")
+        fd.write(ff.format(precision["double"]))
+        fd.close()
 
 prec = {"single": ("float32", "complex64"),
         "double": ("float64", "complex128")}
 
-ff = open("numba_module.in").read()
-fs = open("numba_single.py", "w")
-fs.write(ff.format(*prec["single"]))
-fs.close()
+t0 = os.path.getmtime("numba_module.in".format(module))
+compile_new = False
+if not os.path.exists("numba_module.py".format(module)):
+    compile_new = True
+elif os.path.getmtime("numba_module.py") < t0:
+    compile_new = True
+if compile_new:
+    ff = open("numba_module.in").read()
+    fs = open("numba_single.py", "w")
+    fs.write(ff.format(*prec["single"]))
+    fs.close()
 
-fd = open("numba_double.py", "w")
-fd.write(ff.format(*prec["double"]))
-fd.close()
+    fd = open("numba_double.py", "w")
+    fd.write(ff.format(*prec["double"]))
+    fd.close()

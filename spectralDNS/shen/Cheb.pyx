@@ -11,20 +11,21 @@ ctypedef fused T:
     real_t
     complex_t
 
-def cheb_derivative_coefficients(np.ndarray[T, ndim=1] fk, np.ndarray[T, ndim=1] fl):
+def cheb_derivative_coefficients(np.ndarray[T, ndim=1] fk, np.ndarray[T, ndim=1] ck):
     cdef:
         unsigned int N = fk.shape[0]-1
         int k
-    fl[-1] = 0
-    fl[-2] = 2*N*fk[-1]
+    ck[-1] = 0
+    ck[-2] = 2*N*fk[-1]
     for k in range(N-2, 0, -1):
-        fl[k] = 2*(k+1)*fk[k+1]+fl[k+2]
-    fl[0] = fk[1] + 0.5*fl[2]
+        ck[k] = 2*(k+1)*fk[k+1]+ck[k+2]
+    ck[0] = fk[1] + 0.5*ck[2]
+    return ck
 
-def cheb_derivative_coefficients_3D(np.ndarray[T, ndim=3] fk, np.ndarray[T, ndim=3] fl):
+def cheb_derivative_coefficients_3D(np.ndarray[T, ndim=3] fk, np.ndarray[T, ndim=3] ck):
     cdef unsigned int i, j
 
     for i in xrange(fk.shape[1]):
         for j in xrange(fk.shape[2]):
-            cheb_derivative_coefficients(fk[:, i, j], fl[:, i, j])
-    return fl
+            cheb_derivative_coefficients(fk[:, i, j], ck[:, i, j])
+    return ck
