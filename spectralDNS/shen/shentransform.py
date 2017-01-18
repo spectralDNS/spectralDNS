@@ -208,10 +208,12 @@ class ChebyshevTransform(SpectralBasis):
         return fk
 
     def forward(self, fj, fk):
+        """Fast forward transform"""
         fk = self.fct(fj, fk)
         return fk
 
     def backward(self, fk, fj):
+        """Fast backward transform"""
         fj = self.ifct(fk, fj)
         return fj
 
