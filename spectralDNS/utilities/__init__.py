@@ -6,6 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from .create_profile import create_profile
 from .memoryprofiler import MemoryUsage
 from time import time
+import types
 
 class Timer(object):
 
@@ -35,6 +36,17 @@ class Timer(object):
             print("Time = {}".format(toc))
             print("Fastest = {}".format(fast))
             print("Slowest = {}".format(slow))
+
+
+def docstrings(cls):
+    for name, func in vars(cls).items():
+        if isinstance(func, types.FunctionType) and not func.__doc__:
+            for parent in cls.__bases__:
+                parfunc = getattr(parent, name, None)
+                if parfunc and getattr(parfunc, '__doc__', None):
+                    func.__doc__ = parfunc.__doc__
+                    break
+    return cls
 
 def reset_profile(prof):
     prof.code_map = {}

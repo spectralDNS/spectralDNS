@@ -7,6 +7,7 @@ from mpiFFT4py import dct, work_arrays, Slab_R2C, fftfreq, rfftfreq, rfft2, \
 from . import SFTc
 import scipy.sparse.linalg as la
 from ..optimization import optimizer
+from ..utilities import docstrings
 from collections import defaultdict
 import decimal
 from mpi4py import MPI
@@ -82,34 +83,72 @@ class SpectralBasis(object):
     def evaluate_basis_all(self, fk, fj):
         """Evaluate basis on entire mesh
 
-           f(x_j) = \sum_k f_k \phi_k(x_j)  \forall j = 0, 1, ..., N
+           f(x_j) = \sum_k f_k \T_k(x_j)  for all j = 0, 1, ..., N
 
         args:
-            fk         Expansion coefficients
-            fj         f(x_j)
+            fk   (input)     Expansion coefficients
+            fj   (output)    Function values on quadrature mesh
 
         """
         raise NotImplementedError
 
     def scalar_product(self, fj, fk, fast_transform=True):
-        """Scalar product
+        """Chebyshev scalar product
 
-          f_k = (f, \phi_k)_w      \forall k = 0, 1, ..., N
+          f_k = (f, \phi_k)_w      for all k = 0, 1, ..., N
               = \sum_j f(x_j) \phi_k(x_j) \sigma(x_j)
 
-        where \phi_k are the basis functions and \sigma the quadrature weights.
+        args:
+            fj   (input)     Function values on quadrature mesh
+            fk   (output)    Expansion coefficients
 
         """
         raise NotImplementedError
 
     def forward(self, fj, fk):
-        """Forward transform from physical to spectral space.
+        """Fast forward transform
+
+        args:
+            fj   (input)     Function values on quadrature mesh
+            fk   (output)    Expansion coefficients
 
         """
         raise NotImplementedError
 
     def backward(self, fk, fj):
-        """Backward transform from spectral to physical space.
+        """Fast backward transform
+
+        args:
+            fk   (input)     Expansion coefficients
+            fj   (output)    Function values on quadrature mesh
+
+        """
+        raise NotImplementedError
+
+    def fst(self, fj, fk):
+        """Fast forward Shen transform
+
+        args:
+            fj   (input)     Function values on quadrature mesh
+            fk   (output)    Expansion coefficients
+
+        kwargs:
+            fast_transform   bool - If True use fast transforms,
+                             if False use Vandermonde type
+
+        """
+        raise NotImplementedError
+
+    def ifst(self, fk, fj):
+        """Inverse fast Shen transform
+
+        args:
+            fk   (input)     Expansion coefficients
+            fj   (output)    Function values on quadrature mesh
+
+        kwargs:
+            fast_transform   bool - If True use fast transforms,
+                             if False use Vandermonde type
 
         """
         raise NotImplementedError
@@ -163,7 +202,15 @@ class SpectralBasis(object):
         fj[:] = np.dot(P, fk)
         return fj
 
+    def slice(self, N):
+        """Return dofs of current basis, with N points in real space"""
+        return slice(0, N)
 
+    def get_shape(self, N):
+        """Return shape of current basis"""
+        return N
+
+@docstrings
 class ChebyshevTransform(SpectralBasis):
     """Basis for regular Chebyshev series
 
@@ -217,30 +264,15 @@ class ChebyshevTransform(SpectralBasis):
         return fk
 
     def forward(self, fj, fk):
-        """Fast forward transform
-
-        args:
-            fj   (input)     Function values on quadrature mesh
-            fk   (output)    Expansion coefficients
-
-        """
         fk = self.fct(fj, fk)
         return fk
 
     def backward(self, fk, fj):
-        """Fast backward transform
-
-        args:
-            fk   (input)     Expansion coefficients
-            fj   (output)    Function values on quadrature mesh
-
-        """
         fj = self.ifct(fk, fj)
         return fj
 
     def fct(self, fj, fk, fast_transform=True):
         """Fast Chebyshev transform.
-
 
         args:
             fj   (input)     Function values on quadrature mesh
@@ -275,15 +307,6 @@ class ChebyshevTransform(SpectralBasis):
         return fj
 
     def evaluate_basis_all(self, fk, fj):
-        """Evaluate basis on entire mesh
-
-           f(x_j) = \sum_k f_k \T_k(x_j)  for all j = 0, 1, ..., N
-
-        args:
-            fk   (input)     Expansion coefficients
-            fj   (output)    Function values on quadrature mesh
-
-        """
         if self.quad == "GC":
             fj = dct(fk, fj, type=3, axis=0, threads=self.threads, planner_effort=self.planner_effort)
             fj *= 0.5
@@ -299,16 +322,6 @@ class ChebyshevTransform(SpectralBasis):
         return fj
 
     def scalar_product(self, fj, fk, fast_transform=True):
-        """Chebyshev scalar product
-
-          f_k = (f, \phi_k)_w      for all k = 0, 1, ..., N
-              = \sum_j f(x_j) \phi_k(x_j) \sigma(x_j)
-
-        args:
-            fj   (input)     Function values on quadrature mesh
-            fk   (output)    Expansion coefficients
-
-        """
         N = fj.shape[0]
         if fast_transform:
             if self.quad == "GC":
@@ -324,13 +337,12 @@ class ChebyshevTransform(SpectralBasis):
         return fk
 
     def slice(self, N):
-        """Return dofs of current basis, with N points in real space"""
         return slice(0, N)
 
     def get_shape(self, N):
-        """Return shape of current basis"""
         return N
 
+@docstrings
 class ShenDirichletBasis(SpectralBasis):
     """Shen basis for Dirichlet boundary conditions
 
@@ -391,11 +403,6 @@ class ShenDirichletBasis(SpectralBasis):
         return fj
 
     def ifst(self, fk, fj, fast_transform=True):
-        """Fast inverse Shen transform
-
-        Transform needs to take into account that phi_k = T_k - T_{k+2}
-        fk contains Shen coefficients in the first fk.shape[0]-2 positions
-        """
         if fast_transform:
             fj = self.evaluate_basis_all(fk, fj)
         else:
@@ -404,8 +411,6 @@ class ShenDirichletBasis(SpectralBasis):
         return fj
 
     def fst(self, fj, fk, fast_transform=True):
-        """Fast Shen transform
-        """
         fk = self.scalar_product(fj, fk, fast_transform)
         fk[0] -= pi/2*(self.bc[0] + self.bc[1])
         fk[1] -= pi/4*(self.bc[0] - self.bc[1])
@@ -428,7 +433,7 @@ class ShenDirichletBasis(SpectralBasis):
     def get_shape(self, N):
         return N-2
 
-
+@docstrings
 class ShenNeumannBasis(SpectralBasis):
     """Shen basis for homogeneous Neumann boundary conditions
 
@@ -471,10 +476,6 @@ class ShenNeumannBasis(SpectralBasis):
             self._factor = (k[1:]/(k[1:]+2))**2
 
     def scalar_product(self, fj, fk, fast_transform=True):
-        """Fast Shen scalar product.
-        Chebyshev transform taking into account that phi_k = T_k - (k/(k+2))**2*T_{k+2}
-        Note, this is the non-normalized scalar product
-        """
         if fast_transform:
             fk = self.CT.scalar_product(fj, fk)
             self.set_factor_array(fk)
@@ -496,8 +497,6 @@ class ShenNeumannBasis(SpectralBasis):
         return fj
 
     def ifst(self, fk, fj, fast_transform=True):
-        """Fast inverse Shen scalar transform
-        """
         if fast_transform:
             fj = self.evaluate_basis_all(fk, fj)
         else:
@@ -506,8 +505,6 @@ class ShenNeumannBasis(SpectralBasis):
         return fj
 
     def fst(self, fj, fk):
-        """Fast Shen transform
-        """
         fk = self.scalar_product(fj, fk)
         fk = self.solver(fk)
         return fk
@@ -526,6 +523,8 @@ class ShenNeumannBasis(SpectralBasis):
     def get_shape(self, N):
         return N-2
 
+
+@docstrings
 class ShenBiharmonicBasis(SpectralBasis):
     """Shen biharmonic basis
 
@@ -574,8 +573,6 @@ class ShenBiharmonicBasis(SpectralBasis):
             self._factor2 = ((k+1)/(k+3)).astype(float)
 
     def scalar_product(self, fj, fk, fast_transform=True):
-        """Shen scalar product.
-        """
         if fast_transform:
             self.set_factor_arrays(fk)
             Tk = work[(fk, 0)]
@@ -606,8 +603,6 @@ class ShenBiharmonicBasis(SpectralBasis):
         return fj
 
     def ifst(self, fk, fj, fast_transform=True):
-        """Inverse Shen scalar transform
-        """
         if fast_transform:
             fj = self.evaluate_basis_all(fk, fj)
         else:
@@ -616,8 +611,6 @@ class ShenBiharmonicBasis(SpectralBasis):
         return fj
 
     def fst(self, fj, fk, fast_transform=True):
-        """Fast Shen transform
-        """
         fk = self.scalar_product(fj, fk, fast_transform)
         fk = self.solver(fk)
         return fk
