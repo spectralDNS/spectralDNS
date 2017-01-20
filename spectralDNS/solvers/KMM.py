@@ -5,11 +5,11 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from .spectralinit import *
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, \
-    ShenBiharmonicBasis, SFTc, SlabShen_R2C
+    ShenBiharmonicBasis, SlabShen_R2C
 from ..shen.Matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, \
     ADDmat, BDDmat, CDBmat, BiharmonicCoeff, HelmholtzCoeff
 from ..shen.la import Helmholtz, TDMA, Biharmonic
-from ..shen import SFTc
+from ..shen import LUsolve
 
 def get_context():
     """Set up context for solver"""
@@ -75,12 +75,12 @@ def get_context():
 
     # Collect all linear algebra solvers
     la = config.AttributeDict(dict(
-        HelmholtzSolverG = Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST.quad, False),
+        HelmholtzSolverG = Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST),
         BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0],
                                     -(K2[0] + nu*dt/2.*K4[0]), quad=SB.quad,
                                     solver="cython"),
-        HelmholtzSolverU0 = Helmholtz(N[0], np.sqrt(2./nu/dt), ST.quad, False),
-        TDMASolverD = TDMA(ST.quad, False)
+        HelmholtzSolverU0 = Helmholtz(N[0], np.sqrt(2./nu/dt), ST),
+        TDMASolverD = TDMA(ST)
         )
     )
 
@@ -160,7 +160,7 @@ def get_convection(H_hat, U_hat, g, K, FST, SB, ST, work, mat, la, **context):
     #"""Solve for pressure if Ni is fst of convection"""
     #pass
     ##F_tmp[0] = 0
-    ##SFTc.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])
+    ##LUsolve.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])
     ##HelmholtzSolverP = Helmholtz(N[0], sqrt(K2[0]), SN.quad, True)
     ##P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
     ##return P_hat
@@ -186,7 +186,7 @@ def compute_curl(c, u_hat, g, K, FST, SB, ST, work):
     Uc = work[(c, 2, False)]
     # Mult_CTD_3D_n is projection to T of d(u_hat)/dx (for components 1 and 2 of u_hat)
     # Corresponds to CTD.matvec(u_hat[1])/BTT.dd, CTD.matvec(u_hat[2])/BTT.dd
-    SFTc.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
+    LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST.CT, dealias=params.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST.CT, dealias=params.dealias)
     c[0] = FST.ifst(g, c[0], ST, dealias=params.dealias)
@@ -206,7 +206,7 @@ def compute_derivatives(duidxj, u_hat, FST, ST, SB, la, mat, work):
     F_tmp[0] = mat.CDB.matvec(U_hat[0])
     F_tmp[0] = la.TDMASolverD(F_tmp[0])
     duidxj[0, 0] = FST.ifst(F_tmp[0], duidxj[0, 0], ST)
-    SFTc.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
+    LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
     duidxj[1, 0] = dvdx = FST.ifct(F_tmp[1], duidxj[1, 0], ST.CT)  # proj to Cheb
     duidxj[2, 0] = dwdx = FST.ifct(F_tmp[2], duidxj[2, 0], ST.CT)  # proj to Cheb
     duidxj[0, 1] = dudy = FST.ifst(1j*K[1]*u_hat[0], duidxj[0, 1], SB) # ShenB
@@ -230,7 +230,7 @@ def standardConvection(rhs, u_dealias, u_hat, K, FST, SB, ST, work, mat, la):
     F_tmp[0] = la.TDMASolverD(F_tmp[0])
     dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], ST, dealias=params.dealias)
 
-    SFTc.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
+    LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST.CT, dealias=params.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST.CT, dealias=params.dealias)
 

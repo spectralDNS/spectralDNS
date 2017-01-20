@@ -1,5 +1,5 @@
 import numpy as np
-from .SFTc import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, \
+from .Matvec import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, \
     SBBmat_matvec3D, Biharmonic_matvec, Biharmonic_matvec3D, Tridiagonal_matvec, \
     Tridiagonal_matvec3D, Pentadiagonal_matvec, Pentadiagonal_matvec3D, \
     CBD_matvec3D, CBD_matvec, CDB_matvec3D, ADDmat_matvec, Helmholtz_matvec3D, \
@@ -7,8 +7,7 @@ from .SFTc import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, \
 
 from .shentransform import ChebyshevTransform, ShenDirichletBasis, ShenNeumannBasis, \
     ShenBiharmonicBasis
-
-from . import points_and_weights
+from spectralDNS.utilities import inheritdocstrings
 import numpy.polynomial.chebyshev as cheb
 from scipy.sparse import diags
 from collections import OrderedDict
@@ -48,8 +47,25 @@ class SparseMatrix(dict):
         self.shape = shape
         self._diags = None
 
-    #@profile
     def matvec(self, v, c, format='dia'):
+        """Matrix vector product
+
+        Returns c = dot(self, v)
+
+        args:
+            v    (input)         Numpy array of ndim=1 or 3
+            c    (output)        Numpy array of same ndim as v
+
+        kwargs:
+            format  ('csr',      Choice for computation
+                     'dia',      format = 'csr' or 'dia' uses sparse matrices
+                     'python')   from scipy.sparse and their built in matvec.
+                                 format = 'python' uses numpy and vectorization
+                                 May be overloaded in subclass, for example
+                                 with a Cython matvec
+
+        """
+        assert v.shape == c.shape
         N, M = self.shape
         c.fill(0)
         if len(v.shape) > 1:
@@ -65,7 +81,8 @@ class SparseMatrix(dict):
                                 c[:min(N, M-key), i, j] += val*v[key:min(M, N+key), i, j]
 
             else:
-                assert format in ('csr', 'dia', 'csc')
+                if not format in ('csr', 'dia'): # Fallback on 'csr'
+                    format = 'csr'
                 diags = self.diags(format=format)
                 for i in range(v.shape[1]):
                     for j in range(v.shape[2]):
@@ -80,7 +97,8 @@ class SparseMatrix(dict):
                         c[:min(N, M-key)] += val*v[key:min(M, N+key)]
 
             else:
-                assert format in ('csr', 'dia', 'csc')
+                if not format in ('csr', 'dia'):
+                    format = 'csr'
                 diags = self.diags(format=format)
                 c[:N] = diags.dot(v[:M])
 
@@ -89,8 +107,8 @@ class SparseMatrix(dict):
     def diags(self, format='dia'):
         """Return a regular sparse matrix of specified format
 
-        args:
-            - format  ('dia', 'csr', 'csc')
+        kwargs:
+            format  ('dia', 'csr', 'csc')
 
         """
         if self._diags is None:
@@ -103,46 +121,47 @@ class SparseMatrix(dict):
 
         return self._diags
 
-    def __imul__(self, alfa):
-        """self *= alfa"""
-        assert isinstance(alfa, (np.float, np.int))
+    def __imul__(self, y):
+        """self.__imul__(y) <==> self*=y"""
+        assert isinstance(y, (np.float, np.int))
         for key, val in six.iteritems(self):
             # Check if symmetric
             if key < 0 and (-key) in self:
                 if id(self[key]) == id(self[-key]):
                     continue
-            val *= alfa
+            val *= y
         return self
 
-    def __mul__(self, alfa):
-        """Return copy self*alfa"""
+    def __mul__(self, y):
+        """Returns copy of self.__mul__(y) <==> self*y"""
         f = SparseMatrix(deepcopy(dict(self)), self.shape)
-        assert isinstance(alfa, (np.float, np.int))
+        assert isinstance(y, (np.float, np.int))
         for key, val in six.iteritems(f):
             # Check if symmetric
             if key < 0 and (-key) in f:
                 if id(f[key]) == id(f[-key]):
                     continue
-            val *= alfa
+            val *= y
         return f
 
-    def __rmul__(self, alfa):
-        return self.__mul__(alfa)
+    def __rmul__(self, y):
+        """Returns copy of self.__rmul__(y) <==> y*self"""
+        return self.__mul__(y)
 
-    def __div__(self, alfa):
-        """Return copy self/alfa"""
+    def __div__(self, y):
+        """Returns copy self.__div__(y) <==> self/y"""
         f = SparseMatrix(deepcopy(dict(self)), self.shape)
-        assert isinstance(alfa, (np.float, np.int))
+        assert isinstance(y, (np.float, np.int))
         for key, val in six.iteritems(f):
             # Check if symmetric
             if key < 0 and (-key) in f:
                 if id(f[key]) == id(f[-key]):
                     continue
-            val /= alfa
+            val /= y
         return f
 
     def __add__(self, d):
-        """Return copy of self+d"""
+        """Return copy of self.__add__(y) <==> self+d"""
         f = SparseMatrix(deepcopy(dict(self)), self.shape)
         if isinstance(d, dict):
             assert d.shape == self.shape
@@ -162,7 +181,7 @@ class SparseMatrix(dict):
         return f
 
     def __iadd__(self, d):
-        """self += d"""
+        """self.__iadd__(d) <==> self += d"""
         if isinstance(d, dict):
             assert d.shape == self.shape
             for key, val in six.iteritems(d):
@@ -180,13 +199,13 @@ class SparseMatrix(dict):
                 val += d
         return self
 
-
+@inheritdocstrings
 class ShenMatrix(SparseMatrix):
     """Base class for Shen matrices
 
     args:
         d                            Dictionary, where keys are the diagonal
-                                         offsets and values the diagonals
+                                     offsets and values the diagonals
         N      integer               Length of main diagonal
         trial  (basis, derivative)   tuple, where basis is an instance of
                                      one of
@@ -266,20 +285,26 @@ class ShenMatrix(SparseMatrix):
         M = 32
         SN = ShenNeumannBasis('GC')
         x = Symbol("x")
+        # Define an exact solution to compute rhs
         u = (1-x**2)*sin(np.pi*x)
         f = -u.diff(x, 2)
         points, weights = SN.points_and_weights(M, SN.quad)
+        # Compute exact function on quadrature points
         uj = np.array([u.subs(x, h) for h in points], dtype=np.float)
         fj = np.array([f.subs(x, h) for h in points], dtype=np.float)
-        A = ShenMatrix({}, M, (SN, 2), SN, scale=-1)
-        s = slice(1, M-2)
         # Subtract mean
         fj -= np.dot(fj, weights)/weights.sum()
         uj -= np.dot(uj, weights)/weights.sum()
+        # Get the stiffness matrix
+        A = ShenMatrix({}, M, (SN, 2), SN, scale=-1)
+        # Compute rhs scalar product
         f_hat = np.zeros(M)
         f_hat = SN.scalar_product(fj, f_hat)
+        # Solve
         u_hat = np.zeros(M)
+        s = slice(1, M-2)
         u_hat[s] = np.linalg.solve(A.diags().toarray()[s, s], f_hat[s])
+        # Compare with exact solution
         u0 = np.zeros(M)
         u0 = SN.ifst(u_hat, u0)
         assert np.allclose(u0, uj)
@@ -300,6 +325,7 @@ class ShenMatrix(SparseMatrix):
             self *= scale
 
     def get_shape(self):
+        """Return shape of matrix"""
         return (self.testfunction.get_shape(self.N),
                 self.trialfunction.get_shape(self.N))
 
@@ -312,7 +338,7 @@ class ShenMatrix(SparseMatrix):
     def get_dense_matrix(self):
         """Return dense matrix automatically computed from basis"""
         N = self.N
-        x, w = points_and_weights(N, self.trialfunction.quad)
+        x, w = self.testfunction.points_and_weights(N, self.trialfunction.quad)
         V = self.testfunction.vandermonde(x, N)
         test = self.testfunction.get_vandermonde_basis(V)
         trial = self.trialfunction.get_vandermonde_basis_derivative(V, self.derivative)
@@ -349,7 +375,7 @@ def extract_diagonal_matrix(M, tol=1e-8):
 
     return SparseMatrix(d, M.shape)
 
-
+@inheritdocstrings
 class BDDmat(ShenMatrix):
     """Matrix for inner product B_{kj}=(phi_j, phi_k)_w
 
@@ -365,13 +391,12 @@ class BDDmat(ShenMatrix):
         assert len(K.shape) == 1
         N = K.shape[0]
         ck = self.get_ck(N, quad)
-        data = {-2: np.array([-pi/2.]),
-                 0: pi/2*(ck[:-2]+ck[2:]),
-                 2: np.array([-pi/2])}
+        d = {0: pi/2*(ck[:-2]+ck[2:]),
+             2: np.array([-pi/2])}
+        d[-2] = d[2]
         trial = ShenDirichletBasis(quad=quad)
-        ShenMatrix.__init__(self, data, N, (trial, 0), trial)
+        ShenMatrix.__init__(self, d, N, (trial, 0), trial)
 
-    #@profile
     def matvec(self, v, c, format='cython'):
         N, M = self.shape
         c.fill(0)
@@ -386,7 +411,7 @@ class BDDmat(ShenMatrix):
                 c[2:N]   += self[-2]*v[:(N-2)]
 
             else:
-                c = ShenMatrix.matvec(self, v, c, format=format)
+                c = super(BDDmat, self).matvec(v, c, format=format)
 
         else:
             if format == 'cython':
@@ -404,7 +429,7 @@ class BDDmat(ShenMatrix):
         return c
 
 
-## Mass matrices
+@inheritdocstrings
 class BNDmat(ShenMatrix):
     """Mass matrix for inner product B_{kj} = (phi_j, psi_k)_w
 
@@ -435,6 +460,7 @@ class BNDmat(ShenMatrix):
         return c
 
 
+@inheritdocstrings
 class BDNmat(ShenMatrix):
     """Mass matrix for inner product B_{kj} = (psi_j, phi_k)_w
 
@@ -461,6 +487,7 @@ class BDNmat(ShenMatrix):
         ShenMatrix.__init__(self, d, N, (trial, 0), test)
 
 
+@inheritdocstrings
 class BTTmat(ShenMatrix):
     """Mass matrix for inner product B_{kj} = (T_j, T_k)_w
 
@@ -497,6 +524,7 @@ class BTTmat(ShenMatrix):
         return c
 
 
+@inheritdocstrings
 class BNNmat(ShenMatrix):
     """Mass matrix for inner product B_{kj} = (phi_j, phi_k)_w
 
@@ -515,9 +543,9 @@ class BNNmat(ShenMatrix):
         N = K.shape[0]
         ck = self.get_ck(N, quad)
         k = K[:-2].astype(float)
-        d = {-2: -pi/2*((k[2:]-2)/(k[2:]))**2,
-              0: pi/2*(ck[:-2]+ck[2:]*(k[:]/(k[:]+2))**4),
-              2: -pi/2*((k[2:]-2)/(k[2:]))**2}
+        d = {0: pi/2*(ck[:-2]+ck[2:]*(k[:]/(k[:]+2))**4),
+             2: -pi/2*((k[2:]-2)/(k[2:]))**2}
+        d[-2] = d[2]
         trial = ShenNeumannBasis(quad)
         ShenMatrix.__init__(self, d, N, (trial, 0), trial)
 
@@ -840,16 +868,16 @@ class CDDmat(ShenMatrix):
         c.fill(0)
         if len(v.shape) > 1:
             if format == 'self':
-                c[:N-1] = self.ud.repeat(array(v.shape[1:]).prod()).reshape(v[1:N].shape)*v[1:N]
-                c[1:N] += self.ld.repeat(array(v.shape[1:]).prod()).reshape(v[:(N-1)].shape)*v[:(N-1)]
+                c[:N-1] = self[1].repeat(array(v.shape[1:]).prod()).reshape(v[1:N].shape)*v[1:N]
+                c[1:N] += self[-1].repeat(array(v.shape[1:]).prod()).reshape(v[:(N-1)].shape)*v[:(N-1)]
             elif format == 'cython':
                 CDDmat_matvec(self[1], self[-1], v, c)
             else:
                 c = ShenMatrix.matvec(self, v, c, format=format)
         else:
             if format == 'self':
-                c[:N-1] = self.ud*v[1:N]
-                c[1:N] += self.ld*v[:(N-1)]
+                c[:N-1] = self[1]*v[1:N]
+                c[1:N] += self[-1]*v[:(N-1)]
             else:
                 if format == 'cython': format='csr'
                 c = ShenMatrix.matvec(self, v, c, format=format)
@@ -1191,6 +1219,13 @@ class SBBmat(ShenMatrix):
                 c = ShenMatrix.matvec(self, v, c, format=format)
 
         return c
+
+mass_matrix = {
+    'ChebyshevTransform': BTTmat,
+    'ShenDirichletBasis': BDDmat,
+    'ShenNeumannBasis': BNNmat,
+    'ShenBiharmonicBasis': BBBmat
+}
 
 
 class BiharmonicCoeff(object):

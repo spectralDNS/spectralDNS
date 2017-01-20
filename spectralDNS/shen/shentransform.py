@@ -4,10 +4,10 @@ from numpy import array, zeros_like, sum, hstack, meshgrid, abs, pi, uint8, \
 from numpy.polynomial import chebyshev as n_cheb
 from mpiFFT4py import dct, work_arrays, Slab_R2C, fftfreq, rfftfreq, rfft2, \
     irfft2, rfft, irfft, fft, ifft
-from . import SFTc
+from . import Cheb
 import scipy.sparse.linalg as la
 from ..optimization import optimizer
-from ..utilities import docstrings
+from ..utilities import inheritdocstrings
 from collections import defaultdict
 import decimal
 from mpi4py import MPI
@@ -41,7 +41,7 @@ pi, zeros, ones = np.pi, np.zeros, np.ones
 work = work_arrays()
 
 class SpectralBasis(object):
-    """Basis for spectral series
+    """Basis for all spectral function spaces
 
     args:
         quad        ('GL', 'GC')  Chebyshev-Gauss-Lobatto or Chebyshev-Gauss
@@ -53,10 +53,8 @@ class SpectralBasis(object):
 
     """
 
-    def __init__(self, quad="GL", threads=1, planner_effort="FFTW_MEASURE"):
+    def __init__(self, quad="GC"):
         self.quad = quad
-        self.threads = threads
-        self.planner_effort = planner_effort
 
     def points_and_weights(self, N, quad):
         """Return points and weights of quadrature
@@ -93,7 +91,7 @@ class SpectralBasis(object):
         raise NotImplementedError
 
     def scalar_product(self, fj, fk, fast_transform=True):
-        """Chebyshev scalar product
+        """Return scalar product
 
           f_k = (f, \phi_k)_w      for all k = 0, 1, ..., N
               = \sum_j f(x_j) \phi_k(x_j) \sigma(x_j)
@@ -210,7 +208,7 @@ class SpectralBasis(object):
         """Return shape of current basis"""
         return N
 
-@docstrings
+@inheritdocstrings
 class ChebyshevTransform(SpectralBasis):
     """Basis for regular Chebyshev series
 
@@ -224,8 +222,10 @@ class ChebyshevTransform(SpectralBasis):
 
     """
 
-    def __init__(self, quad="GL", threads=1, planner_effort="FFTW_MEASURE"):
-        SpectralBasis.__init__(self, quad, threads, planner_effort)
+    def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"):
+        SpectralBasis.__init__(self, quad)
+        self.threads = threads
+        self.planner_effort = planner_effort
 
     def cheb_derivative_coefficients(self, fk, ck):
         """Return coefficients of Chebyshev series for c = f'(x)
@@ -236,13 +236,19 @@ class ChebyshevTransform(SpectralBasis):
 
         """
         if len(fk.shape) == 1:
-            ck = SFTc.cheb_derivative_coefficients(fk, ck)
+            ck = Cheb.cheb_derivative_coefficients(fk, ck)
         elif len(fk.shape) == 3:
-            ck = SFTc.cheb_derivative_coefficients_3D(fk, ck)
+            ck = Cheb.cheb_derivative_coefficients_3D(fk, ck)
         return ck
 
     def fast_cheb_derivative(self, fj, fd):
-        """Return derivative of fj = f(x_j) at the same points."""
+        """Return derivative of fj = f(x_j) at quadrature points
+
+        args:
+            fj   (input)     Function values on quadrature mesh
+            fd   (output)    Function derivative on quadrature mesh
+
+        """
         fk = work[(fj, 0)]
         ck = work[(fj, 1)]
         fk = self.fct(fj, fk)
@@ -251,7 +257,12 @@ class ChebyshevTransform(SpectralBasis):
         return fd
 
     def solver(self, fk):
-        """Apply inverse BTT_{kj} = c_k 2/pi \delta_{kj}"""
+        """Apply inverse BTT_{kj} = c_k 2/pi \delta_{kj}
+
+        args:
+            fk   (input/output)    Expansion coefficients
+
+        """
         if self.quad == 'GC':
             fk *= (2/pi)
             fk[0] /= 2
@@ -342,7 +353,7 @@ class ChebyshevTransform(SpectralBasis):
     def get_shape(self, N):
         return N
 
-@docstrings
+@inheritdocstrings
 class ShenDirichletBasis(SpectralBasis):
     """Shen basis for Dirichlet boundary conditions
 
@@ -357,13 +368,15 @@ class ShenDirichletBasis(SpectralBasis):
 
     """
 
-    def __init__(self, quad="GL", threads=1, planner_effort="FFTW_MEASURE",
+    def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE",
                  bc=(0., 0.)):
-        SpectralBasis.__init__(self, quad, threads, planner_effort)
+        SpectralBasis.__init__(self, quad)
+        self.threads = threads
+        self.planner_effort = planner_effort
+        self.bc = bc
         self.CT = ChebyshevTransform(quad, threads, planner_effort)
         from .la import TDMA
-        self.solver = TDMA(quad, False)
-        self.bc = bc
+        self.solver = TDMA(self)
 
     def wavenumbers(self, N):
         N = list(N) if np.ndim(N) else [N]
@@ -433,7 +446,7 @@ class ShenDirichletBasis(SpectralBasis):
     def get_shape(self, N):
         return N-2
 
-@docstrings
+@inheritdocstrings
 class ShenNeumannBasis(SpectralBasis):
     """Shen basis for homogeneous Neumann boundary conditions
 
@@ -448,11 +461,11 @@ class ShenNeumannBasis(SpectralBasis):
     """
 
     def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"):
-        SpectralBasis.__init__(self, quad, threads, planner_effort)
+        SpectralBasis.__init__(self, quad)
         self.CT = ChebyshevTransform(quad, threads, planner_effort)
         self._factor = zeros(0)
         from .la import TDMA
-        self.solver = TDMA(quad, True)
+        self.solver = TDMA(self)
 
     def wavenumbers(self, N):
         N = list(N) if np.ndim(N) else [N]
@@ -524,7 +537,7 @@ class ShenNeumannBasis(SpectralBasis):
         return N-2
 
 
-@docstrings
+@inheritdocstrings
 class ShenBiharmonicBasis(SpectralBasis):
     """Shen biharmonic basis
 
@@ -542,7 +555,7 @@ class ShenBiharmonicBasis(SpectralBasis):
 
     def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"):
         from .la import PDMA
-        SpectralBasis.__init__(self, quad, threads, planner_effort)
+        SpectralBasis.__init__(self, quad)
         self.CT = ChebyshevTransform(quad, threads, planner_effort)
         self._factor1 = zeros(0)
         self._factor2 = zeros(0)
@@ -1109,7 +1122,7 @@ class SlabShen_R2C(Slab_R2C):
         UT = self.work_arrays[((2, self.N[0], self.Np[1], self.N[2]), self.float, 0)]
 
         UT[0] = self.fct0(fj, UT[0], S)
-        UT[1] = SFTc.cheb_derivative_coefficients_3D(UT[0], UT[1])
+        UT[1] = Cheb.cheb_derivative_coefficients_3D(UT[0], UT[1])
         u0 = self.ifct0(UT[1], u0, S)
         return u0
 

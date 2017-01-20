@@ -4,8 +4,9 @@ from spectralDNS.shen.shentransform import ShenDirichletBasis, ShenNeumannBasis,
 from spectralDNS.shen.la import TDMA, Helmholtz, Biharmonic
 from spectralDNS.shen.Matrices import BNNmat, BTTmat, BDDmat, CDDmat, CDNmat, \
     BNDmat, CNDmat, BDNmat, ADDmat, ANNmat, CTDmat, BDTmat, CDTmat, BTDmat, \
-    BTNmat, BBBmat, ABBmat, SBBmat, CDBmat, CBDmat, ATTmat, BBDmat, HelmholtzCoeff
-from spectralDNS.shen import SFTc
+    BTNmat, BBBmat, ABBmat, SBBmat, CDBmat, CBDmat, ATTmat, BBDmat, HelmholtzCoeff, \
+    mass_matrix
+from spectralDNS.shen import LUsolve
 from scipy.linalg import solve
 from mpi4py import MPI
 from sympy import chebyshevt, Symbol, sin, cos, pi
@@ -17,120 +18,46 @@ comm = MPI.COMM_WORLD
 N = 32
 x = Symbol("x")
 
-@pytest.fixture(params=("NGC", "NGL", "DGC", "DGL", "CGC", "CGL", "BGL", "BGC"))
-def ST(request):
-    if request.param[0] == 'N':
-        return ShenNeumannBasis(request.param[1:])
-    elif request.param[0] == 'D':
-        return ShenDirichletBasis(request.param[1:])
-    elif request.param[0] == 'C':
-        return ChebyshevTransform(request.param[1:])
-    elif request.param[0] == 'B':
-        return ShenBiharmonicBasis(request.param[1:])
+Basis = (ChebyshevTransform, ShenDirichletBasis, ShenNeumannBasis, ShenBiharmonicBasis)
+quads = ('GC', 'GL')
 
-@pytest.fixture(params=("NGC", "NGL", "DGC", "DGL"))
-def ST2(request):
-    if request.param[0] == 'N':
-        return ShenNeumannBasis(request.param[1:])
-    elif request.param[0] == 'D':
-        return ShenDirichletBasis(request.param[1:])
-
-@pytest.fixture(params=("GC", "GL"))
-def SD(request):
-    return ShenDirichletBasis(request.param)
-
-@pytest.fixture(params=("GC", "GL"))
-def SB(request):
-    return ShenBiharmonicBasis(request.param)
-
-@pytest.fixture(params=("GCGC", "GLGL"))
-def SDSN(request):
-    return (ShenDirichletBasis(request.param[:2]), ShenNeumannBasis(request.param[2:]))
-
-@pytest.fixture(params=("GCGC", "GLGL"))
-def SBSD(request):
-    return (ShenBiharmonicBasis(request.param[:2]), ShenDirichletBasis(request.param[:2]))
-
-@pytest.fixture(params=("GCGC1", "GLGL1", "GCGC2", "GLGL2"))
-def S1S2(request):
-    if request.param[-1] == "1":
-        return (ShenDirichletBasis(request.param[:2]), ShenNeumannBasis(request.param[2:4]))
-    elif request.param[-1] == "2":
-        return (ShenNeumannBasis(request.param[2:4]), ShenDirichletBasis(request.param[:2]))
-
-@pytest.fixture(params=("GCGC1", "GLGL1", "GCGC3"))
-def SXSX(request):
-    if request.param[-1] == "1":
-        return (ShenDirichletBasis(request.param[:2]), ShenNeumannBasis(request.param[2:4]))
-    elif request.param[-1] == "2":
-        return (ShenNeumannBasis(request.param[2:4]), ShenDirichletBasis(request.param[:2]))
-    elif request.param[-1] == "3":
-        return (ShenDirichletBasis(request.param[2:4]), ShenDirichletBasis(request.param[:2]))
-    elif request.param[-1] == "4":
-        return (ShenNeumannBasis(request.param[2:4]), ShenNeumannBasis(request.param[:2]))
-
-@pytest.fixture(params=("NGC", "NGL", "DGC", "DGL"))
-def T(request):
-    if request.param[0] == 'N':
-        return TDMA(request.param[1:], True)
-    elif request.param[0] == 'D':
-        return TDMA(request.param[1:], False)
-
-@pytest.fixture(params=("GCGC", "GLGL"))
-def SDST(request):
-    return (ShenDirichletBasis(request.param[:2]), ChebyshevTransform(request.param[2:]))
-
-@pytest.fixture(params=("GCGC", "GLGL"))
-def SBST(request):
-    return (ShenBiharmonicBasis(request.param[:2]), ShenDirichletBasis(request.param[2:]))
-
-@pytest.fixture(params=("GCGC1", "GLGL1", "GCGC2", "GLGL2"))
-def SXST(request):
-    if request.param[-1] == "1":
-        return (ShenDirichletBasis(request.param[:2]), ChebyshevTransform(request.param[2:-1]))
-    elif request.param[-1] == "2":
-        return (ShenNeumannBasis(request.param[:2]), ChebyshevTransform(request.param[2:-1]))
-
-def test_scalarproduct(ST):
+@pytest.mark.parametrize('ST', Basis)
+@pytest.mark.parametrize('quad', quads)
+def test_scalarproduct(ST, quad):
     """Test fast scalar product against Vandermonde computed version"""
+    ST = ST(quad=quad)
     points, weights = ST.points_and_weights(N,  ST.quad)
     f = x*x+cos(pi*x)
     fj = np.array([f.subs(x, j) for j in points], dtype=float)
     u0 = np.zeros(N)
     u1 = np.zeros(N)
     ST.fast_transform = True
-    if ST.__class__.__name__ == "ChebyshevTransform":
-        u0 = ST.scalar_product(fj, u0)
-    else:
-        u0 = ST.scalar_product(fj, u0)
+    u0 = ST.scalar_product(fj, u0)
     ST.fast_transform = False
-    if ST.__class__.__name__ == "ChebyshevTransform":
-        u1 = ST.scalar_product(fj, u1)
-    else:
-        u1 = ST.scalar_product(fj, u1)
+    u1 = ST.scalar_product(fj, u1)
     assert np.allclose(u1, u0)
 
-#@profile
-def test_TDMA(T):
+#test_scalarproduct(ShenDirichletBasis, 'GC')
+
+@pytest.mark.parametrize('ST', Basis[1:3])
+@pytest.mark.parametrize('quad', quads)
+def test_TDMA(ST, quad):
     from scipy.linalg import solve
     from numpy import zeros_like
-    N = 128
-    if T.neumann == True:
-        B = BNNmat(np.arange(N).astype(np.float), T.quad)
-        s = slice(1, N-2)
-    else:
-        B = BDDmat(np.arange(N).astype(np.float), T.quad)
-        s = slice(0, N-2)
-    #from IPython import embed;embed()
 
-    Ba = B.diags().toarray()[s, s]
+    ST = ST(quad=quad)
+    T = TDMA(ST)
+    s = ST.slice(N)
+    B = mass_matrix[ST.__class__.__name__](np.arange(N).astype(np.float), ST.quad)
+    B = B.diags().toarray()[s, s]
     f = np.random.random(N)
-    u = solve(Ba, f[s])
+    u = solve(B, f[s])
 
     u0 = f.copy()
     u0 = T(u0)
 
     assert np.allclose(u0[s], u)
+
     # Again
     u0 = f.copy()
     u0 = T(u0)
@@ -143,75 +70,50 @@ def test_TDMA(T):
     assert np.allclose(u0[s, 2, 2].real, u)
     assert np.allclose(u0[s, 2, 2].imag, u)
 
-#test_TDMA(TDMA("GC", False))
+#test_TDMA(ShenNeumannBasis, 'GC')
 
 #@profile
-def test_BNNmat(ST):
+@pytest.mark.parametrize('ST', Basis)
+@pytest.mark.parametrize('quad', quads)
+def test_BNNmat(ST, quad):
+    ST = ST(quad=quad)
     points, weights = ST.points_and_weights(N,  ST.quad)
     f_hat = np.zeros(N)
     fj = np.random.random(N)
     u0 = np.zeros(N)
-    if ST.__class__.__name__ == "ShenNeumannBasis":
-        B = BNNmat(np.arange(N).astype(np.float), ST.quad)
-        f_hat = ST.fst(fj, f_hat)
-        fj = ST.ifst(f_hat, fj)
-        u0 = ST.scalar_product(fj, u0)
-        f_hat = ST.fst(fj, f_hat)
-    elif ST.__class__.__name__ == "ShenDirichletBasis":
-        B = BDDmat(np.arange(N).astype(np.float), ST.quad)
-        f_hat = ST.fst(fj, f_hat)
-        fj = ST.ifst(f_hat, fj)
-        u0 = ST.scalar_product(fj, u0)
-        f_hat = ST.fst(fj, f_hat)
-    elif ST.__class__.__name__ == "ShenBiharmonicBasis":
-        B = BBBmat(np.arange(N).astype(np.float), ST.quad)
-        f_hat = ST.fst(fj, f_hat)
-        fj = ST.ifst(f_hat, fj)
-        u0 = ST.scalar_product(fj, u0)
-        f_hat = ST.fst(fj, f_hat)
-    else:
-        B = BTTmat(np.arange(N).astype(np.float), ST.quad)
-        f_hat = ST.fct(fj, f_hat)
-        fj = ST.ifct(f_hat, fj)
-        u0 = ST.scalar_product(fj, u0)
-        f_hat = ST.fct(fj, f_hat)
-
+    B = mass_matrix[ST.__class__.__name__](np.arange(N).astype(np.float), ST.quad)
+    f_hat = ST.forward(fj, f_hat)
+    fj = ST.backward(f_hat, fj)
+    u0 = ST.scalar_product(fj, u0)
+    f_hat = ST.forward(fj, f_hat)
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
 
-    #from IPython import embed; embed()
     assert np.allclose(u2[:-2], u0[:-2])
 
     # Multidimensional version
     fj = fj.repeat(16).reshape((N, 4, 4)) + 1j*fj.repeat(16).reshape((N, 4, 4))
     u0 = np.zeros((N, 4, 4), dtype=np.complex)
     f_hat = np.zeros((N, 4, 4), dtype=np.complex)
-    if ST.__class__.__name__ in ("ChebyshevTransform"):
-        u0 = ST.scalar_product(fj, u0)
-        f_hat = ST.fct(fj, f_hat)
-    else:
-        u0 = ST.scalar_product(fj, u0)
-        f_hat = ST.fst(fj, f_hat)
+    u0 = ST.scalar_product(fj, u0)
+    f_hat = ST.forward(fj, f_hat)
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
-    #from IPython import embed; embed()
     assert np.allclose(u2[:-2], u0[:-2])
 
-#test_BNNmat(ShenNeumannBasis("GC"))
+#test_BNNmat(ShenNeumannBasis, 'GC')
 
-#@profile
-def test_BDNmat(S1S2):
-    S1, S2 = S1S2
+@pytest.mark.parametrize('quad', quads)
+@pytest.mark.parametrize('mat', (BNDmat, BDNmat))
+def test_BDNmat(mat, quad):
+    B = mat(np.arange(N).astype(np.float), quad)
+    S2 = B.trialfunction
+    S1 = B.testfunction
 
     f_hat = np.zeros(N)
     fj = np.random.random(N)
     f_hat = S2.fst(fj, f_hat)
     fj = S2.ifst(f_hat, fj)
-
-    if S1.__class__.__name__ == "ShenNeumannBasis":
-        B = BNDmat(np.arange(N).astype(np.float), S1.quad)
-    else:
-        B = BDNmat(np.arange(N).astype(np.float), S1.quad)
 
     f_hat = S2.fst(fj, f_hat)
     u2 = np.zeros_like(f_hat)
@@ -231,10 +133,12 @@ def test_BDNmat(S1S2):
     u2 = B.matvec(f_hat, u2)
     assert np.linalg.norm(u2-u0)/(N*16) < 1e-12
 
-#test_BDNmat((ShenNeumannBasis("GL"), ShenDirichletBasis("GL")))
+#test_BDNmat(BNDmat, "GL")
 
-def test_BDTmat(SDST):
-    SD, ST = SDST
+@pytest.mark.parametrize('quad', quads)
+def test_BDTmat(quad):
+    SD = ShenDirichletBasis(quad=quad)
+    ST = ChebyshevTransform(quad=quad)
 
     f_hat = np.zeros(N)
     fj = np.random.random(N)
@@ -267,8 +171,10 @@ def test_BDTmat(SDST):
 
 #test_BDTmat((ShenDirichletBasis("GL"), ShenNeumannBasis("GL")))
 
-def test_BBDmat(SBSD):
-    SB, SD = SBSD
+@pytest.mark.parametrize('quad', quads)
+def test_BBDmat(quad):
+    SB = ShenBiharmonicBasis(quad=quad)
+    SD = ShenDirichletBasis(quad=quad)
 
     f_hat = np.zeros(N)
     fj = np.random.random(N)
@@ -310,18 +216,17 @@ def test_BBDmat(SBSD):
 
 #test_BBDmat((ShenBiharmonicBasis("GL"), ShenDirichletBasis("GL")))
 
-def test_BTXmat(SXST):
-    SX, ST = SXST
+@pytest.mark.parametrize('mat', (BTDmat, BTNmat))
+@pytest.mark.parametrize('quad', quads)
+def test_BTXmat(mat, quad):
+    B = mat(np.arange(N).astype(np.float), quad)
+    SX = B.trialfunction
+    ST = B.testfunction
 
     f_hat = np.zeros(N)
     fj = np.random.random(N)
     f_hat = SX.fst(fj, f_hat)
     fj = SX.ifst(f_hat, fj)
-
-    if SX.__class__.__name__ == "ShenDirichletBasis":
-        B = BTDmat(np.arange(N).astype(np.float), ST.quad)
-    if SX.__class__.__name__ == "ShenNeumannBasis":
-        B = BTNmat(np.arange(N).astype(np.float), ST.quad)
 
     f_hat = SX.fst(fj, f_hat)
     u2 = np.zeros_like(f_hat)
@@ -342,47 +247,43 @@ def test_BTXmat(SXST):
     u2 = B.matvec(f_hat, u2)
     assert np.linalg.norm(u2-u0)/(N*16) < 1e-12
 
-#test_BTXmat((ShenDirichletBasis("GL"), ChebyshevTransform("GL")))
+#test_BTXmat(BTDmat, 'GC')
 
-def test_transforms(ST):
+@pytest.mark.parametrize('ST', Basis)
+@pytest.mark.parametrize('quad', quads)
+def test_transforms(ST, quad):
+    ST = ST(quad=quad)
     points, weights = ST.points_and_weights(N,  ST.quad)
     fj = np.random.random(N)
 
     # Project function to space first
-    if not ST.__class__.__name__ == "ChebyshevTransform":
-        f_hat = np.zeros(N)
-        f_hat = ST.fst(fj, f_hat)
-        fj = ST.ifst(f_hat, fj)
+    f_hat = np.zeros(N)
+    f_hat = ST.forward(fj, f_hat)
+    fj = ST.backward(f_hat, fj)
 
     # Then check if transformations work as they should
     u0 = np.zeros(N)
     u1 = np.zeros(N)
-    if ST.__class__.__name__ == "ChebyshevTransform":
-        u0 = ST.fct(fj, u0)
-        u1 = ST.ifct(u0, u1)
-    else:
-        u0 = ST.fst(fj, u0)
-        u1 = ST.ifst(u0, u1)
+    u0 = ST.forward(fj, u0)
+    u1 = ST.backward(u0, u1)
 
-    #from IPython import embed; embed()
     assert np.allclose(fj, u1)
 
     # Multidimensional version
     fj = fj.repeat(16).reshape((N, 4, 4)) + 1j*fj.repeat(16).reshape((N, 4, 4))
     u0 = np.zeros((N, 4, 4), dtype=np.complex)
     u1 = np.zeros((N, 4, 4), dtype=np.complex)
-    if ST.__class__.__name__ == "ChebyshevTransform":
-        u0 = ST.fct(fj, u0)
-        u1 = ST.ifct(u0, u1)
-    else:
-        u0 = ST.fst(fj, u0)
-        u1 = ST.ifst(u0, u1)
+    u0 = ST.forward(fj, u0)
+    u1 = ST.backward(u0, u1)
 
     assert np.allclose(fj, u1)
 
 #test_transforms(ShenBiharmonicBasis("GC"))
 
-def test_FST(ST):
+@pytest.mark.parametrize('ST', Basis)
+@pytest.mark.parametrize('quad', quads)
+def test_FST(ST, quad):
+    ST = ST(quad=quad)
     FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), comm)
 
     if FST.rank == 0:
@@ -393,13 +294,9 @@ def test_FST(ST):
         A = np.random.random((N, N, N)).astype(FST.float)
         B2 = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
 
-        if not ST.__class__.__name__ == "ChebyshevTransform":
-            B2 = FST_SELF.fst(A, B2, ST)
-            A = FST_SELF.ifst(B2, A, ST)
-            B2 = FST_SELF.fst(A, B2, ST)
-
-        else:
-            B2 = FST_SELF.fct(A, B2, ST)
+        B2 = FST_SELF.forward(A, B2, ST.forward)
+        A = FST_SELF.backward(B2, A, ST.backward)
+        B2 = FST_SELF.forward(A, B2, ST.forward)
 
     else:
         A = np.zeros((N, N, N), dtype=FST.float)
@@ -412,25 +309,20 @@ def test_FST(ST):
     a = np.zeros(FST.real_shape(), dtype=FST.float)
     c = np.zeros(FST.complex_shape(), dtype=FST.complex)
     a[:] = A[FST.real_local_slice()]
-    if ST.__class__.__name__ == "ChebyshevTransform":
-        c = FST.fct(a, c, ST)
-    else:
-        c = FST.fst(a, c, ST)
+    c = FST.forward(a, c, ST.forward)
 
     assert np.all(abs((c - B2[FST.complex_local_slice()])/c.max()) < rtol)
 
-    if ST.__class__.__name__ == "ChebyshevTransform":
-        a = FST.ifct(c, a, ST)
-
-    else:
-        a = FST.ifst(c, a, ST)
+    a = FST.backward(c, a, ST.backward)
 
     assert np.all(abs((a - A[FST.real_local_slice()])/a.max()) < rtol)
 
+#test_FST(ShenDirichletBasis, 'GC')
 
-#test_FST(ShenDirichletBasis("GL"))
-
-def test_FST_padded(ST):
+@pytest.mark.parametrize('ST', Basis)
+@pytest.mark.parametrize('quad', quads)
+def test_FST_padded(ST, quad):
+    ST = ST(quad=quad)
     M = np.array([N, 2*N, 4*N])
     FST = SlabShen_R2C(M, np.array([2*pi, 2*pi, 2*pi]), comm,
                        communication='Alltoall')
@@ -441,23 +333,15 @@ def test_FST_padded(ST):
         A = np.random.random(M).astype(FST.float)
         A_hat = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
 
-        if not ST.__class__.__name__ == "ChebyshevTransform":
-            A_hat = FST_SELF.fst(A, A_hat, ST)
-            A = FST_SELF.ifst(A_hat, A, ST)
-            A_hat = FST_SELF.fst(A, A_hat, ST)
-        else:
-            A_hat = FST_SELF.fct(A, A_hat, ST)
+        A_hat = FST_SELF.forward(A, A_hat, ST.forward)
+        A = FST_SELF.backward(A_hat, A, ST.backward)
+        A_hat = FST_SELF.forward(A, A_hat, ST.forward)
 
         A_hat[:, -M[1]/2] = 0
 
         A_pad = np.zeros(FST_SELF.real_shape_padded(), dtype=FST.float)
-        if not ST.__class__.__name__ == "ChebyshevTransform":
-            A_pad = FST_SELF.ifst(A_hat, A_pad, ST, dealias='3/2-rule')
-            A_hat = FST_SELF.fst(A_pad, A_hat, ST, dealias='3/2-rule')
-
-        else:
-            A_pad = FST_SELF.ifct(A_hat, A_pad, ST, dealias='3/2-rule')
-            A_hat = FST_SELF.fct(A_pad, A_hat, ST, dealias='3/2-rule')
+        A_pad = FST_SELF.backward(A_hat, A_pad, ST.backward, dealias='3/2-rule')
+        A_hat = FST_SELF.forward(A_pad, A_hat, ST.forward, dealias='3/2-rule')
 
     else:
         A_pad = np.zeros(FST_SELF.real_shape_padded(), dtype=FST.float)
@@ -470,27 +354,21 @@ def test_FST_padded(ST):
     a = np.zeros(FST.real_shape_padded(), dtype=FST.float)
     c = np.zeros(FST.complex_shape(), dtype=FST.complex)
     a[:] = A_pad[FST.real_local_slice(padsize=1.5)]
-    if ST.__class__.__name__ == "ChebyshevTransform":
-        c = FST.fct(a, c, ST, dealias='3/2-rule')
-    else:
-        c = FST.fst(a, c, ST, dealias='3/2-rule')
+    c = FST.forward(a, c, ST.forward, dealias='3/2-rule')
 
     assert np.all(abs((c - A_hat[FST.complex_local_slice()])/c.max()) < rtol)
 
-    if ST.__class__.__name__ == "ChebyshevTransform":
-        a = FST.ifct(c, a, ST, dealias='3/2-rule')
-
-    else:
-        a = FST.ifst(c, a, ST, dealias='3/2-rule')
+    a = FST.backward(c, a, ST.backward, dealias='3/2-rule')
 
     #print abs((a - A_pad[FST.real_local_slice(padsize=1.5)])/a.max())
     assert np.all(abs((a - A_pad[FST.real_local_slice(padsize=1.5)])/a.max()) < rtol)
 
 
-#test_FST_padded(ShenBiharmonicBasis("GC"))
+#test_FST_padded(ShenBiharmonicBasis, 'GC')
 
-#@profile
-def test_CDDmat(SD):
+@pytest.mark.parametrize('quad', quads)
+def test_CDDmat(quad):
+    SD = ShenDirichletBasis(quad=quad)
     M = 256
     u = (1-x**2)*sin(np.pi*6*x)
     dudx = u.diff(x, 1)
@@ -510,7 +388,7 @@ def test_CDDmat(SD):
     dudx_j = SD.CT.fast_cheb_derivative(uj, dudx_j)
 
     Cm = CDDmat(np.arange(M).astype(np.float))
-    TDMASolver = TDMA(SD.quad, False)
+    TDMASolver = TDMA(SD)
 
     cs = np.zeros_like(u_hat)
     cs = Cm.matvec(u_hat, cs)
@@ -544,17 +422,13 @@ def test_CDDmat(SD):
     #from IPython import embed; embed()
     assert np.linalg.norm(du3-d3)/(M*16) < 1e-10
 
-#test_CDDmat(ShenDirichletBasis('GL'))
+#test_CDDmat('GL')
 
-def test_CXXmat(SXSX):
-    S1, S2 = SXSX
-
-    if S1.__class__.__name__ == "ShenDirichletBasis" and S2.__class__.__name__ == "ShenDirichletBasis":
-        Cm = CDDmat(np.arange(N).astype(np.float))
-    elif S1.__class__.__name__ == "ShenDirichletBasis":
-        Cm = CDNmat(np.arange(N).astype(np.float))
-    elif S1.__class__.__name__ == "ShenNeumannBasis":
-        Cm = CNDmat(np.arange(N).astype(np.float))
+@pytest.mark.parametrize('mat', (CDDmat, CDNmat, CNDmat))
+def test_CXXmat(mat):
+    Cm = mat(np.arange(N).astype(np.float))
+    S2 = Cm.trialfunction
+    S1 = Cm.testfunction
 
     fj = np.random.randn(N)
     # project to S2
@@ -571,7 +445,6 @@ def test_CXXmat(SXSX):
     cs2 = np.zeros(N)
     cs2 = S1.scalar_product(df, cs2)
 
-    #from IPython import embed; embed()
     assert np.allclose(cs, cs2)
 
     # Multidimensional version
@@ -584,10 +457,12 @@ def test_CXXmat(SXSX):
 
     assert np.allclose(cs, cs2)
 
-#test_CXXmat((ShenDirichletBasis('GL'), ShenNeumannBasis('GL')))
+#test_CXXmat(CNDmat)
 
-def test_CDTmat(SDST):
-    SD, ST = SDST
+@pytest.mark.parametrize('quad', quads)
+def test_CDTmat(quad):
+    SD = ShenDirichletBasis(quad=quad)
+    ST = ChebyshevTransform(quad=quad)
 
     Cm = CDTmat(np.arange(N).astype(np.float))
 
@@ -621,8 +496,10 @@ def test_CDTmat(SDST):
 
 #test_CDTmat((ShenDirichletBasis('GL'), ChebyshevTransform('GL')))
 
-def test_CTDmat(SDST):
-    SD, ST = SDST
+@pytest.mark.parametrize('quad', quads)
+def test_CTDmat(quad):
+    SD = ShenDirichletBasis(quad=quad)
+    ST = ChebyshevTransform(quad=quad)
 
     Cm = CTDmat(np.arange(N).astype(np.float))
 
@@ -656,8 +533,10 @@ def test_CTDmat(SDST):
 
 #test_CTDmat((ShenDirichletBasis('GC'), ChebyshevTransform('GC')))
 
-def test_CDBmat(SBST):
-    SB, SD = SBST
+@pytest.mark.parametrize('quad', quads)
+def test_CDBmat(quad):
+    SB = ShenBiharmonicBasis(quad=quad)
+    SD = ShenDirichletBasis(quad=quad)
 
     M = 8*N
     Cm = CDBmat(np.arange(M).astype(np.float))
@@ -701,8 +580,10 @@ def test_CDBmat(SBST):
 
 #test_CDBmat((ShenBiharmonicBasis("GC"), ShenDirichletBasis("GC")))
 
-def test_CBDmat(SBST):
-    SB, SD = SBST
+@pytest.mark.parametrize('quad', quads)
+def test_CBDmat(quad):
+    SB = ShenBiharmonicBasis(quad=quad)
+    SD = ShenDirichletBasis(quad=quad)
 
     M = 4*N
     Cm = CBDmat(np.arange(M).astype(np.float))
@@ -773,7 +654,7 @@ def test_Mult_Div():
     wk  = SD.ifst(wk0, wk)
     wk0 = SD.fst(wk, wk0)
 
-    SFTc.Mult_Div_1D(N, 7, 7, uk0[:N-2], vk0[:N-2], wk0[:N-2], b[1:N-2])
+    LUsolve.Mult_Div_1D(N, 7, 7, uk0[:N-2], vk0[:N-2], wk0[:N-2], b[1:N-2])
 
     uu = np.zeros_like(uk0)
     v0 = np.zeros_like(vk0)
@@ -790,7 +671,7 @@ def test_Mult_Div():
     b = np.zeros((N,4,4), dtype=np.complex)
     m = np.zeros((4,4))+7
     n = np.zeros((4,4))+7
-    SFTc.Mult_Div_3D(N, m, n, uk0[:N-2], vk0[:N-2], wk0[:N-2], b[1:N-2])
+    LUsolve.Mult_Div_3D(N, m, n, uk0[:N-2], vk0[:N-2], wk0[:N-2], b[1:N-2])
 
     uu = np.zeros_like(uk0)
     v0 = np.zeros_like(vk0)
@@ -802,46 +683,49 @@ def test_Mult_Div():
 
 #test_Mult_Div()
 
-def test_ADDmat(ST2):
+@pytest.mark.parametrize('ST', Basis[1:3])
+@pytest.mark.parametrize('quad', quads)
+def test_ADDmat(ST, quad):
+    ST = ST(quad=quad)
     M = 2*N
     u = (1-x**2)*sin(np.pi*x)
     f = -u.diff(x, 2)
 
-    points, weights = ST2.points_and_weights(M,  ST2.quad)
+    points, weights = ST.points_and_weights(M,  quad)
     uj = np.array([u.subs(x, h) for h in points], dtype=np.float)
     fj = np.array([f.subs(x, h) for h in points], dtype=np.float)
+    s = ST.slice(M)
 
-    if ST2.__class__.__name__ == "ShenDirichletBasis":
+    if ST.__class__.__name__ == "ShenDirichletBasis":
         A = ADDmat(np.arange(M).astype(np.float))
-        s = slice(0, M-2)
-    elif ST2.__class__.__name__ == "ShenNeumannBasis":
+    elif ST.__class__.__name__ == "ShenNeumannBasis":
         A = ANNmat(np.arange(M).astype(np.float))
-        s = slice(1, M-2)
         fj -= np.dot(fj, weights)/weights.sum()
         uj -= np.dot(uj, weights)/weights.sum()
 
     f_hat = np.zeros(M)
-    f_hat = ST2.scalar_product(fj, f_hat)
+    f_hat = ST.scalar_product(fj, f_hat)
     u_hat = np.zeros(M)
     u_hat[s] = solve(A.diags().toarray()[s,s], f_hat[s])
 
     u0 = np.zeros(M)
-    u0 = ST2.ifst(u_hat, u0)
+    u0 = ST.ifst(u_hat, u0)
 
     #from IPython import embed; embed()
     assert np.allclose(u0, uj)
 
     u1 = np.zeros(M)
-    u1 = ST2.fst(uj, u1)
+    u1 = ST.fst(uj, u1)
     c = np.zeros_like(u1)
     c = A.matvec(u1, c)
 
     assert np.allclose(c, f_hat)
 
-#test_ADDmat(ShenNeumannBasis("GL"))
+#test_ADDmat(ShenNeumannBasis, "GL")
 
-
-def test_SBBmat(SB):
+@pytest.mark.parametrize('quad', quads)
+def test_SBBmat(quad):
+    SB = ShenBiharmonicBasis(quad=quad)
     M = 72
     u = sin(4*pi*x)**2
     f = u.diff(x, 4)
@@ -881,7 +765,9 @@ def test_SBBmat(SB):
 
 #test_SBBmat(ShenBiharmonicBasis("GC"))
 
-def test_ABBmat(SB):
+@pytest.mark.parametrize('quad', quads)
+def test_ABBmat(quad):
+    SB = ShenBiharmonicBasis(quad=quad)
     M = 6*N
     u = sin(6*pi*x)**2
     f = u.diff(x, 2)
@@ -957,34 +843,35 @@ def test_ABBmat(SB):
 #test_ABBmat(ShenBiharmonicBasis("GC"))
 
 #@profile
-def test_Helmholtz(ST2):
+@pytest.mark.parametrize('ST', Basis[1:3])
+@pytest.mark.parametrize('quad', quads)
+def test_Helmholtz(ST, quad):
+    ST = ST(quad=quad)
     M = 4*N
     kx = 12
 
-    points, weights = ST2.points_and_weights(M,  ST2.quad)
+    points, weights = ST.points_and_weights(M,  ST.quad)
 
     fj = np.random.randn(M)
     f_hat = np.zeros(M)
-    if not ST2.__class__.__name__ == "ChebyshevTransform":
-        f_hat = ST2.fst(fj, f_hat)
-        fj = ST2.ifst(f_hat, fj)
+    f_hat = ST.forward(fj, f_hat)
+    fj = ST.backward(f_hat, fj)
+    s = ST.slice(M)
 
-    if ST2.__class__.__name__ == "ShenDirichletBasis":
+    if ST.__class__.__name__ == "ShenDirichletBasis":
         A = ADDmat(np.arange(M).astype(np.float))
-        B = BDDmat(np.arange(M).astype(np.float), ST2.quad)
-        s = slice(0, M-2)
-    elif ST2.__class__.__name__ == "ShenNeumannBasis":
+        B = BDDmat(np.arange(M).astype(np.float), ST.quad)
+    elif ST.__class__.__name__ == "ShenNeumannBasis":
         A = ANNmat(np.arange(M).astype(np.float))
-        B = BNNmat(np.arange(M).astype(np.float), ST2.quad)
-        s = slice(1, M-2)
+        B = BNNmat(np.arange(M).astype(np.float), ST.quad)
 
     f_hat = np.zeros(M)
-    f_hat = ST2.scalar_product(fj, f_hat)
+    f_hat = ST.scalar_product(fj, f_hat)
     u_hat = np.zeros(M)
     H = A + kx**2*B
     u_hat[s] = solve(H.diags().toarray()[s, s], f_hat[s])
     u1 = np.zeros(M)
-    u1 = ST2.ifst(u_hat, u1)
+    u1 = ST.backward(u_hat, u1)
     c0 = np.zeros_like(u_hat)
     c1 = np.zeros_like(u_hat)
     c = A.matvec(u_hat, c0)+kx**2*B.matvec(u_hat, c1)
@@ -994,11 +881,11 @@ def test_Helmholtz(ST2):
     assert np.allclose(c, f_hat)
     assert np.allclose(c[s], c2)
 
-    H = Helmholtz(M, kx, ST2.quad, ST2.__class__.__name__ == "ShenNeumannBasis")
+    H = Helmholtz(M, kx, ST)
     u0_hat = np.zeros(M)
     u0_hat = H(u0_hat, f_hat)
     u0 = np.zeros(M)
-    u0 = ST2.ifst(u0_hat, u0)
+    u0 = ST.backward(u0_hat, u0)
 
     assert np.linalg.norm(u0 - u1) < 1e-12
 
@@ -1006,18 +893,20 @@ def test_Helmholtz(ST2):
     # Multidimensional
     f_hat = (f_hat.repeat(16).reshape((M, 4, 4))+1j*f_hat.repeat(16).reshape((M, 4, 4)))
     kx = np.zeros((4, 4))+12
-    H = Helmholtz(M, kx, ST2.quad, ST2.__class__.__name__ == "ShenNeumannBasis")
+    H = Helmholtz(M, kx, ST)
     u0_hat = np.zeros((M, 4, 4), dtype=np.complex)
     u0_hat = H(u0_hat, f_hat)
     u0 = np.zeros((M, 4, 4), dtype=np.complex)
-    u0 = ST2.ifst(u0_hat, u0)
+    u0 = ST.backward(u0_hat, u0)
 
     assert np.linalg.norm(u0[:, 2, 2].real - u1)/(M*16) < 1e-12
     assert np.linalg.norm(u0[:, 2, 2].imag - u1)/(M*16) < 1e-12
 
-#test_Helmholtz(ShenNeumannBasis("GC"))
+#test_Helmholtz(ShenNeumannBasis, "GC")
 
-def test_Helmholtz2(SD):
+@pytest.mark.parametrize('quad', quads)
+def test_Helmholtz2(quad):
+    SD = ShenDirichletBasis(quad=quad)
     M = 2*N
     kx = 11
     points, weights = SD.points_and_weights(M,  SD.quad)
@@ -1028,7 +917,7 @@ def test_Helmholtz2(SD):
 
     A = ADDmat(np.arange(M).astype(np.float))
     B = BDDmat(np.arange(M).astype(np.float), SD.quad)
-    s = slice(0, M-2)
+    s = SD.slice(M)
 
     u1 = np.zeros(M)
     u1 = SD.fst(uj, u1)
@@ -1037,21 +926,25 @@ def test_Helmholtz2(SD):
     c = A.matvec(u1, c0)+kx**2*B.matvec(u1, c1)
 
     b = np.zeros(M)
-    H = Helmholtz(M, kx, SD.quad, SD.__class__.__name__ == "ShenNeumannBasis")
+    H = Helmholtz(M, kx, SD)
     b = H.matvec(u1, b)
-    #SFTc.Mult_Helmholtz_1D(M, SD.quad=="GL", 1, kx**2, u1, b)
+    #LUsolve.Mult_Helmholtz_1D(M, SD.quad=="GL", 1, kx**2, u1, b)
     assert np.allclose(c, b)
 
     b = np.zeros((M, 4, 4), dtype=np.complex)
     u1 = u1.repeat(16).reshape((M, 4, 4)) +1j*u1.repeat(16).reshape((M, 4, 4))
     kx = np.zeros((4, 4))+kx
-    H = Helmholtz(M, kx, SD.quad, SD.__class__.__name__ == "ShenNeumannBasis")
+    H = Helmholtz(M, kx, SD)
     b = H.matvec(u1, b)
-    #SFTc.Mult_Helmholtz_3D_complex(M, SD.quad=="GL", 1.0, kx**2, u1, b)
+    #LUsolve.Mult_Helmholtz_3D_complex(M, SD.quad=="GL", 1.0, kx**2, u1, b)
     assert np.linalg.norm(b[:, 2, 2].real - c)/(M*16) < 1e-12
     assert np.linalg.norm(b[:, 2, 2].imag - c)/(M*16) < 1e-12
 
-def test_Mult_CTD(SD):
+#test_Helmholtz2('GL')
+
+@pytest.mark.parametrize('quad', quads)
+def test_Mult_CTD(quad):
+    SD = ShenDirichletBasis(quad=quad)
     C = CTDmat(np.arange(N).astype(np.float))
     B = BTTmat(np.arange(N).astype(np.float), SD.quad)
 
@@ -1073,7 +966,7 @@ def test_Mult_CTD(SD):
     wk  = SD.ifst(wk0, wk)
     wk0 = SD.fst(wk, wk0)
 
-    SFTc.Mult_CTD_1D(N, vk0, wk0, bv, bw)
+    LUsolve.Mult_CTD_1D(N, vk0, wk0, bv, bw)
 
     cv = np.zeros_like(vk0)
     cw = np.zeros_like(wk0)
@@ -1086,9 +979,11 @@ def test_Mult_CTD(SD):
     assert np.allclose(cv, bv)
     assert np.allclose(cw, bw)
 
-#test_Mult_CTD(ShenDirichletBasis("GL"))
+#test_Mult_CTD("GL")
 
-def test_Mult_CTD_3D(SD):
+@pytest.mark.parametrize('quad', quads)
+def test_Mult_CTD_3D(quad):
+    SD = ShenDirichletBasis(quad=quad)
     C = CTDmat(np.arange(N).astype(np.float))
     B = BTTmat(np.arange(N).astype(np.float), SD.quad)
 
@@ -1111,7 +1006,7 @@ def test_Mult_CTD_3D(SD):
     wk0 = SD.fst(wk, wk0)
 
     #from IPython import embed; embed()
-    SFTc.Mult_CTD_3D_n(N, vk0, wk0, bv, bw)
+    LUsolve.Mult_CTD_3D_n(N, vk0, wk0, bv, bw)
 
     cv = np.zeros_like(vk0)
     cw = np.zeros_like(wk0)
@@ -1123,10 +1018,11 @@ def test_Mult_CTD_3D(SD):
     assert np.allclose(cv, bv)
     assert np.allclose(cw, bw)
 
-#test_Mult_CTD_3D(ShenDirichletBasis("GL"))
+#test_Mult_CTD_3D("GL")
 
-
-def test_Biharmonic(SB):
+@pytest.mark.parametrize('quad', quads)
+def test_Biharmonic(quad):
+    SB = ShenBiharmonicBasis(quad=quad)
     M = 128
     x = Symbol("x")
     u = sin(6*pi*x)**2
@@ -1155,9 +1051,11 @@ def test_Biharmonic(SB):
 
     assert np.allclose(u1, uj)
 
-#test_Biharmonic(ShenBiharmonicBasis("GC"))
+#test_Biharmonic("GC")
 
-def test_Helmholtz_matvec(SD):
+@pytest.mark.parametrize('quad', quads)
+def test_Helmholtz_matvec(quad):
+    SD = ShenDirichletBasis(quad=quad)
     M = 2*N
     kx = 11
     points, weights = SD.points_and_weights(M,  SD.quad)
@@ -1169,7 +1067,7 @@ def test_Helmholtz_matvec(SD):
     A = ADDmat(np.arange(M).astype(np.float))
     B = BDDmat(np.arange(M).astype(np.float), SD.quad)
     AB = HelmholtzCoeff(np.arange(M).astype(np.float), 1, kx**2, SD.quad)
-    s = slice(0, M-2)
+    s = SD.slice(M)
 
     u1 = np.zeros(M)
     u1 = SD.fst(uj, u1)
@@ -1178,21 +1076,21 @@ def test_Helmholtz_matvec(SD):
     c = A.matvec(u1, c0)+kx**2*B.matvec(u1, c1)
 
     b = np.zeros(M)
-    #SFTc.Mult_Helmholtz_1D(M, SD.quad=="GL", 1, kx**2, u1, b)
+    #LUsolve.Mult_Helmholtz_1D(M, SD.quad=="GL", 1, kx**2, u1, b)
     b = AB.matvec(u1, b)
     assert np.allclose(c, b)
 
     b = np.zeros((M, 4, 4), dtype=np.complex)
     u1 = u1.repeat(16).reshape((M, 4, 4)) +1j*u1.repeat(16).reshape((M, 4, 4))
     kx = np.zeros((4, 4))+kx
-    #SFTc.Mult_Helmholtz_3D_complex(M, SD.quad=="GL", 1.0, kx**2, u1, b)
+    #LUsolve.Mult_Helmholtz_3D_complex(M, SD.quad=="GL", 1.0, kx**2, u1, b)
     AB = HelmholtzCoeff(np.arange(M).astype(np.float), 1, kx**2, SD.quad)
     b = AB.matvec(u1, b)
 
     assert np.linalg.norm(b[:, 2, 2].real - c)/(M*16) < 1e-12
     assert np.linalg.norm(b[:, 2, 2].imag - c)/(M*16) < 1e-12
 
-#test_Helmholtz_matvec(ShenDirichletBasis("GL"))
+#test_Helmholtz_matvec("GL")
 
 #test_ADDmat(ShenNeumannBasis("GL"))
 #test_Helmholtz2(ShenDirichletBasis("GL"))

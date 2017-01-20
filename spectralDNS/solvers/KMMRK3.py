@@ -66,13 +66,13 @@ def get_context():
     # RK 3 requires three solvers because of the three different coefficients
     rk = 0
     la = config.AttributeDict(dict(
-        HelmholtzSolverG = [Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/(a[rk]+b[rk])/dt),
-                                    ST.quad, False) for rk in range(3)],
+        HelmholtzSolverG = [Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/(a[rk]+b[rk])/dt), ST)
+                            for rk in range(3)],
         BiharmonicSolverU = [Biharmonic(N[0], -nu*(a[rk]+b[rk])*dt/2., 1.+nu*(a[rk]+b[rk])*dt*K2[0],
                                         -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0]), quad=SB.quad,
                                         solver="cython") for rk in range(3)],
-        HelmholtzSolverU0 = [Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST.quad, False) for rk in range(3)],
-        TDMASolverD = TDMA(ST.quad, False)
+        HelmholtzSolverU0 = [Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST) for rk in range(3)],
+        TDMASolverD = TDMA(ST)
         )
     )
 

@@ -1,12 +1,10 @@
 import pytest
 import numpy as np
 from spectralDNS.shen import Matrices
+from itertools import product
 
 mats = filter(lambda f: f.endswith('mat'), vars(Matrices).keys())
-
-@pytest.fixture(params=mats)
-def mat(request):
-    return eval(('.').join(('Matrices', request.param)))
+formats = ('dia', 'cython', 'python', 'self')
 
 N = 16
 k = np.arange(N).astype(float)
@@ -17,27 +15,27 @@ c1= np.zeros(N)
 d = np.zeros((N, N, N))
 d1 = np.zeros((N, N, N))
 
-def test_mat(mat):
+@pytest.mark.parametrize('mat', mats)
+@pytest.mark.parametrize('quad', ('GC', 'GL'))
+def test_mat(mat, quad):
     """Test that matrix equals one that is automatically created"""
-    m = mat(k, 'GC')
-    m.test()
-    m = mat(k, 'GL')
+    mat = eval(('.').join(('Matrices', mat)))
+    m = mat(k, quad)
     m.test()
 
-def test_matvec(mat):
+@pytest.mark.parametrize('mat', mats)
+@pytest.mark.parametrize('format', formats)
+@pytest.mark.parametrize('quad', ('GC', 'GL'))
+def test_matvec(mat, format, quad):
     """Test matrix-vector product"""
     global c, c1, d, d1
-    m = mat(k, 'GC')
+    mat = eval(('.').join(('Matrices', mat)))
+    m = mat(k, quad)
     c = m.matvec(a, c, format='csr')
-    c1 = m.matvec(a, c1, format='python')
+    c1 = m.matvec(a, c1, format=format)
     assert np.allclose(c, c1)
-    c1 = m.matvec(a, c1)
-    assert np.allclose(c, c1)
-    d = m.matvec(b, d, format='csr')
-    d1 = m.matvec(b, d1, format='python')
-    assert np.allclose(d, d1)
-    d1 = m.matvec(b, d1)
-    assert np.allclose(d, d1)
 
+    d = m.matvec(b, d, format='csr')
+    d1 = m.matvec(b, d1, format=format)
 
 #test_matvec(Matrices.BBDmat)

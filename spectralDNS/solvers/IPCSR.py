@@ -61,12 +61,10 @@ def get_context():
 
     # Collect all linear algebra solvers
     la = config.AttributeDict(dict(
-        HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt),
-                                    ST.quad, False),
-        HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2),
-                                     SN.quad, True),
-        TDMASolverD = TDMA(ST.quad, False),
-        TDMASolverN = TDMA(SN.quad, True)
+        HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), ST),
+        HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2), SN),
+        TDMASolverD = TDMA(ST),
+        TDMASolverN = TDMA(SN)
         )
     )
 
@@ -171,7 +169,7 @@ def compute_pressure(P_hat, H_hat, U_hat, U_hat0, K, FST, ST, work, mat, la,
     H_hat *= -1
 
     F_tmp = work[(P_hat, 0)]
-    SFTc.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], H_hat[0, u_slice],
+    LUsolve.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], H_hat[0, u_slice],
                      H_hat[1, u_slice], H_hat[2, u_slice], F_tmp[p_slice])
     P_hat = la.HelmholtzSolverP(P_hat, F_tmp)
 

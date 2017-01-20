@@ -6,9 +6,11 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from .spectralinit import *
 from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, CNDmat, \
     HelmholtzCoeff
+from ..shen import LUsolve
 from ..shen.la import Helmholtz, TDMA
 from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, \
-    ShenBiharmonicBasis, SFTc, SlabShen_R2C
+    ShenBiharmonicBasis, SlabShen_R2C
+
 from functools import wraps
 
 def get_context():
@@ -66,12 +68,10 @@ def get_context():
 
     # Collect all linear algebra solvers
     la = config.AttributeDict(dict(
-        HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt),
-                                    ST.quad, False),
-        HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2),
-                                     SN.quad, True),
-        TDMASolverD = TDMA(ST.quad, False),
-        TDMASolverN = TDMA(SN.quad, True)
+        HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), ST),
+        HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2), SN),
+        TDMASolverD = TDMA(ST),
+        TDMASolverN = TDMA(SN)
         )
     )
 
@@ -155,8 +155,8 @@ def compute_pressure(P_hat, H_hat, U_hat, U_hat0, K, FST, ST, work, mat, la,
     H_hat *= -1
 
     dP = work[(P_hat, 0)]
-    SFTc.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], H_hat[0, u_slice],
-                     H_hat[1, u_slice], H_hat[2, u_slice], dP[p_slice])
+    LUsolve.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], H_hat[0, u_slice],
+                        H_hat[1, u_slice], H_hat[2, u_slice], dP[p_slice])
     P_hat = la.HelmholtzSolverP(P_hat, dP)
     return P_hat
 
@@ -177,8 +177,8 @@ def pressuregrad(rhs, p_hat, mat, work, K, Nu):
 
 def pressurerhs(dP, u_hat, K, u_slice, p_slice):
     dP[:] = 0.
-    SFTc.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], u_hat[0, u_slice],
-                     u_hat[1, u_slice], u_hat[2, u_slice], dP[p_slice])
+    LUsolve.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], u_hat[0, u_slice],
+                        u_hat[1, u_slice], u_hat[2, u_slice], dP[p_slice])
 
     dP[p_slice] *= -1./params.dt
     return dP
@@ -200,7 +200,7 @@ def Cross(c, a, b, FST, S, work):
 def compute_curl(c, u_hat, K, FST, ST, work):
     F_tmp = work[(u_hat, 0)]
     Uc = work[(c, 2)]
-    SFTc.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
+    LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST.CT, dealias=params.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST.CT, dealias=params.dealias)
     c[0] = FST.ifst((1j*K[1]*u_hat[2] - 1j*K[2]*u_hat[1]), c[0], ST, dealias=params.dealias)
@@ -225,8 +225,8 @@ def Div(a_hat):
 
 def Divu(U_hat, c):
     c[:] = 0
-    SFTc.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], U_hat[0, u_slice],
-                     U_hat[1, u_slice], U_hat[2, u_slice], c[p_slice])
+    LUsolve.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], U_hat[0, u_slice],
+                        U_hat[1, u_slice], U_hat[2, u_slice], c[p_slice])
     c = TDMASolverN(c)
     return c
 
@@ -249,7 +249,7 @@ def standardConvection(c, U, U_hat, K, FST, ST, work, mat, la):
     #SN.quad = ST.quad
     #dudx = Uc[0] = FST.ifst(F_tmp[0], Uc[0], SN, dealias=params.dealias)
 
-    SFTc.Mult_CTD_3D_n(params.N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
+    LUsolve.Mult_CTD_3D_n(params.N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FST.ifct(F_tmp[1], Uc[1], ST.CT, dealias=params.dealias)
     dwdx = Uc[2] = FST.ifct(F_tmp[2], Uc[2], ST.CT, dealias=params.dealias)
 

@@ -1,99 +1,113 @@
 from numpy import zeros, ones, arange, pi, float, complex, int, complex128, array
 from .Matrices import BBBmat, SBBmat, ABBmat, BDDmat, BNNmat, ADDmat
-from . import SFTc
+from .Matrices import mass_matrix
+from .shentransform import ShenNeumannBasis, SpectralBasis
+from . import LUsolve, TDMAsolve, PDMAsolve, Matvec
 from scipy.linalg import lu_factor, lu_solve, solve, solve_banded, decomp_cholesky
 import scipy.sparse.linalg as la_solve
 import decimal
 
 class Helmholtz(object):
+    """Helmholtz solver -u'' + alfa*u = b
 
-    def __init__(self, N, alfa, quad="GL", neumann=False):
+    args:
+        N          integer       Size of problem in real space
+        alfa    float or array   Coefficients. Just one value for 1D problems
+                                 and a 2D array for 3D problems.
+        basis                    ShenNeumannBasis or ShenDirichletBasis
+
+    """
+
+    def __init__(self, N, alfa, basis):
         # Prepare LU Helmholtz solver for velocity
         self.N = N
         self.alfa = alfa
-        self.neumann = neumann
-        M = (N-4)//2 if neumann else (N-3)//2
+        self.basis = basis
+        self.neumann = True if isinstance(basis, ShenNeumannBasis) else False
+        quad = basis.quad
+        M = (N-4)//2 if self.neumann else (N-3)//2
+        self.s = basis.slice(N)
         if hasattr(alfa, "__len__"):
             Ny, Nz = alfa.shape
             self.u0 = zeros((2, M+1, Ny, Nz), float)   # Diagonal entries of U
             self.u1 = zeros((2, M, Ny, Nz), float)     # Diagonal+1 entries of U
             self.u2 = zeros((2, M-1, Ny, Nz), float)   # Diagonal+2 entries of U
             self.L  = zeros((2, M, Ny, Nz), float)     # The single nonzero row of L
-            self.s = slice(1, N-2) if neumann else slice(0, N-2)
-            SFTc.LU_Helmholtz_3D(N, neumann, quad=="GL", self.alfa, self.u0, self.u1, self.u2, self.L)
+            LUsolve.LU_Helmholtz_3D(N, self.neumann, quad=="GL", self.alfa, self.u0, self.u1, self.u2, self.L)
         else:
             self.u0 = zeros((2, M+1), float)   # Diagonal entries of U
             self.u1 = zeros((2, M), float)     # Diagonal+1 entries of U
             self.u2 = zeros((2, M-1), float)   # Diagonal+2 entries of U
             self.L  = zeros((2, M), float)     # The single nonzero row of L
-            self.s = slice(1, N-2) if neumann else slice(0, N-2)
-            SFTc.LU_Helmholtz_1D(N, neumann, quad=="GL", self.alfa, self.u0, self.u1, self.u2, self.L)
-        if not neumann:
+            LUsolve.LU_Helmholtz_1D(N, self.neumann, quad=="GL", self.alfa, self.u0, self.u1, self.u2, self.L)
+        if not self.neumann:
             self.B = BDDmat(arange(N), quad)
             self.A = ADDmat(arange(N))
 
     def __call__(self, u, b):
         if len(u.shape) > 1:
-            SFTc.Solve_Helmholtz_3D_n(self.N, self.neumann, b[self.s], u[self.s], self.u0, self.u1, self.u2, self.L)
+            LUsolve.Solve_Helmholtz_3D_n(self.N, self.neumann, b[self.s], u[self.s], self.u0, self.u1, self.u2, self.L)
         else:
             if u.dtype == complex128:
-                SFTc.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s].real, u[self.s].real, self.u0, self.u1, self.u2, self.L)
-                SFTc.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s].imag, u[self.s].imag, self.u0, self.u1, self.u2, self.L)
+                LUsolve.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s].real, u[self.s].real, self.u0, self.u1, self.u2, self.L)
+                LUsolve.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s].imag, u[self.s].imag, self.u0, self.u1, self.u2, self.L)
             else:
-                SFTc.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s], u[self.s], self.u0, self.u1, self.u2, self.L)
+                LUsolve.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s], u[self.s], self.u0, self.u1, self.u2, self.L)
         return u
 
     def matvec(self, v, c):
         assert self.neumann is False
         c[:] = 0
         if len(v.shape) > 1:
-            SFTc.Helmholtz_matvec3D(v, c, 1.0, self.alfa**2, self.A[0], self.A[2], self.B[0])
+            Matvec.Helmholtz_matvec3D(v, c, 1.0, self.alfa**2, self.A[0], self.A[2], self.B[0])
         else:
-            SFTc.Helmholtz_matvec(v, c, 1.0, self.alfa**2, self.A[0], self.A[2], self.B[0])
+            Matvec.Helmholtz_matvec(v, c, 1.0, self.alfa**2, self.A[0], self.A[2], self.B[0])
         return c
 
 
 class TDMA(object):
+    """Tridiagonal matrix solver
 
-    def __init__(self, quad="GL", neumann=False):
-        self.quad = quad
-        self.neumann = neumann
+    args:
+        basis       ShenNeumannBasis or ShenDirichletBasis
+
+    """
+
+    def __init__(self, basis):
+        assert isinstance(basis, SpectralBasis)
+        self.basis = basis
         self.dd = zeros(0)
-        self.ud = zeros(0)
 
     def init(self, N):
-        kk = arange(N).astype(float)
-        if self.neumann:
-            self.M = BNNmat(kk, self.quad)
-            self.dd = self.M[0][1:]
-            self.ud = self.M[2][1:]
-            self.L = zeros(N-4)
-            SFTc.TDMA_SymLU(self.dd, self.ud, self.L)
-            self.s = slice(1, N-2)
-
-        else:
-            self.M = BDDmat(kk, self.quad)
-            self.dd = self.M[0]
-            self.ud = ones(N-4)*self.M[2]
-            self.L = zeros(N-4)
-            self.s = slice(0, N-2)
-            SFTc.TDMA_SymLU(self.dd, self.ud, self.L)
+        M = self.basis.get_shape(N)
+        B = mass_matrix[self.basis.__class__.__name__](arange(N).astype(float), self.basis.quad)
+        self.dd = B[0].copy()*ones(M)
+        self.ud = B[2].copy()*ones(M-2)
+        self.L = zeros(M-2)
+        self.s = self.basis.slice(N)
+        TDMAsolve.TDMA_SymLU(self.dd[self.s], self.ud[self.s], self.L)
 
     def __call__(self, u):
         N = u.shape[0]
         if not self.dd.shape[0] == u.shape[0]:
             self.init(N)
         if len(u.shape) == 3:
-            #SFTc.TDMA_3D(self.ud, self.dd, self.dd.copy(), self.ud.copy(), u[self.s])
-            SFTc.TDMA_SymSolve3D(self.dd, self.ud, self.L, u[self.s])
+            #TDMAsolve.TDMA_3D(self.ud, self.dd, self.dd.copy(), self.ud.copy(), u[self.s])
+            TDMAsolve.TDMA_SymSolve3D(self.dd[self.s], self.ud[self.s], self.L, u[self.s])
         elif len(u.shape) == 1:
-            #SFTc.TDMA_1D(self.ud, self.dd, self.dd.copy(), self.ud.copy(), u[self.s])
-            SFTc.TDMA_SymSolve(self.dd, self.ud, self.L, u[self.s])
+            #TDMAsolve.TDMA_1D(self.ud, self.dd, self.dd.copy(), self.ud.copy(), u[self.s])
+            TDMAsolve.TDMA_SymSolve(self.dd[self.s], self.ud[self.s], self.L, u[self.s])
         else:
             raise NotImplementedError
         return u
 
 class PDMA(object):
+    """Pentadiagonal matrix solver
+
+    kwargs:
+        quad        ('GL', 'GC')  Chebyshev-Gauss-Lobatto or Chebyshev-Gauss
+        solver      ('cython', 'python') Choose implementation
+    """
 
     def __init__(self, quad="GL", solver="cython"):
         self.quad = quad
@@ -104,7 +118,7 @@ class PDMA(object):
         self.B = BBBmat(arange(N), self.quad)
         if self.solver == "cython":
             self.d0, self.d1, self.d2 = self.B[0].copy(), self.B[2].copy(), self.B[4].copy()
-            SFTc.PDMA_SymLU(self.d0, self.d1, self.d2)
+            PDMAsolve.PDMA_SymLU(self.d0, self.d1, self.d2)
             #self.SymLU(self.d0, self.d1, self.d2)
             ##self.d0 = self.d0.astype(float)
             ##self.d1 = self.d1.astype(float)
@@ -172,7 +186,7 @@ class PDMA(object):
             self.init(N)
         if len(u.shape) == 3:
             if self.solver == "cython":
-                SFTc.PDMA_Symsolve3D(self.d0, self.d1, self.d2, u[:-4])
+                PDMAsolve.PDMA_Symsolve3D(self.d0, self.d1, self.d2, u[:-4])
             else:
                 b = u.copy()
                 for i in range(u.shape[1]):
@@ -182,7 +196,7 @@ class PDMA(object):
 
         elif len(u.shape) == 1:
             if self.solver == "cython":
-                SFTc.PDMA_Symsolve(self.d0, self.d1, self.d2, u[:-4])
+                PDMAsolve.PDMA_Symsolve(self.d0, self.d1, self.d2, u[:-4])
                 #self.SymSolve(self.d0, self.d1, self.d2, u[:-4])
             else:
                 b = u.copy()
@@ -196,6 +210,20 @@ class PDMA(object):
         return u
 
 class Biharmonic(object):
+    """Biharmonic solver
+
+      a0*u'''' + alfa*u'' + beta*u = b
+
+    args:
+        N            integer        Size of problem in real space
+        a0           float          Coefficient
+        alfa, beta float/arrays     Coefficients. Just one value for 1D problems
+                                    and 2D arrays for 3D problems.
+    kwargs:
+        quad        ('GL', 'GC')    Chebyshev-Gauss-Lobatto or Chebyshev-Gauss
+        solver ('cython', 'python') Choose implementation
+
+    """
 
     def __init__(self, N, a0, alfa, beta, quad="GL", solver="cython"):
         self.quad = quad
@@ -241,8 +269,8 @@ class Biharmonic(object):
                 self.l1 = zeros((2, M, Ny, Nz))
                 self.ak = zeros((2, M, Ny, Nz))
                 self.bk = zeros((2, M, Ny, Nz))
-                SFTc.LU_Biharmonic_3D_n(a0, alfa, beta, sii, siu, siuu, ail, aii, aiu, bill, bil, bii, biu, biuu, self.u0, self.u1, self.u2, self.l0, self.l1)
-                SFTc.Biharmonic_factor_pr_3D(self.ak, self.bk, self.l0, self.l1)
+                LUsolve.LU_Biharmonic_3D_n(a0, alfa, beta, sii, siu, siuu, ail, aii, aiu, bill, bil, bii, biu, biuu, self.u0, self.u1, self.u2, self.l0, self.l1)
+                LUsolve.Biharmonic_factor_pr_3D(self.ak, self.bk, self.l0, self.l1)
 
         else:
             if solver == "scipy":
@@ -260,8 +288,8 @@ class Biharmonic(object):
                 self.l1 = zeros((2, M))
                 self.ak = zeros((2, M))
                 self.bk = zeros((2, M))
-                SFTc.LU_Biharmonic_1D(a0, alfa, beta, sii, siu, siuu, ail, aii, aiu, bill, bil, bii, biu, biuu, self.u0, self.u1, self.u2, self.l0, self.l1)
-                SFTc.Biharmonic_factor_pr(self.ak, self.bk, self.l0, self.l1)
+                LUsolve.LU_Biharmonic_1D(a0, alfa, beta, sii, siu, siuu, ail, aii, aiu, bill, bil, bii, biu, biuu, self.u0, self.u1, self.u2, self.l0, self.l1)
+                LUsolve.Biharmonic_factor_pr(self.ak, self.bk, self.l0, self.l1)
 
     def __call__(self, u, b):
         if len(u.shape) == 3:
@@ -275,8 +303,8 @@ class Biharmonic(object):
                         #u[:-4, i, j].imag = la_solve.spsolve(self.AA[i][j], b[:-4, i, j].imag)
 
             else:
-                SFTc.Solve_Biharmonic_3D_n(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
-                #SFTc.Solve_Biharmonic_3D_com(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
+                LUsolve.Solve_Biharmonic_3D_n(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
+                #LUsolve.Solve_Biharmonic_3D_com(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
         else:
             if self.solver == "scipy":
                 #u[:-4:2] = lu_solve(self.Le, b[:-4:2])
@@ -284,7 +312,7 @@ class Biharmonic(object):
                 u[:-4] = la_solve.spsolve(self.AA, b[:-4])
                 #u[:-4] = solve(self.AA, b[:-4])
             else:
-                SFTc.Solve_Biharmonic_1D(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
+                LUsolve.Solve_Biharmonic_1D(b, u, self.u0, self.u1, self.u2, self.l0, self.l1, self.ak, self.bk, self.a0)
 
         return u
 
@@ -292,11 +320,11 @@ class Biharmonic(object):
         N = v.shape[0]
         c[:] = 0
         if len(v.shape) > 1:
-            SFTc.Biharmonic_matvec3D(v, c, self.a0, self.alfa, self.beta, self.S[0], self.S[2],
+            Matvec.Biharmonic_matvec3D(v, c, self.a0, self.alfa, self.beta, self.S[0], self.S[2],
                                 self.S[4], self.A[-2], self.A[0], self.A[2],
                                 self.B[-4], self.B[-2], self.B[0], self.B[2], self.B[4])
         else:
-            SFTc.Biharmonic_matvec(v, c, self.a0, self.alfa, self.beta, self.S[0], self.S[2],
+            Matvec.Biharmonic_matvec(v, c, self.a0, self.alfa, self.beta, self.S[0], self.S[2],
                                 self.S[4], self.A[-2], self.A[0], self.A[2],
                                 self.B[-4], self.B[-2], self.B[0], self.B[2], self.B[4])
         return c

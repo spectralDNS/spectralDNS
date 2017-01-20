@@ -1,6 +1,6 @@
 from .Cheb import *
-from .TDMA import *
-from .PDMA import *
+from .TDMAsolve import *
+from .PDMAsolve import *
 from .LUsolve import *
 from .Matvec import *
 

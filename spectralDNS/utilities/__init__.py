@@ -38,7 +38,7 @@ class Timer(object):
             print("Slowest = {}".format(slow))
 
 
-def docstrings(cls):
+def inheritdocstrings(cls):
     for name, func in vars(cls).items():
         if isinstance(func, types.FunctionType) and not func.__doc__:
             for parent in cls.__bases__:
