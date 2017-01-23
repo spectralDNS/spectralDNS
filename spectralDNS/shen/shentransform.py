@@ -40,8 +40,8 @@ float, complex = np.float64, np.complex128
 pi, zeros, ones = np.pi, np.zeros, np.ones
 work = work_arrays()
 
-class SpectralBasis(object):
-    """Basis for all spectral function spaces
+class SpectralBase(object):
+    """Base class for all spectral function spaces
 
     args:
         quad        ('GL', 'GC')  Chebyshev-Gauss-Lobatto or Chebyshev-Gauss
@@ -62,19 +62,7 @@ class SpectralBasis(object):
             quad ('GL', 'GC')   Chebyshev-Gauss-Lobatto or Chebyshev-Gauss
 
         """
-        if quad == "GL":
-            points = -(n_cheb.chebpts2(N)).astype(float)
-            weights = zeros(N)+pi/(N-1)
-            weights[0] /= 2
-            weights[-1] /= 2
-
-        elif quad == "GC":
-            points, weights = n_cheb.chebgauss(N)
-            points = points.astype(float)
-            weights = weights.astype(float)
-
-        return points, weights
-
+        raise NotImplementedError
 
     def evaluate_basis_all(self, fk, fj):
         """Evaluate basis on entire mesh
@@ -150,14 +138,14 @@ class SpectralBasis(object):
         raise NotImplementedError
 
     def vandermonde(self, x, N):
-        """Return Chebyshev Vandermonde matrix
+        """Return Vandermonde matrix
 
         args:
             x               points for evaluation
-            N               Number of Chebyshev polynomials
+            N               Number of polynomials
 
         """
-        return n_cheb.chebvander(x, N-1)
+        raise NotImplementedError
 
     def get_vandermonde_basis(self, V):
         """Return basis as a Vandermonde matrix
@@ -170,15 +158,10 @@ class SpectralBasis(object):
     def get_vandermonde_basis_derivative(self, V, der=0):
         """Return derivatives of basis as a Vandermonde matrix
 
-        V is the Chebyshev Vandermonde matrix
+        V is the Vandermonde matrix
 
         """
-        N = V.shape[0]
-        if der > 0:
-            D = np.zeros((N, N))
-            D[:-der, :] = n_cheb.chebder(np.eye(N), der)
-            V  = np.dot(V, D)
-        return self.get_vandermonde_basis(V)
+        raise NotImplementedError
 
     def vandermonde_scalar_product(self, fj, fk):
         """Naive implementation of scalar product"""
@@ -206,8 +189,68 @@ class SpectralBasis(object):
         """Return shape of current basis"""
         return N
 
+
+class ChebyshevBase(SpectralBase):
+    """Base class for all Chebyshev based function spaces
+
+    args:
+        quad        ('GL', 'GC')  Chebyshev-Gauss-Lobatto or Chebyshev-Gauss
+
+    Transforms are performed along the first dimension of a multidimensional
+    array.
+
+    """
+
+    def __init__(self, quad="GC"):
+        SpectralBase.__init__(self, quad)
+
+    def points_and_weights(self, N, quad):
+        """Return points and weights of quadrature
+
+        args:
+            N      integer      Number of points
+            quad ('GL', 'GC')   Chebyshev-Gauss-Lobatto or Chebyshev-Gauss
+
+        """
+        if quad == "GL":
+            points = -(n_cheb.chebpts2(N)).astype(float)
+            weights = zeros(N)+pi/(N-1)
+            weights[0] /= 2
+            weights[-1] /= 2
+
+        elif quad == "GC":
+            points, weights = n_cheb.chebgauss(N)
+            points = points.astype(float)
+            weights = weights.astype(float)
+
+        return points, weights
+
+    def vandermonde(self, x, N):
+        """Return Chebyshev Vandermonde matrix
+
+        args:
+            x               points for evaluation
+            N               Number of Chebyshev polynomials
+
+        """
+        return n_cheb.chebvander(x, N-1)
+
+    def get_vandermonde_basis_derivative(self, V, der=0):
+        """Return derivatives of basis as a Vandermonde matrix
+
+        V is the Chebyshev Vandermonde matrix
+
+        """
+        N = V.shape[0]
+        if der > 0:
+            D = np.zeros((N, N))
+            D[:-der, :] = n_cheb.chebder(np.eye(N), der)
+            V  = np.dot(V, D)
+        return self.get_vandermonde_basis(V)
+
+
 @inheritdocstrings
-class ChebyshevTransform(SpectralBasis):
+class ChebyshevTransform(ChebyshevBase):
     """Basis for regular Chebyshev series
 
     args:
@@ -221,7 +264,7 @@ class ChebyshevTransform(SpectralBasis):
     """
 
     def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"):
-        SpectralBasis.__init__(self, quad)
+        ChebyshevBase.__init__(self, quad)
         self.threads = threads
         self.planner_effort = planner_effort
 
@@ -352,7 +395,7 @@ class ChebyshevTransform(SpectralBasis):
         return N
 
 @inheritdocstrings
-class ShenDirichletBasis(SpectralBasis):
+class ShenDirichletBasis(ChebyshevBase):
     """Shen basis for Dirichlet boundary conditions
 
     args:
@@ -368,7 +411,7 @@ class ShenDirichletBasis(SpectralBasis):
 
     def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE",
                  bc=(0., 0.)):
-        SpectralBasis.__init__(self, quad)
+        ChebyshevBase.__init__(self, quad)
         self.threads = threads
         self.planner_effort = planner_effort
         self.bc = bc
@@ -445,7 +488,7 @@ class ShenDirichletBasis(SpectralBasis):
         return N-2
 
 @inheritdocstrings
-class ShenNeumannBasis(SpectralBasis):
+class ShenNeumannBasis(ChebyshevBase):
     """Shen basis for homogeneous Neumann boundary conditions
 
     args:
@@ -459,7 +502,9 @@ class ShenNeumannBasis(SpectralBasis):
     """
 
     def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"):
-        SpectralBasis.__init__(self, quad)
+        ChebyshevBase.__init__(self, quad)
+        self.threads = threads
+        self.planner_effort = planner_effort
         self.CT = ChebyshevTransform(quad, threads, planner_effort)
         self._factor = zeros(0)
         from .la import TDMA
@@ -536,7 +581,7 @@ class ShenNeumannBasis(SpectralBasis):
 
 
 @inheritdocstrings
-class ShenBiharmonicBasis(SpectralBasis):
+class ShenBiharmonicBasis(ChebyshevBase):
     """Shen biharmonic basis
 
     Homogeneous Dirichlet and Neumann boundary conditions.
@@ -553,7 +598,9 @@ class ShenBiharmonicBasis(SpectralBasis):
 
     def __init__(self, quad="GC", threads=1, planner_effort="FFTW_MEASURE"):
         from .la import PDMA
-        SpectralBasis.__init__(self, quad)
+        ChebyshevBase.__init__(self, quad)
+        self.threads = threads
+        self.planner_effort = planner_effort
         self.CT = ChebyshevTransform(quad, threads, planner_effort)
         self._factor1 = zeros(0)
         self._factor2 = zeros(0)

@@ -1,7 +1,7 @@
 from numpy import zeros, ones, arange, pi, float, complex, int, complex128, array
 from .Matrices import BBBmat, SBBmat, ABBmat, BDDmat, BNNmat, ADDmat
 from .Matrices import mass_matrix
-from .shentransform import ShenNeumannBasis, SpectralBasis
+from .shentransform import ShenNeumannBasis, SpectralBase
 from . import LUsolve, TDMAsolve, PDMAsolve, Matvec
 from scipy.linalg import lu_factor, lu_solve, solve, solve_banded, decomp_cholesky
 import scipy.sparse.linalg as la_solve
@@ -74,7 +74,7 @@ class TDMA(object):
     """
 
     def __init__(self, basis):
-        assert isinstance(basis, SpectralBasis)
+        assert isinstance(basis, SpectralBase)
         self.basis = basis
         self.dd = zeros(0)
 

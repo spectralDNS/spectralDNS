@@ -4,7 +4,7 @@ from spectralDNS.shen import Matrices
 from copy import deepcopy
 import six
 
-mats = filter(lambda f: f.endswith('mat'), vars(Matrices).keys())
+mats = list(filter(lambda f: f.endswith('mat'), vars(Matrices).keys()))
 formats = ('dia', 'cython', 'python', 'self')
 
 N = 16

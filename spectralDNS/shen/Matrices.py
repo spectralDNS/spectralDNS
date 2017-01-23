@@ -1,3 +1,4 @@
+from __future__ import division
 import numpy as np
 from .Matvec import CDNmat_matvec, BDNmat_matvec, CDDmat_matvec, SBBmat_matvec, \
     SBBmat_matvec3D, Biharmonic_matvec, Biharmonic_matvec3D, Tridiagonal_matvec, \
@@ -160,6 +161,10 @@ class SparseMatrix(dict):
                     continue
             f[key] /= y
         return f
+
+    def __truediv__(self, y):
+        """Returns copy self.__div__(y) <==> self/y"""
+        return self.__div__(y)
 
     def __add__(self, d):
         """Return copy of self.__add__(y) <==> self+d"""
