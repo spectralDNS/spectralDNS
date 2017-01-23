@@ -1,6 +1,6 @@
 import pytest
 from spectralDNS.shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, \
-    ChebyshevTransform, ShenBiharmonicBasis, SlabShen_R2C, rfft2
+    ChebyshevTransform, ShenBiharmonicBasis, SlabShen_R2C
 from spectralDNS.shen.la import TDMA, Helmholtz, Biharmonic
 from spectralDNS.shen.Matrices import BNNmat, BTTmat, BDDmat, CDDmat, CDNmat, \
     BNDmat, CNDmat, BDNmat, ADDmat, ANNmat, CTDmat, BDTmat, CDTmat, BTDmat, \

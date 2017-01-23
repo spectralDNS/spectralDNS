@@ -1,7 +1,8 @@
 import pytest
 import numpy as np
 from spectralDNS.shen import Matrices
-from itertools import product
+from copy import deepcopy
+import six
 
 mats = filter(lambda f: f.endswith('mat'), vars(Matrices).keys())
 formats = ('dia', 'cython', 'python', 'self')
@@ -38,4 +39,79 @@ def test_matvec(mat, format, quad):
     d = m.matvec(b, d, format='csr')
     d1 = m.matvec(b, d1, format=format)
 
-#test_matvec(Matrices.BBDmat)
+@pytest.mark.parametrize('mat', mats)
+@pytest.mark.parametrize('quad', ('GC', 'GL'))
+def test_imul(mat, quad):
+    mat = eval(('.').join(('Matrices', mat)))
+    m = mat(k, quad)
+    mc = deepcopy(dict(m))
+    m *= 2
+    for key, val in six.iteritems(m):
+        assert np.allclose(val, mc[key]*2)
+
+#test_imul('BDNmat', 'GL')
+
+@pytest.mark.parametrize('mat', mats)
+@pytest.mark.parametrize('quad', ('GC', 'GL'))
+def test_mul(mat, quad):
+    mat = eval(('.').join(('Matrices', mat)))
+    m = mat(k, quad)
+    mc = 2.*m
+    for key, val in six.iteritems(mc):
+        assert np.allclose(val, m[key]*2.)
+
+@pytest.mark.parametrize('mat', mats)
+@pytest.mark.parametrize('quad', ('GC', 'GL'))
+def test_rmul(mat, quad):
+    mat = eval(('.').join(('Matrices', mat)))
+    m = mat(k, quad)
+    mc = m*2.
+    for key, val in six.iteritems(mc):
+        assert np.allclose(val, m[key]*2.)
+
+@pytest.mark.parametrize('mat', mats)
+@pytest.mark.parametrize('quad', ('GC', 'GL'))
+def test_div(mat, quad):
+    mat = eval(('.').join(('Matrices', mat)))
+    m = mat(k, quad)
+    mc = m/2.
+    for key, val in six.iteritems(mc):
+        assert np.allclose(val, m[key]/2.)
+
+@pytest.mark.parametrize('mat', mats)
+@pytest.mark.parametrize('quad', ('GC', 'GL'))
+def test_add(mat, quad):
+    mat = eval(('.').join(('Matrices', mat)))
+    m = mat(k, quad)
+    mc = m + m
+    for key, val in six.iteritems(mc):
+        assert np.allclose(val, m[key]*2)
+
+@pytest.mark.parametrize('mat', mats)
+@pytest.mark.parametrize('quad', ('GC', 'GL'))
+def test_iadd(mat, quad):
+    mat = eval(('.').join(('Matrices', mat)))
+    m = mat(k, quad)
+    mc = deepcopy(m)
+    m += mc
+    for key, val in six.iteritems(m):
+        assert np.allclose(val, mc[key]*2)
+
+@pytest.mark.parametrize('mat', mats)
+@pytest.mark.parametrize('quad', ('GC', 'GL'))
+def test_isub(mat, quad):
+    mat = eval(('.').join(('Matrices', mat)))
+    m = mat(k, quad)
+    mc = deepcopy(m)
+    m -= mc
+    for key, val in six.iteritems(m):
+        assert np.allclose(val, 0)
+
+@pytest.mark.parametrize('mat', mats)
+@pytest.mark.parametrize('quad', ('GC', 'GL'))
+def test_sub(mat, quad):
+    mat = eval(('.').join(('Matrices', mat)))
+    m = mat(k, quad)
+    mc = m - m
+    for key, val in six.iteritems(mc):
+        assert np.allclose(val, 0)

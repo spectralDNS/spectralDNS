@@ -14,7 +14,7 @@ from collections import OrderedDict
 import six
 from copy import deepcopy
 
-pi, zeros, ones, array = np.pi, np.zeros, np.ones, np.array
+pi, zeros, ones, array = pi, np.zeros, np.ones, np.array
 float, complex = np.float64, np.complex128
 
 class SparseMatrix(dict):
@@ -34,9 +34,9 @@ class SparseMatrix(dict):
     In case of variable values, store the entire diagonal
     For an N x N matrix use:
 
-    >>> d = {-1: np.ones(N-1),
-              0: -2*np.ones(N),
-              1: np.ones(N-1)}
+    >>> d = {-1: ones(N-1),
+              0: -2*ones(N),
+              1: ones(N-1)}
 
     >>> SparseMatrix(d, (N, N))
 
@@ -81,7 +81,7 @@ class SparseMatrix(dict):
                                 c[:min(N, M-key), i, j] += val*v[key:min(M, N+key), i, j]
 
             else:
-                if not format in ('csr', 'dia'): # Fallback on 'csr'
+                if not format in ('csr', 'dia'): # Fallback on 'csr'. Should probably throw warning
                     format = 'csr'
                 diags = self.diags(format=format)
                 for i in range(v.shape[1]):
@@ -129,7 +129,8 @@ class SparseMatrix(dict):
             if key < 0 and (-key) in self:
                 if id(self[key]) == id(self[-key]):
                     continue
-            val *= y
+            self[key] *= y
+
         return self
 
     def __mul__(self, y):
@@ -141,7 +142,7 @@ class SparseMatrix(dict):
             if key < 0 and (-key) in f:
                 if id(f[key]) == id(f[-key]):
                     continue
-            val *= y
+            f[key] *= y
         return f
 
     def __rmul__(self, y):
@@ -157,47 +158,75 @@ class SparseMatrix(dict):
             if key < 0 and (-key) in f:
                 if id(f[key]) == id(f[-key]):
                     continue
-            val /= y
+            f[key] /= y
         return f
 
     def __add__(self, d):
         """Return copy of self.__add__(y) <==> self+d"""
         f = SparseMatrix(deepcopy(dict(self)), self.shape)
-        if isinstance(d, dict):
-            assert d.shape == self.shape
-            for key, val in six.iteritems(d):
-                if key in f:
-                    # Check if symmetric and make copy if necessary
-                    if (-key) in f:
-                        if id(f[key]) == id(f[-key]):
-                            f[-key] = deepcopy(f[key])
-                    f[key] += val
-                else:
-                    f[key] = val
+        assert isinstance(d, dict)
+        assert d.shape == self.shape
+        for key, val in six.iteritems(d):
+            if key in f:
+                # Check if symmetric and make copy if necessary
+                if (-key) in f:
+                    if id(f[key]) == id(f[-key]):
+                        f[-key] = deepcopy(f[key])
+                f[key] += val
+            else:
+                f[key] = val
 
-        elif isinstance(d, (np.float, np.int)):
-            for key, val in six.iteritems(f):
-                val += d
         return f
 
     def __iadd__(self, d):
         """self.__iadd__(d) <==> self += d"""
-        if isinstance(d, dict):
-            assert d.shape == self.shape
-            for key, val in six.iteritems(d):
-                if key in self:
-                    # Check if symmetric and make copy if necessary
-                    if (-key) in self:
-                        if id(self[key]) == id(self[-key]):
-                            self[-key] = deepcopy(self[key])
-                    self[key] += val
-                else:
-                    self[key] = val
+        assert isinstance(d, dict)
+        assert d.shape == self.shape
+        for key, val in six.iteritems(d):
+            if key in self:
+                # Check if symmetric and make copy if necessary
+                if (-key) in self:
+                    if id(self[key]) == id(self[-key]):
+                        self[-key] = deepcopy(self[key])
+                self[key] += val
+            else:
+                self[key] = val
 
-        elif isinstance(d, (np.float, np.int)):
-            for key, val in six.iteritems(self):
-                val += d
         return self
+
+    def __sub__(self, d):
+        """Return copy of self.__add__(y) <==> self+d"""
+        f = SparseMatrix(deepcopy(dict(self)), self.shape)
+        assert isinstance(d, dict)
+        assert d.shape == self.shape
+        for key, val in six.iteritems(d):
+            if key in f:
+                # Check if symmetric and make copy if necessary
+                if (-key) in f:
+                    if id(f[key]) == id(f[-key]):
+                        f[-key] = deepcopy(f[key])
+                f[key] -= val
+            else:
+                f[key] = -val
+
+        return f
+
+    def __isub__(self, d):
+        """self.__isub__(d) <==> self -= d"""
+        assert isinstance(d, dict)
+        assert d.shape == self.shape
+        for key, val in six.iteritems(d):
+            if key in self:
+                # Check if symmetric and make copy if necessary
+                if (-key) in self:
+                    if id(self[key]) == id(self[-key]):
+                        self[-key] = deepcopy(self[key])
+                self[key] -= val
+            else:
+                self[key] = -val
+
+        return self
+
 
 @inheritdocstrings
 class ShenMatrix(SparseMatrix):
@@ -286,7 +315,7 @@ class ShenMatrix(SparseMatrix):
         SN = ShenNeumannBasis('GC')
         x = Symbol("x")
         # Define an exact solution to compute rhs
-        u = (1-x**2)*sin(np.pi*x)
+        u = (1-x**2)*sin(pi*x)
         f = -u.diff(x, 2)
         points, weights = SN.points_and_weights(M, SN.quad)
         # Compute exact function on quadrature points
@@ -392,7 +421,7 @@ class BDDmat(ShenMatrix):
         N = K.shape[0]
         ck = self.get_ck(N, quad)
         d = {0: pi/2*(ck[:-2]+ck[2:]),
-             2: np.array([-pi/2])}
+             2: array([-pi/2])}
         d[-2] = d[2]
         trial = ShenDirichletBasis(quad=quad)
         ShenMatrix.__init__(self, d, N, (trial, 0), trial)
@@ -401,7 +430,7 @@ class BDDmat(ShenMatrix):
         N, M = self.shape
         c.fill(0)
         if len(v.shape) > 1:
-            ld = self[-2]*np.ones(M-2)
+            ld = self[-2]*ones(M-2)
             if format == 'cython':
                 Tridiagonal_matvec3D(v, c, ld, self[0], ld)
 
@@ -415,7 +444,7 @@ class BDDmat(ShenMatrix):
 
         else:
             if format == 'cython':
-                ld = self[-2]*np.ones(M-2)
+                ld = self[-2]*ones(M-2)
                 Tridiagonal_matvec(v, c, ld, self[0], ld)
 
             elif format == 'self':
@@ -1111,15 +1140,15 @@ class ADDmat(ShenMatrix):
     def __init__(self, K, quad='GC'):
         assert len(K.shape) == 1
         N = K.shape[0]
-        d = {0: -2*np.pi*(K[:N-2]+1)*(K[:N-2]+2)}
+        d = {0: -2*pi*(K[:N-2]+1)*(K[:N-2]+2)}
         for i in range(2, N-2, 2):
-            d[i] = -4*np.pi*(K[:-(i+2)]+1)
+            d[i] = -4*pi*(K[:-(i+2)]+1)
         trial = ShenDirichletBasis()
         ShenMatrix.__init__(self, d, N, (trial, 2), trial, -1.0)
 
     def matvec(self, v, c, format='cython'):
         N = self.shape[0]
-        c = np.zeros(v.shape, dtype=v.dtype)
+        c = zeros(v.shape, dtype=v.dtype)
         if len(v.shape) > 1:
             if format == 'cython': format = 'csr'
             c = ShenMatrix.matvec(self, v, c, format=format)
@@ -1150,7 +1179,7 @@ class ANNmat(ShenMatrix):
         k = K[:-2].astype(float)
         d = {0: -2*pi*k**2*(k+1)/(k+2)}
         for i in range(2, N-2, 2):
-            d[i] = -4*np.pi*(k[:-i]+i)**2*(k[:-i]+1)/(k[:-i]+2)**2
+            d[i] = -4*pi*(k[:-i]+i)**2*(k[:-i]+1)/(k[:-i]+2)**2
         trial = ShenNeumannBasis()
         ShenMatrix.__init__(self, d, N, (trial, 2), trial, -1.0)
 
@@ -1176,7 +1205,7 @@ class ATTmat(ShenMatrix):
         N = K.shape[0]
         d = {}
         for j in range(2, N, 2):
-            d[j] = K[j:]*(K[j:]**2-K[:-j]**2)*np.pi/2.
+            d[j] = K[j:]*(K[j:]**2-K[:-j]**2)*pi/2.
         trial = ChebyshevTransform()
         ShenMatrix.__init__(self, d, N, (trial, 2), trial, -1.0)
 
@@ -1200,7 +1229,7 @@ class SBBmat(ShenMatrix):
         d = {0: i * pi}
         for j in range(2, N-4, 2):
             i = 8*(ki[:-j]+1)*(ki[:-j]+2)*(ki[:-j]*(ki[:-j]+4)+3*(ki[j:]+2)**2)
-            d[j] = np.array(i*pi/(k[j:]+3))
+            d[j] = array(i*pi/(k[j:]+3))
         trial = ShenBiharmonicBasis()
         ShenMatrix.__init__(self, d, N, (trial, 4), trial)
 
@@ -1243,7 +1272,7 @@ class BiharmonicCoeff(object):
 
     def matvec(self, v, c):
         N = self.shape[0]
-        #c = np.zeros(v.shape, dtype=v.dtype)
+        #c = zeros(v.shape, dtype=v.dtype)
         c.fill(0)
         if len(v.shape) > 1:
             Biharmonic_matvec3D(v, c, self.a0, self.alfa, self.beta, self.S[0], self.S[2],
