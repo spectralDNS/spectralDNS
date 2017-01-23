@@ -16,7 +16,7 @@ def set_Source(Source, Sk, FST, ST, **context):
     Source[:] = 0
     Source[1, :] = -2./config.params.Re
     Sk[:] = 0
-    Sk[1] = FST.fss(Source[1], Sk[1], ST)
+    Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
 
 def exact(x, Re, t, num_terms=400):
     beta = 2./Re

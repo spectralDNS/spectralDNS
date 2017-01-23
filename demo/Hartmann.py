@@ -27,21 +27,21 @@ def init(U, U_hat, X, FST, ST, SN, t=0.):
     U[5] = 0
     for i in range(6):
         if i<3:
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
+            U_hat[i] = FST.forward(U[i], U_hat[i], ST)
         else:
-            U_hat[i] = FST.fst(U[i], U_hat[i], SN)
+            U_hat[i] = FST.forward(U[i], U_hat[i], SN)
         
     for i in range(6):
         if i<3:
-            U[i] = FST.ifst(U_hat[i], U[i], ST)
+            U[i] = FST.backward(U_hat[i], U[i], ST)
         else:
-            U[i] = FST.ifst(U_hat[i], U[i], SN)
+            U[i] = FST.backward(U_hat[i], U[i], SN)
             
     for i in range(6):
         if i<3:
-            U_hat[i] = FST.fst(U[i], U_hat[i], ST)
+            U_hat[i] = FST.forward(U[i], U_hat[i], ST)
         else:
-            U_hat[i] = FST.fst(U[i], U_hat[i], SN)
+            U_hat[i] = FST.forward(U[i], U_hat[i], SN)
 
 
 def energy(u, N, comm, rank, L):
@@ -65,7 +65,7 @@ def initialize(U, U_hat, U0, U_hat0, P, P_hat, conv1, FST, ST, SN, X, N, comm, r
     conv1 = standardConvection(conv1)
     init(U, U_hat, X, FST, ST, SN, t=dt) 
     P[:] = 0
-    P_hat = FST.fst(P, P_hat, SN)
+    P_hat = FST.forward(P, P_hat, SN)
     U0[:] = U
     U_hat0[:] = U_hat
     config.t = dt
@@ -77,7 +77,7 @@ def set_Source(Source, Sk, FST, ST, **kw):
     Source[1, :] = -2./config.Re
     Sk[:] = 0
     for i in range(3):
-        Sk[i] = FST.fss(Source[i], Sk[i], ST)
+        Sk[i] = FST.scalar_product(Source[i], Sk[i], ST)
 
 def update(rank, X, U, P, N, comm, L, **kw):
     

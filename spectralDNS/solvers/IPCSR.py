@@ -110,15 +110,14 @@ class IPCSRWriter(HDF5Writer):
             c = config.AttributeDict(context)
             U0 = get_velocity(c.U0, c.U_hat0, c.FST, c.ST)
 
-
 def get_pressure(P, P_hat, FST, SN, **context):
     """Compute pressure from context"""
-    P = FST.ifct(P_hat, P, SN.CT)
+    P = FST.backward(P_hat, P, SN.CT)
     return P
 
 def set_pressure(P_hat, P, FST, SN, **context):
     """Compute pressure from context"""
-    P_hat = FST.fct(P, P_hat, SN.CT)
+    P_hat = FST.forward(P, P_hat, SN.CT)
     return P_hat
 
 def pressuregrad(rhs, p_hat, mat, work, K, Nu):
@@ -133,7 +132,7 @@ def pressuregrad(rhs, p_hat, mat, work, K, Nu):
 
     # pressure gradient y-direction
     dP = work[(p_hat, 1, False)]
-    #dP = FST.fss(P, dP, ST)
+    #dP = FST.scalar_product(P, dP, ST)
     dP = mat.BDT.matvec(p_hat, dP)
 
     rhs[1, :Nu] -= 1j*K[1, :Nu]*dP[:Nu]
@@ -174,10 +173,10 @@ def compute_pressure(P_hat, H_hat, U_hat, U_hat0, K, FST, ST, work, mat, la,
     P_hat = la.HelmholtzSolverP(P_hat, F_tmp)
 
     # P in Chebyshev basis for this solver
-    P[:] = FST.ifst(P_hat, P, SN)
-    P_hat  = FST.fct(P, P_hat, SN.CT)
-    P[:] = FST.ifct(P_hat, P, SN.CT)
-    P_hat  = FST.fct(P, P_hat, SN.CT)
+    P[:] = FST.backward(P_hat, P, SN)
+    P_hat  = FST.forward(P, P_hat, SN.CT)
+    P[:] = FST.backward(P_hat, P, SN.CT)
+    P_hat  = FST.forward(P, P_hat, SN.CT)
     return P_hat
 
 def updatepressure(p_hat, p_corr, u_hat, K, mat, dd, work):

@@ -152,7 +152,7 @@ def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
     w0 = work[(H_hat[0], 0, False)]
     w1 = work[(H_hat[0], 1, False)]
     hv[1] = -K2*mat.BBD.matvec(H_hat[0], w0)
-    #hv[:] = FST.fss(H[0], hv, SB)
+    #hv[:] = FST.scalar_product(H[0], hv, SB)
     #hv *= -K2
     hv[1] -= 1j*K[1]*mat.CBD.matvec(H_hat[1], w0)
     hv[1] -= 1j*K[2]*mat.CBD.matvec(H_hat[2], w0)

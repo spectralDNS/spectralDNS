@@ -70,7 +70,7 @@ def initialize(solver, context):
 
     if not params.solver in ("KMM", "KMMRK3"):
         P_hat = solver.compute_pressure(**context)
-        P = context.FST.ifst(P_hat, context.P, context.SN)
+        P = context.FST.backward(P_hat, context.P, context.SN)
 
     context.U_hat0[:] = context.U_hat[:]
     context.H_hat1[:] = solver.get_convection(**context)
@@ -106,7 +106,7 @@ def set_Source(Source, Sk, ST, FST, **context):
     Source[:] = 0
     Source[1, :] = -utau**2
     Sk[:] = 0
-    Sk[1] = FST.fss(Source[1], Sk[1], ST)
+    Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
 
 beta = zeros(1)
 def update(context):
@@ -119,14 +119,14 @@ def update(context):
 
     # Dynamically adjust flux
     if params.tstep % 1 == 0:
-        U[1] = c.FST.ifst(U_hat[1], U[1], c.ST)
+        U[1] = c.FST.backward(U_hat[1], U[1], c.ST)
         beta[0] = c.FST.dx(U[1], c.ST.quad)
         #solver.comm.Bcast(beta)
         q = (flux[0] - beta[0])  # array(params.L).prod()
         #U_tmp = c.work[(U[0], 0)]
         #F_tmp = c.work[(U_hat[0], 0)]
         #U_tmp[:] = beta[0]
-        #F_tmp = c.FST.fst(U_tmp, F_tmp, c.ST)
+        #F_tmp = c.FST.forward(U_tmp, F_tmp, c.ST)
         #U_hat[1] += q/beta[0]*U_hat[1]
         if solver.rank == 0:
             d0 = zeros(U_hat.shape[1], dtype=U_hat.dtype)
@@ -136,26 +136,26 @@ def update(context):
             c.Sk[1,0,0,0] -= (flux[0]/beta[0]-1)/params.dt*(-params.nu*params.dt/2.*d0[0] + d1[0])*0.025
 
         #c.Source[1] -= q/array(params.L).prod()
-        #c.Sk[1] = c.FST.fss(c.Source[1], c.Sk[1], c.ST)
+        #c.Sk[1] = c.FST.scalar_product(c.Source[1], c.Sk[1], c.ST)
 
     #if params.tstep % 1 == 0:
-        #U[1] = c.FST.ifst(U_hat[1], U[1], c.ST)
+        #U[1] = c.FST.backward(U_hat[1], U[1], c.ST)
         #beta[0] = c.FST.dx(U[1], c.ST.quad)
         ##beta[0] = (flux[0] - beta[0])/(array(params.L).prod())
         #solver.comm.Bcast(beta)
         #q = flux[0]/beta[0]-1
         ##U[1] += beta[0]*U[1]
-        ##U_hat[1] = c.FST.fst(U[1], U_hat[1], c.ST)
+        ##U_hat[1] = c.FST.forward(U[1], U_hat[1], c.ST)
         #U_hat[1] += q*U_hat[1]
         #c.Source[1] -= beta[0]*q/(array(params.L).prod())/params.dt/2
-        #c.Sk[1] = c.FST.fss(c.Source[1], c.Sk[1], c.ST)
+        #c.Sk[1] = c.FST.scalar_product(c.Source[1], c.Sk[1], c.ST)
 
     #utau = config.params.Re_tau * config.params.nu
     #Source[:] = 0
     #Source[1] = -utau**2
     #Source[:] += 0.05*random.randn(*U.shape)
     #for i in range(3):
-        #Sk[i] = FST.fss(Source[i], Sk[i], ST)
+        #Sk[i] = FST.scalar_product(Source[i], Sk[i], ST)
 
     if params.tstep % params.print_energy0 == 0 and solver.rank == 0:
         print(c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 2))

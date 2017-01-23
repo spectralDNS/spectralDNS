@@ -116,34 +116,6 @@ class SpectralBase(object):
         """
         raise NotImplementedError
 
-    def fst(self, fj, fk):
-        """Fast forward Shen transform
-
-        args:
-            fj   (input)     Function values on quadrature mesh
-            fk   (output)    Expansion coefficients
-
-        kwargs:
-            fast_transform   bool - If True use fast transforms,
-                             if False use Vandermonde type
-
-        """
-        raise NotImplementedError
-
-    def ifst(self, fk, fj):
-        """Inverse fast Shen transform
-
-        args:
-            fk   (input)     Expansion coefficients
-            fj   (output)    Function values on quadrature mesh
-
-        kwargs:
-            fast_transform   bool - If True use fast transforms,
-                             if False use Vandermonde type
-
-        """
-        raise NotImplementedError
-
     def vandermonde(self, x, N):
         """Return Vandermonde matrix
 
@@ -301,9 +273,9 @@ class ChebyshevTransform(ChebyshevBase):
         """
         fk = work[(fj, 0)]
         ck = work[(fj, 1)]
-        fk = self.fct(fj, fk)
+        fk = self.forward(fj, fk)
         ck = self.cheb_derivative_coefficients(fk, ck)
-        fd  = self.ifct(ck, fd)
+        fd  = self.backward(ck, fd)
         return fd
 
     def solver(self, fk):
@@ -324,15 +296,7 @@ class ChebyshevTransform(ChebyshevBase):
 
         return fk
 
-    def forward(self, fj, fk):
-        fk = self.fct(fj, fk)
-        return fk
-
-    def backward(self, fk, fj):
-        fj = self.ifct(fk, fj)
-        return fj
-
-    def fct(self, fj, fk, fast_transform=True):
+    def forward(self, fj, fk, fast_transform=True):
         """Fast Chebyshev transform.
 
         args:
@@ -349,7 +313,7 @@ class ChebyshevTransform(ChebyshevBase):
         fk = self.solver(fk)
         return fk
 
-    def ifct(self, fk, fj, fast_transform=True):
+    def backward(self, fk, fj, fast_transform=True):
         """Inverse fast Chebyshev transform.
 
         args:
@@ -455,18 +419,10 @@ class ShenDirichletBasis(ChebyshevBase):
         w_hat[2:] -= fk[:-2]
         w_hat[0] += 0.5*(self.bc[0] + self.bc[1])
         w_hat[1] += 0.5*(self.bc[0] - self.bc[1])
-        fj = self.CT.ifct(w_hat, fj)
+        fj = self.CT.backward(w_hat, fj)
         return fj
 
-    def ifst(self, fk, fj, fast_transform=True):
-        if fast_transform:
-            fj = self.evaluate_basis_all(fk, fj)
-        else:
-            fj = self.vandermonde_evaluate_basis_all(fk, fj)
-
-        return fj
-
-    def fst(self, fj, fk, fast_transform=True):
+    def forward(self, fj, fk, fast_transform=True):
         fk = self.scalar_product(fj, fk, fast_transform)
         fk[0] -= pi/2*(self.bc[0] + self.bc[1])
         fk[1] -= pi/4*(self.bc[0] - self.bc[1])
@@ -475,12 +431,12 @@ class ShenDirichletBasis(ChebyshevBase):
         fk[-1] = self.bc[1]
         return fk
 
-    def forward(self, fj, fk):
-        fk = self.fst(fj, fk)
-        return fk
+    def backward(self, fk, fj, fast_transform=True):
+        if fast_transform:
+            fj = self.evaluate_basis_all(fk, fj)
+        else:
+            fj = self.vandermonde_evaluate_basis_all(fk, fj)
 
-    def backward(self, fk, fj):
-        fj = self.ifst(fk, fj)
         return fj
 
     def slice(self, N):
@@ -545,28 +501,20 @@ class ShenNeumannBasis(ChebyshevBase):
         self.set_factor_array(fk)
         w_hat[1:-2] = fk[1:-2]
         w_hat[3:] -= self._factor*fk[1:-2]
-        fj = self.CT.ifct(w_hat, fj)
+        fj = self.CT.backward(w_hat, fj)
         return fj
 
-    def ifst(self, fk, fj, fast_transform=True):
+    def forward(self, fj, fk, fast_transform=True):
+        fk = self.scalar_product(fj, fk, fast_transform)
+        fk = self.solver(fk)
+        return fk
+
+    def backward(self, fk, fj, fast_transform=True):
         if fast_transform:
             fj = self.evaluate_basis_all(fk, fj)
         else:
             fj = self.vandermonde_evaluate_basis_all(fk, fj)
 
-        return fj
-
-    def fst(self, fj, fk):
-        fk = self.scalar_product(fj, fk)
-        fk = self.solver(fk)
-        return fk
-
-    def forward(self, fj, fk):
-        fk = self.fst(fj, fk)
-        return fk
-
-    def backward(self, fk, fj):
-        fj = self.ifst(fk, fj)
         return fj
 
     def slice(self, N):
@@ -646,28 +594,20 @@ class ShenBiharmonicBasis(ChebyshevBase):
         w_hat = work[(fk, 0)]
         self.set_factor_arrays(fk)
         w_hat = ShenBiharmonicBasis.set_w_hat(w_hat, fk, self._factor1, self._factor2)
-        fj = self.CT.ifct(w_hat, fj)
+        fj = self.CT.backward(w_hat, fj)
         return fj
 
-    def ifst(self, fk, fj, fast_transform=True):
+    def forward(self, fj, fk, fast_transform=True):
+        fk = self.scalar_product(fj, fk, fast_transform)
+        fk = self.solver(fk)
+        return fk
+
+    def backward(self, fk, fj, fast_transform=True):
         if fast_transform:
             fj = self.evaluate_basis_all(fk, fj)
         else:
             fj = self.vandermonde_evaluate_basis_all(fk, fj)
 
-        return fj
-
-    def fst(self, fj, fk, fast_transform=True):
-        fk = self.scalar_product(fj, fk, fast_transform)
-        fk = self.solver(fk)
-        return fk
-
-    def forward(self, fj, fk):
-        fk = self.fst(fj, fk)
-        return fk
-
-    def backward(self, fk, fj):
-        fj = self.ifst(fk, fj)
         return fj
 
     def slice(self, N):
@@ -750,16 +690,8 @@ class LegendreTransform(LegendreBase):
     def __init__(self, quad="LG"):
         LegendreBase.__init__(self, quad)
 
-    def forward(self, fj, fk):
-        fk = self.flt(fj, fk)
-        return fk
-
-    def backward(self, fk, fj):
-        fj = self.iflt(fk, fj)
-        return fj
-
-    def flt(self, fj, fk, fast_transform=False):
-        """Fast Legendre transform.
+    def forward(self, fj, fk, fast_transform=False):
+        """Forward Legendre transform.
 
         args:
             fj   (input)     Function values on quadrature mesh
@@ -775,8 +707,8 @@ class LegendreTransform(LegendreBase):
         fk = self.solver(fk)
         return fk
 
-    def iflt(self, fk, fj, fast_transform=False):
-        """Inverse fast Legendre transform.
+    def backward(self, fk, fj, fast_transform=False):
+        """Inverse Legendre transform.
 
         args:
             fk   (input)     Expansion coefficients
@@ -849,28 +781,42 @@ class ShenLegendreDirichletBasis(LegendreBase):
         w_hat = work[(fk, 0)]
         w_hat[:-2] = fk[:-2]
         w_hat[2:] -= fk[:-2]
-        fj = self.LT.ifct(w_hat, fj)
+        fj = self.LT.backward(w_hat, fj)
         return fj
 
-    def ifst(self, fk, fj, fast_transform=False):
+    def forward(self, fj, fk, fast_transform=False):
+        """Forward Legendre transform.
+
+        args:
+            fj   (input)     Function values on quadrature mesh
+            fk   (output)    Expansion coefficients
+
+        kwargs:
+            fast_transform   bool - If True use fast transforms,
+                             if False use Vandermonde type
+
+        """
+        fk = self.scalar_product(fj, fk, fast_transform)
+        fk = self.solver(fk)
+        return fk
+
+    def backward(self, fk, fj, fast_transform=False):
+        """Inverse Legendre transform.
+
+        args:
+            fk   (input)     Expansion coefficients
+            fj   (output)    Function values on quadrature mesh
+
+        kwargs:
+            fast_transform   bool - If True use fast transforms,
+                             if False use Vandermonde type
+
+        """
         if fast_transform:
             fj = self.evaluate_basis_all(fk, fj)
         else:
             fj = self.vandermonde_evaluate_basis_all(fk, fj)
 
-        return fj
-
-    def fst(self, fj, fk, fast_transform=False):
-        fk = self.scalar_product(fj, fk, fast_transform)
-        fk = self.solver(fk)
-        return fk
-
-    def forward(self, fj, fk):
-        fk = self.fst(fj, fk)
-        return fk
-
-    def backward(self, fk, fj):
-        fj = self.ifst(fk, fj)
         return fj
 
     def slice(self, N):
@@ -998,8 +944,7 @@ class SlabShen_R2C(Slab_R2C):
             fp[:, :, :(N[2]/2+1)] = fu[:]
         return fp
 
-    #@profile
-    def forward(self, u, fu, fun, dealias=None):
+    def _forward(self, u, fu, fun, dealias=None):
 
         # Intermediate work arrays
         Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0, False)]
@@ -1149,11 +1094,11 @@ class SlabShen_R2C(Slab_R2C):
 
         return fu
 
-    #@profile
     def backward(self, fu, u, fun, dealias=None):
 
         Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0, False)]
         Uc_mpi  = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
+        fun = fun.backward
 
         if dealias == '2/3-rule' and self.dealias.shape == (0,):
             self.dealias = self.get_dealias_filter()
@@ -1289,32 +1234,37 @@ class SlabShen_R2C(Slab_R2C):
 
         return u
 
-    def fss(self, u, fu, S, dealias=None):
-        """Fast Shen scalar product of x-direction, Fourier transform of y and z"""
-        fu = self.forward(u, fu, S.scalar_product, dealias=dealias)
-        return fu
-
-    def fst(self, u, fu, S, dealias=None):
+    def forward(self, u, fu, S, dealias=None):
         """Fast Shen transform of x-direction, Fourier transform of y and z"""
-        fu = self.forward(u, fu, S.fst, dealias=dealias)
+        fu = self._forward(u, fu, S.forward, dealias=dealias)
         return fu
 
-    def fct(self, u, fu, S, dealias=None):
-        """Fast Cheb transform of x-direction, Fourier transform of y and z"""
-        assert isinstance(S, ChebyshevTransform)
-        fu = self.forward(u, fu, S.fct, dealias=dealias)
+    def scalar_product(self, u, fu, S, dealias=None):
+        """Fast Shen scalar product of x-direction, Fourier transform of y and z"""
+        fu = self._forward(u, fu, S.scalar_product, dealias=dealias)
         return fu
 
-    def ifst(self, fu, u, S, dealias=None):
-        """Inverse Shen transform of x-direction, Fourier in y and z"""
-        u = self.backward(fu, u, S.ifst, dealias=dealias)
-        return u
+    #def fst(self, u, fu, S, dealias=None):
+        #"""Fast Shen transform of x-direction, Fourier transform of y and z"""
+        #fu = self.forward(u, fu, S.forward, dealias=dealias)
+        #return fu
 
-    def ifct(self, fu, u, S, dealias=None):
-        """Inverse Cheb transform of x-direction, Fourier in y and z"""
-        assert isinstance(S, ChebyshevTransform)
-        u = self.backward(fu, u, S.ifct, dealias=dealias)
-        return u
+    #def fct(self, u, fu, S, dealias=None):
+        #"""Fast Cheb transform of x-direction, Fourier transform of y and z"""
+        #assert isinstance(S, ChebyshevTransform)
+        #fu = self.forward(u, fu, S.forward, dealias=dealias)
+        #return fu
+
+    #def ifst(self, fu, u, S, dealias=None):
+        #"""Inverse Shen transform of x-direction, Fourier in y and z"""
+        #u = self.backward(fu, u, S.backward, dealias=dealias)
+        #return u
+
+    #def ifct(self, fu, u, S, dealias=None):
+        #"""Inverse Cheb transform of x-direction, Fourier in y and z"""
+        #assert isinstance(S, ChebyshevTransform)
+        #u = self.backward(fu, u, S.backward, dealias=dealias)
+        #return u
 
     def fft(self, u, fu):
         """Fast Fourier transform of y and z"""
@@ -1336,13 +1286,13 @@ class SlabShen_R2C(Slab_R2C):
         return u
 
     def fct0(self, u, fu, S):
-        """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do fct."""
+        """Fast Cheb transform of x-direction. No FFT, just align data in x-direction and do forward."""
         U_mpi2 = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.N[2]), self.float, 0)]
         UT = self.work_arrays[((self.N[0], self.Np[1], self.N[2]), self.float, 0)]
 
         U_mpi2[:] = rollaxis(u.reshape(self.Np[0], self.num_processes, self.Np[1], self.N[2]), 1)
         self.comm.Alltoall([U_mpi2, self.mpitype], [UT, self.mpitype])
-        fu = S.fct(UT, fu)
+        fu = S.forward(UT, fu)
         return fu
 
     def ifct0(self, fu, u, S):
@@ -1350,7 +1300,7 @@ class SlabShen_R2C(Slab_R2C):
         U_mpi2 = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.N[2]), self.float, 0)]
         UT = self.work_arrays[((self.N[0], self.Np[1], self.N[2]), self.float, 0)]
 
-        UT = S.ifct(fu, UT)
+        UT = S.backward(fu, UT)
         self.comm.Alltoall([UT, self.mpitype], [U_mpi2, self.mpitype])
         u[:] = rollaxis(U_mpi2, 1).reshape(u.shape)
         return u
@@ -1407,18 +1357,18 @@ if __name__ == "__main__":
     points, weights = CT.points_and_weights(N)
     fj = np.array([f.subs(x, j) for j in points], dtype=float)
     u0 = zeros(N, dtype=float)
-    u0 = CT.fct(fj, u0)
+    u0 = CT.forward(fj, u0)
     u1 = u0.copy()
-    u1 = CT.ifct(u0, u1)
+    u1 = CT.backward(u0, u1)
     assert np.allclose(u1, fj)
 
     ST = ShenDirichletBasis(quad="GC")
     points, weights = ST.points_and_weights(N)
     fj = np.array([f.subs(x, j) for j in points], dtype=float)
     u0 = zeros(N, dtype=float)
-    u0 = ST.fst(fj, u0)
+    u0 = ST.forward(fj, u0)
     u1 = u0.copy()
-    u1 = ST.ifst(u0, u1)
+    u1 = ST.backward(u0, u1)
     assert np.allclose(u1, fj)
 
     SN = ShenNeumannBasis(quad="GL")
@@ -1426,9 +1376,9 @@ if __name__ == "__main__":
     f = cos(pi*x)  # A function with f(+-1) = 0 and f'(+-1) = 0
     fj = np.array([f.subs(x, j) for j in points], dtype=float)
     fj -= np.dot(fj, weights)/weights.sum()
-    u0 = SN.fst(fj, u0)
+    u0 = SN.forward(fj, u0)
     u1 = u0.copy()
-    u1 = SN.ifst(u0, u1)
+    u1 = SN.backward(u0, u1)
     assert np.allclose(u1, fj)
 
     N = 30
@@ -1437,7 +1387,7 @@ if __name__ == "__main__":
     f = (1-x**2)*sin(2*pi*x)
     fj = np.array([f.subs(x, j) for j in points], dtype=float)
     u0 = zeros(N, dtype=float)
-    u0 = SB.fst(fj, u0)
+    u0 = SB.forward(fj, u0)
     u1 = u0.copy()
-    u1 = SB.ifst(u0, u1)
+    u1 = SB.backward(u0, u1)
     assert np.allclose(u1, fj)

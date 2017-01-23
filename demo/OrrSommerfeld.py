@@ -81,7 +81,7 @@ def initialize(solver, context):
 
     if not params.solver in ("KMM", "KMMRK3"):
         P_hat = solver.compute_pressure(**context)
-        P = FST.ifst(P_hat, context.P, context.SN)
+        P = FST.backward(P_hat, context.P, context.SN)
 
     else:
         context.g[:] = 0
@@ -90,7 +90,7 @@ def set_Source(Source, Sk, FST, ST, **kw):
     Source[:] = 0
     Source[1] = -2./config.params.Re
     Sk[:] = 0
-    Sk[1] = FST.fss(Source[1], Sk[1], ST)
+    Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
 
 im1, im2, im3, im4 = (None, )*4
 def update(context):

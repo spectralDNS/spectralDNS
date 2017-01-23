@@ -112,10 +112,10 @@ def test_BDNmat(mat, quad):
 
     f_hat = np.zeros(N)
     fj = np.random.random(N)
-    f_hat = S2.fst(fj, f_hat)
-    fj = S2.ifst(f_hat, fj)
+    f_hat = S2.forward(fj, f_hat)
+    fj = S2.backward(f_hat, fj)
 
-    f_hat = S2.fst(fj, f_hat)
+    f_hat = S2.forward(fj, f_hat)
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
     u0 = np.zeros(N)
@@ -142,12 +142,12 @@ def test_BDTmat(quad):
 
     f_hat = np.zeros(N)
     fj = np.random.random(N)
-    f_hat = ST.fct(fj, f_hat)
-    fj = ST.ifct(f_hat, fj)
+    f_hat = ST.forward(fj, f_hat)
+    fj = ST.backward(f_hat, fj)
 
     B = BDTmat(np.arange(N).astype(np.float), SD.quad)
 
-    f_hat = ST.fct(fj, f_hat)
+    f_hat = ST.forward(fj, f_hat)
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
     u2 = B.matvec(f_hat, u2, 'csr')
@@ -178,12 +178,12 @@ def test_BBDmat(quad):
 
     f_hat = np.zeros(N)
     fj = np.random.random(N)
-    f_hat = SD.fst(fj, f_hat)
-    fj = SD.ifst(f_hat, fj)
+    f_hat = SD.forward(fj, f_hat)
+    fj = SD.backward(f_hat, fj)
 
     B = BBDmat(np.arange(N).astype(np.float), SB.quad)
 
-    f_hat = SD.fst(fj, f_hat)
+    f_hat = SD.forward(fj, f_hat)
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
     u0 = np.zeros(N)
@@ -204,14 +204,14 @@ def test_BBDmat(quad):
     FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), MPI.COMM_SELF)
     f_hat = np.zeros(FST.complex_shape(), dtype=np.complex)
     fj = np.random.random((N, N, N))
-    f_hat = FST.fst(fj, f_hat, SD)
-    fj = FST.ifst(f_hat, fj, SD)
-    f_hat = FST.fst(fj, f_hat, SD)
+    f_hat = FST.forward(fj, f_hat, SD)
+    fj = FST.backward(f_hat, fj, SD)
+    f_hat = FST.forward(fj, f_hat, SD)
 
     z0 = np.zeros_like(f_hat)
     z0 = B.matvec(f_hat, z0)
     z1 = z0.copy()*0
-    z1 = FST.fss(fj, z1, SB)
+    z1 = FST.scalar_product(fj, z1, SB)
     assert np.linalg.norm(z1-z0)/(N*N*N) < 1e-12
 
 #test_BBDmat((ShenBiharmonicBasis("GL"), ShenDirichletBasis("GL")))
@@ -225,10 +225,10 @@ def test_BTXmat(mat, quad):
 
     f_hat = np.zeros(N)
     fj = np.random.random(N)
-    f_hat = SX.fst(fj, f_hat)
-    fj = SX.ifst(f_hat, fj)
+    f_hat = SX.forward(fj, f_hat)
+    fj = SX.backward(f_hat, fj)
 
-    f_hat = SX.fst(fj, f_hat)
+    f_hat = SX.forward(fj, f_hat)
     u2 = np.zeros_like(f_hat)
     u2 = B.matvec(f_hat, u2)
     u0 = np.zeros(N)
@@ -294,9 +294,9 @@ def test_FST(ST, quad):
         A = np.random.random((N, N, N)).astype(FST.float)
         B2 = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
 
-        B2 = FST_SELF.forward(A, B2, ST.forward)
-        A = FST_SELF.backward(B2, A, ST.backward)
-        B2 = FST_SELF.forward(A, B2, ST.forward)
+        B2 = FST_SELF.forward(A, B2, ST)
+        A = FST_SELF.backward(B2, A, ST)
+        B2 = FST_SELF.forward(A, B2, ST)
 
     else:
         A = np.zeros((N, N, N), dtype=FST.float)
@@ -309,11 +309,11 @@ def test_FST(ST, quad):
     a = np.zeros(FST.real_shape(), dtype=FST.float)
     c = np.zeros(FST.complex_shape(), dtype=FST.complex)
     a[:] = A[FST.real_local_slice()]
-    c = FST.forward(a, c, ST.forward)
+    c = FST.forward(a, c, ST)
 
     assert np.all(abs((c - B2[FST.complex_local_slice()])/c.max()) < rtol)
 
-    a = FST.backward(c, a, ST.backward)
+    a = FST.backward(c, a, ST)
 
     assert np.all(abs((a - A[FST.real_local_slice()])/a.max()) < rtol)
 
@@ -333,15 +333,15 @@ def test_FST_padded(ST, quad):
         A = np.random.random(M).astype(FST.float)
         A_hat = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
 
-        A_hat = FST_SELF.forward(A, A_hat, ST.forward)
-        A = FST_SELF.backward(A_hat, A, ST.backward)
-        A_hat = FST_SELF.forward(A, A_hat, ST.forward)
+        A_hat = FST_SELF.forward(A, A_hat, ST)
+        A = FST_SELF.backward(A_hat, A, ST)
+        A_hat = FST_SELF.forward(A, A_hat, ST)
 
         A_hat[:, -M[1]/2] = 0
 
         A_pad = np.zeros(FST_SELF.real_shape_padded(), dtype=FST.float)
-        A_pad = FST_SELF.backward(A_hat, A_pad, ST.backward, dealias='3/2-rule')
-        A_hat = FST_SELF.forward(A_pad, A_hat, ST.forward, dealias='3/2-rule')
+        A_pad = FST_SELF.backward(A_hat, A_pad, ST, dealias='3/2-rule')
+        A_hat = FST_SELF.forward(A_pad, A_hat, ST, dealias='3/2-rule')
 
     else:
         A_pad = np.zeros(FST_SELF.real_shape_padded(), dtype=FST.float)
@@ -354,11 +354,11 @@ def test_FST_padded(ST, quad):
     a = np.zeros(FST.real_shape_padded(), dtype=FST.float)
     c = np.zeros(FST.complex_shape(), dtype=FST.complex)
     a[:] = A_pad[FST.real_local_slice(padsize=1.5)]
-    c = FST.forward(a, c, ST.forward, dealias='3/2-rule')
+    c = FST.forward(a, c, ST, dealias='3/2-rule')
 
     assert np.all(abs((c - A_hat[FST.complex_local_slice()])/c.max()) < rtol)
 
-    a = FST.backward(c, a, ST.backward, dealias='3/2-rule')
+    a = FST.backward(c, a, ST, dealias='3/2-rule')
 
     #print abs((a - A_pad[FST.real_local_slice(padsize=1.5)])/a.max())
     assert np.all(abs((a - A_pad[FST.real_local_slice(padsize=1.5)])/a.max()) < rtol)
@@ -378,12 +378,12 @@ def test_CDDmat(quad):
 
     dudx_j = np.zeros(M)
     u_hat = np.zeros(M)
-    u_hat = SD.fst(uj, u_hat)
-    uj = SD.ifst(u_hat, uj)
-    u_hat = SD.fst(uj, u_hat)
+    u_hat = SD.forward(uj, u_hat)
+    uj = SD.backward(u_hat, uj)
+    u_hat = SD.forward(uj, u_hat)
 
     uc_hat = np.zeros(M)
-    uc_hat = SD.CT.fct(uj, uc_hat)
+    uc_hat = SD.CT.forward(uj, uc_hat)
     du_hat = np.zeros(M)
     dudx_j = SD.CT.fast_cheb_derivative(uj, dudx_j)
 
@@ -401,7 +401,7 @@ def test_CDDmat(quad):
 
     cs = TDMASolver(cs)
     du = np.zeros(M)
-    du = SD.ifst(cs, du)
+    du = SD.backward(cs, du)
 
     assert np.linalg.norm(du-dudx_j)/M < 1e-10
 
@@ -417,7 +417,7 @@ def test_CDDmat(quad):
 
     cs = TDMASolver(cs)
     d3 = np.zeros((M, 4, 4), dtype=np.complex)
-    d3 = SD.ifst(cs, d3)
+    d3 = SD.backward(cs, d3)
 
     #from IPython import embed; embed()
     assert np.linalg.norm(du3-d3)/(M*16) < 1e-10
@@ -433,11 +433,11 @@ def test_CXXmat(mat):
     fj = np.random.randn(N)
     # project to S2
     f_hat = np.zeros(N)
-    f_hat = S2.fst(fj, f_hat)
-    fj = S2.ifst(f_hat, fj)
+    f_hat = S2.forward(fj, f_hat)
+    fj = S2.backward(f_hat, fj)
 
-    # Check S1.fss(f) equals Cm*S2.fst(f)
-    f_hat = S2.fst(fj, f_hat)
+    # Check S1.scalar_product(f) equals Cm*S2.forward(f)
+    f_hat = S2.forward(fj, f_hat)
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
@@ -469,11 +469,11 @@ def test_CDTmat(quad):
     fj = np.random.randn(N)
     # project to ST
     f_hat = np.zeros(N)
-    f_hat = ST.fct(fj, f_hat)
-    fj = ST.ifct(f_hat, fj)
+    f_hat = ST.forward(fj, f_hat)
+    fj = ST.backward(f_hat, fj)
 
-    # Check SD.fss(f) equals Cm*ST.fst(f)
-    f_hat = ST.fct(fj, f_hat)
+    # Check SD.scalar_product(f) equals Cm*ST.forward(f)
+    f_hat = ST.forward(fj, f_hat)
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
@@ -506,11 +506,11 @@ def test_CTDmat(quad):
     fj = np.random.randn(N)
     # project to SD
     f_hat = np.zeros(N)
-    f_hat = SD.fst(fj, f_hat)
-    fj = SD.ifst(f_hat, fj)
+    f_hat = SD.forward(fj, f_hat)
+    fj = SD.backward(f_hat, fj)
 
-    # Check if ST.fcs(f') equals Cm*SD.fst(f)
-    f_hat = SD.fst(fj, f_hat)
+    # Check if ST.fcs(f') equals Cm*SD.forward(f)
+    f_hat = SD.forward(fj, f_hat)
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
@@ -552,11 +552,11 @@ def test_CDBmat(quad):
 
     # project to SB
     f_hat = np.zeros(M)
-    f_hat = SB.fst(uj, f_hat)
-    uj = SB.ifst(f_hat, uj)
+    f_hat = SB.forward(uj, f_hat)
+    uj = SB.backward(f_hat, uj)
 
-    # Check if SD.fss(f') equals Cm*SD.fst(f)
-    f_hat = SB.fst(uj, f_hat)
+    # Check if SD.scalar_product(f') equals Cm*SD.forward(f)
+    f_hat = SB.forward(uj, f_hat)
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
 
@@ -599,11 +599,11 @@ def test_CBDmat(quad):
 
     # project to SD
     f_hat = np.zeros(M)
-    f_hat = SD.fst(uj, f_hat)
-    uj = SD.ifst(f_hat, uj)
+    f_hat = SD.forward(uj, f_hat)
+    uj = SD.backward(f_hat, uj)
 
-    # Check if SB.fss(f') equals Cm*SD.fst(f)
-    f_hat = SD.fst(uj, f_hat)
+    # Check if SB.scalar_product(f') equals Cm*SD.forward(f)
+    f_hat = SD.forward(uj, f_hat)
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
 
@@ -644,15 +644,15 @@ def test_Mult_Div():
     vk0 = np.zeros(N, dtype=np.complex)
     wk0 = np.zeros(N, dtype=np.complex)
 
-    uk0 = SD.fst(uk, uk0)
-    uk  = SD.ifst(uk0, uk)
-    uk0 = SD.fst(uk, uk0)
-    vk0 = SD.fst(vk, vk0)
-    vk  = SD.ifst(vk0, vk)
-    vk0 = SD.fst(vk, vk0)
-    wk0 = SD.fst(wk, wk0)
-    wk  = SD.ifst(wk0, wk)
-    wk0 = SD.fst(wk, wk0)
+    uk0 = SD.forward(uk, uk0)
+    uk  = SD.backward(uk0, uk)
+    uk0 = SD.forward(uk, uk0)
+    vk0 = SD.forward(vk, vk0)
+    vk  = SD.backward(vk0, vk)
+    vk0 = SD.forward(vk, vk0)
+    wk0 = SD.forward(wk, wk0)
+    wk  = SD.backward(wk0, wk)
+    wk0 = SD.forward(wk, wk0)
 
     LUsolve.Mult_Div_1D(N, 7, 7, uk0[:N-2], vk0[:N-2], wk0[:N-2], b[1:N-2])
 
@@ -709,13 +709,13 @@ def test_ADDmat(ST, quad):
     u_hat[s] = solve(A.diags().toarray()[s,s], f_hat[s])
 
     u0 = np.zeros(M)
-    u0 = ST.ifst(u_hat, u0)
+    u0 = ST.backward(u_hat, u0)
 
     #from IPython import embed; embed()
     assert np.allclose(u0, uj)
 
     u1 = np.zeros(M)
-    u1 = ST.fst(uj, u1)
+    u1 = ST.forward(uj, u1)
     c = np.zeros_like(u1)
     c = A.matvec(u1, c)
 
@@ -741,12 +741,12 @@ def test_SBBmat(quad):
     u_hat[:-4] = la.spsolve(A.diags(), f_hat[:-4])
 
     u0 = np.zeros(M)
-    u0 = SB.ifst(u_hat, u0)
+    u0 = SB.backward(u_hat, u0)
 
     assert np.allclose(u0, uj)
 
     u1 = np.zeros(M)
-    u1 = SB.fst(uj, u1)
+    u1 = SB.forward(uj, u1)
 
     c = np.zeros_like(u1)
     c = A.matvec(u1, c)
@@ -784,12 +784,12 @@ def test_ABBmat(quad):
     u_hat[:-4] = la.spsolve(A.diags(), f_hat[:-4])
 
     u0 = np.zeros(M)
-    u0 = SB.ifst(u_hat, u0)
+    u0 = SB.backward(u_hat, u0)
 
     assert np.allclose(u0, uj)
 
     u1 = np.zeros(M)
-    u1 = SB.fst(uj, u1)
+    u1 = SB.forward(uj, u1)
     c = np.zeros_like(u1)
     c = A.matvec(u1, c)
 
@@ -807,8 +807,8 @@ def test_ABBmat(quad):
     B = BBBmat(np.arange(M).astype(np.float), SB.quad)
     u0 = np.random.randn(M)
     u0_hat = np.zeros(M)
-    u0_hat = SB.fst(u0, u0_hat)
-    u0 = SB.ifst(u0_hat, u0)
+    u0_hat = SB.forward(u0, u0_hat)
+    u0 = SB.backward(u0_hat, u0)
     b = np.zeros(M)
     k = 2.
     c0 = np.zeros_like(u0_hat)
@@ -818,7 +818,7 @@ def test_ABBmat(quad):
     z0_hat = np.zeros(M)
     z0_hat[:-4] = solve(AA, b[:-4])
     z0 = np.zeros(M)
-    z0 = SB.ifst(z0_hat, z0)
+    z0 = SB.backward(z0_hat, z0)
     assert np.allclose(z0, u0)
 
 
@@ -836,7 +836,7 @@ def test_ABBmat(quad):
     z0_hat = np.zeros((M, 4, 4), dtype=np.complex)
     z0_hat = BH(z0_hat, b)
     z0 = np.zeros((M, 4, 4))
-    z0 = SB.ifst(z0_hat.real, z0)
+    z0 = SB.backward(z0_hat.real, z0)
     #from IPython import embed; embed()
     assert np.allclose(z0, u0)
 
@@ -911,15 +911,15 @@ def test_Helmholtz2(quad):
     points, weights = SD.points_and_weights(M,  SD.quad)
     uj = np.random.randn(M)
     u_hat = np.zeros(M)
-    u_hat = SD.fst(uj, u_hat)
-    uj = SD.ifst(u_hat, uj)
+    u_hat = SD.forward(uj, u_hat)
+    uj = SD.backward(u_hat, uj)
 
     A = ADDmat(np.arange(M).astype(np.float))
     B = BDDmat(np.arange(M).astype(np.float), SD.quad)
     s = SD.slice(M)
 
     u1 = np.zeros(M)
-    u1 = SD.fst(uj, u1)
+    u1 = SD.forward(uj, u1)
     c0 = np.zeros_like(u1)
     c1 = np.zeros_like(u1)
     c = A.matvec(u1, c0)+kx**2*B.matvec(u1, c1)
@@ -958,12 +958,12 @@ def test_Mult_CTD(quad):
     cv = np.zeros(N, dtype=np.complex)
     cw = np.zeros(N, dtype=np.complex)
 
-    vk0 = SD.fst(vk, vk0)
-    vk  = SD.ifst(vk0, vk)
-    vk0 = SD.fst(vk, vk0)
-    wk0 = SD.fst(wk, wk0)
-    wk  = SD.ifst(wk0, wk)
-    wk0 = SD.fst(wk, wk0)
+    vk0 = SD.forward(vk, vk0)
+    vk  = SD.backward(vk0, vk)
+    vk0 = SD.forward(vk, vk0)
+    wk0 = SD.forward(wk, wk0)
+    wk  = SD.backward(wk0, wk)
+    wk0 = SD.forward(wk, wk0)
 
     LUsolve.Mult_CTD_1D(N, vk0, wk0, bv, bw)
 
@@ -997,12 +997,12 @@ def test_Mult_CTD_3D(quad):
     cv = np.zeros((N,4,4), dtype=np.complex)
     cw = np.zeros((N,4,4), dtype=np.complex)
 
-    vk0 = SD.fst(vk, vk0)
-    vk  = SD.ifst(vk0, vk)
-    vk0 = SD.fst(vk, vk0)
-    wk0 = SD.fst(wk, wk0)
-    wk  = SD.ifst(wk0, wk)
-    wk0 = SD.fst(wk, wk0)
+    vk0 = SD.forward(vk, vk0)
+    vk  = SD.backward(vk0, vk)
+    vk0 = SD.forward(vk, vk0)
+    wk0 = SD.forward(wk, wk0)
+    wk  = SD.backward(wk0, wk)
+    wk0 = SD.forward(wk, wk0)
 
     #from IPython import embed; embed()
     LUsolve.Mult_CTD_3D_n(N, vk0, wk0, bv, bw)
@@ -1045,7 +1045,7 @@ def test_Biharmonic(quad):
     u_hat = np.zeros(M)
     u_hat[:-4] = la.spsolve(AA, f_hat[:-4])
     u1 = np.zeros(M)
-    u1 = SB.ifst(u_hat, u1)
+    u1 = SB.backward(u_hat, u1)
     #from IPython import embed; embed()
 
     assert np.allclose(u1, uj)
@@ -1060,8 +1060,8 @@ def test_Helmholtz_matvec(quad):
     points, weights = SD.points_and_weights(M,  SD.quad)
     uj = np.random.randn(M)
     u_hat = np.zeros(M)
-    u_hat = SD.fst(uj, u_hat)
-    uj = SD.ifst(u_hat, uj)
+    u_hat = SD.forward(uj, u_hat)
+    uj = SD.backward(u_hat, uj)
 
     A = ADDmat(np.arange(M).astype(np.float))
     B = BDDmat(np.arange(M).astype(np.float), SD.quad)
@@ -1069,7 +1069,7 @@ def test_Helmholtz_matvec(quad):
     s = SD.slice(M)
 
     u1 = np.zeros(M)
-    u1 = SD.fst(uj, u1)
+    u1 = SD.forward(uj, u1)
     c0 = np.zeros_like(u1)
     c1 = np.zeros_like(u1)
     c = A.matvec(u1, c0)+kx**2*B.matvec(u1, c1)
