@@ -45,8 +45,6 @@ class SpectralBasis(object):
 
     args:
         quad        ('GL', 'GC')  Chebyshev-Gauss-Lobatto or Chebyshev-Gauss
-        threads          1        Number of threads used by pyfftw
-        planner_effort            Planner effort for FFTs.
 
     Transforms are performed along the first dimension of a multidimensional
     array.
