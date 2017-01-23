@@ -18,7 +18,8 @@ comm = MPI.COMM_WORLD
 N = 32
 x = Symbol("x")
 
-Basis = (ChebyshevTransform, ShenDirichletBasis, ShenNeumannBasis, ShenBiharmonicBasis)
+Basis = (ChebyshevTransform, ShenDirichletBasis, ShenNeumannBasis,
+         ShenBiharmonicBasis)
 quads = ('GC', 'GL')
 
 @pytest.mark.parametrize('ST', Basis)
@@ -37,7 +38,6 @@ def test_scalarproduct(ST, quad):
     u1 = ST.scalar_product(fj, u1)
     assert np.allclose(u1, u0)
 
-#test_scalarproduct(ShenDirichletBasis, 'GC')
 
 @pytest.mark.parametrize('ST', Basis[1:3])
 @pytest.mark.parametrize('quad', quads)
@@ -842,7 +842,6 @@ def test_ABBmat(quad):
 
 #test_ABBmat(ShenBiharmonicBasis("GC"))
 
-#@profile
 @pytest.mark.parametrize('ST', Basis[1:3])
 @pytest.mark.parametrize('quad', quads)
 def test_Helmholtz(ST, quad):

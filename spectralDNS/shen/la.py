@@ -69,7 +69,7 @@ class TDMA(object):
     """Tridiagonal matrix solver
 
     args:
-        basis       ShenNeumannBasis or ShenDirichletBasis
+        basis       ShenNeumannBasis, ShenDirichletBasis or ShenLegendreDirichletBasis
 
     """
 

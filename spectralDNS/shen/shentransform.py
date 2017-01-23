@@ -1,7 +1,8 @@
 import numpy as np
-from numpy import array, zeros_like, sum, hstack, meshgrid, abs, pi, uint8, \
-    rollaxis, arange
+from numpy import array, zeros, zeros_like, ones, sum, hstack, meshgrid, abs, \
+    pi, uint8, rollaxis, arange, float, complex
 from numpy.polynomial import chebyshev as n_cheb
+from numpy.polynomial import legendre as leg
 from mpiFFT4py import dct, work_arrays, Slab_R2C, fftfreq, rfftfreq, rfft2, \
     irfft2, rfft, irfft, fft, ifft
 from . import Cheb
@@ -36,33 +37,39 @@ The ChebyshevTransform may be used to compute derivatives
 through fast Chebyshev transforms.
 
 """
-float, complex = np.float64, np.complex128
-pi, zeros, ones = np.pi, np.zeros, np.ones
 work = work_arrays()
 
 class SpectralBase(object):
     """Base class for all spectral function spaces
-
-    args:
-        quad        ('GL', 'GC')  Chebyshev-Gauss-Lobatto or Chebyshev-Gauss
 
     Transforms are performed along the first dimension of a multidimensional
     array.
 
     """
 
-    def __init__(self, quad="GC"):
-        self.quad = quad
-
     def points_and_weights(self, N, quad):
         """Return points and weights of quadrature
 
         args:
-            N      integer      Number of points
-            quad ('GL', 'GC')   Chebyshev-Gauss-Lobatto or Chebyshev-Gauss
+            N      integer            Number of points
+            quad ('GL', 'GC', 'LG')   Chebyshev-Gauss-Lobatto, Chebyshev-Gauss
+                                      or Legendre-Gauss
 
         """
         raise NotImplementedError
+
+    def wavenumbers(self, N):
+        """Return the wavenumbermesh
+
+        The first axis is inhomogeneous, and if ndim(N) > 1, then the trailing
+        axes are assumed to be periodic.
+
+        """
+        N = list(N) if np.ndim(N) else [N]
+        s = [self.slice(N[0])]
+        for n in N[1:]:
+            s.append(slice(0, n))
+        return np.mgrid.__getitem__(s).astype(float)[0]
 
     def evaluate_basis_all(self, fk, fj):
         """Evaluate basis on entire mesh
@@ -189,7 +196,7 @@ class SpectralBase(object):
         """Return shape of current basis"""
         return N
 
-
+@inheritdocstrings
 class ChebyshevBase(SpectralBase):
     """Base class for all Chebyshev based function spaces
 
@@ -202,7 +209,8 @@ class ChebyshevBase(SpectralBase):
     """
 
     def __init__(self, quad="GC"):
-        SpectralBase.__init__(self, quad)
+        SpectralBase.__init__(self)
+        self.quad = quad
 
     def points_and_weights(self, N, quad):
         """Return points and weights of quadrature
@@ -238,7 +246,8 @@ class ChebyshevBase(SpectralBase):
     def get_vandermonde_basis_derivative(self, V, der=0):
         """Return derivatives of basis as a Vandermonde matrix
 
-        V is the Chebyshev Vandermonde matrix
+        args:
+            V               Chebyshev Vandermonde matrix
 
         """
         N = V.shape[0]
@@ -419,13 +428,6 @@ class ShenDirichletBasis(ChebyshevBase):
         from .la import TDMA
         self.solver = TDMA(self)
 
-    def wavenumbers(self, N):
-        N = list(N) if np.ndim(N) else [N]
-        s = [self.slice(N[0])]
-        for n in N[1:]:
-            s.append(slice(0, n))
-        return np.mgrid.__getitem__(s).astype(float)[0]
-
     def get_vandermonde_basis(self, V):
         P = np.zeros(V.shape)
         P[:, :-2] = V[:, :-2] - V[:, 2:]
@@ -487,6 +489,7 @@ class ShenDirichletBasis(ChebyshevBase):
     def get_shape(self, N):
         return N-2
 
+
 @inheritdocstrings
 class ShenNeumannBasis(ChebyshevBase):
     """Shen basis for homogeneous Neumann boundary conditions
@@ -510,16 +513,9 @@ class ShenNeumannBasis(ChebyshevBase):
         from .la import TDMA
         self.solver = TDMA(self)
 
-    def wavenumbers(self, N):
-        N = list(N) if np.ndim(N) else [N]
-        s = [slice(0, N[0]-2)]
-        for n in N[1:]:
-            s.append(slice(0, n))
-        return np.mgrid.__getitem__(s).astype(float)[0]
-
     def get_vandermonde_basis(self, V):
         P = np.zeros(V.shape)
-        k = np.arange(V.shape[1]).astype(np.float)[:-2]
+        k = arange(V.shape[0]).astype(np.float)[:-2]
         P[:, :-2] = V[:, :-2] - (k/(k+2))**2*V[:, 2:]
         return P
 
@@ -529,7 +525,7 @@ class ShenNeumannBasis(ChebyshevBase):
                 k = self.wavenumbers(v.shape)
             elif len(v.shape)==1:
                 k = self.wavenumbers(v.shape[0])
-            self._factor = (k[1:]/(k[1:]+2))**2
+            self._factor = (k/(k+2))**2
 
     def scalar_product(self, fj, fk, fast_transform=True):
         if fast_transform:
@@ -606,16 +602,9 @@ class ShenBiharmonicBasis(ChebyshevBase):
         self._factor2 = zeros(0)
         self.solver = PDMA(quad)
 
-    def wavenumbers(self, N):
-        N = list(N) if np.ndim(N) else [N]
-        s = [self.slice(N[0])]
-        for n in N[1:]:
-            s.append(slice(0, n))
-        return np.mgrid.__getitem__(s).astype(float)[0]
-
     def get_vandermonde_basis(self, V):
-        P = np.zeros_like(V)
-        k = np.arange(V.shape[1]).astype(np.float)[:-4]
+        P = zeros_like(V)
+        k = arange(V.shape[1]).astype(np.float)[:-4]
         P[:, :-4] = V[:, :-4] - (2*(k+2)/(k+3))*V[:, 2:-2] + ((k+1)/(k+3))*V[:, 4:]
         return P
 
@@ -625,7 +614,7 @@ class ShenBiharmonicBasis(ChebyshevBase):
                 k = self.wavenumbers(v.shape)
             elif len(v.shape)==1:
                 k = self.wavenumbers(v.shape[0])
-                #k = np.array(map(decimal.Decimal, np.arange(v.shape[0]-4)))
+                #k = np.array(map(decimal.Decimal, arange(v.shape[0]-4)))
 
             self._factor1 = (-2*(k+2)/(k+3)).astype(float)
             self._factor2 = ((k+1)/(k+3)).astype(float)
@@ -686,6 +675,209 @@ class ShenBiharmonicBasis(ChebyshevBase):
 
     def get_shape(self, N):
         return N-4
+
+
+class LegendreBase(SpectralBase):
+    """Base class for all Legendre based function spaces
+
+    args:
+        quad        ('LG')  Legendre-Gauss
+
+    Transforms are performed along the first dimension of a multidimensional
+    array.
+
+    """
+
+    def __init__(self, quad="LG"):
+        SpectralBase.__init__(self)
+        self.quad = quad
+
+    def points_and_weights(self, N, quad):
+        """Return points and weights of quadrature
+
+        args:
+            N      integer      Number of points
+            quad ('LG', )       Legendre-Gauss
+
+        """
+        if quad == "LG":
+            points, weights = leg.leggauss(N)
+        else:
+            raise NotImplementedError
+
+        return points, weights
+
+    def vandermonde(self, x, N):
+        """Return Legendre Vandermonde matrix
+
+        args:
+            x               points for evaluation
+            N               Number of Legendre polynomials
+
+        """
+        return leg.legvander(x, N-1)
+
+    def get_vandermonde_basis_derivative(self, V, k=0):
+        """Return k'th derivatives of basis as a Vandermonde matrix
+
+        args:
+            V               Legendre Vandermonde matrix
+
+        kwargs:
+            k     integer   Use k'th derivative of basis
+
+        """
+        N = V.shape[0]
+        if k > 0:
+            D = np.zeros((N, N))
+            D[:-k, :] = leg.legder(np.eye(N), k)
+            V  = np.dot(V, D)
+        return self.get_vandermonde_basis(V)
+
+
+@inheritdocstrings
+class LegendreTransform(LegendreBase):
+    """Basis for regular Legendre series
+
+    args:
+        quad        ('LG',)       Legendre-Gauss
+
+    Transforms are performed along the first dimension of a multidimensional
+    array.
+
+    """
+
+    def __init__(self, quad="LG"):
+        LegendreBase.__init__(self, quad)
+
+    def forward(self, fj, fk):
+        fk = self.flt(fj, fk)
+        return fk
+
+    def backward(self, fk, fj):
+        fj = self.iflt(fk, fj)
+        return fj
+
+    def flt(self, fj, fk, fast_transform=False):
+        """Fast Legendre transform.
+
+        args:
+            fj   (input)     Function values on quadrature mesh
+            fk   (output)    Expansion coefficients
+
+        kwargs:
+            fast_transform   bool - If True use fast transforms,
+                             if False use Vandermonde type
+
+
+        """
+        fk = self.scalar_product(fj, fk, fast_transform)
+        fk = self.solver(fk)
+        return fk
+
+    def iflt(self, fk, fj, fast_transform=False):
+        """Inverse fast Legendre transform.
+
+        args:
+            fk   (input)     Expansion coefficients
+            fj   (output)    Function values on quadrature mesh
+
+        kwargs:
+            fast_transform   bool - If True use fast transforms,
+                             if False use Vandermonde type
+
+        """
+        if fast_transform:
+            fj = self.evaluate_basis_all(fk, fj)
+        else:
+            fj = self.vandermonde_evaluate_basis_all(fk, fj)
+        return fj
+
+    def evaluate_basis_all(self, fk, fj):
+        raise NotImplementedError
+
+    def scalar_product(self, fj, fk, fast_transform=False):
+        N = fj.shape[0]
+        if fast_transform:
+            raise NotImplementedError
+        else:
+            fk = self.vandermonde_scalar_product(fj, fk)
+
+        return fk
+
+    def slice(self, N):
+        return slice(0, N)
+
+    def get_shape(self, N):
+        return N
+
+
+@inheritdocstrings
+class ShenLegendreDirichletBasis(LegendreBase):
+    """Shen Legendre basis for Dirichlet boundary conditions
+
+    args:
+        quad        ('LG',)       Legendre-Gauss
+
+    Transforms are performed along the first dimension of a multidimensional
+    array.
+
+    """
+
+    def __init__(self, quad="LG"):
+        LegendreBase.__init__(self, quad)
+        self.LT = LegendreTransform(quad)
+        from .la import TDMA
+        self.solver = TDMA(self)
+
+    def get_vandermonde_basis(self, V):
+        P = np.zeros(V.shape)
+        P[:, :-2] = V[:, :-2] - V[:, 2:]
+        return P
+
+    def scalar_product(self, fj, fk, fast_transform=False):
+        if fast_transform:
+            fk = self.LT.scalar_product(fj, fk)
+            fk[:-2] -= fk[2:]
+        else:
+            fk = self.vandermonde_scalar_product(fj, fk)
+
+        fk[-2:] = 0     # Last two not used, so set to zero. Even for nonhomogeneous bcs, where they are technically non-zero
+        return fk
+
+    def evaluate_basis_all(self, fk, fj):
+        w_hat = work[(fk, 0)]
+        w_hat[:-2] = fk[:-2]
+        w_hat[2:] -= fk[:-2]
+        fj = self.LT.ifct(w_hat, fj)
+        return fj
+
+    def ifst(self, fk, fj, fast_transform=False):
+        if fast_transform:
+            fj = self.evaluate_basis_all(fk, fj)
+        else:
+            fj = self.vandermonde_evaluate_basis_all(fk, fj)
+
+        return fj
+
+    def fst(self, fj, fk, fast_transform=False):
+        fk = self.scalar_product(fj, fk, fast_transform)
+        fk = self.solver(fk)
+        return fk
+
+    def forward(self, fj, fk):
+        fk = self.fst(fj, fk)
+        return fk
+
+    def backward(self, fk, fj):
+        fj = self.ifst(fk, fj)
+        return fj
+
+    def slice(self, N):
+        return slice(0, N-2)
+
+    def get_shape(self, N):
+        return N-2
 
 
 class SlabShen_R2C(Slab_R2C):
@@ -868,7 +1060,7 @@ class SlabShen_R2C(Slab_R2C):
                 Uc_hatT = rfft2(u, Uc_hatT, axes=(1, 2), threads=self.threads, planner_effort=self.planner_effort['rfft2'])
 
                 #Transform data to align with x-direction
-                U_mpi[:] = np.rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
+                U_mpi[:] = rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
 
                 #Communicate all values
                 self.comm.Alltoall([U_mpi, self.mpitype], [Uc_hat, self.mpitype])
@@ -1018,7 +1210,7 @@ class SlabShen_R2C(Slab_R2C):
                 Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
                 #Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0, False)]
                 #self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
-                #Uc_hatT = np.rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
+                #Uc_hatT = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
 
             elif self.communication == 'Alltoallw':
                 if len(self._subarraysA) == 0:
