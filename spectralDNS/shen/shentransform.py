@@ -282,9 +282,9 @@ class ChebyshevTransform(ChebyshevBase):
 
         """
         if len(fk.shape) == 1:
-            ck = Cheb.cheb_derivative_coefficients(fk, ck)
+            ck = Cheb.derivative_coefficients(fk, ck)
         elif len(fk.shape) == 3:
-            ck = Cheb.cheb_derivative_coefficients_3D(fk, ck)
+            ck = Cheb.derivative_coefficients_3D(fk, ck)
         return ck
 
     def fast_derivative(self, fj, fd):
