@@ -14,7 +14,7 @@ from collections import OrderedDict
 import six
 from copy import deepcopy
 
-pi, zeros, ones, array = pi, np.zeros, np.ones, np.array
+pi, zeros, ones, array = np.pi, np.zeros, np.ones, np.array
 float, complex = np.float64, np.complex128
 
 class SparseMatrix(dict):
