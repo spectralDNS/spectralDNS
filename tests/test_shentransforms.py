@@ -385,7 +385,7 @@ def test_CDDmat(quad):
     uc_hat = np.zeros(M)
     uc_hat = SD.CT.forward(uj, uc_hat)
     du_hat = np.zeros(M)
-    dudx_j = SD.CT.fast_cheb_derivative(uj, dudx_j)
+    dudx_j = SD.CT.fast_derivative(uj, dudx_j)
 
     Cm = CDDmat(np.arange(M).astype(np.float))
     TDMASolver = TDMA(SD)
@@ -441,7 +441,7 @@ def test_CXXmat(mat):
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
-    df = S2.CT.fast_cheb_derivative(fj, df)
+    df = S2.CT.fast_derivative(fj, df)
     cs2 = np.zeros(N)
     cs2 = S1.scalar_product(df, cs2)
 
@@ -477,7 +477,7 @@ def test_CDTmat(quad):
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
-    df = ST.fast_cheb_derivative(fj, df)
+    df = ST.fast_derivative(fj, df)
     cs2 = np.zeros(N)
     cs2 = SD.scalar_product(df, cs2)
 
@@ -514,7 +514,7 @@ def test_CTDmat(quad):
     cs = np.zeros_like(f_hat)
     cs = Cm.matvec(f_hat, cs)
     df = np.zeros(N)
-    df = ST.fast_cheb_derivative(fj, df)
+    df = ST.fast_derivative(fj, df)
     cs2 = np.zeros(N)
     cs2 = ST.scalar_product(df, cs2)
 
@@ -561,7 +561,7 @@ def test_CDBmat(quad):
     cs = Cm.matvec(f_hat, cs)
 
     df = np.zeros(M)
-    df = SB.CT.fast_cheb_derivative(uj, df)
+    df = SB.CT.fast_derivative(uj, df)
     cs2 = np.zeros(M)
     cs2 = SD.scalar_product(df, cs2)
 
@@ -608,7 +608,7 @@ def test_CBDmat(quad):
     cs = Cm.matvec(f_hat, cs)
 
     df = np.zeros(M)
-    df = SD.CT.fast_cheb_derivative(uj, df)
+    df = SD.CT.fast_derivative(uj, df)
     cs2 = np.zeros(M)
     cs2 = SB.scalar_product(df, cs2)
 
