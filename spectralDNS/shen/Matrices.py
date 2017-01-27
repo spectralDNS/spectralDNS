@@ -1,8 +1,5 @@
 from .Matvec import Biharmonic_matvec, Biharmonic_matvec3D, Helmholtz_matvec3D, \
     Helmholtz_matvec
-
-from shenfun.chebyshev.bases import ChebyshevBasis, ShenDirichletBasis, ShenNeumannBasis, \
-    ShenBiharmonicBasis
 from shenfun.chebyshev.matrices import BDDmat, ADDmat, BBBmat, ABBmat, SBBmat
 
 

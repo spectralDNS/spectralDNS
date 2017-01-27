@@ -3,7 +3,7 @@ from mpiFFT4py import dct, work_arrays, Slab_R2C, fftfreq, rfft2, \
     irfft2, rfft, irfft, fft, ifft
 from mpi4py import MPI
 from numpy import array, zeros, zeros_like, sum, hstack, meshgrid, abs, \
-    pi, uint8, rollaxis, arange, float
+    pi, uint8, rollaxis, arange
 import numpy as np
 from ..optimization import optimizer
 
@@ -477,7 +477,7 @@ class SlabShen_R2C(Slab_R2C):
                 ak = zeros_like(c)
                 ak = dct(c, ak, 1, axis=0)
                 ak /= (self.N[0]-1)
-                w = arange(0, self.N[0], 1, dtype=float)
+                w = arange(0, self.N[0], 1, dtype=self.float)
                 w[2:] = 2./(1-w[2:]**2)
                 w[0] = 1
                 w[1::2] = 0

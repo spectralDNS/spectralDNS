@@ -1,7 +1,7 @@
 from numpy import zeros, ones, arange, pi, float, complex, int, complex128, array
 from shenfun.chebyshev import matrices as cmatrices
 from shenfun.chebyshev.bases import ShenNeumannBasis, SpectralBase
-from . import LUsolve, TDMAsolve, PDMAsolve, Matvec
+from . import LUsolve, Matvec
 from scipy.linalg import lu_factor, lu_solve, solve, solve_banded, decomp_cholesky
 import scipy.sparse.linalg as la_solve
 
