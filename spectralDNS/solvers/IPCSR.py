@@ -4,7 +4,8 @@ __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from .IPCS import *
-from ..shen.Matrices import CDTmat, CTDmat, BDTmat, BTDmat, BTTmat, BTNmat, CNDmat, BNDmat
+from shenfun.chebyshev.matrices import CDTmat, CTDmat, BDTmat, BTDmat, BTTmat,\
+    BTNmat, CNDmat, BNDmat, BNNmat, BDDmat
 
 def get_context():
     """Set up context for solver"""
@@ -58,20 +59,20 @@ def get_context():
     u = (U_hat, P_hat)
 
     nu, dt, N = params.nu, params.dt, params.N
+    kx = K[0, :, 0, 0]
 
     # Collect all linear algebra solvers
     la = config.AttributeDict(dict(
         HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), ST),
         HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2), SN),
-        TDMASolverD = TDMA(ST),
-        TDMASolverN = TDMA(SN)
+        TDMASolverD = TDMA(BDDmat(kx, ST.quad)),
+        TDMASolverN = TDMA(BNNmat(kx, SN.quad))
         )
     )
 
     alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
 
     # Collect all matrices
-    kx = K[0, :, 0, 0]
     mat = config.AttributeDict(dict(
         CDN = CDNmat(kx),
         CND = CNDmat(kx),

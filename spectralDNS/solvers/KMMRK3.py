@@ -72,7 +72,7 @@ def get_context():
                                         -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0]), quad=SB.quad,
                                         solver="cython") for rk in range(3)],
         HelmholtzSolverU0 = [Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST) for rk in range(3)],
-        TDMASolverD = TDMA(ST)
+        TDMASolverD = TDMA(BDDmat(kx, ST.quad))
         )
     )
 

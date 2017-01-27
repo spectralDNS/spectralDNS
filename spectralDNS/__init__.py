@@ -62,7 +62,7 @@ def solve(solver, context):
 
     args:
         solver       The solver (e.g., NS or VV) module
-        context      The solver's context from setup()
+        context      The solver's context
 
     global args:
         params       Dictionary (config.params) of parameters

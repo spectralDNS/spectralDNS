@@ -1,11 +1,9 @@
 from numpy import zeros, ones, arange, pi, float, complex, int, complex128, array
-from .Matrices import BBBmat, SBBmat, ABBmat, BDDmat, BNNmat, ADDmat
-from .Matrices import mass_matrix
-from .shentransform import ShenNeumannBasis, SpectralBase
+from shenfun.chebyshev import matrices as cmatrices
+from shenfun.chebyshev.bases import ShenNeumannBasis, SpectralBase
 from . import LUsolve, TDMAsolve, PDMAsolve, Matvec
 from scipy.linalg import lu_factor, lu_solve, solve, solve_banded, decomp_cholesky
 import scipy.sparse.linalg as la_solve
-import decimal
 
 class Helmholtz(object):
     """Helmholtz solver -u'' + alfa*u = b
@@ -41,18 +39,21 @@ class Helmholtz(object):
             self.L  = zeros((2, M), float)     # The single nonzero row of L
             LUsolve.LU_Helmholtz_1D(N, self.neumann, quad=="GL", self.alfa, self.u0, self.u1, self.u2, self.L)
         if not self.neumann:
-            self.B = BDDmat(arange(N), quad)
-            self.A = ADDmat(arange(N))
+            self.B = cmatrices.BDDmat(arange(N), quad)
+            self.A = cmatrices.ADDmat(arange(N))
 
     def __call__(self, u, b):
+        s = self.s
+        if isinstance(self.basis, ShenNeumannBasis):
+            s = slice(1, self.s.stop)
         if len(u.shape) > 1:
-            LUsolve.Solve_Helmholtz_3D_n(self.N, self.neumann, b[self.s], u[self.s], self.u0, self.u1, self.u2, self.L)
+            LUsolve.Solve_Helmholtz_3D_n(self.N, self.neumann, b[s], u[s], self.u0, self.u1, self.u2, self.L)
         else:
             if u.dtype == complex128:
-                LUsolve.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s].real, u[self.s].real, self.u0, self.u1, self.u2, self.L)
-                LUsolve.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s].imag, u[self.s].imag, self.u0, self.u1, self.u2, self.L)
+                LUsolve.Solve_Helmholtz_1D(self.N, self.neumann, b[s].real, u[s].real, self.u0, self.u1, self.u2, self.L)
+                LUsolve.Solve_Helmholtz_1D(self.N, self.neumann, b[s].imag, u[s].imag, self.u0, self.u1, self.u2, self.L)
             else:
-                LUsolve.Solve_Helmholtz_1D(self.N, self.neumann, b[self.s], u[self.s], self.u0, self.u1, self.u2, self.L)
+                LUsolve.Solve_Helmholtz_1D(self.N, self.neumann, b[s], u[s], self.u0, self.u1, self.u2, self.L)
         return u
 
     def matvec(self, v, c):
@@ -64,150 +65,6 @@ class Helmholtz(object):
             Matvec.Helmholtz_matvec(v, c, 1.0, self.alfa**2, self.A[0], self.A[2], self.B[0])
         return c
 
-
-class TDMA(object):
-    """Tridiagonal matrix solver
-
-    args:
-        basis       ShenNeumannBasis, ShenDirichletBasis or ShenLegendreDirichletBasis
-
-    """
-
-    def __init__(self, basis):
-        assert isinstance(basis, SpectralBase)
-        self.basis = basis
-        self.dd = zeros(0)
-
-    def init(self, N):
-        M = self.basis.get_shape(N)
-        B = mass_matrix[self.basis.__class__.__name__](arange(N).astype(float), self.basis.quad)
-        self.dd = B[0].copy()*ones(M)
-        self.ud = B[2].copy()*ones(M-2)
-        self.L = zeros(M-2)
-        self.s = self.basis.slice(N)
-        TDMAsolve.TDMA_SymLU(self.dd[self.s], self.ud[self.s], self.L)
-
-    def __call__(self, u):
-        N = u.shape[0]
-        if not self.dd.shape[0] == u.shape[0]:
-            self.init(N)
-        if len(u.shape) == 3:
-            #TDMAsolve.TDMA_3D(self.ud, self.dd, self.dd.copy(), self.ud.copy(), u[self.s])
-            TDMAsolve.TDMA_SymSolve3D(self.dd[self.s], self.ud[self.s], self.L, u[self.s])
-        elif len(u.shape) == 1:
-            #TDMAsolve.TDMA_1D(self.ud, self.dd, self.dd.copy(), self.ud.copy(), u[self.s])
-            TDMAsolve.TDMA_SymSolve(self.dd[self.s], self.ud[self.s], self.L, u[self.s])
-        else:
-            raise NotImplementedError
-        return u
-
-class PDMA(object):
-    """Pentadiagonal matrix solver
-
-    kwargs:
-        quad        ('GL', 'GC')  Chebyshev-Gauss-Lobatto or Chebyshev-Gauss
-        solver      ('cython', 'python') Choose implementation
-    """
-
-    def __init__(self, quad="GL", solver="cython"):
-        self.quad = quad
-        self.B = zeros(0)
-        self.solver = solver
-
-    def init(self, N):
-        self.B = BBBmat(arange(N), self.quad)
-        if self.solver == "cython":
-            self.d0, self.d1, self.d2 = self.B[0].copy(), self.B[2].copy(), self.B[4].copy()
-            PDMAsolve.PDMA_SymLU(self.d0, self.d1, self.d2)
-            #self.SymLU(self.d0, self.d1, self.d2)
-            ##self.d0 = self.d0.astype(float)
-            ##self.d1 = self.d1.astype(float)
-            ##self.d2 = self.d2.astype(float)
-        else:
-            #self.L = lu_factor(self.B.diags().toarray())
-            self.d0, self.d1, self.d2 = self.B[0].copy(), self.B[2].copy(), self.B[4].copy()
-            #self.A = zeros((9, N-4))
-            #self.A[0, 4:] = self.d2
-            #self.A[2, 2:] = self.d1
-            #self.A[4, :] = self.d0
-            #self.A[6, :-2] = self.d1
-            #self.A[8, :-4] = self.d2
-            self.A = zeros((5, N-4))
-            self.A[0, 4:] = self.d2
-            self.A[2, 2:] = self.d1
-            self.A[4, :] = self.d0
-            self.L = decomp_cholesky.cholesky_banded(self.A)
-
-    def SymLU(self, d, e, f):
-        n = d.shape[0]
-        m = e.shape[0]
-        k = n - m
-
-        for i in range(n-2*k):
-            lam = e[i]/d[i]
-            d[i+k] -= lam*e[i]
-            e[i+k] -= lam*f[i]
-            e[i] = lam
-            lam = f[i]/d[i]
-            d[i+2*k] -= lam*f[i]
-            f[i] = lam
-
-        lam = e[n-4]/d[n-4]
-        d[n-2] -= lam*e[n-4]
-        e[n-4] = lam
-        lam = e[n-3]/d[n-3]
-        d[n-1] -= lam*e[n-3]
-        e[n-3] = lam
-
-    def SymSolve(self, d, e, f, b):
-        n = d.shape[0]
-        #bc = array(map(decimal.Decimal, b))
-        bc = b
-
-        bc[2] -= e[0]*bc[0]
-        bc[3] -= e[1]*bc[1]
-        for k in range(4, n):
-            bc[k] -= (e[k-2]*bc[k-2] + f[k-4]*bc[k-4])
-
-        bc[n-1] /= d[n-1]
-        bc[n-2] /= d[n-2]
-        bc[n-3] /= d[n-3]
-        bc[n-3] -= e[n-3]*bc[n-1]
-        bc[n-4] /= d[n-4]
-        bc[n-4] -= e[n-4]*bc[n-2]
-        for k in range(n-5,-1,-1):
-            bc[k] /= d[k]
-            bc[k] -= (e[k]*bc[k+2] + f[k]*bc[k+4])
-        b[:] = bc.astype(float)
-
-    def __call__(self, u):
-        N = u.shape[0]
-        if not self.B.shape[0] == u.shape[0]:
-            self.init(N)
-        if len(u.shape) == 3:
-            if self.solver == "cython":
-                PDMAsolve.PDMA_Symsolve3D(self.d0, self.d1, self.d2, u[:-4])
-            else:
-                b = u.copy()
-                for i in range(u.shape[1]):
-                    for j in range(u.shape[2]):
-                        #u[:-4, i, j] = lu_solve(self.L, b[:-4, i, j])
-                        u[:-4, i, j] = la_solve.spsolve(self.B.diags(), b[:-4, i, j])
-
-        elif len(u.shape) == 1:
-            if self.solver == "cython":
-                PDMAsolve.PDMA_Symsolve(self.d0, self.d1, self.d2, u[:-4])
-                #self.SymSolve(self.d0, self.d1, self.d2, u[:-4])
-            else:
-                b = u.copy()
-                #u[:-4] = lu_solve(self.L, b[:-4])
-                #u[:-4] = la_solve.spsolve(self.B.diags(), b[:-4])
-                #u[:-4] = solve_banded((4, 4), self.A, b[:-4])
-                u[:-4] = decomp_cholesky.cho_solve_banded((self.L, False), b[:-4])
-        else:
-            raise NotImplementedError
-
-        return u
 
 class Biharmonic(object):
     """Biharmonic solver
@@ -229,9 +86,9 @@ class Biharmonic(object):
         self.quad = quad
         self.solver = solver
         k = arange(N)
-        self.S = S = SBBmat(k)
-        self.B = B = BBBmat(k, self.quad)
-        self.A = A = ABBmat(k)
+        self.S = S = cmatrices.SBBmat(k)
+        self.B = B = cmatrices.BBBmat(k, self.quad)
+        self.A = A = cmatrices.ABBmat(k)
         self.a0 = a0
         self.alfa = alfa
         self.beta = beta
@@ -328,3 +185,5 @@ class Biharmonic(object):
                                 self.S[4], self.A[-2], self.A[0], self.A[2],
                                 self.B[-4], self.B[-2], self.B[0], self.B[2], self.B[4])
         return c
+
+
