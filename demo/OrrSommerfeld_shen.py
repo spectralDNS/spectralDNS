@@ -9,10 +9,11 @@ from scipy.linalg import eig
 import numpy as np
 from numpy.linalg import inv
 from numpy.polynomial import chebyshev as n_cheb
-from spectralDNS.shen.shentransform import ShenBiharmonicBasis, \
-    ShenDirichletBasis, ChebyshevTransform
-from spectralDNS.shen.Matrices import CDBmat, ABBmat, SBBmat, BBBmat, \
-    extract_diagonal_matrix
+from shenfun.chebyshev.bases import ShenBiharmonicBasis, \
+    ShenDirichletBasis, ChebyshevBasis
+from shenfun.chebyshev.matrices import CDBmat, ABBmat, SBBmat, BBBmat
+from shenfun.matrixbase import extract_diagonal_matrix
+
 import six
 import warnings
 np.seterr(divide='ignore')
@@ -78,7 +79,7 @@ class OrrSommerfeld(object):
 
     def assemble(self):
         N = self.N
-        CT = ChebyshevTransform(quad=self.quad)
+        CT = ChebyshevBasis(quad=self.quad)
         x, w = self.x, self.w = CT.points_and_weights(N, self.quad)
         V = n_cheb.chebvander(x, N-1)
         D2 = np.zeros((N, N))

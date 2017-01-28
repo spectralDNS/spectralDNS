@@ -4,11 +4,15 @@ __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from .spectralinit import *
-from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, \
-    ShenBiharmonicBasis, SlabShen_R2C
-from ..shen.Matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, \
-    ADDmat, BDDmat, CDBmat, BiharmonicCoeff, HelmholtzCoeff
-from ..shen.la import Helmholtz, TDMA, Biharmonic
+from shenfun.chebyshev.bases import ShenDirichletBasis, ShenNeumannBasis, \
+    ShenBiharmonicBasis
+from shenfun.chebyshev.matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, \
+    ADDmat, BDDmat, CDBmat
+from shenfun.la import TDMA
+
+from ..shen.shentransform import SlabShen_R2C
+from ..shen.Matrices import BiharmonicCoeff, HelmholtzCoeff
+from ..shen.la import Helmholtz, Biharmonic
 from ..shen import LUsolve
 
 def get_context():
@@ -80,7 +84,7 @@ def get_context():
                                     -(K2[0] + nu*dt/2.*K4[0]), quad=SB.quad,
                                     solver="cython"),
         HelmholtzSolverU0 = Helmholtz(N[0], np.sqrt(2./nu/dt), ST),
-        TDMASolverD = TDMA(ST)
+        TDMASolverD = TDMA(BDDmat(kx, ST.quad))
         )
     )
 
@@ -258,12 +262,6 @@ def divergenceConvection(rhs, u_dealias, u_hat, K, FST, SB, ST, work, mat, la, a
     F_tmp  = work[(rhs, 0)]
     F_tmp2 = work[(rhs, 1)]
     U = u_dealias
-    #U_tmp[0] = chebDerivative_3D0(U[0]*U[0], U_tmp[0])
-    #U_tmp[1] = chebDerivative_3D0(U[0]*U[1], U_tmp[1])
-    #U_tmp[2] = chebDerivative_3D0(U[0]*U[2], U_tmp[2])
-    #rhs[0] = fss(U_tmp[0], rhs[0], ST)
-    #rhs[1] = fss(U_tmp[1], rhs[1], ST)
-    #rhs[2] = fss(U_tmp[2], rhs[2], ST)
 
     F_tmp[0] = FST.forward(U[0]*U[0], F_tmp[0], ST, dealias=params.dealias)
     F_tmp[1] = FST.forward(U[0]*U[1], F_tmp[1], ST, dealias=params.dealias)

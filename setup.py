@@ -45,15 +45,11 @@ if not "sdist" in sys.argv:
                     args], cwd=cdir)
 
     ext = []
-    for s in ("LUsolve", "TDMAsolve", "PDMAsolve", "Matvec"):
+    for s in ("LUsolve", "Matvec"):
         ext += cythonize(Extension("spectralDNS.shen.{0}".format(s),
                                    sources=[os.path.join(sdir, '{0}.pyx'.format(s))],
                                    language="c++"))  # , define_macros=define_macros
     [e.extra_link_args.extend(["-std=c++11"]) for e in ext]
-
-    for s in ("Cheb", ):
-        ext += cythonize(Extension("spectralDNS.shen.{0}".format(s),
-                                   sources = [os.path.join(sdir, '{0}.pyx'.format(s))]))
 
     [e.include_dirs.extend([get_include()]) for e in ext]
     ext0 = cythonize(os.path.join(cdir, "*.pyx"))

@@ -4,12 +4,15 @@ __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from .spectralinit import *
-from ..shen.Matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, CNDmat, \
-    HelmholtzCoeff
+from shenfun.chebyshev.matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, \
+    CNDmat, BNNmat
 from ..shen import LUsolve
-from ..shen.la import Helmholtz, TDMA
-from ..shen.shentransform import ShenDirichletBasis, ShenNeumannBasis, \
-    ShenBiharmonicBasis, SlabShen_R2C
+from ..shen.Matrices import HelmholtzCoeff
+from ..shen.la import Helmholtz
+from ..shen.shentransform import SlabShen_R2C
+from shenfun.chebyshev.bases import ShenDirichletBasis, ShenNeumannBasis, \
+    ShenBiharmonicBasis
+from shenfun.la import TDMA
 
 from functools import wraps
 
@@ -70,8 +73,8 @@ def get_context():
     la = config.AttributeDict(dict(
         HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), ST),
         HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2), SN),
-        TDMASolverD = TDMA(ST),
-        TDMASolverN = TDMA(SN)
+        TDMASolverD = TDMA(BDDmat(K[0, :, 0, 0], ST.quad)),
+        TDMASolverN = TDMA(BNNmat(K[0, :, 0, 0], SN.quad))
         )
     )
 
