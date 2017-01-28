@@ -25,15 +25,15 @@ or in-place using
 
     python setup.py build_ext --inplace
 
-spectralDNS requires that [mpiFFT4py](https://github.com/spectralDNS/mpiFFT4py) has been installed already. Other than that, it requires [*h5py*](http://www.h5py.org) built with parallel HDF5, for visualizing the results.  [*cython*](http://cython.org) is used to optimize a few routines. 
+spectralDNS depends on two other modules in the [spectralDNS](https://github.com/spectralDNS) organization: [mpiFFT4py](https://github.com/spectralDNS/mpiFFT4py) and [shenfun](https://github.com/spectralDNS/shenfun). Other than that, it requires [*h5py*](http://www.h5py.org) built with parallel HDF5, for visualizing the results, and [*cython*](http://cython.org) is used to optimize a few routines. 
 
 To install using Anaconda, you may compile it yourselves using (from the main directory)
 
     conda build -c conda-forge -c spectralDNS conf/conda
     conda install spectralDNS --use-local
 
-which will also build and install mpiFFT4py.
-You may also use precompiled binaries in the [*spectralDNS*](https://anaconda.org/spectralDNS/mpifft4py) channel on Anaconda cloud. Use for exampel
+which will also build and install mpiFFT4py and shenfun.
+You may also use precompiled binaries in the [*spectralDNS*](https://anaconda.org/spectralDNS) channel on Anaconda cloud. Use for exampel
 
     conda create --name spectralDNS -c conda-forge -c spectralDNS spectralDNS
     source activate spectralDNS
