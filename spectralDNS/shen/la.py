@@ -1,6 +1,6 @@
 from numpy import zeros, ones, arange, pi, float, complex, int, complex128, array
-from shenfun.chebyshev import matrices as cmatrices
-from shenfun.chebyshev.bases import ShenNeumannBasis, SpectralBase
+from shenfun import inner_product
+from shenfun.chebyshev import bases
 from . import LUsolve, Matvec
 from scipy.linalg import lu_factor, lu_solve, solve, solve_banded, decomp_cholesky
 import scipy.sparse.linalg as la_solve
@@ -21,7 +21,7 @@ class Helmholtz(object):
         self.N = N
         self.alfa = alfa
         self.basis = basis
-        self.neumann = True if isinstance(basis, ShenNeumannBasis) else False
+        self.neumann = True if isinstance(basis, bases.ShenNeumannBasis) else False
         quad = basis.quad
         M = (N-4)//2 if self.neumann else (N-3)//2
         self.s = basis.slice(N)
@@ -39,12 +39,12 @@ class Helmholtz(object):
             self.L  = zeros((2, M), float)     # The single nonzero row of L
             LUsolve.LU_Helmholtz_1D(N, self.neumann, quad=="GL", self.alfa, self.u0, self.u1, self.u2, self.L)
         if not self.neumann:
-            self.B = cmatrices.BDDmat(arange(N), quad)
-            self.A = cmatrices.ADDmat(arange(N))
+            self.B = inner_product((basis, 0), (basis, 0), N)
+            self.A = inner_product((basis, 0), (basis, 2), N)
 
     def __call__(self, u, b):
         s = self.s
-        if isinstance(self.basis, ShenNeumannBasis):
+        if isinstance(self.basis, bases.ShenNeumannBasis):
             s = slice(1, self.s.stop)
         if len(u.shape) > 1:
             LUsolve.Solve_Helmholtz_3D_n(self.N, self.neumann, b[s], u[s], self.u0, self.u1, self.u2, self.L)
@@ -86,9 +86,10 @@ class Biharmonic(object):
         self.quad = quad
         self.solver = solver
         k = arange(N)
-        self.S = S = cmatrices.SBBmat(k)
-        self.B = B = cmatrices.BBBmat(k, self.quad)
-        self.A = A = cmatrices.ABBmat(k)
+        SB = bases.ShenBiharmonicBasis(quad)
+        self.S = S = inner_product((SB, 0), (SB, 4), N)
+        self.B = B = inner_product((SB, 0), (SB, 0), N)
+        self.A = A = inner_product((SB, 0), (SB, 2), N)
         self.a0 = a0
         self.alfa = alfa
         self.beta = beta

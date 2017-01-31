@@ -8,6 +8,7 @@ from shenfun.chebyshev.bases import ShenDirichletBasis, ShenNeumannBasis, \
     ShenBiharmonicBasis
 from shenfun.chebyshev.matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, \
     ADDmat, BDDmat, CDBmat
+from shenfun import inner_product
 from shenfun.la import TDMA
 
 from ..shen.shentransform import SlabShen_R2C
@@ -84,26 +85,26 @@ def get_context():
                                     -(K2[0] + nu*dt/2.*K4[0]), quad=SB.quad,
                                     solver="cython"),
         HelmholtzSolverU0 = Helmholtz(N[0], np.sqrt(2./nu/dt), ST),
-        TDMASolverD = TDMA(BDDmat(kx, ST.quad))
+        TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0), N[0]))
         )
     )
 
     alfa = K2[0] - 2.0/nu/dt
     # Collect all matrices
     mat = config.AttributeDict(dict(
-        CDD = CDDmat(kx),
+        CDD = inner_product((ST, 0), (ST, 1), N[0]),
         AB = HelmholtzCoeff(kx, -1.0, -alfa, ST.quad),
         AC = BiharmonicCoeff(kx, nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad),
         # Matrices for biharmonic equation
-        CBD = CBDmat(kx),
-        ABB = ABBmat(kx),
-        BBB = BBBmat(kx, SB.quad),
-        SBB = SBBmat(kx),
+        CBD = inner_product((SB, 0), (ST, 1), N[0]),
+        ABB = inner_product((SB, 0), (SB, 2), N[0]),
+        BBB = inner_product((SB, 0), (SB, 0), N[0]),
+        SBB = inner_product((SB, 0), (SB, 4), N[0]),
         # Matrices for Helmholtz equation
-        ADD = ADDmat(kx),
-        BDD = BDDmat(kx, ST.quad),
-        BBD = BBDmat(kx, SB.quad),
-        CDB = CDBmat(kx)
+        ADD = inner_product((ST, 0), (ST, 2), N[0]),
+        BDD = inner_product((ST, 0), (ST, 0), N[0]),
+        BBD = inner_product((SB, 0), (ST, 0), N[0]),
+        CDB = inner_product((ST, 0), (SB, 1), N[0])
         )
     )
 

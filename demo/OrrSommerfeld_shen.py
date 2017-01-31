@@ -11,7 +11,7 @@ from numpy.linalg import inv
 from numpy.polynomial import chebyshev as n_cheb
 from shenfun.chebyshev.bases import ShenBiharmonicBasis, \
     ShenDirichletBasis, ChebyshevBasis
-from shenfun.chebyshev.matrices import CDBmat, ABBmat, SBBmat, BBBmat
+from shenfun import inner_product
 from shenfun.matrixbase import extract_diagonal_matrix
 
 import six
@@ -51,7 +51,7 @@ class OrrSommerfeld(object):
             if self.SB is None:
                 self.SB = ShenBiharmonicBasis(quad=self.quad)
                 self.SD = ShenDirichletBasis(quad=self.quad)
-                self.CDB = CDBmat(np.arange(N).astype(np.float))
+                self.CDB = inner_product((SD, 0), (SB, 1), N)
 
             phi = self.SB.ifst(phi_hat, phi)
             dphidy_hat = self.CDB.matvec(phi_hat)
@@ -109,7 +109,7 @@ class OrrSommerfeld(object):
         SB = ShenBiharmonicBasis(quad=self.quad)
         K = np.zeros((N, N))
         #K = SB.scalar_product(T2x, K)
-        K[:-4, :-4] = ABBmat(np.arange(N).astype(np.float)).diags().toarray()
+        K[:-4, :-4] = inner_product((SB, 0), (SB, 2), N).diags().toarray()
 
         # ((1-x**2)u, v)
         xx = (1-x**2).repeat(N).reshape((N, N))
@@ -127,12 +127,12 @@ class OrrSommerfeld(object):
         # (u'''', v)
         #Q = np.dot(w*P4.T, T4x)
         Q = np.zeros((self.N, self.N))
-        Q[:-4, :-4] = SBBmat(np.arange(N).astype(np.float)).diags().toarray()
+        Q[:-4, :-4] = inner_product((SB, 0), (SB, 4), N).diags().toarray()
 
         # (u, v)
         #M = np.dot(w*P4.T, P4)
         M = np.zeros((self.N, self.N))
-        M[:-4, :-4] = BBBmat(np.arange(N).astype(np.float), self.quad).diags().toarray()
+        M[:-4, :-4] = inner_product((SB, 0), (SB, 0), N).diags().toarray()
 
         Re = self.Re
         a = self.alfa

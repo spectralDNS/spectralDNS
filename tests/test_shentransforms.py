@@ -5,10 +5,10 @@ from spectralDNS.shen.Matrices import HelmholtzCoeff
 from spectralDNS.shen import LUsolve
 from scipy.linalg import solve
 from mpi4py import MPI
-from sympy import chebyshevt, Symbol, sin, cos, pi
+from sympy import chebyshevt, Symbol, sin, cos, pi, lambdify
 import numpy as np
 import scipy.sparse.linalg as la
-from shenfun.chebyshev import matrices
+from shenfun import inner_product
 from shenfun.chebyshev.bases import ChebyshevBasis, ShenDirichletBasis, \
     ShenNeumannBasis, ShenBiharmonicBasis
 
@@ -112,10 +112,10 @@ def test_FST_padded(ST, quad):
 def test_Mult_Div():
 
     SD = ShenDirichletBasis("GC")
-    SN = ShenDirichletBasis("GC")
+    SN = ShenNeumannBasis("GC")
 
-    Cm = matrices.CNDmat(np.arange(N).astype(np.float))
-    Bm = matrices.BNDmat(np.arange(N).astype(np.float), "GC")
+    Cm = inner_product((SN, 0), (SD, 1), N)
+    Bm = inner_product((SN, 0), (SD, 0), N)
 
     uk = np.random.randn((N))+np.random.randn((N))*1j
     vk = np.random.randn((N))+np.random.randn((N))*1j
@@ -180,12 +180,8 @@ def test_Helmholtz(ST, quad):
     fj = ST.backward(f_hat, fj)
     s = ST.slice(M)
 
-    if ST.__class__.__name__ == "ShenDirichletBasis":
-        A = matrices.ADDmat(np.arange(M).astype(np.float))
-        B = matrices.BDDmat(np.arange(M).astype(np.float), ST.quad)
-    elif ST.__class__.__name__ == "ShenNeumannBasis":
-        A = matrices.ANNmat(np.arange(M).astype(np.float))
-        B = matrices.BNNmat(np.arange(M).astype(np.float), ST.quad)
+    A = inner_product((ST, 0), (ST, 2), M)
+    B = inner_product((ST, 0), (ST, 0), M)
 
     f_hat = np.zeros(M)
     f_hat = ST.scalar_product(fj, f_hat)
@@ -240,8 +236,8 @@ def test_Helmholtz2(quad):
     u_hat = SD.forward(uj, u_hat)
     uj = SD.backward(u_hat, uj)
 
-    A = matrices.ADDmat(np.arange(M).astype(np.float))
-    B = matrices.BDDmat(np.arange(M).astype(np.float), SD.quad)
+    A = inner_product((SD, 0), (SD, 2), M)
+    B = inner_product((SD, 0), (SD, 0), M)
     s = SD.slice(M)
 
     u1 = np.zeros(M)
@@ -270,8 +266,8 @@ def test_Helmholtz2(quad):
 @pytest.mark.parametrize('quad', quads)
 def test_Mult_CTD(quad):
     SD = ShenDirichletBasis(quad=quad)
-    C = matrices.CTDmat(np.arange(N).astype(np.float))
-    B = matrices.BTTmat(np.arange(N).astype(np.float), SD.quad)
+    C = inner_product((SD.CT, 0), (SD, 1), N)
+    B = inner_product((SD.CT, 0), (SD.CT, 0), N)
 
     uk = np.random.randn((N))+np.random.randn((N))*1j
     vk = np.random.randn((N))+np.random.randn((N))*1j
@@ -309,8 +305,8 @@ def test_Mult_CTD(quad):
 @pytest.mark.parametrize('quad', quads)
 def test_Mult_CTD_3D(quad):
     SD = ShenDirichletBasis(quad=quad)
-    C = matrices.CTDmat(np.arange(N).astype(np.float))
-    B = matrices.BTTmat(np.arange(N).astype(np.float), SD.quad)
+    C = inner_product((SD.CT, 0), (SD, 1), N)
+    B = inner_product((SD.CT, 0), (SD.CT, 0), N)
 
     uk = np.random.random((N,4,4))+np.random.random((N,4,4))*1j
     vk = np.random.random((N,4,4))+np.random.random((N,4,4))*1j
@@ -355,15 +351,15 @@ def test_Biharmonic(quad):
     b = 1.0
     f = -u.diff(x, 4) + a*u.diff(x, 2) + b*u
 
-    points, weights = SB.points_and_weights(M,  SB.quad)
+    ul = lambdify(x, u, 'numpy')
+    fl = lambdify(x, f, 'numpy')
+    points, weights = SB.points_and_weights(M,  quad)
+    uj = ul(points)
+    fj = fl(points)
 
-    uj = np.array([u.subs(x, j) for j in points], dtype=float)
-    fj = np.array([f.subs(x, j) for j in points], dtype=float)     # Get f on quad points
-
-    k = np.arange(M).astype(np.float)
-    A = matrices.SBBmat(k)
-    B = matrices.BBBmat(k, SB.quad)
-    C = matrices.ABBmat(k)
+    A = inner_product((SB, 0), (SB, 4), M)
+    B = inner_product((SB, 0), (SB, 0), M)
+    C = inner_product((SB, 0), (SB, 2), M)
 
     AA = -A.diags() + C.diags() + B.diags()
     f_hat = np.zeros(M)
@@ -389,8 +385,9 @@ def test_Helmholtz_matvec(quad):
     u_hat = SD.forward(uj, u_hat)
     uj = SD.backward(u_hat, uj)
 
-    A = matrices.ADDmat(np.arange(M).astype(np.float))
-    B = matrices.BDDmat(np.arange(M).astype(np.float), SD.quad)
+    B = inner_product((SD, 0), (SD, 0), M)
+    A = inner_product((SD, 0), (SD, 2), M)
+
     AB = HelmholtzCoeff(np.arange(M).astype(np.float), 1, kx**2, SD.quad)
     s = SD.slice(M)
 
@@ -403,6 +400,7 @@ def test_Helmholtz_matvec(quad):
     b = np.zeros(M)
     #LUsolve.Mult_Helmholtz_1D(M, SD.quad=="GL", 1, kx**2, u1, b)
     b = AB.matvec(u1, b)
+    #from IPython import embed; embed()
     assert np.allclose(c, b)
 
     b = np.zeros((M, 4, 4), dtype=np.complex)

@@ -1,6 +1,7 @@
 from .Matvec import Biharmonic_matvec, Biharmonic_matvec3D, Helmholtz_matvec3D, \
     Helmholtz_matvec
-from shenfun.chebyshev.matrices import BDDmat, ADDmat, BBBmat, ABBmat, SBBmat
+from shenfun.chebyshev import bases
+from shenfun import inner_product
 
 
 class BiharmonicCoeff(object):
@@ -9,9 +10,10 @@ class BiharmonicCoeff(object):
         self.quad = quad
         N = K.shape[0]
         self.shape = (N-4, N-4)
-        self.S = SBBmat(K)
-        self.B = BBBmat(K, self.quad)
-        self.A = ABBmat(K)
+        SB = bases.ShenBiharmonicBasis(quad)
+        self.S = inner_product((SB, 0), (SB, 4), N)
+        self.B = inner_product((SB, 0), (SB, 0), N)
+        self.A = inner_product((SB, 0), (SB, 2), N)
         self.a0 = a0
         self.alfa = alfa
         self.beta = beta
@@ -40,8 +42,9 @@ class HelmholtzCoeff(object):
         self.quad = quad
         N = self.N = K.shape[0]-2
         self.shape = (N, N)
-        self.B = BDDmat(K, self.quad)
-        self.A = ADDmat(K)
+        SD = bases.ShenDirichletBasis(quad)
+        self.B = inner_product((SD, 0), (SD, 0), N+2)
+        self.A = inner_product((SD, 0), (SD, 2), N+2)
         self.alfa = alfa
         self.beta = beta
 
@@ -52,4 +55,3 @@ class HelmholtzCoeff(object):
         else:
             Helmholtz_matvec(v, c, self.alfa, self.beta, self.A[0], self.A[2], self.B[0])
         return c
-

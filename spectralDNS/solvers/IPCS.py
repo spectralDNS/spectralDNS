@@ -12,6 +12,7 @@ from ..shen.la import Helmholtz
 from ..shen.shentransform import SlabShen_R2C
 from shenfun.chebyshev.bases import ShenDirichletBasis, ShenNeumannBasis, \
     ShenBiharmonicBasis
+from shenfun import inner_product
 from shenfun.la import TDMA
 
 from functools import wraps
@@ -24,6 +25,7 @@ def get_context():
                             planner_effort=params.planner_effort["dct"])
     SN = ShenNeumannBasis(quad=params.Nquad, threads=params.threads,
                           planner_effort=params.planner_effort["dct"])
+    CT = ST.CT
 
     Nf = params.N[2]/2+1 # Number of independent complex wavenumbers in z-direction
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
@@ -73,8 +75,8 @@ def get_context():
     la = config.AttributeDict(dict(
         HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), ST),
         HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2), SN),
-        TDMASolverD = TDMA(BDDmat(K[0, :, 0, 0], ST.quad)),
-        TDMASolverN = TDMA(BNNmat(K[0, :, 0, 0], SN.quad))
+        TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0), N[0])),
+        TDMASolverN = TDMA(inner_product((SN, 0), (SN, 0), N[0]))
         )
     )
 
@@ -82,12 +84,12 @@ def get_context():
 
     # Collect all matrices
     mat = config.AttributeDict(dict(
-        CDN = CDNmat(K[0, :, 0, 0]),
-        CND = CNDmat(K[0, :, 0, 0]),
-        BDN = BDNmat(K[0, :, 0, 0], ST.quad),
-        CDD = CDDmat(K[0, :, 0, 0]),
-        BDD = BDDmat(K[0, :, 0, 0], ST.quad),
-        BDT = BDTmat(K[0, :, 0, 0], SN.quad),
+        CDN = inner_product((ST, 0), (SN, 1), N[0]),
+        CND = inner_product((SN, 0), (ST, 1), N[0]),
+        BDN = inner_product((ST, 0), (SN, 0), N[0]),
+        CDD = inner_product((ST, 0), (ST, 1), N[0]),
+        BDD = inner_product((ST, 0), (ST, 0), N[0]),
+        BDT = inner_product((ST, 0), (CT, 0), N[0]),
         AB = HelmholtzCoeff(K[0, :, 0, 0], -1.0, -alfa, ST.quad)
         )
     )

@@ -15,6 +15,7 @@ def get_context():
                             planner_effort=params.planner_effort["dct"])
     SN = ShenNeumannBasis(quad=params.Nquad, threads=params.threads,
                           planner_effort=params.planner_effort["dct"])
+    CT = ST.CT
 
     Nf = params.N[2]/2+1 # Number of independent complex wavenumbers in z-direction
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
@@ -65,8 +66,8 @@ def get_context():
     la = config.AttributeDict(dict(
         HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), ST),
         HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2), SN),
-        TDMASolverD = TDMA(BDDmat(kx, ST.quad)),
-        TDMASolverN = TDMA(BNNmat(kx, SN.quad))
+        TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0), N[0])),
+        TDMASolverN = TDMA(inner_product((SN, 0), (SN, 0), N[0]))
         )
     )
 
@@ -74,19 +75,19 @@ def get_context():
 
     # Collect all matrices
     mat = config.AttributeDict(dict(
-        CDN = CDNmat(kx),
-        CND = CNDmat(kx),
-        BDN = BDNmat(kx, ST.quad),
-        CDD = CDDmat(kx),
-        BDD = BDDmat(kx, ST.quad),
+        CDN = inner_product((ST, 0), (SN, 1), N[0]),
+        CND = inner_product((SN, 0), (ST, 1), N[0]),
+        BDN = inner_product((ST, 0), (SN, 0), N[0]),
+        CDD = inner_product((ST, 0), (ST, 1), N[0]),
+        BDD = inner_product((ST, 0), (ST, 0), N[0]),
         AB = HelmholtzCoeff(kx, -1.0, -alfa, ST.quad),
-        CDT = CDTmat(kx),
-        CTD = CTDmat(kx),
-        BDT = BDTmat(kx, ST.quad),
-        BTD = BTDmat(kx, SN.quad),
-        BTT = BTTmat(kx, SN.quad),
-        BTN = BTNmat(kx, SN.quad),
-        BND = BNDmat(kx, SN.quad)
+        CDT = inner_product((ST, 0), (CT, 1), N[0]),
+        CTD = inner_product((CT, 0), (ST, 1), N[0]),
+        BDT = inner_product((ST, 0), (CT, 0), N[0]),
+        BTD = inner_product((CT, 0), (ST, 0), N[0]),
+        BTT = inner_product((CT, 0), (CT, 0), N[0]),
+        BTN = inner_product((CT, 0), (SN, 0), N[0]),
+        BND = inner_product((SN, 0), (ST, 0), N[0]),
         )
     )
 
