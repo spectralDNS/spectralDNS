@@ -7,6 +7,7 @@ from . import config
 import importlib
 import cProfile
 
+
 def get_solver(update=None,
                regression_test=None,
                additional_callback=None,

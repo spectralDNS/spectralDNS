@@ -1,4 +1,5 @@
 import pytest
+from six.moves import reload_module
 from spectralDNS import config, get_solver, solve
 from TG2D import initialize, regression_test, pi
 
@@ -32,7 +33,7 @@ def test_NS2D(args):
 
     config.params.dealias = '2/3-rule'
     config.params.optimization = 'cython'
-    reload(solver)
+    reload_module(solver)
     initialize(**context)
     solve(solver, context)
 

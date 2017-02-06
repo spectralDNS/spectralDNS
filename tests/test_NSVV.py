@@ -1,4 +1,5 @@
 import pytest
+from six.moves import reload_module
 from spectralDNS import config, get_solver, solve
 from TG import initialize, regression_test, pi
 from mpi4py import MPI
@@ -55,7 +56,7 @@ def test_solvers(sol):
 
     config.params.dealias = '2/3-rule'
     config.params.optimization = 'cython'
-    reload(solver)
+    reload_module(solver)
     initialize(solver, **context)
     solve(solver, context)
 

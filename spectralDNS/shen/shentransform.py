@@ -120,8 +120,8 @@ class SlabShen_R2C(Slab_R2C):
     @optimizer
     def copy_from_padded(fp, fu, N, axis=0):
         if axis == 1:
-            fu[:, :N[1]/2] = fp[:, :N[1]/2, :(N[2]/2+1)]
-            fu[:, N[1]/2:] = fp[:, -N[1]/2:, :(N[2]/2+1)]
+            fu[:, :N[1]//2] = fp[:, :N[1]//2, :(N[2]//2+1)]
+            fu[:, N[1]//2:] = fp[:, -N[1]//2:, :(N[2]//2+1)]
             #fu[:, N[1]/2, 0] *= 2 # Because of symmetrical padding
             #fu[:, N[1]/2, N[2]/2] *= 2
         elif axis == 2:
@@ -135,10 +135,10 @@ class SlabShen_R2C(Slab_R2C):
         if axis == 0:
             fp[:N[0]] = fu[:N[0]]
         elif axis == 1:
-            fp[:, :N[1]/2] = fu[:, :N[1]/2]
-            fp[:, -N[1]/2:] = fu[:, N[1]/2:]
+            fp[:, :N[1]//2] = fu[:, :N[1]//2]
+            fp[:, -N[1]//2:] = fu[:, N[1]//2:]
         elif axis == 2:
-            fp[:, :, :(N[2]/2+1)] = fu[:]
+            fp[:, :, :(N[2]//2+1)] = fu[:]
         return fp
 
     def _forward(self, u, fu, fun, dealias=None):

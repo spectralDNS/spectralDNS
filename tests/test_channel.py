@@ -1,5 +1,6 @@
 import pytest
 from spectralDNS import config, get_solver, solve
+from six.moves import reload_module
 from OrrSommerfeld import initialize, regression_test, set_Source, pi
 
 @pytest.fixture(params=('KMMRK3', 'KMM', 'IPCS', 'IPCSR'))
@@ -30,7 +31,7 @@ def test_channel(sol):
 
     config.params.dealias = '3/2-rule'
     config.params.optimization = 'cython'
-    reload(solver) # Need to reload to enable optimization
+    reload_module(solver) # Need to reload to enable optimization
     initialize(solver, context)
     solve(solver, context)
 
