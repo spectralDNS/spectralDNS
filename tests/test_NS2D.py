@@ -9,7 +9,7 @@ def args(request):
         _args = ['--M', '5', '5', '--L', '2*pi', '2*pi']
     else:
         _args = ['--M', '6', '4', '--L', '6*pi', '4*pi']
-    
+
     return _args + ['NS2D']
 
 def test_NS2D(args):
@@ -32,6 +32,7 @@ def test_NS2D(args):
 
     config.params.dealias = '2/3-rule'
     config.params.optimization = 'cython'
+    reload(solver)
     initialize(**context)
     solve(solver, context)
 
@@ -39,7 +40,7 @@ def test_NS2D(args):
     config.params.checkpoint = 1
     config.params.dt = 0.01
     config.params.t = 0.0
-    config.params.tstep = 0    
+    config.params.tstep = 0
     config.params.T = 0.04
     solver.regression_test = lambda c: None
     initialize(**context)

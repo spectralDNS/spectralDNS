@@ -28,7 +28,7 @@ def sol(request):
     else:
         _args += ['--M', '6', '5', '4', '--L', '6*pi', '4*pi', '2*pi']
     _args += [solver]
-    
+
     return _args
 
 
@@ -42,7 +42,7 @@ def test_solvers(sol):
         }
     )
 
-    solver = get_solver(regression_test=regression_test, 
+    solver = get_solver(regression_test=regression_test,
                         parse_args=sol)
     context = solver.get_context()
     initialize(solver, **context)
@@ -52,12 +52,13 @@ def test_solvers(sol):
     config.params.dealias = '3/2-rule'
     initialize(solver, **context)
     solve(solver, context)
-    
+
     config.params.dealias = '2/3-rule'
     config.params.optimization = 'cython'
+    reload(solver)
     initialize(solver, **context)
     solve(solver, context)
-    
+
     config.params.write_result = 1
     config.params.checkpoint = 1
     config.params.dt = 0.01

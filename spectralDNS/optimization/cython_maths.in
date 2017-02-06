@@ -69,11 +69,11 @@ def _cross3(np.ndarray[complex_t, ndim=4] c,
     cdef np.ndarray[real_t, ndim=3] ky = a[1]
     cdef np.ndarray[real_t, ndim=3] kz = a[2]
     for i in xrange(b.shape[1]):
+        a0 = kx[i,0,0]
         for j in xrange(b.shape[2]):
+            a1 = ky[0,j,0]
             for k in xrange(b.shape[3]):
-                a0 = kx[i,j,k]
-                a1 = ky[i,j,k]
-                a2 = kz[i,j,k]
+                a2 = kz[0,0,k]
                 b0 = b[0,i,j,k]
                 b1 = b[1,i,j,k]
                 b2 = b[2,i,j,k]
@@ -117,15 +117,20 @@ def cross2_2D(np.ndarray[complex_t, ndim=2] c,
             c[i,j].imag = a0*b1.real - a1*b0.real
     return c
 
-def mult_K1j(np.ndarray[np.float64_t, ndim=4] K,
+def mult_K1j(list K,
              np.ndarray[np.complex128_t, ndim=3] a,
              np.ndarray[np.complex128_t, ndim=4] f):
     cdef unsigned int i, j, k
+    cdef real_t ky, kz
+    cdef np.ndarray[real_t, ndim=3] Ky = K[1]
+    cdef np.ndarray[real_t, ndim=3] Kz = K[2]
     for i in xrange(a.shape[0]):
         for j in xrange(a.shape[1]):
+            ky = Ky[0,j,0]
             for k in xrange(a.shape[2]):
-                f[0,i,j,k] = 1j*K[2,i,j,k]*a[i,j,k]
-                f[1,i,j,k] = -1j*K[1,i,j,k]*a[i,j,k]
+                kz = Kz[0,0,k]
+                f[0,i,j,k] = 1j*kz*a[i,j,k]
+                f[1,i,j,k] = -1j*ky*a[i,j,k]
     return f
 
 def copy_to_padded_channel(np.ndarray[np.complex128_t, ndim=3] fu,

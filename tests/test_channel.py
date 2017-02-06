@@ -30,6 +30,7 @@ def test_channel(sol):
 
     config.params.dealias = '3/2-rule'
     config.params.optimization = 'cython'
+    reload(solver) # Need to reload to enable optimization
     initialize(solver, context)
     solve(solver, context)
 
