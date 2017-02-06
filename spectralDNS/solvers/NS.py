@@ -11,15 +11,17 @@ def get_context():
     # FFT class performs the 3D parallel transforms
     FFT = get_FFT(params)
     float, complex, mpitype = datatypes(params.precision)
-    
+
     # Mesh variables
     X = FFT.get_local_mesh()
-    K = FFT.get_scaled_local_wavenumbermesh()
-    K2 = np.sum(K*K, 0, dtype=float)
-    K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)    
-    
+    K = FFT.get_local_wavenumbermesh(scaled=True)
+    K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+    K_over_K2 = zeros((3,) + FFT.complex_shape())
+    for i in range(3):
+        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
+
     # Velocity and pressure
-    U     = empty((3,) + FFT.real_shape(), dtype=float)  
+    U     = empty((3,) + FFT.real_shape(), dtype=float)
     U_hat = empty((3,) + FFT.complex_shape(), dtype=complex)
     P     = empty(FFT.real_shape(), dtype=float)
     P_hat = empty(FFT.complex_shape(), dtype=complex)
@@ -29,10 +31,10 @@ def get_context():
 
     # RHS array
     dU     = empty((3,) + FFT.complex_shape(), dtype=complex)
-    curl   = empty((3,) + FFT.real_shape(), dtype=float)   
+    curl   = empty((3,) + FFT.real_shape(), dtype=float)
     Source = None
     work = work_arrays()
-        
+
     hdf5file = NSWriter({'U':U[0], 'V':U[1], 'W':U[2], 'P':P},
                         chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
                         filename=params.h5filename+'.h5')
@@ -83,8 +85,8 @@ def end_of_tstep(context):
     # Used by adaptive solvers
     if abs(params.t - params.T) < 1e-12:
         return True
-    
-    if (abs(params.t + params.dt - params.T) < 1e-12 or 
+
+    if (abs(params.t + params.dt - params.T) < 1e-12 or
             params.t + params.dt >= params.T + 1e-12):
         params.dt = params.T - params.t
 
@@ -93,6 +95,7 @@ def end_of_tstep(context):
 def compute_curl(c, a, work, FFT, K, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
     curl_hat = work[(a, 0, False)]
+    #from IPython import embed; embed()
     curl_hat = cross2(curl_hat, K, a)
     c[0] = FFT.ifftn(curl_hat[0], c[0], dealias)
     c[1] = FFT.ifftn(curl_hat[1], c[1], dealias)
@@ -123,7 +126,7 @@ def divergence_convection(rhs, u_dealias, work, FFT, K, dealias=None, add=False)
     UUi_hat = work[(rhs, 0, False)]
     for i in range(3):
         UUi_hat[i] = FFT.fftn(u_dealias[0]*u_dealias[i], UUi_hat[i], dealias)
-    rhs[0] += 1j*np.sum(K*UUi_hat, 0)
+    rhs[0] += 1j*(K[0]*UUi_hat[0] + K[1]*UUi_hat[1] + K[2]*UUi_hat[2])
     rhs[1] += 1j*K[0]*UUi_hat[1]
     rhs[2] += 1j*K[0]*UUi_hat[2]
     UUi_hat[0] = FFT.fftn(u_dealias[1]*u_dealias[1], UUi_hat[0], dealias)
@@ -134,12 +137,12 @@ def divergence_convection(rhs, u_dealias, work, FFT, K, dealias=None, add=False)
     return rhs
 
 def getConvection(convection):
-    
+
     if convection == "Standard":
 
         def Conv(rhs, u_hat, work, FFT, K):
             u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                            float, 0, False)]
+                            FFT.float, 0, False)]
             for i in range(3):
                 u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
             rhs = standard_convection(rhs, u_dealias, u_hat, work, FFT, K, params.dealias)
@@ -150,7 +153,7 @@ def getConvection(convection):
 
         def Conv(rhs, u_hat, work, FFT, K):
             u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                            float, 0, False)]
+                            FFT.float, 0, False)]
             for i in range(3):
                 u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
             rhs = divergence_convection(rhs, u_dealias, work, FFT, K, params.dealias, False)
@@ -161,7 +164,7 @@ def getConvection(convection):
 
         def Conv(rhs, u_hat, work, FFT, K):
             u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                            float, 0, False)]
+                            FFT.float, 0, False)]
             for i in range(3):
                 u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
             rhs = standard_convection(rhs, u_dealias, u_hat, work, FFT, K, params.dealias)
@@ -173,9 +176,9 @@ def getConvection(convection):
 
         def Conv(rhs, u_hat, work, FFT, K):
             u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                            float, 0, False)]
+                            FFT.float, 0, False)]
             curl_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                                float, 1, False)]
+                                FFT.float, 1, False)]
             for i in range(3):
                 u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
 
@@ -194,7 +197,8 @@ def add_pressure_diffusion(rhs, u_hat, nu, K2, K, P_hat, K_over_K2):
     P_hat = np.sum(rhs*K_over_K2, 0, out=P_hat)
 
     # Subtract pressure gradient
-    rhs -= P_hat*K
+    for i in range(rhs.shape[0]):
+        rhs[i] -= P_hat*K[i]
 
     # Subtract contribution from diffusion
     rhs -= nu*K2*u_hat
@@ -203,7 +207,7 @@ def add_pressure_diffusion(rhs, u_hat, nu, K2, K, P_hat, K_over_K2):
 
 def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, K2, K_over_K2, **context):
     """Compute right hand side of Navier Stokes
-    
+
     args:
         rhs         The right hand side to be returned
         u_hat       The FFT of the velocity at current time. May differ from
@@ -218,7 +222,7 @@ def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, K2, K_over_K2, **context
         K           Scaled wavenumber mesh
         K2          sum_i K[i]*K[i]
         K_over_K2   K / K2
-    
+
     """
     rhs = solver.conv(rhs, u_hat, work, FFT, K)
     rhs = solver.add_pressure_diffusion(rhs, u_hat, params.nu, K2, K, P_hat,

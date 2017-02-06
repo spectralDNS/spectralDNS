@@ -33,10 +33,10 @@ except ImportError:
     #U[2] = 0
 
 def initOS(OS, U, X, t=0.):
-    x = X[0, :, 0, 0]
+    x = X[0][:, 0, 0]
     phi, dphidy = OS.interp(x, 1, same_mesh=False, verbose=False)
     for j in range(U.shape[2]):
-        y = X[1, 0, j, 0]
+        y = X[1][0, j, 0]
         v = (1-x**2) + config.params.eps*real(dphidy*exp(1j*(y-OS.eigval*t)))
         u = -config.params.eps*real(1j*phi*exp(1j*(y-OS.eigval*t)))
         U[0, :, j, :] = u.repeat(U.shape[3]).reshape((len(x), U.shape[3]))
@@ -73,7 +73,8 @@ def initialize(solver, context):
         params.t = params.dt
         params.tstep = 1
         e1 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.ST.quad)
-        acc[0] += abs(e1/e0 - exp(2*imag(OS.eigval)*params.t))
+        if solver.rank == 0:
+            acc[0] += abs(e1/e0 - exp(2*imag(OS.eigval)*params.t))
 
     else:
         params.t = 0
@@ -108,37 +109,35 @@ def update(context):
     if not plt is None:
         if im1 is None and solver.rank == 0 and params.plot_step > 0:
             plt.figure()
-            im1 = plt.contourf(c.X[1,:,:,0], c.X[0,:,:,0], c.U[0,:,:,0], 100)
+            im1 = plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], c.U[0,:,:,0], 100)
             plt.colorbar(im1)
             plt.draw()
 
             plt.figure()
-            im2 = plt.contourf(c.X[1,:,:,0], c.X[0,:,:,0], c.U[1,:,:,0] - (1-c.X[0,:,:,0]**2), 100)
+            im2 = plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], c.U[1,:,:,0] - (1-c.X[0][:,:,0]**2), 100)
             plt.colorbar(im2)
             plt.draw()
 
             plt.figure()
-            im3 = plt.quiver(c.X[1, :,:,0], c.X[0,:,:,0], c.U[1,:,:,0]-(1-c.X[0,:,:,0]**2), c.U[0,:,:,0])
+            im3 = plt.quiver(c.X[1][:,:,0], c.X[0][:,:,0], c.U[1,:,:,0]-(1-c.X[0][:,:,0]**2), c.U[0,:,:,0])
             plt.draw()
 
             plt.pause(1e-6)
 
         if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
             im1.ax.clear()
-            im1.ax.contourf(c.X[1, :,:,0], c.X[0, :,:,0], U[0, :, :, 0], 100)
+            im1.ax.contourf(c.X[1][:,:,0], c.X[0][:,:,0], U[0, :, :, 0], 100)
             im1.autoscale()
             im2.ax.clear()
-            im2.ax.contourf(c.X[1, :,:,0], c.X[0, :,:,0], U[1, :, :, 0]-(1-c.X[0,:,:,0]**2), 100)
+            im2.ax.contourf(c.X[1][:,:,0], c.X[0][:,:,0], U[1, :, :, 0]-(1-c.X[0][:,:,0]**2), 100)
             im2.autoscale()
-            im3.set_UVC(U[1,:,:,0]-(1-c.X[0,:,:,0]**2), U[0,:,:,0])
+            im3.set_UVC(U[1,:,:,0]-(1-c.X[0][:,:,0]**2), U[0,:,:,0])
             plt.pause(1e-6)
 
     if params.tstep % params.compute_energy == 0:
         e1, e2, exact = compute_error(c)
-        acc[0] += abs(e1/e0-exact)
-        #acc[0] += e1/e0
-
         if solver.rank == 0 and not config.params.spatial_refinement_test:
+            acc[0] += abs(e1/e0-exact)
             print("Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2)))
 
 def compute_error(context):

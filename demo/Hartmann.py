@@ -14,8 +14,8 @@ def init(U, U_hat, X, FST, ST, SN, t=0.):
     for i in range(U.shape[1]):
         x = X[0, i, 0, 0]
         for j in range(U.shape[2]):
-            y = X[1, i, j, 0]
-            u = 0. 
+            y = X[1][i, j, 0]
+            u = 0.
             v = (cosh(Ha)-cosh(Ha*x))/(cosh(Ha)-1.0)
             Bx = (sinh(Ha*x)-Ha*x*cosh(Ha))/(Ha**2*cosh(Ha))
             By = B_strength
@@ -30,13 +30,13 @@ def init(U, U_hat, X, FST, ST, SN, t=0.):
             U_hat[i] = FST.forward(U[i], U_hat[i], ST)
         else:
             U_hat[i] = FST.forward(U[i], U_hat[i], SN)
-        
+
     for i in range(6):
         if i<3:
             U[i] = FST.backward(U_hat[i], U[i], ST)
         else:
             U[i] = FST.backward(U_hat[i], U[i], SN)
-            
+
     for i in range(6):
         if i<3:
             U_hat[i] = FST.forward(U[i], U_hat[i], ST)
@@ -56,14 +56,14 @@ def energy(u, N, comm, rank, L):
         w[1::2] = 0
         return sum(ak*w)*L[1]*L[2]/N[1]/N[2]
     else:
-        return 0    
+        return 0
 
-def initialize(U, U_hat, U0, U_hat0, P, P_hat, conv1, FST, ST, SN, X, N, comm, rank, L, standardConvection, dt, **kw):        
+def initialize(U, U_hat, U0, U_hat0, P, P_hat, conv1, FST, ST, SN, X, N, comm, rank, L, standardConvection, dt, **kw):
 
 
-    init(U0, U_hat0, X, FST, ST, SN)   
+    init(U0, U_hat0, X, FST, ST, SN)
     conv1 = standardConvection(conv1)
-    init(U, U_hat, X, FST, ST, SN, t=dt) 
+    init(U, U_hat, X, FST, ST, SN, t=dt)
     P[:] = 0
     P_hat = FST.forward(P, P_hat, SN)
     U0[:] = U
@@ -80,10 +80,10 @@ def set_Source(Source, Sk, FST, ST, **kw):
         Sk[i] = FST.scalar_product(Source[i], Sk[i], ST)
 
 def update(rank, X, U, P, N, comm, L, **kw):
-    
+
     Ha = config.Ha
-    if config.tstep % config.compute_energy == 0: 
-        u_exact = ( cosh(Ha) - cosh(Ha*X[0,:,0,0]))/(cosh(Ha) - 1.0)
+    if config.tstep % config.compute_energy == 0:
+        u_exact = ( cosh(Ha) - cosh(Ha*X[0][:,0,0]))/(cosh(Ha) - 1.0)
         if rank == 0:
             print "Time %2.5f Error %2.12e" %(config.t, linalg.norm(u_exact-U[1,:,0,0],inf))
 
@@ -92,7 +92,7 @@ def regression_test(U, X, N, comm, rank, L, FST, ST, U0, U_hat0,**kw):
     u_exact = ( cosh(Ha) - cosh(Ha*X[0,:,0,0]))/(cosh(Ha) - 1.0)
     if rank == 0:
         print "Time %2.5f Error %2.12e" %(config.t, linalg.norm(u_exact-U[1,:,0,0],inf))
-        plt.plot(X[0,:,0,0], U[1,:,0,0], X[0,:,0,0], u_exact,'*r')
+        plt.plot(X[0][:,0,0], U[1,:,0,0], X[0][:,0,0], u_exact,'*r')
         plt.show()
 
 if __name__ == "__main__":
@@ -111,7 +111,7 @@ if __name__ == "__main__":
         'M': [7, 6, 1]
         },  "ShenMHD"
     )
-	
+
     config.ShenMHD.add_argument("--compute_energy", type=int, default=1)
     config.ShenMHD.add_argument("--plot_step", type=int, default=10)
     solver = get_solver(update=update, regression_test=regression_test, family="ShenMHD")

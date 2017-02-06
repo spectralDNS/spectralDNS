@@ -28,10 +28,12 @@ def get_context():
     # Mesh variables
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
-    K = FST.get_scaled_local_wavenumbermesh()
+    K = FST.get_local_wavenumbermesh(scaled=True)
 
     K2 = K[1]*K[1]+K[2]*K[2]
-    K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)
+    K_over_K2 = zeros((3,) + FST.complex_shape())
+    for i in range(3):
+        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
 
     # Solution variables
     U  = zeros((3,)+FST.real_shape(), dtype=float)
@@ -56,7 +58,7 @@ def get_context():
     work = work_arrays()
 
     K4 = K2**2
-    kx = K[0, :, 0, 0]
+    kx = K[0][:, 0, 0]
 
     # RK parameters
     a = (8./15., 5./12., 3./4.)

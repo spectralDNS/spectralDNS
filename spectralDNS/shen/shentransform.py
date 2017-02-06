@@ -72,16 +72,29 @@ class SlabShen_R2C(Slab_R2C):
         x0, x1, x2 = self.get_mesh_dims(ST)
 
         # Get grid for velocity points
-        X = array(meshgrid(x0[int(self.rank*self.Np[0]):int((self.rank+1)*self.Np[0])],
-                           x1, x2, indexing='ij'), dtype=self.float)
+        X = meshgrid(x0[int(self.rank*self.Np[0]):int((self.rank+1)*self.Np[0])],
+                     x1, x2, indexing='ij', sparse=True)
+        X = [np.broadcast_to(x, self.real_shape()) for x in X]
         return X
 
-    def get_local_wavenumbermesh(self):
+    def get_local_wavenumbermesh(self, scaled=False):
+        """Returns (scaled) local decomposed wavenumbermesh
+
+        If scaled is True, then the wavenumbermesh is scaled with physical mesh
+        size. This takes care of mapping the physical domain to a computational
+        cube of size (2pi)**3
+        """
         kx = arange(self.N[0]).astype(self.float)
         ky = fftfreq(self.N[1], 1./self.N[1])[int(self.rank*self.Np[1]):int((self.rank+1)*self.Np[1])]
         kz = fftfreq(self.N[2], 1./self.N[2])[:self.Nf]
         kz[-1] *= -1.0
-        return array(meshgrid(kx, ky, kz, indexing='ij'), dtype=self.float)
+        Ks = meshgrid(kx, ky, kz, indexing='ij', sparse=True)
+        if scaled:
+            Lp = array([2, 2*pi, 2*pi])/self.L
+            for i in range(3):
+                Ks[i] *= Lp[i]
+        K = [np.broadcast_to(k, self.complex_shape()) for k in Ks]
+        return K
 
     def get_scaled_local_wavenumbermesh(self):
         K = self.get_local_wavenumbermesh()

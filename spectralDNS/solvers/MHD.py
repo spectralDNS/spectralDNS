@@ -10,9 +10,11 @@ def get_context():
     FFT = get_FFT(params)
     float, complex, mpitype = datatypes(params.precision)
     X = FFT.get_local_mesh()
-    K = FFT.get_scaled_local_wavenumbermesh()
-    K2 = np.sum(K*K, 0, dtype=float)
-    K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)
+    K = FFT.get_local_wavenumbermesh(scaled=True)
+    K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+    K_over_K2 = zeros((3,) + FFT.complex_shape())
+    for i in range(3):
+        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
 
     UB = empty((6,) + FFT.real_shape(), dtype=float)
     P  = empty(FFT.real_shape(), dtype=float)
@@ -27,12 +29,12 @@ def get_context():
     U_hat = UB_hat[:3]
     B     = UB[3:]
     B_hat = UB_hat[3:]
-    
+
     # Primary variable
     u = UB_hat
 
     work = work_arrays()
-    
+
     hdf5file = MHDWriter({'U':U[0], 'V':U[1], 'W':U[2], 'P':P,
                          'Bx':B[0], 'By':B[1], 'Bz':B[2]},
                          chkpoint={'current':{'UB':UB, 'P':P}, 'previous':{}},
@@ -103,7 +105,7 @@ def getConvection(convection):
             rhs = divergenceConvection(rhs, u_dealias+b_dealias, u_dealias-b_dealias,
                                        work, FFT, K, params.dealias)
             return rhs
-    
+
     Conv.convection = convection
     return Conv
 
@@ -113,7 +115,7 @@ def add_pressure_diffusion(rhs, ub_hat, nu, eta, K2, K, P_hat, K_over_K2):
 
     u_hat = ub_hat[:3]
     b_hat = ub_hat[3:]
-    
+
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat = np.sum(rhs[:3]*K_over_K2, 0, out=P_hat)
 
@@ -127,7 +129,7 @@ def add_pressure_diffusion(rhs, ub_hat, nu, eta, K2, K, P_hat, K_over_K2):
 
 def ComputeRHS(rhs, ub_hat, solver, work, FFT, K, K2, K_over_K2, P_hat, **context):
     """Return right hand side of Navier Stokes
-    
+
     args:
         rhs         The right hand side to be returned
         ub_hat      The FFT of the velocity and magnetic fields at current
@@ -143,7 +145,7 @@ def ComputeRHS(rhs, ub_hat, solver, work, FFT, K, K2, K_over_K2, P_hat, **contex
         K2          sum_i K[i]*K[i]
         K_over_K2   K / K2
         P_hat       Transfomred pressure
-    
+
     """
     rhs = solver.conv(rhs, ub_hat, work, FFT, K)
     rhs = solver.add_pressure_diffusion(rhs, ub_hat, params.nu, params.eta, K2,

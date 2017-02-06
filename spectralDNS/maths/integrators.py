@@ -8,7 +8,7 @@ import numpy as np
 
 __all__ = ['getintegrator']
 
-def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset, 
+def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
                aTOL, rTOL, adaptive, errnorm, rhs, u0, solver, dt, tstep,
                context, additional_callback, params, predictivecontroller=False):
     """
@@ -44,7 +44,7 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
         If True use PI controller
     """
     s = A.shape[0]
-    
+
     #Some parameters for adaptive time-stepping. See p167, Hairer, Norsett and Wanner. "Solving Ordinary Differential Equations 1"
     #for details.
     facmax_default = 2
@@ -66,11 +66,11 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
                 #Compute F(Y)
                 rhs = solver.ComputeRHS(rhs, fY_hat[(i+offset[0]) % s], solver, **context)
                 fY_hat[(i+offset[0]) % s] = rhs
-                
+
             if i == 0:
                 context.fu0 = fY_hat[(0+offset[0]) % s]
                 additional_callback(context)
-                
+
         #Calculate the new value
         u0_new[:] = u0
         u0_new[:] += dt*b[0]*fY_hat[(0+offset[0]) % s]
@@ -94,7 +94,7 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
                 est_to_bcast[0] = est
             est_to_bcast = FFT.comm.bcast(est_to_bcast,root=0)
             est = est_to_bcast[0]
-            
+
         elif errnorm == "inf":
             raise AssertionError("Don't use this, not sure if it works")
             #TODO: Test this error norm
@@ -158,7 +158,7 @@ def RK4(u0, u1, u2, rhs, a, b, dt, solver, context):
 
 @optimizer
 def ForwardEuler(u0, u1, rhs, dt, solver, context):
-    rhs = solver.ComputeRHS(rhs, u0, solver, **context) 
+    rhs = solver.ComputeRHS(rhs, u0, solver, **context)
     u0 += rhs*dt
     return u0, dt, dt
 
@@ -177,22 +177,22 @@ def getintegrator(rhs, u0, solver, context):
     """
     params = solver.params
     u1 = u0.copy()
-    
-    if params.integrator == "RK4": 
+
+    if params.integrator == "RK4":
         # RK4 parameters
-        a = np.array([1./6., 1./3., 1./3., 1./6.], dtype=float)
-        b = np.array([0.5, 0.5, 1.], dtype=float)
+        a = np.array([1./6., 1./3., 1./3., 1./6.], dtype=context.float)
+        b = np.array([0.5, 0.5, 1.], dtype=context.float)
         u2 = u0.copy()
         @wraps(RK4)
         def func():
             return RK4(u0, u1, u2, rhs, a, b, params.dt, solver, context)
         return func
 
-    elif params.integrator in ("BS5_adaptive", "BS5_fixed"): 
+    elif params.integrator in ("BS5_adaptive", "BS5_fixed"):
         import nodepy
-        A = nodepy.rk.loadRKM("BS5").A.astype(float)
-        b = nodepy.rk.loadRKM("BS5").b.astype(float)
-        bhat = nodepy.rk.loadRKM("BS5").bhat.astype(float)
+        A = nodepy.rk.loadRKM("BS5").A.astype(context.float)
+        b = nodepy.rk.loadRKM("BS5").b.astype(context.float)
+        bhat = nodepy.rk.loadRKM("BS5").bhat.astype(context.float)
         err_order = 4
         errnorm = "2"
         fsal = True
@@ -213,12 +213,12 @@ def getintegrator(rhs, u0, solver, context):
                               solver.additional_callback, params)
         return func
 
-    elif params.integrator == "ForwardEuler":  
+    elif params.integrator == "ForwardEuler":
         @wraps(ForwardEuler)
         def func():
             return ForwardEuler(u0, u1, rhs, params.dt, solver, context)
         return func
-    
+
     elif params.integrator == "AB2":
         @wraps(AB2)
         def func():

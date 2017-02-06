@@ -18,12 +18,11 @@ def optimizer(func):
     NS solver.
 
     """
-
     try: # Look for optimized version of function
         mod = eval("_".join((config.params.optimization, config.params.precision)))
 
         # Check for generic implementation first, then solver specific
-        name = func.func_name
+        name = func.__name__
         if config.params.decomposition == 'line':
             fun = getattr(mod, name+"_2D", None)
 
@@ -42,7 +41,7 @@ def optimizer(func):
             return u0
 
     except: # Otherwise revert to default numpy implementation
-        #print(func.func_name + ' not optimized')
+        #print(func.__name__ + ' not optimized')
         @wraps(func)
         def wrapped_function(*args, **kwargs):
             u0 = func(*args, **kwargs)
@@ -51,19 +50,19 @@ def optimizer(func):
     return wrapped_function
 
 try:
-    import cython_double, cython_single
+    from . import cython_double, cython_single
 
 except:
     pass
 
 try:
-    import numba_single, numba_double
+    from . import numba_single, numba_double
 
 except:
     pass
 
 try:
-    import numexpr_module
+    from . import numexpr_module
 
 except:
     pass

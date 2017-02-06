@@ -3,28 +3,28 @@ import matplotlib.pyplot as plt
 from numpy import zeros, exp, sum, pi, exp, sin, cos, tanh, float64
 
 def initialize(X, U, Ur, Ur_hat, rho, FFT, float, **kwargs):
-    
+
     params = config.params
     N = params.N
     Um = 0.5*(params.U1 - params.U2)
     U[1] = params.A*sin(2*X[0])
-    #U[0, :, :N/4] = params.U1 - Um*exp((X[1,:, :N/4] - 0.5*pi)/params.delta) 
-    #U[0, :, N/4:N/2] = params.U2 + Um*exp(-1.0*(X[1, :, N/4:N/2] - 0.5*pi)/params.delta) 
-    #U[0, :, N/2:3*N/4] = params.U2 + Um*exp((X[1, :, N/2:3*N/4] - 1.5*pi)/params.delta) 
+    #U[0, :, :N/4] = params.U1 - Um*exp((X[1,:, :N/4] - 0.5*pi)/params.delta)
+    #U[0, :, N/4:N/2] = params.U2 + Um*exp(-1.0*(X[1, :, N/4:N/2] - 0.5*pi)/params.delta)
+    #U[0, :, N/2:3*N/4] = params.U2 + Um*exp((X[1, :, N/2:3*N/4] - 1.5*pi)/params.delta)
     #U[0, :, 3*N/4:] = params.U1 - Um*exp(-1.0*(X[1, :, 3*N/4:] - 1.5*pi)/params.delta)
-    
+
     #rho[:, :N/2] = tanh((X[1][:, :N/2]-(0.5*pi))/params.delta)
     #rho[:, N/2:] =-tanh((X[1][:, N/2:]-(1.5*pi))/params.delta)
-                
+
     rho0 = 0.5*(params.rho1 + params.rho2)
-    U[0, :, :N[1]/2] = tanh((X[1, :, :N[1]/2] -0.5*pi)/params.delta)
-    U[0, :, N[1]/2:] = -tanh((X[1, :, N[1]/2:]-1.5*pi)/params.delta)
-    rho[:, :N[1]/2] = 2.0 + tanh((X[1, :, :N[1]/2] -0.5*pi)/params.delta)
-    rho[:, N[1]/2:] = 2.0 -tanh((X[1, :, N[1]/2:]-1.5*pi)/params.delta) 
+    U[0, :, :N[1]/2] = tanh((X[1][:, :N[1]/2] -0.5*pi)/params.delta)
+    U[0, :, N[1]/2:] = -tanh((X[1][:, N[1]/2:]-1.5*pi)/params.delta)
+    rho[:, :N[1]/2] = 2.0 + tanh((X[1][:, :N[1]/2] -0.5*pi)/params.delta)
+    rho[:, N[1]/2:] = 2.0 -tanh((X[1][:, N[1]/2:]-1.5*pi)/params.delta)
     rho -= rho0
-    
+
     for i in range(3):
-        Ur_hat[i] = FFT.fft2(Ur[i], Ur_hat[i]) 
+        Ur_hat[i] = FFT.fft2(Ur[i], Ur_hat[i])
 
 im, im2 = None, None
 def update(context):
@@ -32,13 +32,13 @@ def update(context):
     c = context
     params = config.params
     solver = config.solver
-    
+
     dx, L, N = params.dx, params.L, params.N
     if (params.tstep % params.plot_result == 0 and params.plot_result > 0):
         P = solver.get_pressure(**context)
         curl = solver.get_curl(**context)
         rho = solver.get_rho(**context)
-        
+
     if params.tstep == 1 and params.plot_result > 0:
         fig, ax = plt.subplots(1, 1)
         fig.suptitle('Density', fontsize=20)
@@ -47,10 +47,10 @@ def update(context):
 
         im = ax.imshow(zeros((N[0], N[1])),cmap=plt.cm.bwr, extent=[0, L[0], 0, L[1]])
         plt.colorbar(im)
-        plt.draw() 
+        plt.draw()
 
         fig2, ax2 = plt.subplots(1,1)
-        fig2.suptitle('Vorticity', fontsize=20)   
+        fig2.suptitle('Vorticity', fontsize=20)
         ax2.set_xlabel('x')
         ax2.set_ylabel('y')
 

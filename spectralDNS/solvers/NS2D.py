@@ -12,12 +12,14 @@ def get_context():
 
     FFT = get_FFT(params)
     float, complex, mpitype = datatypes(params.precision)
-    
+
     # Mesh variables
     X = FFT.get_local_mesh()
-    K = FFT.get_scaled_local_wavenumbermesh()
-    K2 = np.sum(K*K, 0, dtype=float)
-    K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)
+    K = FFT.get_local_wavenumbermesh(scaled=True)
+    K2 = K[0]*K[0] + K[1]*K[1]
+    K_over_K2 = zeros((2,) + FFT.complex_shape())
+    for i in range(2):
+        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
 
     # Solution variables
     U     = empty((2,) + FFT.real_shape(), dtype=float)
@@ -25,7 +27,7 @@ def get_context():
     P     = empty(FFT.real_shape(), dtype=float)
     P_hat = empty(FFT.complex_shape(), dtype=complex)
     curl  = empty(FFT.real_shape(), dtype=float)
-    
+
     # Primary variable
     u = U_hat
 
@@ -33,7 +35,7 @@ def get_context():
     dU = empty((2,) + FFT.complex_shape(), dtype=complex)
     work = work_arrays()
 
-    hdf5file = NS2DWriter({"U":U[0], "V":U[1], "P":P}, 
+    hdf5file = NS2DWriter({"U":U[0], "V":U[1], "P":P},
                           filename=params.h5filename+".h5",
                           chkpoint={'current':{'U':U, 'P':P}, 'previous':{}})
 
@@ -50,7 +52,7 @@ def get_curl(curl, U_hat, work, FFT, K, **context):
     curl_hat = cross2(curl_hat, K, U_hat)
     curl = FFT.ifft2(curl_hat, curl)
     return curl
-            
+
 def get_velocity(U, U_hat, FFT, **context):
     """Compute velocity from context"""
     for i in range(2):
@@ -73,7 +75,7 @@ def getConvection(convection):
             curl_hat = work[(FFT.complex_shape(), complex, 0)]
             u_dealias = work[((2,)+FFT.work_shape(params.dealias), float, 0)]
             curl_dealias = work[(FFT.work_shape(params.dealias), float, 0)]
-            
+
             curl_hat = cross2(curl_hat, K, u_hat)
             curl_dealias = FFT.ifft2(curl_hat, curl_dealias, params.dealias)
             u_dealias[0] = FFT.ifft2(u_hat[0], u_dealias[0], params.dealias)
@@ -81,7 +83,7 @@ def getConvection(convection):
             rhs[0] = FFT.fft2(u_dealias[1]*curl_dealias, rhs[0], params.dealias)
             rhs[1] = FFT.fft2(-u_dealias[0]*curl_dealias, rhs[1], params.dealias)
             return rhs
-    
+
     Conv.convection = convection
     return Conv
 

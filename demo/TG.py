@@ -14,19 +14,19 @@ except ImportError:
 def initialize(solver, **context):
     if 'NS' in config.params.solver:
         initialize1(solver, **context)
-    
+
     else:
         initialize2(solver, **context)
     config.params.t = 0.0
     config.params.tstep = 0
-        
-def initialize1(solver, U, U_hat, X, FFT, **context):    
+
+def initialize1(solver, U, U_hat, X, FFT, **context):
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
-    U[2] = 0 
+    U[2] = 0
     for i in range(3):
         U_hat[i] = FFT.fftn(U[i], U_hat[i])
-        
+
 def initialize2(solver, U, W_hat, X, FFT, K, work, **context):
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
@@ -46,7 +46,7 @@ def update(context):
     c = context
     params = config.params
     solver = config.solver
-    
+
     if (params.tstep % params.compute_energy == 0 or
           params.tstep % params.plot_step == 0 and params.plot_step > 0):
         U = solver.get_velocity(**c)
@@ -58,13 +58,13 @@ def update(context):
         if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
             if im1 is None:
                 plt.figure()
-                im1 = plt.contourf(c.X[1,:,:,0], c.X[0,:,:,0], U[0,:,:,10], 100)
+                im1 = plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], U[0,:,:,10], 100)
                 plt.colorbar(im1)
                 plt.draw()
                 globals().update(im1=im1)
             else:
                 im1.ax.clear()
-                im1.ax.contourf(c.X[1,:,:,0], c.X[0,:,:,0], U[0,:,:,10], 100) 
+                im1.ax.contourf(c.X[1][:,:,0], c.X[0][:,:,0], U[0,:,:,10], 100)
                 im1.autoscale()
             plt.pause(1e-6)
 
@@ -72,22 +72,22 @@ def update(context):
         dx, L = params.dx, params.L
         #if 'NS' in params.solver:
             #ww = comm.reduce(sum(curl*curl)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
-            
+
             #duidxj = work[(((3,3)+FFT.real_shape()), FFT.float, 0)]
             #for i in range(3):
                 #for j in range(3):
-                    #duidxj[i,j] = FFT.ifftn(1j*K[j]*U_hat[i], duidxj[i,j]) 
+                    #duidxj[i,j] = FFT.ifftn(1j*K[j]*U_hat[i], duidxj[i,j])
             #ww2 = comm.reduce(sum(duidxj*duidxj)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
-            
+
             #ddU = work[(((3,)+FFT.real_shape()), FFT.float, 0)]
             #dU = ComputeRHS(dU, U_hat)
             #for i in range(3):
-                #ddU[i] = FFT.ifftn(dU[i], ddU[i]) 
+                #ddU[i] = FFT.ifftn(dU[i], ddU[i])
             #ww3 = comm.reduce(sum(ddU*U)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
-            
+
             #if rank == 0:
                 #print ww, params.nu*ww2, ww3, ww-ww2
-            
+
         ww = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
         kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
         kold[0] = kk
@@ -97,7 +97,7 @@ def update(context):
             print(params.t, float(kk), float(ww))
     #if params.tstep % params.compute_energy == 1:
         #if 'NS' in params.solver:
-            #kk2 = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)        
+            #kk2 = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
             #if rank == 0:
                 #print 0.5*(kk2-kold[0])/params.dt
 
@@ -109,6 +109,7 @@ def regression_test(context):
     curl = solver.get_curl(**context)
     w = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
     k = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
+    config.solver.MemoryUsage('End', context.FFT.comm)
     if solver.rank == 0:
         assert round(w - 0.375249930801, params.ntol) == 0
         assert round(k - 0.124953117517, params.ntol) == 0
@@ -146,7 +147,7 @@ if __name__ == "__main__":
             U = sol.get_velocity(**context)
             P = sol.get_pressure(**context)
             curl = sol.get_curl(**context)
-            
+
         context.hdf5file.update_components = update_components
 
     initialize(sol, **context)

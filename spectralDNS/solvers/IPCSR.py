@@ -51,27 +51,30 @@ def get_context():
     Source  = zeros((3,)+FST.real_shape(), dtype=float)
     Sk      = zeros((3,)+FST.complex_shape(), dtype=complex)
 
-    K = FST.get_scaled_local_wavenumbermesh()
+    K = FST.get_local_wavenumbermesh(scaled=True)
     K2 = K[1]*K[1]+K[2]*K[2]
-    K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)
+    K_over_K2 = zeros((3,) + FST.complex_shape())
+    for i in range(3):
+        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
+
     work = work_arrays()
 
     # Primary variable
     u = (U_hat, P_hat)
 
     nu, dt, N = params.nu, params.dt, params.N
-    kx = K[0, :, 0, 0]
+    kx = K[0][:, 0, 0]
 
     # Collect all linear algebra solvers
     la = config.AttributeDict(dict(
-        HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2+2.0/nu/dt), ST),
-        HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K[1, 0]**2+K[2, 0]**2), SN),
+        HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST),
+        HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K2[0]), SN),
         TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0), N[0])),
         TDMASolverN = TDMA(inner_product((SN, 0), (SN, 0), N[0]))
         )
     )
 
-    alfa = K[1, 0]**2+K[2, 0]**2-2.0/nu/dt
+    alfa = K2[0]-2.0/nu/dt
 
     # Collect all matrices
     mat = config.AttributeDict(dict(
@@ -137,10 +140,10 @@ def pressuregrad(rhs, p_hat, mat, work, K, Nu):
     #dP = FST.scalar_product(P, dP, ST)
     dP = mat.BDT.matvec(p_hat, dP)
 
-    rhs[1, :Nu] -= 1j*K[1, :Nu]*dP[:Nu]
+    rhs[1] -= 1j*K[1]*dP
 
     # pressure gradient z-direction
-    rhs[2, :Nu] -= 1j*K[2, :Nu]*dP[:Nu]
+    rhs[2] -= 1j*K[2]*dP
 
     return rhs
 
@@ -153,10 +156,10 @@ def pressuregrad2(rhs, p_corr, K, mat, work, Nu):
     # pressure gradient y-direction
 
     dP = mat.BDN.matvec(p_corr, dP)
-    rhs[1, :Nu] -= 1j*K[1, :Nu]*dP[:Nu]
+    rhs[1] -= 1j*K[1]*dP
 
     # pressure gradient z-direction
-    rhs[2, :Nu] -= 1j*K[2, :Nu]*dP[:Nu]
+    rhs[2] -= 1j*K[2]*dP
 
     return rhs
 
@@ -170,7 +173,7 @@ def compute_pressure(P_hat, H_hat, U_hat, U_hat0, K, FST, ST, work, mat, la,
     H_hat *= -1
 
     F_tmp = work[(P_hat, 0)]
-    LUsolve.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], H_hat[0, u_slice],
+    LUsolve.Mult_Div_3D(params.N[0], K[1][0], K[2][0], H_hat[0, u_slice],
                      H_hat[1, u_slice], H_hat[2, u_slice], F_tmp[p_slice])
     P_hat = la.HelmholtzSolverP(P_hat, F_tmp)
 

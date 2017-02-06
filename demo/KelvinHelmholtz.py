@@ -5,13 +5,13 @@ from numpy import zeros, pi, sum, exp, sin, cos, tanh, float64
 def initialize(X, U, U_hat, FFT, **context):
     params = config.params
     Um = 0.5*(params.U1 - params.U2)
-    N = params.N    
-    U[1] = params.A*sin(2*X[0])       
-    U[0, :, :N[1]/4] = params.U1 - Um*exp((X[1,:, :N[1]/4] - 0.5*pi)/params.delta)
-    U[0, :, N[1]/4:N[1]/2] = params.U2 + Um*exp(-1.0*(X[1, :, N[1]/4:N[1]/2] - 0.5*pi)/params.delta)
-    U[0, :, N[1]/2:3*N[1]/4] = params.U2 + Um*exp((X[1, :, N[1]/2:3*N[1]/4] - 1.5*pi)/params.delta)
-    U[0, :, 3*N[1]/4:] = params.U1 - Um*exp(-1.0*(X[1, :, 3*N[1]/4:] - 1.5*pi)/params.delta)
-          
+    N = params.N
+    U[1] = params.A*sin(2*X[0])
+    U[0, :, :N[1]/4] = params.U1 - Um*exp((X[1][:, :N[1]/4] - 0.5*pi)/params.delta)
+    U[0, :, N[1]/4:N[1]/2] = params.U2 + Um*exp(-1.0*(X[1][:, N[1]/4:N[1]/2] - 0.5*pi)/params.delta)
+    U[0, :, N[1]/2:3*N[1]/4] = params.U2 + Um*exp((X[1][:, N[1]/2:3*N[1]/4] - 1.5*pi)/params.delta)
+    U[0, :, 3*N[1]/4:] = params.U1 - Um*exp(-1.0*(X[1][:, 3*N[1]/4:] - 1.5*pi)/params.delta)
+
     for i in range(2):
         U_hat[i] = FFT.fft2(U[i], U_hat[i])
 
@@ -32,7 +32,7 @@ def update(context):
         kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
         if solver.rank == 0:
             print params.tstep, kk
-            
+
     if params.tstep == 1 and params.plot_result > 0:
         fig, ax = plt.subplots(1,1)
         fig.suptitle('Pressure', fontsize=20)
@@ -41,10 +41,10 @@ def update(context):
 
         im = ax.imshow(zeros((N[0], N[1])),cmap=plt.cm.bwr, extent=[0, L[0], 0, L[1]])
         plt.colorbar(im)
-        plt.draw() 
+        plt.draw()
 
         fig2, ax2 = plt.subplots(1,1)
-        fig2.suptitle('Vorticity', fontsize=20)   
+        fig2.suptitle('Vorticity', fontsize=20)
         ax2.set_xlabel('x')
         ax2.set_ylabel('y')
 
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         }, 'doublyperiodic'
     )
     # Adding new arguments required here to allow overloading through commandline
-    config.doublyperiodic.add_argument('--plot_result', type=int, default=50)    
+    config.doublyperiodic.add_argument('--plot_result', type=int, default=50)
     config.doublyperiodic.add_argument('--compute_energy', type=int, default=50)
     solver = get_solver(update=update, mesh='doublyperiodic')
     assert config.params.solver == 'NS2D'

@@ -41,7 +41,7 @@ def get_context():
     # Mesh variables
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
-    K = FST.get_scaled_local_wavenumbermesh()
+    K = FST.get_local_wavenumbermesh(scaled=True)
 
     # Remove oddball Nyquist
     #K[1, :, -params.N[1]/2, 0] = 0
@@ -50,7 +50,9 @@ def get_context():
     #K[2, :, -params.N[1]/2, -1] = 0
 
     K2 = K[1]*K[1]+K[2]*K[2]
-    K_over_K2 = K.astype(float) / np.where(K2==0, 1, K2).astype(float)
+    K_over_K2 = zeros((3,) + FST.complex_shape())
+    for i in range(3):
+        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
 
     # Solution variables
     U  = zeros((3,)+FST.real_shape(), dtype=float)
@@ -76,7 +78,7 @@ def get_context():
 
     nu, dt, N = params.nu, params.dt, params.N
     K4 = K2**2
-    kx = K[0, :, 0, 0]
+    kx = K[0][:, 0, 0]
 
     # Collect all linear algebra solvers
     la = config.AttributeDict(dict(

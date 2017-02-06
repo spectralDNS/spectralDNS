@@ -18,10 +18,10 @@ flux = array([736.43])
 
 def initOS(OS, U, X, t=0.):
     for i in range(U.shape[1]):
-        x = X[0, i, 0, 0]
+        x = X[0][i, 0, 0]
         OS.interp(x)
         for j in range(U.shape[2]):
-            y = X[1, i, j, 0]
+            y = X[1][i, j, 0]
             v =  dot(OS.f, real(OS.dphidy*exp(1j*(y-OS.eigval*t))))
             u = -dot(OS.f, real(1j*OS.phi*exp(1j*(y-OS.eigval*t))))
             U[0, i, j, :] = u
@@ -169,17 +169,17 @@ def update(context):
     if params.tstep == 1 and solver.rank == 0 and params.plot_result > 0:
         # Initialize figures
         plt.figure()
-        im1 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[0,:,:,0], 100)
+        im1 = plt.contourf(X[1][:,:,0], X[0][:,:,0], U[0,:,:,0], 100)
         plt.colorbar(im1)
         plt.draw()
 
         plt.figure()
-        im2 = plt.contourf(X[1,:,:,0], X[0,:,:,0], U[1,:,:,0], 100)
+        im2 = plt.contourf(X[1][:,:,0], X[0][:,:,0], U[1,:,:,0], 100)
         plt.colorbar(im2)
         plt.draw()
 
         plt.figure()
-        im3 = plt.contourf(X[2,:,0,:], X[0,:,0,:], U[0, :,0 ,:], 100)
+        im3 = plt.contourf(X[2][:,0,:], X[0][:,0,:], U[0, :,0 ,:], 100)
         plt.colorbar(im3)
         plt.draw()
 
@@ -187,14 +187,14 @@ def update(context):
 
     if params.tstep % params.plot_result == 0 and solver.rank == 0 and params.plot_result > 0:
         im1.ax.clear()
-        im1.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[0, :, :, 0], 100)
+        im1.ax.contourf(X[1][:,:,0], X[0][:,:,0], U[0, :, :, 0], 100)
         im1.autoscale()
         im2.ax.clear()
-        im2.ax.contourf(X[1, :,:,0], X[0, :,:,0], U[1, :, :, 0], 100)
+        im2.ax.contourf(X[1][:,:,0], X[0][:,:,0], U[1, :, :, 0], 100)
         im2.autoscale()
         im3.ax.clear()
         #im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100)
-        im3.ax.contourf(X[2,:,0,:], X[0,:,0,:], U[0, :,0 ,:], 100)
+        im3.ax.contourf(X[2][:,0,:], X[0][:,0,:], U[0, :,0 ,:], 100)
         im3.autoscale()
         plt.pause(1e-6)
 
