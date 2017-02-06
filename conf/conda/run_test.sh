@@ -1,2 +1,2 @@
 pushd tests
-py.test -v
+mpirun -np 4 py.test -v
