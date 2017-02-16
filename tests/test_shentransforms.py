@@ -42,7 +42,7 @@ def test_FST(ST, quad):
 
     else:
         A = np.zeros((N, N, N), dtype=FST.float)
-        B2 = np.zeros((N, N, N/2+1), dtype=FST.complex)
+        B2 = np.zeros((N, N, N//2+1), dtype=FST.complex)
 
     atol, rtol = (1e-10, 1e-8) if FST.float is np.float64 else (5e-7, 1e-4)
     FST.comm.Bcast(A, root=0)
@@ -78,8 +78,6 @@ def test_FST_padded(ST, quad):
         A_hat = FST_SELF.forward(A, A_hat, ST)
         A = FST_SELF.backward(A_hat, A, ST)
         A_hat = FST_SELF.forward(A, A_hat, ST)
-
-        A_hat[:, -M[1]/2] = 0
 
         A_pad = np.zeros(FST_SELF.real_shape_padded(), dtype=FST.float)
         A_pad = FST_SELF.backward(A_hat, A_pad, ST, dealias='3/2-rule')

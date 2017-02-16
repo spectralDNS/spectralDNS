@@ -1,4 +1,5 @@
 import pytest
+from six.moves import reload_module
 from spectralDNS import config, get_solver, solve
 from TGMHD import initialize, regression_test, pi
 from mpi4py import MPI
@@ -6,7 +7,7 @@ from mpi4py import MPI
 comm = MPI.COMM_WORLD
 
 if comm.Get_size() >= 4:
-    params = ('uniform_slab', 'nonuniform_slab', 
+    params = ('uniform_slab', 'nonuniform_slab',
               'uniform_pencil', 'nonuniform_pencil')
 else:
     params = ('uniform', 'nonuniform')
@@ -25,7 +26,7 @@ def sol(request):
     else:
         _args += ['--M', '6', '5', '4', '--L', '6*pi', '4*pi', '2*pi']
     _args += ['MHD']
-    
+
     return _args
 
 def test_MHD(sol):
@@ -40,19 +41,20 @@ def test_MHD(sol):
         'convection': 'Divergence'
         }
     )
-        
+
     solver = get_solver(regression_test=regression_test,
                         parse_args=sol)
     context = solver.get_context()
     initialize(**context)
     solve(solver, context)
-    
+
     config.params.dealias = '3/2-rule'
     initialize(**context)
     solve(solver, context)
-    
+
     config.params.dealias = '2/3-rule'
     config.params.optimization = 'cython'
+    reload_module(solver)
     initialize(**context)
     solve(solver, context)
 

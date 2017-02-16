@@ -54,11 +54,11 @@ def test_solvers(sol):
     initialize(solver, **context)
     solve(solver, context)
 
-    config.params.dealias = '2/3-rule'
-    config.params.optimization = 'cython'
-    reload_module(solver)
-    initialize(solver, **context)
-    solve(solver, context)
+    #config.params.dealias = '2/3-rule'
+    #config.params.optimization = 'cython'
+    #reload_module(solver)
+    #initialize(solver, **context)
+    #solve(solver, context)
 
     config.params.write_result = 1
     config.params.checkpoint = 1

@@ -152,3 +152,5 @@ if __name__ == "__main__":
 
     initialize(sol, **context)
     solve(sol, context)
+    context.hdf5file._init_h5file(config.params, **context)
+    context.hdf5file.f.close()

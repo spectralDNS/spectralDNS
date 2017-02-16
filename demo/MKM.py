@@ -158,8 +158,8 @@ def update(context):
         #Sk[i] = FST.scalar_product(Source[i], Sk[i], ST)
 
     if params.tstep % params.print_energy0 == 0 and solver.rank == 0:
-        print(c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 2))
-        print(c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 1))
+        print( (c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 2)))
+        print( (c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 1)))
 
     if (params.tstep % params.compute_energy == 0 or
         params.tstep % params.plot_result == 0 and params.plot_result > 0 or

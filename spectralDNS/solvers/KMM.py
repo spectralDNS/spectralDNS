@@ -186,7 +186,7 @@ def mult_K1j(K, a, f):
     f[0] = 1j*K[2]*a
     f[1] = -1j*K[1]*a
     return f
-
+#@profile
 def compute_curl(c, u_hat, g, K, FST, SB, ST, work):
     F_tmp = work[(u_hat, 0, False)]
     F_tmp2 = work[(u_hat, 2, False)]

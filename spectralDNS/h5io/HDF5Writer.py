@@ -53,15 +53,15 @@ try:
 
             self.f.attrs.create("dt", params.dt)
             self.f.attrs.create("N", params.N)
-            self.f.attrs.create("L", params.L)    
+            self.f.attrs.create("L", params.L)
             self.f.attrs.create("Sk", 0.0)
-            if 'write_yz_slice' in params:                
+            if 'write_yz_slice' in params:
                 self.f["2D/yz"].attrs.create("i", params.write_yz_slice[0])
                 self.f["2D/xy"].attrs.create("j", params.write_xy_slice[0])
                 self.f["2D/xz"].attrs.create("k", params.write_xz_slice[0])
 
         def update(self, params, **kw):
-            if (self.check_if_write(params) or 
+            if (self.check_if_write(params) or
                   params.tstep % params.checkpoint == 0):
                 self.update_components(**kw)
 
@@ -76,7 +76,7 @@ try:
                 return True
 
             if 'write_xy_slice' in params:
-                if (params.tstep % params.write_xy_slice[1] == 0 or 
+                if (params.tstep % params.write_xy_slice[1] == 0 or
                     params.tstep % params.write_yz_slice[1] == 0 or
                     params.tstep % params.write_xz_slice[1] == 0):
                     return True
@@ -84,17 +84,23 @@ try:
 
         def _checkpoint(self, params, **kw):
             FFT = kw.pop('FFT', kw.get('FST'))
-            if self.f is None: 
-                self._init_h5file(params, FFT, **kw) 
+            if self.f is None:
+                self._init_h5file(params, FFT, **kw)
             else:
                 self.f = h5py.File(self.fname, driver="mpio", comm=FFT.comm)
                 if not all(self.f.attrs['N'] == params.N):
                     self._init_h5file(params, FFT, **kw)
 
             dim = str(self.dim)+"D"
-            keys = self.chkpoint['current'].keys()
+            keys = list(self.chkpoint['current'].keys())
             # Create datasets first time around
-            if not "1" in self.f["{}/checkpoint/{}".format(dim, list(keys)[0])].keys():
+            create_new_dataset = False
+            for key in keys:
+                kk = "{}/checkpoint/{}".format(dim, key)
+                if not "1" in list(self.f[kk].keys()):
+                    create_new_dataset = True
+            FFT.comm.barrier()
+            if create_new_dataset:
                 for key, val in six.iteritems(self.chkpoint['current']):
                     shape = params.N if len(val.shape) == self.dim else (val.shape[0],)+tuple(params.N)
                     self.f["{}/checkpoint/{}".format(dim, key)].create_dataset("1", shape=shape, dtype=val.dtype)
@@ -121,13 +127,16 @@ try:
                     if len(s) == len(val.shape):
                         self.f["3D/checkpoint/{}/1".format(key)][s] = val
                     else:
-                        self.f["3D/checkpoint/{}/1".format(key)][:, s[0], s[1], s[2]] = val
+                        ss = (slice(None),)+s
+                        self.f["3D/checkpoint/{}/1".format(key)][ss] = val
+
                 for key, val in six.iteritems(self.chkpoint['previous']):
                     if len(s) == len(val.shape):
                         self.f["3D/checkpoint/{}/0".format(key)][s] = val
                     else:
-                        self.f["3D/checkpoint/{}/0".format(key)][:, s[0], s[1], s[2]] = val
-            
+                        ss = (slice(None),)+s
+                        self.f["3D/checkpoint/{}/0".format(key)][ss] = val
+
             # For channel solver with dynamic pressure
             if 'Sk' in kw:
                 z0 = kw['Sk'][1,0,0,0].real
@@ -137,8 +146,8 @@ try:
 
         def _write(self, params, **kw):
             FFT = kw.pop('FFT', kw.get('FST'))
-            if self.f is None: 
-                self._init_h5file(params, FFT, **kw) 
+            if self.f is None:
+                self._init_h5file(params, FFT, **kw)
             else:
                 self.f = h5py.File(self.fname, driver="mpio", comm=FFT.comm)
                 if not all(self.f.attrs['N'] == params.N):
@@ -165,7 +174,7 @@ try:
                             self.f["2D/yz/%s/%d"%(comp, params.tstep)][s[1], s[2]] = val[i-sx.start]
 
                 if params.tstep % params.write_xz_slice[1] == 0:
-                    j = params.write_xz_slice[0]                
+                    j = params.write_xz_slice[0]
                     for comp in self.components:
                         self.f["2D/xz/"+comp].create_dataset(str(params.tstep), shape=(N[0], N[2]), dtype=FFT.float)
 
@@ -180,10 +189,10 @@ try:
                                 self.f["2D/xz/%s/%d"%(comp, params.tstep)][s[0], s[2]] = val[:, j-sy.start, :]
 
                 if params.tstep % params.write_xy_slice[1] == 0:
-                    k = params.write_xy_slice[0]                
+                    k = params.write_xy_slice[0]
                     for comp in self.components:
                         self.f["2D/xy/"+comp].create_dataset(str(params.tstep), shape=(N[0], N[1]), dtype=FFT.float)
-                    
+
                     for comp, val in six.iteritems(self.components):
                         self.f["2D/xy/%s/%d"%(comp, params.tstep)][s[0], s[1]] = val[:, :, k]
 

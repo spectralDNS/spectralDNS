@@ -35,9 +35,9 @@ def get_context():
     Source = None
     work = work_arrays()
 
-    hdf5file = NSWriter({'U':U[0], 'V':U[1], 'W':U[2], 'P':P},
-                        chkpoint={'current':{'U':U, 'P':P}, 'previous':{}},
-                        filename=params.h5filename+'.h5')
+    hdf5file = NSWriter({"U":U[0], "V":U[1], "W":U[2], "P":P},
+                        chkpoint={"current":{"U":U, "P":P}, "previous":{}},
+                        filename=params.h5filename+".h5")
 
     return config.AttributeDict(locals())
 
