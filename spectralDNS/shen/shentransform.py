@@ -96,17 +96,6 @@ class SlabShen_R2C(Slab_R2C):
         K = [np.broadcast_to(k, self.complex_shape()) for k in Ks]
         return K
 
-    def get_scaled_local_wavenumbermesh(self):
-        K = self.get_local_wavenumbermesh()
-
-        # scale with physical mesh size.
-        # This takes care of mapping the physical domain to a computational cube of size (2, 2pi, 2pi)
-        # Note that first direction cannot be different from 2 (yet)
-        Lp = array([2, 2*pi, 2*pi])/self.L
-        for i in range(3):
-            K[i] *= Lp[i]
-        return K
-
     def get_dealias_filter(self):
         """Filter for dealiasing nonlinear convection"""
         K = self.get_local_wavenumbermesh()
@@ -123,6 +112,7 @@ class SlabShen_R2C(Slab_R2C):
             fu.fill(0)
             fu[:, :N[1]//2+1] = fp[:, :N[1]//2+1, :(N[2]//2+1)]
             fu[:, N[1]//2:] += fp[:, -N[1]//2:, :(N[2]//2+1)]
+
         elif axis == 2:
             fu[:] = fp[:, :, :(N[2]//2+1)]
 
