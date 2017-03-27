@@ -1,6 +1,7 @@
 """Orr-Sommerfeld"""
 import pyfftw  # Hack because of https://github.com/pyFFTW/pyFFTW/issues/40
 from spectralDNS import config, get_solver, solve
+from spectralDNS.utilities import reset_profile
 from OrrSommerfeld_shen import OrrSommerfeld
 #from OrrSommerfeld_eig import OrrSommerfeld
 from numpy import dot, real, pi, cos, exp, sum, zeros, arange, imag, sqrt, \
@@ -99,6 +100,8 @@ def update(context):
     c = context
     params = config.params
     solver = config.solver
+
+    #if params.tstep == 2: reset_profile(profile)
 
     if (params.tstep % params.plot_step == 0 or
         params.tstep % params.compute_energy == 0):

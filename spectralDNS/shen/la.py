@@ -24,7 +24,7 @@ class Helmholtz(object):
         self.neumann = True if isinstance(basis, bases.ShenNeumannBasis) else False
         quad = basis.quad
         M = (N-4)//2 if self.neumann else (N-3)//2
-        self.s = basis.slice(N)
+        self.s = basis.slice()
         if hasattr(alfa, "__len__"):
             Ny, Nz = alfa.shape
             self.u0 = zeros((2, M+1, Ny, Nz), float)   # Diagonal entries of U
@@ -39,8 +39,8 @@ class Helmholtz(object):
             self.L  = zeros((2, M), float)     # The single nonzero row of L
             LUsolve.LU_Helmholtz_1D(N, self.neumann, quad=="GL", self.alfa, self.u0, self.u1, self.u2, self.L)
         if not self.neumann:
-            self.B = inner_product((basis, 0), (basis, 0), N)
-            self.A = inner_product((basis, 0), (basis, 2), N)
+            self.B = inner_product((basis, 0), (basis, 0))
+            self.A = inner_product((basis, 0), (basis, 2))
 
     def __call__(self, u, b):
         s = self.s
@@ -86,10 +86,10 @@ class Biharmonic(object):
         self.quad = quad
         self.solver = solver
         k = arange(N)
-        SB = bases.ShenBiharmonicBasis(quad)
-        self.S = S = inner_product((SB, 0), (SB, 4), N)
-        self.B = B = inner_product((SB, 0), (SB, 0), N)
-        self.A = A = inner_product((SB, 0), (SB, 2), N)
+        SB = bases.ShenBiharmonicBasis(N, quad=quad)
+        self.S = S = inner_product((SB, 0), (SB, 4))
+        self.B = B = inner_product((SB, 0), (SB, 0))
+        self.A = A = inner_product((SB, 0), (SB, 2))
         self.a0 = a0
         self.alfa = alfa
         self.beta = beta
@@ -186,5 +186,4 @@ class Biharmonic(object):
                                 self.S[4], self.A[-2], self.A[0], self.A[2],
                                 self.B[-4], self.B[-2], self.B[0], self.B[2], self.B[4])
         return c
-
 

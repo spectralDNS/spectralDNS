@@ -10,10 +10,10 @@ class BiharmonicCoeff(object):
         self.quad = quad
         N = K.shape[0]
         self.shape = (N-4, N-4)
-        SB = bases.ShenBiharmonicBasis(quad)
-        self.S = inner_product((SB, 0), (SB, 4), N)
-        self.B = inner_product((SB, 0), (SB, 0), N)
-        self.A = inner_product((SB, 0), (SB, 2), N)
+        SB = bases.ShenBiharmonicBasis(N, quad)
+        self.S = inner_product((SB, 0), (SB, 4))
+        self.B = inner_product((SB, 0), (SB, 0))
+        self.A = inner_product((SB, 0), (SB, 2))
         self.a0 = a0
         self.alfa = alfa
         self.beta = beta
@@ -42,9 +42,9 @@ class HelmholtzCoeff(object):
         self.quad = quad
         N = self.N = K.shape[0]-2
         self.shape = (N, N)
-        SD = bases.ShenDirichletBasis(quad)
-        self.B = inner_product((SD, 0), (SD, 0), N+2)
-        self.A = inner_product((SD, 0), (SD, 2), N+2)
+        SD = bases.ShenDirichletBasis(N+2, quad)
+        self.B = inner_product((SD, 0), (SD, 0))
+        self.A = inner_product((SD, 0), (SD, 2))
         self.alfa = alfa
         self.beta = beta
 

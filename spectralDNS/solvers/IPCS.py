@@ -21,9 +21,9 @@ def get_context():
     """Set up context for solver"""
 
     # Get points and weights for Chebyshev weighted integrals
-    ST = ShenDirichletBasis(quad=params.Dquad, threads=params.threads,
+    ST = ShenDirichletBasis(params.N[0], quad=params.Dquad, threads=params.threads,
                             planner_effort=params.planner_effort["dct"])
-    SN = ShenNeumannBasis(quad=params.Nquad, threads=params.threads,
+    SN = ShenNeumannBasis(params.N[0], quad=params.Nquad, threads=params.threads,
                           planner_effort=params.planner_effort["dct"])
     CT = ST.CT
 
@@ -77,8 +77,8 @@ def get_context():
     la = config.AttributeDict(dict(
         HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST),
         HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K2[0]), SN),
-        TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0), N[0])),
-        TDMASolverN = TDMA(inner_product((SN, 0), (SN, 0), N[0]))
+        TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0))),
+        TDMASolverN = TDMA(inner_product((SN, 0), (SN, 0)))
         )
     )
 
@@ -87,12 +87,12 @@ def get_context():
     # Collect all matrices
     kx = K[0][:, 0, 0]
     mat = config.AttributeDict(dict(
-        CDN = inner_product((ST, 0), (SN, 1), N[0]),
-        CND = inner_product((SN, 0), (ST, 1), N[0]),
-        BDN = inner_product((ST, 0), (SN, 0), N[0]),
-        CDD = inner_product((ST, 0), (ST, 1), N[0]),
-        BDD = inner_product((ST, 0), (ST, 0), N[0]),
-        BDT = inner_product((ST, 0), (CT, 0), N[0]),
+        CDN = inner_product((ST, 0), (SN, 1)),
+        CND = inner_product((SN, 0), (ST, 1)),
+        BDN = inner_product((ST, 0), (SN, 0)),
+        CDD = inner_product((ST, 0), (ST, 1)),
+        BDD = inner_product((ST, 0), (ST, 0)),
+        BDT = inner_product((ST, 0), (CT, 0)),
         AB = HelmholtzCoeff(kx, -1.0, -alfa, ST.quad)
         )
     )

@@ -1,6 +1,7 @@
 """Turbulent channel"""
 import pyfftw
 from spectralDNS import config, get_solver, solve
+from spectralDNS.utilities import reset_profile
 from numpy import dot, real, pi, exp, sum, complex, float, zeros, arange, imag, \
     cos, where, pi, random, exp, sin, log, array, zeros_like
 import h5py
@@ -116,6 +117,8 @@ def update(context):
     params = config.params
     solver = config.solver
     X, U, U_hat = c.X, c.U, c.U_hat
+
+    #if params.tstep == 1: reset_profile(profile)
 
     # Dynamically adjust flux
     if params.tstep % 1 == 0:

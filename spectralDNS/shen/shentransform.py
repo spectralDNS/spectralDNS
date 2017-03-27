@@ -62,7 +62,7 @@ class SlabShen_R2C(Slab_R2C):
 
     def get_mesh_dim(self, ST, d):
         if d == 0:
-            return ST.points_and_weights(self.N[0], ST.quad)[0]
+            return ST.points_and_weights()[0]
         elif d == 1:
             return arange(self.N[1], dtype=self.float)*self.L[1]/self.N[1]
         elif d == 2:
@@ -110,8 +110,10 @@ class SlabShen_R2C(Slab_R2C):
     def copy_from_padded(fp, fu, N, axis=0):
         if axis == 1:
             fu.fill(0)
-            fu[:, :N[1]//2+1] = fp[:, :N[1]//2+1, :(N[2]//2+1)]
-            fu[:, N[1]//2:] += fp[:, -N[1]//2:, :(N[2]//2+1)]
+            #fu[:, :N[1]//2+1] = fp[:, :N[1]//2+1, :(N[2]//2+1)]
+            #fu[:, N[1]//2:] += fp[:, -N[1]//2:, :(N[2]//2+1)]
+            fu[:, :N[1]//2] = fp[:, :N[1]//2, :(N[2]//2+1)]
+            fu[:, N[1]//2:] = fp[:, -N[1]//2:, :(N[2]//2+1)]
 
         elif axis == 2:
             fu[:] = fp[:, :, :(N[2]//2+1)]

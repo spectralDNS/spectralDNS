@@ -20,9 +20,9 @@ def get_context():
     """Set up context for solver"""
 
     # Get points and weights for Chebyshev weighted integrals
-    ST = ShenDirichletBasis(quad=params.Dquad, threads=params.threads,
+    ST = ShenDirichletBasis(params.N[0], quad=params.Dquad, threads=params.threads,
                             planner_effort=params.planner_effort["dct"])
-    SB = ShenBiharmonicBasis(quad=params.Bquad, threads=params.threads,
+    SB = ShenBiharmonicBasis(params.N[0], quad=params.Bquad, threads=params.threads,
                              planner_effort=params.planner_effort["dct"])
     CT = ST.CT  # Chebyshev transform
 
@@ -42,12 +42,6 @@ def get_context():
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
     K = FST.get_local_wavenumbermesh(scaled=True)
-
-    # Remove oddball Nyquist
-    #K[1, :, -params.N[1]/2, 0] = 0
-    #K[1, :, -params.N[1]/2, -1] = 0
-    #K[2, :, 0, -1] = 0
-    #K[2, :, -params.N[1]/2, -1] = 0
 
     K2 = K[1]*K[1]+K[2]*K[2]
     K_over_K2 = zeros((3,) + FST.complex_shape())
@@ -87,26 +81,26 @@ def get_context():
                                     -(K2[0] + nu*dt/2.*K4[0]), quad=SB.quad,
                                     solver="cython"),
         HelmholtzSolverU0 = Helmholtz(N[0], np.sqrt(2./nu/dt), ST),
-        TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0), N[0]))
+        TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0)))
         )
     )
 
     alfa = K2[0] - 2.0/nu/dt
     # Collect all matrices
     mat = config.AttributeDict(dict(
-        CDD = inner_product((ST, 0), (ST, 1), N[0]),
+        CDD = inner_product((ST, 0), (ST, 1)),
         AB = HelmholtzCoeff(kx, -1.0, -alfa, ST.quad),
         AC = BiharmonicCoeff(kx, nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad),
         # Matrices for biharmonic equation
-        CBD = inner_product((SB, 0), (ST, 1), N[0]),
-        ABB = inner_product((SB, 0), (SB, 2), N[0]),
-        BBB = inner_product((SB, 0), (SB, 0), N[0]),
-        SBB = inner_product((SB, 0), (SB, 4), N[0]),
+        CBD = inner_product((SB, 0), (ST, 1)),
+        ABB = inner_product((SB, 0), (SB, 2)),
+        BBB = inner_product((SB, 0), (SB, 0)),
+        SBB = inner_product((SB, 0), (SB, 4)),
         # Matrices for Helmholtz equation
-        ADD = inner_product((ST, 0), (ST, 2), N[0]),
-        BDD = inner_product((ST, 0), (ST, 0), N[0]),
-        BBD = inner_product((SB, 0), (ST, 0), N[0]),
-        CDB = inner_product((ST, 0), (SB, 1), N[0])
+        ADD = inner_product((ST, 0), (ST, 2)),
+        BDD = inner_product((ST, 0), (ST, 0)),
+        BBD = inner_product((SB, 0), (ST, 0)),
+        CDB = inner_product((ST, 0), (SB, 1))
         )
     )
 

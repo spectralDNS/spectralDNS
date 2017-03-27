@@ -9,7 +9,7 @@ from scipy.linalg import eig
 import numpy as np
 from numpy.linalg import inv
 from shenfun.chebyshev.bases import ShenBiharmonicBasis, \
-    ShenDirichletBasis, ChebyshevBasis
+    ShenDirichletBasis, Basis
 from shenfun import inner_product
 from shenfun.matrixbase import extract_diagonal_matrix
 
@@ -48,9 +48,9 @@ class OrrSommerfeld(object):
             phi = np.zeros_like(phi_hat)
             dphidy = np.zeros_like(phi_hat)
             if self.SB is None:
-                self.SB = ShenBiharmonicBasis(quad=self.quad)
-                self.SD = ShenDirichletBasis(quad=self.quad)
-                self.CDB = inner_product((SD, 0), (SB, 1), N)
+                self.SB = ShenBiharmonicBasis(N, quad=self.quad)
+                self.SD = ShenDirichletBasis(N, quad=self.quad)
+                self.CDB = inner_product((self.SD, 0), (self.SB, 1))
 
             phi = self.SB.ifst(phi_hat, phi)
             dphidy_hat = self.CDB.matvec(phi_hat)
@@ -60,8 +60,8 @@ class OrrSommerfeld(object):
         else:
             # Recompute interpolation matrices if necessary
             if not len(self.P4) == len(y):
-                SB = ShenBiharmonicBasis(quad=self.quad)
-                V = self.V = SB.vandermonde(y, N)
+                SB = ShenBiharmonicBasis(N, quad=self.quad)
+                V = self.V = SB.vandermonde(y)
                 P4 = self.P4 = SB.get_vandermonde_basis(V)
                 T4x = self.T4x = SB.get_vandermonde_basis_derivative(V, 1)
             phi = np.dot(self.P4, phi_hat)
@@ -71,10 +71,10 @@ class OrrSommerfeld(object):
 
     def assemble(self):
         N = self.N
-        SB = ShenBiharmonicBasis(quad=self.quad)
+        SB = ShenBiharmonicBasis(N, quad=self.quad)
         CT = SB.CT
-        x, w = self.x, self.w = SB.points_and_weights(N, self.quad)
-        V = SB.vandermonde(x, N)
+        x, w = self.x, self.w = SB.points_and_weights()
+        V = SB.vandermonde(x)
 
         # Trial function
         P4 = SB.get_vandermonde_basis(V)
@@ -84,10 +84,10 @@ class OrrSommerfeld(object):
 
         # (u'', v)
         K = np.zeros((N, N))
-        K[:-4, :-4] = inner_product((SB, 0), (SB, 2), N).diags().toarray()
+        K[:-4, :-4] = inner_product((SB, 0), (SB, 2)).diags().toarray()
 
         # ((1-x**2)u, v)
-        xx = (1-x**2).repeat(N).reshape((N, N))
+        xx = np.broadcast_to((1-x**2)[:, np.newaxis], (N, N))
         #K1 = np.dot(w*P4.T, xx*P4)  # Alternative: K1 = np.dot(w*P4.T, ((1-x**2)*P4.T).T)
         K1 = np.zeros((N, N))
         K1 = SB.scalar_product(xx*P4, K1)
@@ -100,11 +100,11 @@ class OrrSommerfeld(object):
 
         # (u'''', v)
         Q = np.zeros((self.N, self.N))
-        Q[:-4, :-4] = inner_product((SB, 0), (SB, 4), N).diags().toarray()
+        Q[:-4, :-4] = inner_product((SB, 0), (SB, 4)).diags().toarray()
 
         # (u, v)
         M = np.zeros((self.N, self.N))
-        M[:-4, :-4] = inner_product((SB, 0), (SB, 0), N).diags().toarray()
+        M[:-4, :-4] = inner_product((SB, 0), (SB, 0)).diags().toarray()
 
         Re = self.Re
         a = self.alfa
