@@ -16,7 +16,7 @@ def setupNS(context):
     FFT = context.FFT
         
     X = FFT.get_local_mesh()
-    K = FFT.get_scaled_local_wavenumbermesh()
+    K = numpy.array(FFT.get_local_wavenumbermesh(scaled=True))
 
     # Solution array and Fourier coefficients
     U     = empty((2,) + FFT.real_shape(), dtype=float)
@@ -43,7 +43,7 @@ def setupBoussinesq(context):
     FFT = context.FFT
     
     X = FFT.get_local_mesh()
-    K = FFT.get_scaled_local_wavenumbermesh()
+    K = numpy.array(FFT.get_local_wavenumbermesh(scaled=True))
 
     Ur     = empty((3,) + FFT.real_shape(), dtype=float)
     Ur_hat = empty((3,) + FFT.complex_shape(), dtype=complex)

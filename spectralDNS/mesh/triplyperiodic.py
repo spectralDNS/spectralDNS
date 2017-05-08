@@ -3,6 +3,7 @@ __date__ = "2014-12-30"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
+import numpy
 from numpy import sum,where
 from mpiFFT4py import *
 
@@ -15,7 +16,7 @@ def setupDNS(context):
     FFT = context.FFT
 
     X = FFT.get_local_mesh()
-    K = FFT.get_scaled_local_wavenumbermesh()
+    K = numpy.array(FFT.get_local_wavenumbermesh(scaled=True))
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
     
@@ -45,7 +46,7 @@ def setupDNS_Boussinesq(context):
     FFT = context.FFT
 
     X = FFT.get_local_mesh()
-    K = FFT.get_scaled_local_wavenumbermesh()
+    K = numpy.array(FFT.get_local_wavenumbermesh(scaled=True))
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
     
@@ -79,7 +80,7 @@ def setupMHD(context):
     FFT = context.FFT
     
     X = FFT.get_local_mesh()
-    K = FFT.get_scaled_local_wavenumbermesh()
+    K = nump.array(FFT.get_local_wavenumbermesh(scaled=True))
 
     K2 = sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
