@@ -12,7 +12,7 @@ from ..shen.la import Helmholtz
 from ..shen.shentransform import SlabShen_R2C
 from shenfun.chebyshev.bases import ShenDirichletBasis, ShenNeumannBasis, \
     ShenBiharmonicBasis
-from shenfun import inner_product
+from shenfun.spectralbase import inner_product
 from shenfun.la import TDMA
 
 from functools import wraps

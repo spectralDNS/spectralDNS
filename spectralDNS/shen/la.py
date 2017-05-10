@@ -1,5 +1,5 @@
 from numpy import zeros, ones, arange, pi, float, complex, int, complex128, array
-from shenfun import inner_product
+from shenfun.spectralbase import inner_product
 from shenfun.chebyshev import bases
 from . import LUsolve, Matvec
 from scipy.linalg import lu_factor, lu_solve, solve, solve_banded, decomp_cholesky

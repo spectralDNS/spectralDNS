@@ -8,7 +8,7 @@ from mpi4py import MPI
 from sympy import chebyshevt, Symbol, sin, cos, pi, lambdify
 import numpy as np
 import scipy.sparse.linalg as la
-from shenfun import inner_product
+from shenfun.spectralbase import inner_product
 from shenfun.chebyshev.bases import Basis, ShenDirichletBasis, \
     ShenNeumannBasis, ShenBiharmonicBasis
 
@@ -25,20 +25,22 @@ quads = ('GC', 'GL')
 @pytest.mark.parametrize('ST', Basis)
 @pytest.mark.parametrize('quad', quads)
 def test_FST(ST, quad):
-    ST = ST(N, quad=quad)
+    ST1 = ST(N, quad=quad)
     FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), comm)
+    ST1.plan(FST.complex_shape(), 0, np.complex, {})
 
     if FST.rank == 0:
 
         FST_SELF = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]),
                                 MPI.COMM_SELF)
-
+        ST0 = ST(N, quad=quad)
         A = np.random.random((N, N, N)).astype(FST.float)
         B2 = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
+        ST0.plan(FST_SELF.complex_shape(), 0, np.complex, {})
 
-        B2 = FST_SELF.forward(A, B2, ST)
-        A = FST_SELF.backward(B2, A, ST)
-        B2 = FST_SELF.forward(A, B2, ST)
+        B2 = FST_SELF.forward(A, B2, ST0)
+        A = FST_SELF.backward(B2, A, ST0)
+        B2 = FST_SELF.forward(A, B2, ST0)
 
     else:
         A = np.zeros((N, N, N), dtype=FST.float)
@@ -51,11 +53,11 @@ def test_FST(ST, quad):
     a = np.zeros(FST.real_shape(), dtype=FST.float)
     c = np.zeros(FST.complex_shape(), dtype=FST.complex)
     a[:] = A[FST.real_local_slice()]
-    c = FST.forward(a, c, ST)
+    c = FST.forward(a, c, ST1)
 
     assert np.all(abs((c - B2[FST.complex_local_slice()])/c.max()) < rtol)
 
-    a = FST.backward(c, a, ST)
+    a = FST.backward(c, a, ST1)
 
     assert np.all(abs((a - A[FST.real_local_slice()])/a.max()) < rtol)
 
@@ -64,26 +66,29 @@ def test_FST(ST, quad):
 @pytest.mark.parametrize('ST', Basis)
 @pytest.mark.parametrize('quad', quads)
 def test_FST_padded(ST, quad):
-    ST = ST(N, quad=quad)
+    ST1 = ST(N, quad=quad)
     M = np.array([N, 2*N, 4*N])
     FST = SlabShen_R2C(M, np.array([2*pi, 2*pi, 2*pi]), comm,
                        communication='Alltoall')
     FST_SELF = SlabShen_R2C(M, np.array([2*pi, 2*pi, 2*pi]),
                             MPI.COMM_SELF)
+    ST1.plan(FST.complex_shape(), 0, np.complex, {})
 
     if FST.rank == 0:
+        ST0 = ST(N, quad=quad)
+        ST0.plan(FST_SELF.complex_shape(), 0, np.complex, {})
         A = np.random.random(M).astype(FST.float)
         A_hat = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
 
-        A_hat = FST_SELF.forward(A, A_hat, ST)
-        A = FST_SELF.backward(A_hat, A, ST)
-        A_hat = FST_SELF.forward(A, A_hat, ST)
+        A_hat = FST_SELF.forward(A, A_hat, ST0)
+        A = FST_SELF.backward(A_hat, A, ST0)
+        A_hat = FST_SELF.forward(A, A_hat, ST0)
 
         A_hat[:, -M[1]//2] = 0
 
         A_pad = np.zeros(FST_SELF.real_shape_padded(), dtype=FST.float)
-        A_pad = FST_SELF.backward(A_hat, A_pad, ST, dealias='3/2-rule')
-        A_hat = FST_SELF.forward(A_pad, A_hat, ST, dealias='3/2-rule')
+        A_pad = FST_SELF.backward(A_hat, A_pad, ST0, dealias='3/2-rule')
+        A_hat = FST_SELF.forward(A_pad, A_hat, ST0, dealias='3/2-rule')
 
     else:
         A_pad = np.zeros(FST_SELF.real_shape_padded(), dtype=FST.float)
@@ -96,11 +101,11 @@ def test_FST_padded(ST, quad):
     a = np.zeros(FST.real_shape_padded(), dtype=FST.float)
     c = np.zeros(FST.complex_shape(), dtype=FST.complex)
     a[:] = A_pad[FST.real_local_slice(padsize=1.5)]
-    c = FST.forward(a, c, ST, dealias='3/2-rule')
+    c = FST.forward(a, c, ST1, dealias='3/2-rule')
 
     assert np.all(abs((c - A_hat[FST.complex_local_slice()])/c.max()) < rtol)
 
-    a = FST.backward(c, a, ST, dealias='3/2-rule')
+    a = FST.backward(c, a, ST1, dealias='3/2-rule')
 
     #print abs((a - A_pad[FST.real_local_slice(padsize=1.5)])/a.max())
     assert np.all(abs((a - A_pad[FST.real_local_slice(padsize=1.5)])/a.max()) < rtol)
@@ -113,6 +118,8 @@ def test_Mult_Div():
 
     SD = ShenDirichletBasis(N, "GC")
     SN = ShenNeumannBasis(N, "GC")
+    SD.plan(N, 0, np.complex, {})
+    SN.plan(N, 0, np.complex, {})
 
     Cm = inner_product((SN, 0), (SD, 1))
     Bm = inner_product((SN, 0), (SD, 0))
@@ -169,10 +176,10 @@ def test_Mult_Div():
 @pytest.mark.parametrize('quad', quads)
 def test_Helmholtz(ST, quad):
     M = 4*N
-    ST = ST(M, quad=quad)
+    ST = ST(M, quad=quad, plan=True)
     kx = 12
 
-    points, weights = ST.points_and_weights()
+    points, weights = ST.points_and_weights(M)
 
     fj = np.random.randn(M)
     f_hat = np.zeros(M)
@@ -207,37 +214,59 @@ def test_Helmholtz(ST, quad):
     u0_hat = H(u0_hat, f_hat)
     u0 = np.zeros(M)
     u0 = ST.backward(u0_hat, u0)
-    #from IPython import embed; embed()
-    assert np.linalg.norm(u0 - u1) < 1e-12
 
+    from shenfun.chebyshev.la import Helmholtz as HH
+    A.scale = np.ones(1)
+    B.scale = np.array([kx**2])
+    Hs = HH(**{'ADDmat':A, 'BDDmat':B})
+    u2_hat = np.zeros_like(u1)
+    u2_hat = Hs(u2_hat, f_hat)
+    u2 = np.zeros_like(u2_hat)
+    u2 = ST.backward(u2_hat, u2)
+    assert np.linalg.norm(u2 - u1) < 1e-12
 
     # Multidimensional
     f_hat = (f_hat.repeat(16).reshape((M, 4, 4))+1j*f_hat.repeat(16).reshape((M, 4, 4)))
+    ST.plan((M, 4, 4), 0, np.complex, {})
     kx = np.zeros((4, 4))+12
+
     H = Helmholtz(M, kx, ST)
     u0_hat = np.zeros((M, 4, 4), dtype=np.complex)
     u0_hat = H(u0_hat, f_hat)
     u0 = np.zeros((M, 4, 4), dtype=np.complex)
     u0 = ST.backward(u0_hat, u0)
 
-    assert np.linalg.norm(u0[:, 2, 2].real - u1)/(M*16) < 1e-12
-    assert np.linalg.norm(u0[:, 2, 2].imag - u1)/(M*16) < 1e-12
+    A.scale = np.ones((1,1,1))
+    B.scale = 12**2*np.ones((1, 4, 4))
+    A.axis = 0
+    B.axis = 0
+    #from IPython import embed; embed()
+
+    Hs = HH(**{'ADDmat':A, 'BDDmat':B})
+    u2_hat = np.zeros_like(u0_hat)
+    u2_hat = Hs(u2_hat, f_hat)
+    u2 = np.zeros_like(u2_hat)
+    u2 = ST.backward(u2_hat, u2)
+
+    assert np.linalg.norm(u2[:, 2, 2].real - u1)/(M*16) < 1e-12
+    assert np.linalg.norm(u2[:, 2, 2].imag - u1)/(M*16) < 1e-12
 
 #test_Helmholtz(ShenDirichletBasis, "GC")
 
 @pytest.mark.parametrize('quad', quads)
 def test_Helmholtz2(quad):
     M = 2*N
-    SD = ShenDirichletBasis(M, quad=quad)
-    kx = 11
-    points, weights = SD.points_and_weights()
+    SD = ShenDirichletBasis(M, quad=quad, plan=True)
+    kx = 12
+    points, weights = SD.points_and_weights(M)
     uj = np.random.randn(M)
     u_hat = np.zeros(M)
     u_hat = SD.forward(uj, u_hat)
     uj = SD.backward(u_hat, uj)
 
-    A = inner_product((SD, 0), (SD, 2), M)
-    B = inner_product((SD, 0), (SD, 0), M)
+    #from IPython import embed; embed()
+    A = inner_product((SD, 0), (SD, 2))
+    B = inner_product((SD, 0), (SD, 0))
     s = SD.slice()
 
     u1 = np.zeros(M)
@@ -261,11 +290,12 @@ def test_Helmholtz2(quad):
     assert np.linalg.norm(b[:, 2, 2].real - c)/(M*16) < 1e-12
     assert np.linalg.norm(b[:, 2, 2].imag - c)/(M*16) < 1e-12
 
-#test_Helmholtz2('GL')
+#test_Helmholtz2('GC')
 
 @pytest.mark.parametrize('quad', quads)
 def test_Mult_CTD(quad):
     SD = ShenDirichletBasis(N, quad=quad)
+    SD.plan(N, 0, np.complex, {})
     C = inner_product((SD.CT, 0), (SD, 1))
     B = inner_product((SD.CT, 0), (SD.CT, 0))
 
@@ -296,15 +326,16 @@ def test_Mult_CTD(quad):
     cv /= B[0]
     cw /= B[0]
 
-    #from IPython import embed; embed()
     assert np.allclose(cv, bv)
     assert np.allclose(cw, bw)
 
-#test_Mult_CTD("GL")
+#test_Mult_CTD("GC")
 
 @pytest.mark.parametrize('quad', quads)
 def test_Mult_CTD_3D(quad):
     SD = ShenDirichletBasis(N, quad=quad)
+    SD.plan((N, 4, 4), 0, np.complex, {})
+
     C = inner_product((SD.CT, 0), (SD, 1))
     B = inner_product((SD.CT, 0), (SD.CT, 0))
 
@@ -344,7 +375,7 @@ def test_Mult_CTD_3D(quad):
 @pytest.mark.parametrize('quad', quads)
 def test_Biharmonic(quad):
     M = 128
-    SB = ShenBiharmonicBasis(M, quad=quad)
+    SB = ShenBiharmonicBasis(M, quad=quad, plan=True)
     x = Symbol("x")
     u = sin(6*pi*x)**2
     a = 1.0
@@ -353,7 +384,7 @@ def test_Biharmonic(quad):
 
     ul = lambdify(x, u, 'numpy')
     fl = lambdify(x, f, 'numpy')
-    points, weights = SB.points_and_weights()
+    points, weights = SB.points_and_weights(M)
     uj = ul(points)
     fj = fl(points)
 
@@ -377,9 +408,9 @@ def test_Biharmonic(quad):
 @pytest.mark.parametrize('quad', quads)
 def test_Helmholtz_matvec(quad):
     M = 2*N
-    SD = ShenDirichletBasis(M, quad=quad)
+    SD = ShenDirichletBasis(M, quad=quad, plan=True)
     kx = 11
-    points, weights = SD.points_and_weights()
+    points, weights = SD.points_and_weights(M)
     uj = np.random.randn(M)
     u_hat = np.zeros(M)
     u_hat = SD.forward(uj, u_hat)
