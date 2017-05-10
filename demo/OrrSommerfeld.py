@@ -118,6 +118,14 @@ def initialize(solver, context):
     else:
         context.g[:] = 0
 
+    HH = context.work[(U[0], 0)]
+    HH = context.FST.backward(context.H_hat1[0], HH)
+    plt.figure()
+    plt.contourf(context.X[1][:,:,0], context.X[0][:,:,0], HH[:,:,0], 100)
+    plt.colorbar(im1)
+    plt.show()
+
+
 def set_Source(Source, Sk, FST, **kw):
     Source[:] = 0
     Source[1] = -2./config.params.Re

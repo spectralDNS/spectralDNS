@@ -28,8 +28,8 @@ def get_context():
     SB = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
     CT = Basis(params.N[0], quad=params.Dquad)
     ST0 = ShenDirichletBasis(params.N[0], quad=params.Dquad, plan=True) # For 1D problem
-    K0 = C2CBasis(params.N[1])
-    K1 = R2CBasis(params.N[2])
+    K0 = C2CBasis(params.N[1], domain=(0, params.L[1]))
+    K1 = R2CBasis(params.N[2], domain=(0, params.L[2]))
 
     #threads=params.threads, planner_effort=params.planner_effort["dct"]
 
@@ -39,16 +39,21 @@ def get_context():
     FCT = TensorProductSpace(comm, (CT, K0, K1))    # Regular Chebyshev
     VFS = VectorTensorProductSpace([FSB, FST, FST])
 
-    # Padded
-    STp = ShenDirichletBasis(params.N[0], quad=params.Dquad)
-    SBp = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
-    CTp = Basis(params.N[0], quad=params.Dquad)
-    K0p = C2CBasis(params.N[1], padding_factor=1.5)
-    K1p = R2CBasis(params.N[2], padding_factor=1.5)
-    FSTp = TensorProductSpace(comm, (STp, K0p, K1p))
-    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p))
-    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p))
-    VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
+    ## Padded
+    #STp = ShenDirichletBasis(params.N[0], quad=params.Dquad)
+    #SBp = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
+    #CTp = Basis(params.N[0], quad=params.Dquad)
+    #K0p = C2CBasis(params.N[1], padding_factor=1.5)
+    #K1p = R2CBasis(params.N[2], padding_factor=1.5)
+    #FSTp = TensorProductSpace(comm, (STp, K0p, K1p))
+    #FSBp = TensorProductSpace(comm, (SBp, K0p, K1p))
+    #FCTp = TensorProductSpace(comm, (CTp, K0p, K1p))
+    #VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
+
+    VFSp = VFS
+    FCTp = FCT
+    FSTp = FST
+    FSBp = FSB
 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
     Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
@@ -129,22 +134,17 @@ def get_context():
         #TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0)))
         #)
     #)
-    mat.ADD.scale = np.ones((1,1,1))
     mat.ADD.axis = 0
-    mat.BDD.scale = (K2[0]+2.0/nu/dt)[np.newaxis,:,:]
     mat.BDD.axis = 0
-    mat.SBB.scale = -nu*dt/2.*np.ones((1,1,1))
-    mat.ABB.scale = (1.+nu*dt*K2[0])[np.newaxis,:,:]
-    mat.BBB.scale = -(K2[0] + nu*dt/2.*K4[0])[np.newaxis,:,:]
     mat.SBB.axis = 0
 
     la = config.AttributeDict(dict(
-        HelmholtzSolverG = Helmholtz(mat.ADD, mat.BDD, np.ones((1,1,1)),
+        HelmholtzSolverG = Helmholtz(mat.ADD, mat.BDD, -np.ones((1,1,1)),
                                      (K2[0]+2.0/nu/dt)[np.newaxis,:,:]),
         BiharmonicSolverU = Biharmonic(mat.SBB, mat.ABB, mat.BBB, -nu*dt/2.*np.ones((1,1,1)),
                                        (1.+nu*dt*K2[0])[np.newaxis,:,:],
                                        (-(K2[0] + nu*dt/2.*K4[0]))[np.newaxis,:,:]),
-        HelmholtzSolverU0 = Helmholtz(mat.ADD0, mat.BDD0, np.ones(1), np.array([2./nu/dt])),
+        HelmholtzSolverU0 = Helmholtz(mat.ADD0, mat.BDD0, -np.ones(1), np.array([2./nu/dt])),
         TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0)))
         )
     )
