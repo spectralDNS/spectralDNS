@@ -5,7 +5,7 @@ from spectralDNS.utilities import reset_profile
 from OrrSommerfeld_shen import OrrSommerfeld
 #from OrrSommerfeld_eig import OrrSommerfeld
 from numpy import dot, real, pi, cos, exp, sum, zeros, arange, imag, sqrt, \
-    array, zeros_like, log10
+    array, zeros_like, log10, hstack
 from numpy.linalg import norm
 from mpiFFT4py import dct
 from scipy.fftpack import ifft
@@ -44,6 +44,35 @@ def initOS(OS, U, X, t=0.):
         U[1, :, j, :] = v.repeat(U.shape[3]).reshape((len(x), U.shape[3]))
     U[2] = 0
 
+def dx(u, FST):
+    """Compute integral of u over domain"""
+    uu = sum(u, axis=(1, 2))
+    N = u.shape[0]
+    c = zeros(N)
+    FST.comm.Gather(uu, c)
+    quad = FST.bases[0].quad
+    if FST.comm.Get_rank() == 0:
+        if quad == 'GL':
+            ak = zeros_like(c)
+            ak = dct(c, ak, 1, axis=0)
+            ak /= (N-1)
+            w = arange(0, N, 1, dtype=np.float)
+            w[2:] = 2./(1-w[2:]**2)
+            w[0] = 1
+            w[1::2] = 0
+            return sum(ak*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
+
+        elif quad == 'GC':
+            d = zeros(N)
+            k = 2*(1 + arange((N-1)//2))
+            d[::2] = (2./N)/hstack((1., 1.-k*k))
+            w = zeros_like(d)
+            w = dct(d, w, type=3, axis=0)
+            return sum(c*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
+    else:
+        return 0
+
+
 acc = zeros(1)
 OS, e0 = None, None
 def initialize(solver, context):
@@ -61,7 +90,8 @@ def initialize(solver, context):
 
     # Compute convection from data in context (i.e., context.U_hat and context.g)
     # This is the convection at t=0
-    e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.ST.quad)
+    e0 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
+    #print(e0)
     acc[0] = 0.0
 
     if not params.solver == 'KMMRK3':
@@ -73,7 +103,7 @@ def initialize(solver, context):
         context.U_hat0[:] = U_hat
         params.t = params.dt
         params.tstep = 1
-        e1 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.ST.quad)
+        e1 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
         if solver.rank == 0:
             acc[0] += abs(e1/e0 - exp(2*imag(OS.eigval)*params.t))
 
@@ -88,11 +118,11 @@ def initialize(solver, context):
     else:
         context.g[:] = 0
 
-def set_Source(Source, Sk, FST, ST, **kw):
+def set_Source(Source, Sk, FST, **kw):
     Source[:] = 0
     Source[1] = -2./config.params.Re
     Sk[:] = 0
-    Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
+    Sk[1] = FST.scalar_product(Source[1], Sk[1])
 
 im1, im2, im3, im4 = (None, )*4
 def update(context):
@@ -150,12 +180,12 @@ def compute_error(context):
     solver = config.solver
     U = solver.get_velocity(**c)
     pert = (U[1] - (1-c.X[0]**2))**2 + U[0]**2
-    e1 = 0.5*c.FST.dx(pert, c.ST.quad)
+    e1 = 0.5*dx(pert, c.FST)
     exact = exp(2*imag(OS.eigval)*params.t)
     U0 = c.work[(c.U, 0)]
     initOS(OS, U0, c.X, t=params.t)
     pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
-    e2 = 0.5*c.FST.dx(pert, c.ST.quad)
+    e2 = 0.5*dx(pert, c.FST)
     return e1, e2, exact
 
 def regression_test(context):
@@ -186,7 +216,7 @@ if __name__ == "__main__":
         'dt': 0.001,                 # Time step
         'T': 0.01,                   # End time
         'L': [2, 2*pi, 4*pi/3.],
-        'M': [7, 5, 1]
+        'M': [7, 5, 2]
         },  "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)

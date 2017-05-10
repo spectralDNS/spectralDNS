@@ -10,7 +10,7 @@ import numpy as np
 from numpy.linalg import inv
 from shenfun.chebyshev.bases import ShenBiharmonicBasis, \
     ShenDirichletBasis, Basis
-from shenfun import inner_product
+from shenfun.spectralbase import inner_product
 from shenfun.matrixbase import extract_diagonal_matrix
 
 import six
@@ -48,8 +48,8 @@ class OrrSommerfeld(object):
             phi = np.zeros_like(phi_hat)
             dphidy = np.zeros_like(phi_hat)
             if self.SB is None:
-                self.SB = ShenBiharmonicBasis(N, quad=self.quad)
-                self.SD = ShenDirichletBasis(N, quad=self.quad)
+                self.SB = ShenBiharmonicBasis(N, quad=self.quad, plan=True)
+                self.SD = ShenDirichletBasis(N, quad=self.quad, plan=True)
                 self.CDB = inner_product((self.SD, 0), (self.SB, 1))
 
             phi = self.SB.ifst(phi_hat, phi)
@@ -72,8 +72,10 @@ class OrrSommerfeld(object):
     def assemble(self):
         N = self.N
         SB = ShenBiharmonicBasis(N, quad=self.quad)
+        SB.plan((N, N), 0, np.float, {})
+
         CT = SB.CT
-        x, w = self.x, self.w = SB.points_and_weights()
+        x, w = self.x, self.w = SB.points_and_weights(N)
         V = SB.vandermonde(x)
 
         # Trial function
