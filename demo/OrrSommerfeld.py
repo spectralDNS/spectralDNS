@@ -118,12 +118,12 @@ def initialize(solver, context):
     else:
         context.g[:] = 0
 
-    HH = context.work[(U[0], 0)]
-    HH = context.FST.backward(context.H_hat1[0], HH)
-    plt.figure()
-    plt.contourf(context.X[1][:,:,0], context.X[0][:,:,0], HH[:,:,0], 100)
-    plt.colorbar(im1)
-    plt.show()
+    #HH = context.work[(U[0], 0)]
+    #HH = context.FST.backward(context.H_hat1[1], HH)
+    #plt.figure()
+    #plt.contourf(context.X[1][:,:,0], context.X[0][:,:,0], HH[:,:,0], 100)
+    #plt.colorbar(im1)
+    #plt.show()
 
 
 def set_Source(Source, Sk, FST, **kw):
@@ -166,6 +166,7 @@ def update(context):
             plt.pause(1e-6)
 
         if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
+            print('Hei')
             im1.ax.clear()
             im1.ax.contourf(c.X[1][:,:,0], c.X[0][:,:,0], U[0, :, :, 0], 100)
             im1.autoscale()
@@ -192,7 +193,8 @@ def compute_error(context):
     exact = exp(2*imag(OS.eigval)*params.t)
     U0 = c.work[(c.U, 0)]
     initOS(OS, U0, c.X, t=params.t)
-    pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
+    #pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
+    pert = (U[0] - U0[0])**2
     e2 = 0.5*dx(pert, c.FST)
     return e1, e2, exact
 
@@ -223,7 +225,7 @@ if __name__ == "__main__":
         'nu': 1./8000.,             # Viscosity
         'dt': 0.001,                 # Time step
         'T': 0.01,                   # End time
-        'L': [2, 2*pi, 4*pi/3.],
+        'L': [2, 2*pi, 2*pi],
         'M': [7, 5, 2]
         },  "channel"
     )

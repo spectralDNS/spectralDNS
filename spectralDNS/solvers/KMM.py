@@ -485,13 +485,13 @@ def solve_linear(u_hat, g_hat, rhs,
 
         w[:] = 2./params.nu * mat.BDD.matvec(h0_hat[0], w1)
         w -= 2./params.nu * Sk[1, :, 0, 0]
-        w -= mat.ADD.matvec(u0_hat[0], w1)
-        w += 2./params.nu/params.dt * mat.BDD.matvec(u0_hat[0], w1)
+        w -= mat.ADD0.matvec(u0_hat[0], w1)
+        w += 2./params.nu/params.dt * mat.BDD0.matvec(u0_hat[0], w1)
         u0_hat[0] = la.HelmholtzSolverU0(u0_hat[0], w)
 
-        w[:] = 2./params.nu * mat.BDD.matvec(h0_hat[1], w1)
-        w -= mat.ADD.matvec(u0_hat[1], w1)
-        w += 2./params.nu/params.dt * mat.BDD.matvec(u0_hat[1], w1)
+        w[:] = 2./params.nu * mat.BDD0.matvec(h0_hat[1], w1)
+        w -= mat.ADD0.matvec(u0_hat[1], w1)
+        w += 2./params.nu/params.dt * mat.BDD0.matvec(u0_hat[1], w1)
         u0_hat[1] = la.HelmholtzSolverU0(u0_hat[1], w)
 
         u_hat[1, :, 0, 0] = u0_hat[0]
