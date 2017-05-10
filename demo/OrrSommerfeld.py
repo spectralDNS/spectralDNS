@@ -131,6 +131,7 @@ def set_Source(Source, Sk, FST, **kw):
     Source[1] = -2./config.params.Re
     Sk[:] = 0
     Sk[1] = FST.scalar_product(Source[1], Sk[1])
+    Sk[1, -2:,0,0] = 0
 
 im1, im2, im3, im4 = (None, )*4
 def update(context):
@@ -166,7 +167,6 @@ def update(context):
             plt.pause(1e-6)
 
         if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
-            print('Hei')
             im1.ax.clear()
             im1.ax.contourf(c.X[1][:,:,0], c.X[0][:,:,0], U[0, :, :, 0], 100)
             im1.autoscale()
