@@ -19,6 +19,7 @@ from shenfun.chebyshev.la import Helmholtz, Biharmonic
 #from ..shen.shentransform import SlabShen_R2C
 from ..shen.Matrices import BiharmonicCoeff, HelmholtzCoeff
 from ..shen import LUsolve
+from ..shen.la import Helmholtz as old_Helmholtz
 
 def get_context():
     """Set up context for solver"""
@@ -144,7 +145,7 @@ def get_context():
         BiharmonicSolverU = Biharmonic(mat.SBB, mat.ABB, mat.BBB, -nu*dt/2.*np.ones((1,1,1)),
                                        (1.+nu*dt*K2[0])[np.newaxis,:,:],
                                        (-(K2[0] + nu*dt/2.*K4[0]))[np.newaxis,:,:]),
-        HelmholtzSolverU0 = Helmholtz(mat.ADD0, mat.BDD0, -np.ones(1), np.array([2./nu/dt])),
+        HelmholtzSolverU0 = old_Helmholtz(N[0], np.sqrt(2./nu/dt), ST),
         TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0)))
         )
     )

@@ -146,6 +146,9 @@ def update(context):
         params.tstep % params.compute_energy == 0):
         U = solver.get_velocity(**context)
 
+    print(norm(context.U_hat[0]), norm(context.U_hat[1]))
+    print(norm(context.U[0]), norm(context.U[1]))
+
     # Use GL for postprocessing
     global im1, im2, im3, OS, e0, acc
     if not plt is None:

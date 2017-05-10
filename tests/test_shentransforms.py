@@ -444,7 +444,7 @@ def test_Helmholtz_matvec(quad):
     assert np.linalg.norm(b[:, 2, 2].real - c)/(M*16) < 1e-12
     assert np.linalg.norm(b[:, 2, 2].imag - c)/(M*16) < 1e-12
 
-#test_Helmholtz_matvec("GL")
+test_Helmholtz_matvec("GL")
 #test_ADDmat(ShenNeumannBasis("GL"))
 #test_Helmholtz2(ShenDirichletBasis("GL"))
 #test_Mult_CTD(ShenDirichletBasis("GL"))
