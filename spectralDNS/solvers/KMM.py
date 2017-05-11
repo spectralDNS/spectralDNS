@@ -32,24 +32,22 @@ def get_context():
     K0 = C2CBasis(params.N[1], domain=(0, params.L[1]))
     K1 = R2CBasis(params.N[2], domain=(0, params.L[2]))
 
-    #threads=params.threads, planner_effort=params.planner_effort["dct"]
-
     #CT = ST.CT  # Chebyshev transform
-    FST = TensorProductSpace(comm, (ST, K0, K1))    # Dirichlet
-    FSB = TensorProductSpace(comm, (SB, K0, K1))    # Biharmonic
-    FCT = TensorProductSpace(comm, (CT, K0, K1))    # Regular Chebyshev
+    FST = TensorProductSpace(comm, (ST, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Dirichlet
+    FSB = TensorProductSpace(comm, (SB, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Biharmonic
+    FCT = TensorProductSpace(comm, (CT, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Regular Chebyshev
     VFS = VectorTensorProductSpace([FSB, FST, FST])
 
-    ## Padded
-    #STp = ShenDirichletBasis(params.N[0], quad=params.Dquad)
-    #SBp = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
-    #CTp = Basis(params.N[0], quad=params.Dquad)
-    #K0p = C2CBasis(params.N[1], padding_factor=1.5)
-    #K1p = R2CBasis(params.N[2], padding_factor=1.5)
-    #FSTp = TensorProductSpace(comm, (STp, K0p, K1p))
-    #FSBp = TensorProductSpace(comm, (SBp, K0p, K1p))
-    #FCTp = TensorProductSpace(comm, (CTp, K0p, K1p))
-    #VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
+    # Padded
+    STp = ShenDirichletBasis(params.N[0], quad=params.Dquad)
+    SBp = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
+    CTp = Basis(params.N[0], quad=params.Dquad)
+    K0p = C2CBasis(params.N[1], padding_factor=1.5)
+    K1p = R2CBasis(params.N[2], padding_factor=1.5)
+    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+    VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
 
     VFSp = VFS
     FCTp = FCT
@@ -222,7 +220,7 @@ def mult_K1j(K, a, f):
     f[0] = 1j*K[2]*a
     f[1] = -1j*K[1]*a
     return f
-#@profile
+@profile
 def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, work):
     F_tmp = work[(u_hat, 0, False)]
     F_tmp2 = work[(u_hat, 2, False)]
@@ -484,18 +482,15 @@ def solve_linear(u_hat, g_hat, rhs,
         u0_hat[0] = U_hat0[1, :, 0, 0]
         u0_hat[1] = U_hat0[2, :, 0, 0]
 
-        w1 = mat.BDD.matvec(h0_hat[0], w1)
-        w[:] = 2./params.nu * w1
+        w = mat.BDD.matvec(2./params.nu*h0_hat[0], w)
         w -= 2./params.nu * Sk[1, :, 0, 0]
-        w1 = mat.ADD0.matvec(u0_hat[0], w1)
-        w += w1
-        w1 = mat.BDD0.matvec(u0_hat[0], w1)
-        w += 2./params.nu/params.dt * w1
+        w += mat.ADD0.matvec(u0_hat[0], w1)
+        w += 2./params.nu/params.dt * mat.BDD0.matvec(u0_hat[0], w1)
         u0_hat[0] = la.HelmholtzSolverU0(u0_hat[0], w)
 
-        w[:] = 2./params.nu * mat.BDD0.matvec(h0_hat[1], w1)
+        w = mat.BDD0.matvec(2./params.nu*h0_hat[1], w)
         w += mat.ADD0.matvec(u0_hat[1], w1)
-        w += 2./params.nu/params.dt * mat.BDD0.matvec(u0_hat[1], w1)
+        w += mat.BDD0.matvec(2./params.nu/params.dt*u0_hat[1], w1)
         u0_hat[1] = la.HelmholtzSolverU0(u0_hat[1], w)
 
         u_hat[1, :, 0, 0] = u0_hat[0]

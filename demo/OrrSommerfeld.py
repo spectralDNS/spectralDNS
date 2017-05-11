@@ -47,7 +47,7 @@ def initOS(OS, U, X, t=0.):
 def dx(u, FST):
     """Compute integral of u over domain"""
     uu = sum(u, axis=(1, 2))
-    N = u.shape[0]
+    N = FST.shape()[0]
     c = zeros(N)
     FST.comm.Gather(uu, c)
     quad = FST.bases[0].quad
@@ -131,6 +131,7 @@ def set_Source(Source, Sk, FST, **kw):
     Source[1] = -2./config.params.Re
     Sk[:] = 0
     Sk[1] = FST.scalar_product(Source[1], Sk[1])
+    Sk[1] /= (config.params.L[1]*config.params.L[2])
     Sk[1, -2:,0,0] = 0
 
 im1, im2, im3, im4 = (None, )*4
