@@ -10,7 +10,7 @@ from shenfun.chebyshev.matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, C
     ADDmat, BDDmat, CDBmat
 from shenfun.spectralbase import inner_product
 from shenfun.la import TDMA
-from shenfun import TensorProductSpace, Function, TestFunction, TrialFunction, \
+from shenfun import TensorProductSpace, Array, TestFunction, TrialFunction, \
     VectorTensorProductSpace
 from shenfun.chebyshev.bases import ShenDirichletBasis, ShenBiharmonicBasis, Basis
 from shenfun.fourier.bases import R2CBasis, C2CBasis
@@ -72,29 +72,29 @@ def get_context():
     K = FST.local_wavenumbers(scaled=True)
 
     K2 = K[1]*K[1]+K[2]*K[2]
-    K_over_K2 = Function(VFS)[1:]
+    K_over_K2 = Array(VFS)[1:]
     for i in range(2):
         K_over_K2[i] = K[i+1] / np.where(K2==0, 1, K2)
 
     # Solution variables
-    U  = Function(VFS, False)
-    U0 = Function(VFS, False)
-    U_hat  = Function(VFS)
-    U_hat0 = Function(VFS)
-    g = Function(FST)
+    U  = Array(VFS, False)
+    U0 = Array(VFS, False)
+    U_hat  = Array(VFS)
+    U_hat0 = Array(VFS)
+    g = Array(FST)
 
     # primary variable
     u = (U_hat, g)
 
-    H_hat  = Function(VFS)
-    H_hat0 = Function(VFS)
-    H_hat1 = Function(VFS)
+    H_hat  = Array(VFS)
+    H_hat0 = Array(VFS)
+    H_hat1 = Array(VFS)
 
-    dU = Function(VFS)
-    hv = Function(FST)
-    hg = Function(FST)
-    Source = Function(VFS, False)
-    Sk = Function(VFS)
+    dU = Array(VFS)
+    hv = Array(FST)
+    hg = Array(FST)
+    Source = Array(VFS, False)
+    Sk = Array(VFS)
 
     work = work_arrays()
 
@@ -220,13 +220,14 @@ def mult_K1j(K, a, f):
     f[0] = 1j*K[2]*a
     f[1] = -1j*K[1]*a
     return f
-@profile
+#@profile
 def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, work):
     F_tmp = work[(u_hat, 0, False)]
     F_tmp2 = work[(u_hat, 2, False)]
     Uc = work[(c, 2, False)]
     # Mult_CTD_3D_n is projection to T of d(u_hat)/dx (for components 1 and 2 of u_hat)
     # Corresponds to CTD.matvec(u_hat[1])/BTT.dd, CTD.matvec(u_hat[2])/BTT.dd
+    #from IPython import embed; embed()
     LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
     dvdx = Uc[1] = FCTp.backward(F_tmp[1], Uc[1])
     dwdx = Uc[2] = FCTp.backward(F_tmp[2], Uc[2])
@@ -381,7 +382,6 @@ def getConvection(convection):
 
         u_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 0)]
         curl_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 1)]
-        #from IPython import embed; embed()
         u_dealias = VFSp.backward(u_hat, u_dealias)
         curl_dealias = compute_curl(curl_dealias, u_hat, g_hat, K, FCTp, FSTp, FSBp, work)
         rhs = Cross(rhs, u_dealias, curl_dealias, FSTp, work)
@@ -413,6 +413,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
     rhs[1] += diff_g
     return rhs
 
+#@profile
 def ComputeRHS(rhs, u_hat, g_hat, solver,
                H_hat, H_hat1, H_hat0, VFSp, FSTp, FSBp, FCTp, work, K, K2, K4, hv, hg,
                mat, la, **context):
