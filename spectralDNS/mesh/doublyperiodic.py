@@ -6,6 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from mpiFFT4py import *
 
+import numpy
 from numpy import array, sum, meshgrid, mgrid, where, abs, pi, uint8, conj
 
 __all__ = ['setup']
