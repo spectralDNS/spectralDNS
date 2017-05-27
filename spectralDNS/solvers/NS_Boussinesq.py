@@ -272,6 +272,7 @@ def solve(context):
     t = context.model_params["t"]
     FFT = context.FFT
 
+    reached_the_end_already_once = False
     while t + dt <= T + 1.e-15: #The 1.e-15 term is for rounding errors
         dt_prev = dt 
         kwargs = {
@@ -301,8 +302,9 @@ def solve(context):
         #Make sure that the last step hits T exactly.
         if t + dt >= T:
             dt = T - t
-            if dt <= 1.e-14:
+            if (dt <= 0.0) || reached_the_end_already_once:
                 break
+            reached_the_end_already_once = True
 
     kwargs = {
             "additional_callback":context.callbacks["additional_callback"],
