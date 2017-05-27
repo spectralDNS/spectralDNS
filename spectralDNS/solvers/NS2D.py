@@ -105,7 +105,7 @@ def solve(context):
             profiler.enable()
         if t + dt >= T:
             dt = T - t
-            if (dt <= 0.0) || reached_the_end_already_once:
+            if (dt <= 0.0) or reached_the_end_already_once:
                 break
             reached_the_end_already_once = True
                 
