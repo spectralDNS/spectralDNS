@@ -54,15 +54,15 @@ class SlabShen_R2C(Slab_R2C):
     def global_complex_shape(self, padsize=1.0):
         """Global size of problem in complex wavenumber space"""
         if self.dealias_cheb:
-            return (int(self.padsize*self.N[0]), int(self.padsize*self.N[1]),
+            return (int(padsize*self.N[0]), int(padsize*self.N[1]),
                     int(padsize*self.N[2]/2+1))
         else:
-            return (self.N[0], int(self.padsize*self.N[1]),
+            return (self.N[0], int(padsize*self.N[1]),
                     int(padsize*self.N[2]/2+1))
 
     def get_mesh_dim(self, ST, d):
         if d == 0:
-            return ST.points_and_weights()[0]
+            return ST.points_and_weights(self.N[0])[0]
         elif d == 1:
             return arange(self.N[1], dtype=self.float)*self.L[1]/self.N[1]
         elif d == 2:

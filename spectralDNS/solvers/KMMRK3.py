@@ -8,52 +8,71 @@ from .spectralinit import end_of_tstep
 
 def get_context():
     # Get points and weights for Chebyshev weighted integrals
-    ST = ShenDirichletBasis(params.N[0], quad=params.Dquad, threads=params.threads,
-                            planner_effort=params.planner_effort["dct"])
-    SB = ShenBiharmonicBasis(params.N[0], quad=params.Bquad, threads=params.threads,
-                             planner_effort=params.planner_effort["dct"])
+    ST = ShenDirichletBasis(params.N[0], quad=params.Dquad)
+    SB = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
+    CT = Basis(params.N[0], quad=params.Dquad)
+    ST0 = ShenDirichletBasis(params.N[0], quad=params.Dquad, plan=True) # For 1D problem
+    K0 = C2CBasis(params.N[1], domain=(0, params.L[1]))
+    K1 = R2CBasis(params.N[2], domain=(0, params.L[2]))
+
+    #CT = ST.CT  # Chebyshev transform
+    FST = TensorProductSpace(comm, (ST, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Dirichlet
+    FSB = TensorProductSpace(comm, (SB, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Biharmonic
+    FCT = TensorProductSpace(comm, (CT, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Regular Chebyshev
+    VFS = VectorTensorProductSpace([FSB, FST, FST])
+
+    # Padded
+    STp = ShenDirichletBasis(params.N[0], quad=params.Dquad)
+    SBp = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
+    CTp = Basis(params.N[0], quad=params.Dquad)
+    K0p = C2CBasis(params.N[1], padding_factor=1.5, domain=(0, params.L[1]))
+    K1p = R2CBasis(params.N[2], padding_factor=1.5, domain=(0, params.L[2]))
+    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+    VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
+
+    VFSp = VFS
+    FCTp = FCT
+    FSTp = FST
+    FSBp = FSB
 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
     Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
     u_slice = slice(0, Nu)
     v_slice = slice(0, Nb)
 
-    FST = SlabShen_R2C(params.N, params.L, comm, threads=params.threads,
-                       communication=params.communication,
-                       planner_effort=params.planner_effort,
-                       dealias_cheb=params.dealias_cheb)
-
     float, complex, mpitype = datatypes("double")
 
     # Mesh variables
-    X = FST.get_local_mesh(ST)
-    x0, x1, x2 = FST.get_mesh_dims(ST)
-    K = FST.get_local_wavenumbermesh(scaled=True)
-
-    K2 = K[1]*K[1]+K[2]*K[2]
-    K_over_K2 = zeros((3,) + FST.complex_shape())
-    for i in range(3):
-        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
+    X = FST.local_mesh(True)
+    x0, x1, x2 = FST.mesh()
+    K = FST.local_wavenumbers(scaled=True)
 
     # Solution variables
-    U  = zeros((3,)+FST.real_shape(), dtype=float)
-    U_hat  = zeros((3,)+FST.complex_shape(), dtype=complex)
-    g = zeros(FST.complex_shape(), dtype=complex)
+    U = Array(VFS, False)
+    U_hat = Array(VFS)
+    g = Array(FST)
 
     # primary variable
     u = (U_hat, g)
 
     nu, dt, N = params.nu, params.dt, params.N
 
-    H_hat  = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat = Array(VFS)
 
-    dU = zeros((3,)+FST.complex_shape(), dtype=complex)
-    hv = zeros((2,)+FST.complex_shape(), dtype=complex)
-    hg = zeros((2,)+FST.complex_shape(), dtype=complex)
+    dU = Array(VFS)
+    hv = zeros((2,)+FST.local_shape(), dtype=complex)
+    hg = zeros((2,)+FST.local_shape(), dtype=complex)
     h1 = zeros((2, 2, N[0]), dtype=complex)
 
-    Source = zeros((3,)+FST.real_shape(), dtype=float)
-    Sk = zeros((3,)+FST.complex_shape(), dtype=complex)
+    Source = Array(VFS, False)
+    Sk = Array(VFS)
+
+    K2 = K[1]*K[1]+K[2]*K[2]
+    K_over_K2 = np.zeros((2,)+g.shape)
+    for i in range(2):
+        K_over_K2[i] = K[i+1] / np.where(K2==0, 1, K2)
 
     work = work_arrays()
 
@@ -63,20 +82,6 @@ def get_context():
     # RK parameters
     a = (8./15., 5./12., 3./4.)
     b = (0.0, -17./60., -5./12.)
-
-    # Collect all linear algebra solvers
-    # RK 3 requires three solvers because of the three different coefficients
-    rk = 0
-    la = config.AttributeDict(dict(
-        HelmholtzSolverG = [Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/(a[rk]+b[rk])/dt), ST)
-                            for rk in range(3)],
-        BiharmonicSolverU = [Biharmonic(N[0], -nu*(a[rk]+b[rk])*dt/2., 1.+nu*(a[rk]+b[rk])*dt*K2[0],
-                                        -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0]), quad=SB.quad,
-                                        solver="cython") for rk in range(3)],
-        HelmholtzSolverU0 = [Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST) for rk in range(3)],
-        TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0)))
-        )
-    )
 
     alfa = K2[0] - 2.0/nu/dt
     # Collect all matrices
@@ -95,9 +100,31 @@ def get_context():
         ADD = inner_product((ST, 0), (ST, 2)),
         BDD = inner_product((ST, 0), (ST, 0)),
         BBD = inner_product((SB, 0), (ST, 0)),
-        CDB = inner_product((ST, 0), (SB, 1))
+        CDB = inner_product((ST, 0), (SB, 1)),
+        ADD0 = inner_product((ST0, 0), (ST0, 2)),
+        BDD0 = inner_product((ST0, 0), (ST0, 0)),
         )
     )
+    mat.ADD.axis = 0
+    mat.BDD.axis = 0
+    mat.SBB.axis = 0
+
+    # Collect all linear algebra solvers
+    # RK 3 requires three solvers because of the three different coefficients
+    rk = 0
+    la = config.AttributeDict(dict(
+        HelmholtzSolverG = [Helmholtz(mat.ADD, mat.BDD, -np.ones((1,1,1)),
+                                      np.sqrt(K2[0]+2.0/nu/(a[rk]+b[rk])/dt)[np.newaxis, :, :])
+                            for rk in range(3)],
+        BiharmonicSolverU = [Biharmonic(mat.SBB, mat.ABB, mat.BBB, -nu*(a[rk]+b[rk])*dt/2.*np.ones((1,1,1)),
+                                        (1.+nu*(a[rk]+b[rk])*dt*K2[0])[np.newaxis,:,:],
+                                        -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0])[np.newaxis,:,:])
+                             for rk in range(3)],
+        HelmholtzSolverU0 = [old_Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST) for rk in range(3)],
+        TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0)))
+        )
+    )
+
     del rk
 
     hdf5file = KMMRK3Writer({"U":U[0], "V":U[1], "W":U[2]},
@@ -132,7 +159,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
     return rhs
 
 def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
-               H_hat, FST, ST, SB, work, K, K2, K4, hv,
+               H_hat, VFSp, FSTp, FSBp, FCTp, work, K, K2, K4, hv,
                hg, a, b, K_over_K2, la, mat, **context):
 
     """Compute right hand side of Navier Stokes
@@ -149,7 +176,7 @@ def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
     """
 
     # Nonlinear convection term at current u_hat
-    H_hat = solver.conv(H_hat, u_hat, g_hat, K, FST, SB, ST, work, mat, la)
+    H_hat = solver.conv(H_hat, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la)
 
     w0 = work[(H_hat[0], 0, False)]
     w1 = work[(H_hat[0], 1, False)]
@@ -199,19 +226,19 @@ def solve_linear(u_hat, g_hat, rhs, rk,
         h0_hat[0] = H_hat[1, :, 0, 0]
         h0_hat[1] = H_hat[2, :, 0, 0]
 
-        h1[1, 0] = mat.BDD.matvec(h0_hat[0], h1[1, 0])
-        h1[1, 1] = mat.BDD.matvec(h0_hat[1], h1[1, 1])
+        h1[1, 0] = mat.BDD0.matvec(h0_hat[0], h1[1, 0])
+        h1[1, 1] = mat.BDD0.matvec(h0_hat[1], h1[1, 1])
         h1[1, 0] -= Sk[1, :, 0, 0]  # Subtract constant pressure gradient
 
         beta = 2./params.nu/(a[rk]+b[rk])
         w[:] = beta*(a[rk]*h1[1, 0] + b[rk]*h1[0, 0])
-        w -= mat.ADD.matvec(u0_hat[0], w1)
-        w += beta/params.dt*mat.BDD.matvec(u0_hat[0], w1)
+        w += mat.ADD0.matvec(u0_hat[0], w1)
+        w += beta/params.dt*mat.BDD0.matvec(u0_hat[0], w1)
         u0_hat[0] = la.HelmholtzSolverU0[rk](u0_hat[0], w)
 
         w[:] = beta*(a[rk]*h1[1, 1] + b[rk]*h1[0, 1])
-        w -= mat.ADD.matvec(u0_hat[1], w1)
-        w += beta/params.dt*mat.BDD.matvec(u0_hat[1], w1)
+        w += mat.ADD0.matvec(u0_hat[1], w1)
+        w += beta/params.dt*mat.BDD0.matvec(u0_hat[1], w1)
         u0_hat[1] = la.HelmholtzSolverU0[rk](u0_hat[1], w)
 
         h1[0] = h1[1]

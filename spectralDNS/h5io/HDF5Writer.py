@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 """Wrap call to hdf5 to allow running without installing h5py
 """
-from numpy import all
+from numpy import all, squeeze
 from numpy.linalg import norm
 import warnings
 import six
@@ -32,6 +32,7 @@ try:
             if len(self.mesh) > 0:
                 self.f.create_group("mesh")
                 for key, val in six.iteritems(self.mesh):
+                    val = squeeze(val)
                     self.f["/mesh/"].create_dataset(key, shape=(len(val),), dtype=val.dtype)
                     self.f["/mesh/"+key][:] = val
 
@@ -108,7 +109,11 @@ try:
                     shape = params.N if len(val.shape) == self.dim else (val.shape[0],)+tuple(params.N)
                     self.f["{}/checkpoint/{}".format(dim, key)].create_dataset("0", shape=shape, dtype=val.dtype)
 
-            s = FFT.real_local_slice()
+            try:
+                s = FFT.real_local_slice()
+            except:
+                s = tuple(FFT.local_slice(False))
+
             # Get new values
             if dim == "2D":
                 for key, val in six.iteritems(self.chkpoint['current']):
@@ -155,11 +160,15 @@ try:
 
             dim = str(self.dim)+"D"
             N = params.N
-            s = FFT.real_local_slice()
+            try:
+                s = FFT.real_local_slice()
+            except:
+                s = FFT.local_slice(False)
+
             if params.tstep % params.write_result == 0:
                 for comp, val in six.iteritems(self.components):
                     self.f[dim+"/"+comp].create_dataset(str(params.tstep), shape=N, dtype=val.dtype)
-                    self.f[dim+"/%s/%d"%(comp, params.tstep)][s] = val
+                    self.f[dim+"/%s/%d"%(comp, params.tstep)][tuple(s)] = val
 
             # Write slices
             if 'write_yz_slice' in params:

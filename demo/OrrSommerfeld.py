@@ -10,6 +10,7 @@ from numpy.linalg import norm
 from mpiFFT4py import dct
 from scipy.fftpack import ifft
 import warnings
+from mpi4py import MPI
 
 try:
     import matplotlib.pyplot as plt
@@ -47,25 +48,29 @@ def initOS(OS, U, X, t=0.):
 def dx(u, FST):
     """Compute integral of u over domain"""
     uu = sum(u, axis=(1, 2))
-    N = FST.shape()[0]
-    c = zeros(N)
-    FST.comm.Gather(uu, c)
+    N = u.shape[0]
+    sl = FST.local_slice(False)[0]
+    M = FST.shape()[0]
+    c = zeros(M)
+    cc = zeros(M)
+    cc[sl] = uu
+    FST.comm.Reduce(cc, c, op=MPI.SUM, root=0)
     quad = FST.bases[0].quad
     if FST.comm.Get_rank() == 0:
         if quad == 'GL':
             ak = zeros_like(c)
             ak = dct(c, ak, 1, axis=0)
-            ak /= (N-1)
-            w = arange(0, N, 1, dtype=np.float)
+            ak /= (M-1)
+            w = arange(0, M, 1, dtype=np.float)
             w[2:] = 2./(1-w[2:]**2)
             w[0] = 1
             w[1::2] = 0
             return sum(ak*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
 
         elif quad == 'GC':
-            d = zeros(N)
-            k = 2*(1 + arange((N-1)//2))
-            d[::2] = (2./N)/hstack((1., 1.-k*k))
+            d = zeros(M)
+            k = 2*(1 + arange((M-1)//2))
+            d[::2] = (2./M)/hstack((1., 1.-k*k))
             w = zeros_like(d)
             w = dct(d, w, type=3, axis=0)
             return sum(c*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
@@ -90,7 +95,10 @@ def initialize(solver, context):
 
     # Compute convection from data in context (i.e., context.U_hat and context.g)
     # This is the convection at t=0
-    e0 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
+    if hasattr(context.FST, 'dx'):
+        e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.ST.quad)
+    else:
+        e0 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
     #print(e0)
     acc[0] = 0.0
 
@@ -103,7 +111,11 @@ def initialize(solver, context):
         context.U_hat0[:] = U_hat
         params.t = params.dt
         params.tstep = 1
-        e1 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
+        if hasattr(context.FST, 'dx'):
+            e1 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.ST.quad)
+        else:
+            e1 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
+
         if solver.rank == 0:
             acc[0] += abs(e1/e0 - exp(2*imag(OS.eigval)*params.t))
 
@@ -111,7 +123,7 @@ def initialize(solver, context):
         params.t = 0
         params.tstep = 0
 
-    if not params.solver in ("KMM", "KMMRK3"):
+    if not "KMM" in params.solver:
         P_hat = solver.compute_pressure(**context)
         P = FST.backward(P_hat, context.P, context.SN)
 
@@ -126,12 +138,16 @@ def initialize(solver, context):
     #plt.show()
 
 
-def set_Source(Source, Sk, FST, **kw):
+def set_Source(Source, Sk, FST, ST, N, **kw):
     Source[:] = 0
     Source[1] = -2./config.params.Re
     Sk[:] = 0
-    Sk[1] = FST.scalar_product(Source[1], Sk[1])
-    Sk[1] /= (config.params.L[1]*config.params.L[2])
+    if hasattr(FST, 'complex_shape'):
+        Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
+        #Sk[1] /= (2*2*pi*2*pi*N[0]*N[1]*N[2])
+    else:
+        Sk[1] = FST.scalar_product(Source[1], Sk[1])
+        Sk[1] /= (config.params.L[1]*config.params.L[2])
     Sk[1, -2:,0,0] = 0
 
 im1, im2, im3, im4 = (None, )*4
@@ -193,13 +209,21 @@ def compute_error(context):
     solver = config.solver
     U = solver.get_velocity(**c)
     pert = (U[1] - (1-c.X[0]**2))**2 + U[0]**2
-    e1 = 0.5*dx(pert, c.FST)
+    if hasattr(context.FST, 'dx'):
+        e1 = 0.5*c.FST.dx(pert, c.ST.quad)
+    else:
+        e1 = 0.5*dx(pert, c.FST)
+
     exact = exp(2*imag(OS.eigval)*params.t)
     U0 = c.work[(c.U, 0)]
     initOS(OS, U0, c.X, t=params.t)
     #pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
     pert = (U[0] - U0[0])**2
-    e2 = 0.5*dx(pert, c.FST)
+    if hasattr(context.FST, 'dx'):
+        e2 = 0.5*c.FST.dx(pert, c.ST.quad)
+    else:
+        e2 = 0.5*dx(pert, c.FST)
+
     return e1, e2, exact
 
 def regression_test(context):
@@ -230,7 +254,8 @@ if __name__ == "__main__":
         'dt': 0.001,                 # Time step
         'T': 0.01,                   # End time
         'L': [2, 2*pi, 2*pi],
-        'M': [7, 5, 2]
+        'M': [7, 5, 2],
+        'dealias': None
         },  "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)

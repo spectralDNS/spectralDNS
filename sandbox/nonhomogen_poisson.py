@@ -47,7 +47,7 @@ domain = sys.argv[-1] if len(sys.argv) == 2 else "C1"
 # Chebyshev-Gauss nodes and weights
 from spectralDNS.shen.shentransform import ChebyshevTransform
 CT = ChebyshevTransform(quad="GL")
-points, w = CT.points_and_weights(n+1)
+points, w = CT.points_and_weights(n+1, CT.quad)
 
 #points, w = n_cheb.chebgauss(n+1)
 #points = -points

@@ -120,7 +120,7 @@ if __name__ == "__main__":
         'nu': 0.000625,             # Viscosity
         'dt': 0.01,                 # Time step
         'T': 0.1,                   # End time
-        'L': [2*pi, 2*pi, 2*pi],
+        'L': [2*pi, 0.5*pi, 2*pi],
         'M': [5, 5, 5],
         #'planner_effort': {'dct': 'FFTW_EXHAUSTIVE'},
         #'decomposition': 'pencil',
@@ -138,7 +138,7 @@ if __name__ == "__main__":
     # Add curl to the stored results. For this we need to update the update_components
     # method used by the HDF5Writer class to compute the real fields that are stored
     if config.params.solver == 'NS':
-        context.hdf5file.fname = "NS7.h5"
+        context.hdf5file.fname = "NS8.h5"
         context.hdf5file.components["curlx"] = context.curl[0]
         context.hdf5file.components["curly"] = context.curl[1]
         context.hdf5file.components["curlz"] = context.curl[2]
@@ -152,5 +152,5 @@ if __name__ == "__main__":
 
     initialize(sol, **context)
     solve(sol, context)
-    context.hdf5file._init_h5file(config.params, **context)
-    context.hdf5file.f.close()
+    #context.hdf5file._init_h5file(config.params, **context)
+    #context.hdf5file.f.close()

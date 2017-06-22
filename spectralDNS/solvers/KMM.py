@@ -42,8 +42,8 @@ def get_context():
     STp = ShenDirichletBasis(params.N[0], quad=params.Dquad)
     SBp = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
     CTp = Basis(params.N[0], quad=params.Dquad)
-    K0p = C2CBasis(params.N[1], padding_factor=1.5)
-    K1p = R2CBasis(params.N[2], padding_factor=1.5)
+    K0p = C2CBasis(params.N[1], padding_factor=1.5, domain=(0, params.L[1]))
+    K1p = R2CBasis(params.N[2], padding_factor=1.5, domain=(0, params.L[2]))
     FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
     FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
     FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
@@ -59,22 +59,12 @@ def get_context():
     u_slice = slice(0, Nu)
     v_slice = slice(0, Nb)
 
-    #FST = SlabShen_R2C(params.N, params.L, comm, threads=params.threads,
-                       #communication=params.communication,
-                       #planner_effort=params.planner_effort,
-                       #dealias_cheb=params.dealias_cheb)
-
     float, complex, mpitype = datatypes("double")
 
     # Mesh variables
     X = FST.local_mesh(True)
     x0, x1, x2 = FST.mesh()
     K = FST.local_wavenumbers(scaled=True)
-
-    K2 = K[1]*K[1]+K[2]*K[2]
-    K_over_K2 = Array(VFS)[1:]
-    for i in range(2):
-        K_over_K2[i] = K[i+1] / np.where(K2==0, 1, K2)
 
     # Solution variables
     U  = Array(VFS, False)
@@ -95,6 +85,11 @@ def get_context():
     hg = Array(FST)
     Source = Array(VFS, False)
     Sk = Array(VFS)
+
+    K2 = K[1]*K[1]+K[2]*K[2]
+    K_over_K2 = np.zeros((2,)+g.shape)
+    for i in range(2):
+        K_over_K2[i] = K[i+1] / np.where(K2==0, 1, K2)
 
     work = work_arrays()
 
@@ -483,9 +478,10 @@ def solve_linear(u_hat, g_hat, rhs,
         u0_hat[0] = U_hat0[1, :, 0, 0]
         u0_hat[1] = U_hat0[2, :, 0, 0]
 
-        w = mat.BDD.matvec(2./params.nu*h0_hat[0], w)
+        w = mat.BDD0.matvec(2./params.nu*h0_hat[0], w)
         w -= 2./params.nu * Sk[1, :, 0, 0]
-        w += mat.ADD0.matvec(u0_hat[0], w1)
+        w1 = mat.ADD0.matvec(u0_hat[0], w1)
+        w += w1
         w += 2./params.nu/params.dt * mat.BDD0.matvec(u0_hat[0], w1)
         u0_hat[0] = la.HelmholtzSolverU0(u0_hat[0], w)
 

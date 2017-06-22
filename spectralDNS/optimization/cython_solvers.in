@@ -117,6 +117,6 @@ def compute_vw_KMM(np.ndarray[complex_t, ndim=4] u_hat,
     for i in range(u_hat.shape[1]):
         for j in range(u_hat.shape[2]):
             for k in range(u_hat.shape[3]):
-                u_hat[1, i, j, k] = -1j*(k_over_k2[1, i, j, k]*f_hat[i, j, k] - k_over_k2[2, i, j, k]*g_hat[i, j, k])
-                u_hat[2, i, j, k] = -1j*(k_over_k2[2, i, j, k]*f_hat[i, j, k] + k_over_k2[1, i, j, k]*g_hat[i, j, k])
+                u_hat[1, i, j, k] = -1j*(k_over_k2[0, i, j, k]*f_hat[i, j, k] - k_over_k2[1, i, j, k]*g_hat[i, j, k])
+                u_hat[2, i, j, k] = -1j*(k_over_k2[1, i, j, k]*f_hat[i, j, k] + k_over_k2[0, i, j, k]*g_hat[i, j, k])
     return u_hat

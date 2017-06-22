@@ -3,6 +3,8 @@ __date__ = "2015-10-29"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
+raise RuntimeError("Needs to be updated to new TensorProductSpaces")
+
 from .spectralinit import *
 from shenfun.chebyshev.matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, \
     CNDmat, BNNmat
