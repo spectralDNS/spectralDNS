@@ -144,7 +144,7 @@ def set_Source(Source, Sk, FST, ST, N, **kw):
     Sk[:] = 0
     if hasattr(FST, 'complex_shape'):
         Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
-        #Sk[1] /= (2*2*pi*2*pi*N[0]*N[1]*N[2])
+
     else:
         Sk[1] = FST.scalar_product(Source[1], Sk[1])
         Sk[1] /= (config.params.L[1]*config.params.L[2])

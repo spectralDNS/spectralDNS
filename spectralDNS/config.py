@@ -339,6 +339,11 @@ KMM_mpifft4py = channelsubparsers.add_parser('KMM_mpifft4py',
                                    help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
 KMM_mpifft4py.add_argument('--integrator', default='implicit', choices=('implicit',),
                  help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
+KMMRK3_mpifft4py = channelsubparsers.add_parser('KMMRK3_mpifft4py',
+                                      help='Kim Moin Moser channel solver with third order semi-implicit Runge-Kutta discretization.')
+KMMRK3_mpifft4py.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',),
+                    help='RK3 integrator for channel solver')
+
 
 IPCS = channelsubparsers.add_parser('IPCS',
                                     help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')

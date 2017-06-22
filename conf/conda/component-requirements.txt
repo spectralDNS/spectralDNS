@@ -1,3 +1,4 @@
+git+https://bitbucket.org/mpi4py/mpi4py-fft@master
 git+https://github.com/spectralDNS/mpiFFT4py.git@master
 git+https://github.com/ketch/nodepy.git@master
 git+https://github.com/spectralDNS/shenfun.git@master
