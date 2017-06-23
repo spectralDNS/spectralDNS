@@ -16,6 +16,8 @@ from ..shen.Matrices import BiharmonicCoeff, HelmholtzCoeff
 from ..shen.la import Helmholtz, Biharmonic
 from ..shen import LUsolve
 
+#FIXME Use padding in convection
+
 def get_context():
     """Set up context for solver"""
 
