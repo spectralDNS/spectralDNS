@@ -102,7 +102,7 @@ def initialize(solver, context):
     #print(e0)
     acc[0] = 0.0
 
-    if not params.solver == 'KMMRK3':
+    if not 'KMMRK3' in params.solver:
         # Initialize at t = dt
         context.H_hat1[:] = solver.get_convection(**context)
         initOS(OS, U, X, t=params.dt)

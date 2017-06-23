@@ -55,7 +55,7 @@ class OrrSommerfeld(object):
             phi = self.SB.ifst(phi_hat, phi)
             dphidy_hat = self.CDB.matvec(phi_hat)
             dphidy_hat = self.SD.apply_inverse_mass(dphidy_hat)
-            dphidy = self.SD.ifst(dphidy_hat, dphidy)
+            dphidy = self.SD.backward(dphidy_hat, dphidy)
 
         else:
             # Recompute interpolation matrices if necessary
