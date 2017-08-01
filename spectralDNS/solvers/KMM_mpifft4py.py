@@ -16,7 +16,6 @@ from ..shen.Matrices import BiharmonicCoeff, HelmholtzCoeff
 from ..shen.la import Helmholtz, Biharmonic
 from ..shen import LUsolve
 
-#FIXME Use padding in convection
 
 def get_context():
     """Set up context for solver"""
@@ -25,10 +24,6 @@ def get_context():
     ST = ShenDirichletBasis(params.N[0], quad=params.Dquad)
     SB = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
     CT = ST.CT  # Chebyshev transform
-
-    ST_pad = ShenDirichletBasis(params.N[0], quad=params.Dquad)
-    SB_pad = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
-    CT_pad = ST.CT  # Chebyshev transform
 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
     Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
@@ -45,10 +40,6 @@ def get_context():
     ST.plan(FST.complex_shape(), 0, complex, {'threads':params.threads,
                              'planner_effort':params.planner_effort["dct"]})
     SB.plan(FST.complex_shape(), 0, complex, {'threads':params.threads,
-                             'planner_effort':params.planner_effort["dct"]})
-    ST_pad.plan(FST.complex_shape_padded(), 0, complex, {'threads':params.threads,
-                             'planner_effort':params.planner_effort["dct"]})
-    SB_pad.plan(FST.complex_shape_padded(), 0, complex, {'threads':params.threads,
                              'planner_effort':params.planner_effort["dct"]})
 
     # Mesh variables
@@ -102,8 +93,8 @@ def get_context():
     # Collect all matrices
     mat = config.AttributeDict(dict(
         CDD = inner_product((ST, 0), (ST, 1)),
-        AB = HelmholtzCoeff(kx, -1.0, -alfa, ST.quad),
-        AC = BiharmonicCoeff(kx, nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad),
+        AB = HelmholtzCoeff(N[0], 1.0, -alfa, ST.quad),
+        AC = BiharmonicCoeff(N[0], nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad),
         # Matrices for biharmonic equation
         CBD = inner_product((SB, 0), (ST, 1)),
         ABB = inner_product((SB, 0), (SB, 2)),
@@ -164,10 +155,10 @@ def get_curl(curl, U_hat, g, work, FST, SB, ST, K, **context):
     curl = compute_curl(curl, U_hat, g, K, FST, SB, ST, work)
     return curl
 
-def get_convection(H_hat, U_hat, g, K, FST, SB, ST, SB_pad, ST_pad, work, mat, la, **context):
+def get_convection(H_hat, U_hat, g, K, FST, SB, ST, work, mat, la, **context):
     """Compute convection from context"""
     conv = getConvection(params.convection)
-    H_hat = conv(H_hat, U_hat, g, K, FST, SB, ST, SB_pad, ST_pad, work, mat, la)
+    H_hat = conv(H_hat, U_hat, g, K, FST, SB, ST, work, mat, la)
     return H_hat
 
 #def get_pressure(P_hat, Ni):
@@ -240,7 +231,7 @@ def standardConvection(rhs, u_dealias, u_hat, K, FST, SB, ST, work, mat, la):
 
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = mat.CDB.matvec(u_hat[0])
+    F_tmp[0] = mat.CDB.matvec(u_hat[0], F_tmp[0])
     F_tmp[0] = la.TDMASolverD(F_tmp[0])
     dudx = Uc[0] = FST.backward(F_tmp[0], Uc[0], ST, dealias=params.dealias)
 
@@ -350,11 +341,7 @@ def getConvection(convection):
 
     elif convection == "Vortex":
         #@profile
-        def Conv(rhs, u_hat, g_hat, K, FST, SB, ST, SB_pad, ST_pad, work, mat, la):
-
-            if params.dealias == '3/2-rule':
-                ST = ST_pad
-                SB = SB_pad
+        def Conv(rhs, u_hat, g_hat, K, FST, SB, ST, work, mat, la):
 
             u_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
             curl_dealias = work[((3,)+FST.work_shape(params.dealias), float, 1)]
@@ -377,7 +364,7 @@ def assembleAB(H_hat0, H_hat, H_hat1):
 @optimizer
 def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
     diff_u = work[(g, 0)]
-    diff_g = work[(g, 1, False)]
+    diff_g = work[(g, 1)]
     u0 = work[(g, 2, False)]
 
     # Compute diffusion for g-equation
@@ -393,7 +380,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
     return rhs
 
 def ComputeRHS(rhs, u_hat, g_hat, solver,
-               H_hat, H_hat1, H_hat0, FST, ST, SB, ST_pad, SB_pad, work, K, K2, K4, hv, hg,
+               H_hat, H_hat1, H_hat0, FST, ST, SB, work, K, K2, K4, hv, hg,
                mat, la, **context):
     """Compute right hand side of Navier Stokes
 
@@ -407,7 +394,7 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
 
     """
     # Nonlinear convection term at current u_hat
-    H_hat = solver.conv(H_hat, u_hat, g_hat, K, FST, SB, ST, SB_pad, ST_pad, work, mat, la)
+    H_hat = solver.conv(H_hat, u_hat, g_hat, K, FST, SB, ST, work, mat, la)
 
     # Assemble convection with Adams-Bashforth at time = n+1/2
     H_hat0 = solver.assembleAB(H_hat0, H_hat, H_hat1)
@@ -425,6 +412,7 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
 
     rhs = solver.add_linear(rhs, u_hat[0], g_hat, work, mat.AB, mat.AC, mat.SBB,
                             mat.ABB, mat.BBB, params.nu, params.dt, K2, K4)
+
 
     return rhs
 

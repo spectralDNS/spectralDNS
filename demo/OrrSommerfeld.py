@@ -61,7 +61,7 @@ def dx(u, FST):
             ak = zeros_like(c)
             ak = dct(c, ak, 1, axis=0)
             ak /= (M-1)
-            w = arange(0, M, 1, dtype=np.float)
+            w = arange(0, M, 1, dtype=float)
             w[2:] = 2./(1-w[2:]**2)
             w[0] = 1
             w[1::2] = 0
@@ -130,6 +130,7 @@ def initialize(solver, context):
     else:
         context.g[:] = 0
 
+
     #HH = context.work[(U[0], 0)]
     #HH = context.FST.backward(context.H_hat1[1], HH)
     #plt.figure()
@@ -147,7 +148,7 @@ def set_Source(Source, Sk, FST, ST, N, **kw):
 
     else:
         Sk[1] = FST.scalar_product(Source[1], Sk[1])
-        Sk[1] /= (config.params.L[1]*config.params.L[2])
+        Sk[1] /= (4*pi**2)
     Sk[1, -2:,0,0] = 0
 
 im1, im2, im3, im4 = (None, )*4
@@ -163,6 +164,7 @@ def update(context):
         params.tstep % params.compute_energy == 0):
         U = solver.get_velocity(**context)
 
+    #U = solver.get_velocity(**context)
     #print(norm(context.U_hat[0]), norm(context.U_hat[1]))
     #print(norm(context.U[0]), norm(context.U[1]))
 
@@ -253,13 +255,15 @@ if __name__ == "__main__":
         'nu': 1./8000.,             # Viscosity
         'dt': 0.001,                 # Time step
         'T': 0.01,                   # End time
-        'L': [2, 2*pi, 2*pi],
+        'L': [2, 2*pi, pi],
         'M': [7, 5, 2],
+        'Dquad': 'GC',
+        'Bquad': 'GC',
         'dealias': None
         },  "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)
-    config.channel.add_argument("--plot_step", type=int, default=10)
+    config.channel.add_argument("--plot_step", type=int, default=5)
     config.channel.add_argument("--refinement_test", type=bool, default=False)
     config.channel.add_argument("--eps_refinement_test", type=bool, default=False)
     config.channel.add_argument("--spatial_refinement_test", type=bool, default=False)

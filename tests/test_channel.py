@@ -3,13 +3,13 @@ from spectralDNS import config, get_solver, solve
 from six.moves import reload_module
 from OrrSommerfeld import initialize, regression_test, set_Source, pi
 
-@pytest.fixture(params=('KMMRK3', 'KMM', 'IPCS', 'IPCSR', 'KMM_mpifft4py', 'KMMRK3_mpifft4py'))
+@pytest.fixture(params=('KMMRK3', 'KMM', 'IPCS', 'IPCSR', 'KMMRK3_mpifft4py', 'KMM_mpifft4py'))
 def sol(request):
     """Check for uniform and non-uniform cube"""
     return request.param
 
 def test_channel(sol):
-    if sol in ('IPCS', 'IPCSR', 'KMM_mpifft4py', 'KMMRK3_mpifft4py'):
+    if sol in ('IPCS', 'IPCSR'):
         pytest.skip(sol+' not currently working')
     config.update(
         {

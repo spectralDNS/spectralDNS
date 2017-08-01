@@ -251,7 +251,7 @@ def test_Helmholtz(ST, quad):
     assert np.linalg.norm(u2[:, 2, 2].real - u1)/(M*16) < 1e-12
     assert np.linalg.norm(u2[:, 2, 2].imag - u1)/(M*16) < 1e-12
 
-#test_Helmholtz(ShenDirichletBasis, "GC")
+#test_Helmholtz(ShenNeumannBasis, "GC")
 
 @pytest.mark.parametrize('quad', quads)
 def test_Helmholtz2(quad):
@@ -419,7 +419,7 @@ def test_Helmholtz_matvec(quad):
     B = inner_product((SD, 0), (SD, 0))
     A = inner_product((SD, 0), (SD, 2))
 
-    AB = HelmholtzCoeff(np.arange(M).astype(np.float), 1, kx**2, SD.quad)
+    AB = HelmholtzCoeff(M, 1, kx**2, SD.quad)
     s = SD.slice()
 
     u1 = np.zeros(M)
@@ -438,13 +438,13 @@ def test_Helmholtz_matvec(quad):
     u1 = u1.repeat(16).reshape((M, 4, 4)) +1j*u1.repeat(16).reshape((M, 4, 4))
     kx = np.zeros((4, 4))+kx
     #LUsolve.Mult_Helmholtz_3D_complex(M, SD.quad=="GL", 1.0, kx**2, u1, b)
-    AB = HelmholtzCoeff(np.arange(M).astype(np.float), 1, kx**2, SD.quad)
+    AB = HelmholtzCoeff(M, 1, kx**2, SD.quad)
     b = AB.matvec(u1, b)
 
     assert np.linalg.norm(b[:, 2, 2].real - c)/(M*16) < 1e-12
     assert np.linalg.norm(b[:, 2, 2].imag - c)/(M*16) < 1e-12
 
-test_Helmholtz_matvec("GL")
+#test_Helmholtz_matvec("GL")
 #test_ADDmat(ShenNeumannBasis("GL"))
 #test_Helmholtz2(ShenDirichletBasis("GL"))
 #test_Mult_CTD(ShenDirichletBasis("GL"))

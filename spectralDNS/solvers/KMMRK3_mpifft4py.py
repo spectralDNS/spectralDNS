@@ -32,10 +32,6 @@ def get_context():
                              'planner_effort':params.planner_effort["dct"]})
     SB.plan(FST.complex_shape(), 0, complex, {'threads':params.threads,
                              'planner_effort':params.planner_effort["dct"]})
-    ST_pad.plan(FST.complex_shape_padded(), 0, complex, {'threads':params.threads,
-                             'planner_effort':params.planner_effort["dct"]})
-    SB_pad.plan(FST.complex_shape_padded(), 0, complex, {'threads':params.threads,
-                             'planner_effort':params.planner_effort["dct"]})
 
     # Mesh variables
     X = FST.get_local_mesh(ST)
@@ -94,9 +90,9 @@ def get_context():
     # Collect all matrices
     mat = config.AttributeDict(dict(
         CDD = inner_product((ST, 0), (ST, 1)),
-        AC = [BiharmonicCoeff(kx, nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2[0]),
+        AC = [BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2[0]),
                             -(K2[0] - nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)],
-        AB = [HelmholtzCoeff(kx, -1.0, -(K2[0] - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)],
+        AB = [HelmholtzCoeff(N[0], 1.0, -(K2[0] - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)],
 
         # Matrices for biharmonic equation
         CBD = inner_product((SB, 0), (ST, 1)),
@@ -144,7 +140,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
     return rhs
 
 def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
-               H_hat, FST, ST, SB, ST_pad, SB_pad, work, K, K2, K4, hv,
+               H_hat, FST, ST, SB, work, K, K2, K4, hv,
                hg, a, b, K_over_K2, la, mat, **context):
 
     """Compute right hand side of Navier Stokes
@@ -161,7 +157,7 @@ def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
     """
 
     # Nonlinear convection term at current u_hat
-    H_hat = solver.conv(H_hat, u_hat, g_hat, K, FST, SB, ST, SB_pad, ST_pad, work, mat, la)
+    H_hat = solver.conv(H_hat, u_hat, g_hat, K, FST, SB, ST, work, mat, la)
 
     w0 = work[(H_hat[0], 0, False)]
     w1 = work[(H_hat[0], 1, False)]

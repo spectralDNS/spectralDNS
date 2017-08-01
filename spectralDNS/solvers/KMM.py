@@ -11,20 +11,21 @@ from shenfun.chebyshev.matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, C
 from shenfun.spectralbase import inner_product
 from shenfun.la import TDMA
 from shenfun import TensorProductSpace, Array, TestFunction, TrialFunction, \
-    VectorTensorProductSpace
+    VectorTensorProductSpace, div, grad, Dx, inner
 from shenfun.chebyshev.bases import ShenDirichletBasis, ShenBiharmonicBasis, Basis
 from shenfun.fourier.bases import R2CBasis, C2CBasis
 from shenfun.chebyshev.la import Helmholtz, Biharmonic
 
-#from ..shen.shentransform import SlabShen_R2C
 from ..shen.Matrices import BiharmonicCoeff, HelmholtzCoeff
 from ..shen import LUsolve
 from ..shen.la import Helmholtz as old_Helmholtz
+from ..shen.la import Biharmonic as old_Biharmonic
 
 def get_context():
     """Set up context for solver"""
 
     # Get points and weights for Chebyshev weighted integrals
+    assert params.Dquad == params.Bquad
     ST = ShenDirichletBasis(params.N[0], quad=params.Dquad)
     SB = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
     CT = Basis(params.N[0], quad=params.Dquad)
@@ -32,27 +33,30 @@ def get_context():
     K0 = C2CBasis(params.N[1], domain=(0, params.L[1]))
     K1 = R2CBasis(params.N[2], domain=(0, params.L[2]))
 
-    #CT = ST.CT  # Chebyshev transform
     FST = TensorProductSpace(comm, (ST, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Dirichlet
     FSB = TensorProductSpace(comm, (SB, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Biharmonic
     FCT = TensorProductSpace(comm, (CT, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Regular Chebyshev
     VFS = VectorTensorProductSpace([FSB, FST, FST])
 
     # Padded
-    STp = ShenDirichletBasis(params.N[0], quad=params.Dquad)
-    SBp = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
-    CTp = Basis(params.N[0], quad=params.Dquad)
-    K0p = C2CBasis(params.N[1], padding_factor=1.5, domain=(0, params.L[1]))
-    K1p = R2CBasis(params.N[2], padding_factor=1.5, domain=(0, params.L[2]))
-    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
-    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
-    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
-    VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
+    if params.dealias == '3/2-rule':
+        STp = ShenDirichletBasis(params.N[0], quad=params.Dquad)
+        SBp = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
+        CTp = Basis(params.N[0], quad=params.Dquad)
+        K0p = C2CBasis(params.N[1], padding_factor=1.5, domain=(0, params.L[1]))
+        K1p = R2CBasis(params.N[2], padding_factor=1.5, domain=(0, params.L[2]))
+        FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+        FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+        FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+        VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
 
-    VFSp = VFS
-    FCTp = FCT
-    FSTp = FST
-    FSBp = FSB
+    else:
+        K0p = C2CBasis(params.N[1], domain=(0, params.L[1]), dealias_direct=params.dealias=='2/3-rule')
+        K1p = R2CBasis(params.N[2], domain=(0, params.L[2]), dealias_direct=params.dealias=='2/3-rule')
+        FSTp = TensorProductSpace(comm, (ST, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Dirichlet
+        FSBp = TensorProductSpace(comm, (SB, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Biharmonic
+        FCTp = TensorProductSpace(comm, (CT, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Regular Chebyshev
+        VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
     Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
@@ -101,8 +105,8 @@ def get_context():
     # Collect all matrices
     mat = config.AttributeDict(dict(
         CDD = inner_product((ST, 0), (ST, 1)),
-        AB = HelmholtzCoeff(kx, -1.0, -alfa, ST.quad),
-        AC = BiharmonicCoeff(kx, nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad),
+        AB = HelmholtzCoeff(N[0], 1.0, -alfa, ST.quad),
+        AC = BiharmonicCoeff(N[0], nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad),
         # Matrices for biharmonic equation
         CBD = inner_product((SB, 0), (ST, 1)),
         ABB = inner_product((SB, 0), (SB, 2)),
@@ -118,16 +122,17 @@ def get_context():
         )
     )
 
-    # Collect all linear algebra solvers
+    ## Collect all linear algebra solvers
     #la = config.AttributeDict(dict(
-        #HelmholtzSolverG = Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST),
-        #BiharmonicSolverU = Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0],
+        #HelmholtzSolverG = old_Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST),
+        #BiharmonicSolverU = old_Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0],
                                     #-(K2[0] + nu*dt/2.*K4[0]), quad=SB.quad,
                                     #solver="cython"),
-        #HelmholtzSolverU0 = Helmholtz(N[0], np.sqrt(2./nu/dt), ST),
+        #HelmholtzSolverU0 = old_Helmholtz(N[0], np.sqrt(2./nu/dt), ST),
         #TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0)))
         #)
     #)
+
     mat.ADD.axis = 0
     mat.BDD.axis = 0
     mat.SBB.axis = 0
@@ -142,6 +147,7 @@ def get_context():
         TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0)))
         )
     )
+
 
     hdf5file = KMMWriter({"U":U[0], "V":U[1], "W":U[2]},
                          chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
@@ -192,14 +198,48 @@ def get_convection(H_hat, U_hat, g, K, VFSp, FSTp, FSBp, FCTp,  work, mat, la, *
     H_hat = conv(H_hat, U_hat, g, K, VFSp, FSTp, FSBp, FCTp, work, mat, la)
     return H_hat
 
-#def get_pressure(P_hat, Ni):
-    #"""Solve for pressure if Ni is fst of convection"""
-    #pass
-    ##F_tmp[0] = 0
-    ##LUsolve.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])
-    ##HelmholtzSolverP = Helmholtz(N[0], sqrt(K2[0]), SN.quad, True)
-    ##P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
-    ##return P_hat
+def get_pressure(context, solver):
+    FCT = context.FCT
+    FST = context.FST
+
+    U = solver.get_velocity(**context)
+    U0 = context.VFS.backward(context.U_hat0, context.U0)
+    dt = solver.params.dt
+
+    H_hat = solver.get_convection(**context)
+    Hx = Array(FST, False)
+    Hx = FST.backward(H_hat[0], Hx)
+
+    v = TestFunction(FCT)
+    p = TrialFunction(FCT)
+    U = U.as_function()
+    U0 = U0.as_function()
+
+    rhs_hat = inner((0.5*context.nu)*div(grad(U[0]+U0[0])), v)
+    Hx -= 1./dt*(U[0]-U0[0])
+    rhs_hat += inner(Hx, v)
+
+    CT = inner(Dx(p, 0), v)
+
+    # Should implement fast solver. Just a backwards substitution
+    A = CT.diags().toarray()*CT.scale[0]
+    A[-1, 0] = 1
+    a_i = np.linalg.inv(A)
+
+    p_hat = Array(context.FCT)
+
+    for j in range(p_hat.shape[1]):
+        for k in range(p_hat.shape[2]):
+            p_hat[:, j, k] = np.dot(a_i, rhs_hat[:, j, k])
+
+    p = Array(FCT, False)
+    p = FCT.backward(p_hat, p)
+
+    uu = np.sum((0.5*(U+U0))**2, 0)
+    uu *= 0.5
+
+    return p-uu+3./16.
+
 
 #@profile
 def Cross(c, a, b, FSTp, work):
@@ -235,152 +275,140 @@ def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, work):
     c[2] += dvdx
     return c
 
-#def compute_derivatives(duidxj, u_hat, FST, ST, SB, la, mat, work):
-    #duidxj[:] = 0
-    #F_tmp = work[(u_hat, 0)]
-    ## dudx = 0 from continuity equation. Use Shen Dirichlet basis
-    ## Use regular Chebyshev basis for dvdx and dwdx
-    #F_tmp[0] = mat.CDB.matvec(U_hat[0])
-    #F_tmp[0] = la.TDMASolverD(F_tmp[0])
-    #duidxj[0, 0] = FST.backward(F_tmp[0], duidxj[0, 0], ST)
-    #LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
-    #duidxj[1, 0] = dvdx = FST.backward(F_tmp[1], duidxj[1, 0], ST.CT)  # proj to Cheb
-    #duidxj[2, 0] = dwdx = FST.backward(F_tmp[2], duidxj[2, 0], ST.CT)  # proj to Cheb
-    #duidxj[0, 1] = dudy = FST.backward(1j*K[1]*u_hat[0], duidxj[0, 1], SB) # ShenB
-    #duidxj[0, 2] = dudz = FST.backward(1j*K[2]*u_hat[0], duidxj[0, 2], SB)
-    #duidxj[1, 1] = dvdy = FST.backward(1j*K[1]*u_hat[1], duidxj[1, 1], ST)
-    #duidxj[1, 2] = dvdz = FST.backward(1j*K[2]*u_hat[1], duidxj[1, 2], ST)
-    #duidxj[2, 1] = dwdy = FST.backward(1j*K[1]*u_hat[2], duidxj[2, 1], ST)
-    #duidxj[2, 2] = dwdz = FST.backward(1j*K[2]*u_hat[2], duidxj[2, 2], ST)
-    #return duidxj
+def compute_derivatives(duidxj, u_hat, FST, FCT, FSB, la, mat, work):
+    duidxj[:] = 0
+    F_tmp = work[(u_hat, 0)]
+    # dudx = 0 from continuity equation. Use Shen Dirichlet basis
+    # Use regular Chebyshev basis for dvdx and dwdx
+    F_tmp[0] = mat.CDB.matvec(U_hat[0], F_tmp0)
+    F_tmp[0] = la.TDMASolverD(F_tmp[0])
+    duidxj[0, 0] = FST.backward(F_tmp[0], duidxj[0, 0])
+    LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
+    duidxj[1, 0] = dvdx = FCT.backward(F_tmp[1], duidxj[1, 0])  # proj to Cheb
+    duidxj[2, 0] = dwdx = FCT.backward(F_tmp[2], duidxj[2, 0])  # proj to Cheb
+    duidxj[0, 1] = dudy = FSB.backward(1j*K[1]*u_hat[0], duidxj[0, 1]) # ShenB
+    duidxj[0, 2] = dudz = FSB.backward(1j*K[2]*u_hat[0], duidxj[0, 2])
+    duidxj[1, 1] = dvdy = FST.backward(1j*K[1]*u_hat[1], duidxj[1, 1])
+    duidxj[1, 2] = dvdz = FST.backward(1j*K[2]*u_hat[1], duidxj[1, 2])
+    duidxj[2, 1] = dwdy = FST.backward(1j*K[1]*u_hat[2], duidxj[2, 1])
+    duidxj[2, 2] = dwdz = FST.backward(1j*K[2]*u_hat[2], duidxj[2, 2])
+    return duidxj
 
-#def standardConvection(rhs, u_dealias, u_hat, K, FST, SB, ST, work, mat, la):
-    #rhs[:] = 0
-    #U = u_dealias
-    #Uc = work[(U, 1)]
-    #Uc2 = work[(U, 2)]
-    #F_tmp = work[(rhs, 0)]
+def standardConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp, FSBp, FCTp, work,
+                       mat, la):
+    rhs[:] = 0
+    U = u_dealias
+    Uc = work[(U, 1)]
+    Uc2 = work[(U, 2)]
+    F_tmp = work[(rhs, 0)]
 
-    ## dudx = 0 from continuity equation. Use Shen Dirichlet basis
-    ## Use regular Chebyshev basis for dvdx and dwdx
-    #F_tmp[0] = mat.CDB.matvec(u_hat[0])
-    #F_tmp[0] = la.TDMASolverD(F_tmp[0])
-    #dudx = Uc[0] = FST.backward(F_tmp[0], Uc[0], ST, dealias=params.dealias)
+    # dudx = 0 from continuity equation. Use Shen Dirichlet basis
+    # Use regular Chebyshev basis for dvdx and dwdx
+    F_tmp[0] = mat.CDB.matvec(u_hat[0], F_tmp[0])
+    F_tmp[0] = la.TDMASolverD(F_tmp[0])
+    dudx = Uc[0] = FSTp.backward(F_tmp[0], Uc[0])
 
-    #LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
-    #dvdx = Uc[1] = FST.backward(F_tmp[1], Uc[1], ST.CT, dealias=params.dealias)
-    #dwdx = Uc[2] = FST.backward(F_tmp[2], Uc[2], ST.CT, dealias=params.dealias)
+    LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
+    dvdx = Uc[1] = FCTp.backward(F_tmp[1], Uc[1])
+    dwdx = Uc[2] = FCTp.backward(F_tmp[2], Uc[2])
 
-    #dudy = Uc2[0] = FST.backward(1j*K[1]*u_hat[0], Uc2[0], SB, dealias=params.dealias)
-    #dudz = Uc2[1] = FST.backward(1j*K[2]*u_hat[0], Uc2[1], SB, dealias=params.dealias)
-    #rhs[0] = FST.forward(U[0]*dudx + U[1]*dudy + U[2]*dudz, rhs[0], ST, dealias=params.dealias)
+    dudy = Uc2[0] = FSBp.backward(1j*K[1]*u_hat[0], Uc2[0])
+    dudz = Uc2[1] = FSBp.backward(1j*K[2]*u_hat[0], Uc2[1])
+    rhs[0] = FSTp.forward(U[0]*dudx + U[1]*dudy + U[2]*dudz, rhs[0])
 
-    #Uc2[:] = 0
-    #dvdy = Uc2[0] = FST.backward(1j*K[1]*u_hat[1], Uc2[0], ST, dealias=params.dealias)
+    Uc2[:] = 0
+    dvdy = Uc2[0] = FSTp.backward(1j*K[1]*u_hat[1], Uc2[0])
 
-    #dvdz = Uc2[1] = FST.backward(1j*K[2]*u_hat[1], Uc2[1], ST, dealias=params.dealias)
-    #rhs[1] = FST.forward(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, rhs[1], ST, dealias=params.dealias)
+    dvdz = Uc2[1] = FSTp.backward(1j*K[2]*u_hat[1], Uc2[1])
+    rhs[1] = FSTp.forward(U[0]*dvdx + U[1]*dvdy + U[2]*dvdz, rhs[1])
 
-    #Uc2[:] = 0
-    #dwdy = Uc2[0] = FST.backward(1j*K[1]*u_hat[2], Uc2[0], ST, dealias=params.dealias)
-    #dwdz = Uc2[1] = FST.backward(1j*K[2]*u_hat[2], Uc2[1], ST, dealias=params.dealias)
+    Uc2[:] = 0
+    dwdy = Uc2[0] = FSTp.backward(1j*K[1]*u_hat[2], Uc2[0])
+    dwdz = Uc2[1] = FSTp.backward(1j*K[2]*u_hat[2], Uc2[1])
 
-    #rhs[2] = FST.forward(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, rhs[2], ST, dealias=params.dealias)
+    rhs[2] = FSTp.forward(U[0]*dwdx + U[1]*dwdy + U[2]*dwdz, rhs[2])
 
-    #return rhs
+    return rhs
 
-#def divergenceConvection(rhs, u_dealias, u_hat, K, FST, SB, ST, work, mat, la, add=False):
-    #"""c_i = div(u_i u_j)"""
-    #if not add: rhs.fill(0)
-    #F_tmp  = work[(rhs, 0)]
-    #F_tmp2 = work[(rhs, 1)]
-    #U = u_dealias
+def divergenceConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp, FSBp, FCTp, work,
+                         mat, la, add=False):
+    """c_i = div(u_i u_j)"""
+    if not add: rhs.fill(0)
+    F_tmp  = work[(rhs, 0)]
+    F_tmp2 = work[(rhs, 1)]
+    U = u_dealias
 
-    #F_tmp[0] = FST.forward(U[0]*U[0], F_tmp[0], ST, dealias=params.dealias)
-    #F_tmp[1] = FST.forward(U[0]*U[1], F_tmp[1], ST, dealias=params.dealias)
-    #F_tmp[2] = FST.forward(U[0]*U[2], F_tmp[2], ST, dealias=params.dealias)
+    F_tmp[0] = FSTp.forward(U[0]*U[0], F_tmp[0])
+    F_tmp[1] = FSTp.forward(U[0]*U[1], F_tmp[1])
+    F_tmp[2] = FSTp.forward(U[0]*U[2], F_tmp[2])
 
-    #F_tmp2[0] = mat.CDD.matvec(F_tmp[0], F_tmp2[0])
-    #F_tmp2[1] = mat.CDD.matvec(F_tmp[1], F_tmp2[1])
-    #F_tmp2[2] = mat.CDD.matvec(F_tmp[2], F_tmp2[2])
-    #F_tmp2[0] = la.TDMASolverD(F_tmp2[0])
-    #F_tmp2[1] = la.TDMASolverD(F_tmp2[1])
-    #F_tmp2[2] = la.TDMASolverD(F_tmp2[2])
-    #rhs[0] += F_tmp2[0]
-    #rhs[1] += F_tmp2[1]
-    #rhs[2] += F_tmp2[2]
+    F_tmp2[0] = mat.CDD.matvec(F_tmp[0], F_tmp2[0])
+    F_tmp2[1] = mat.CDD.matvec(F_tmp[1], F_tmp2[1])
+    F_tmp2[2] = mat.CDD.matvec(F_tmp[2], F_tmp2[2])
+    F_tmp2[0] = la.TDMASolverD(F_tmp2[0])
+    F_tmp2[1] = la.TDMASolverD(F_tmp2[1])
+    F_tmp2[2] = la.TDMASolverD(F_tmp2[2])
+    rhs[0] += F_tmp2[0]
+    rhs[1] += F_tmp2[1]
+    rhs[2] += F_tmp2[2]
 
-    #F_tmp2[0] = FST.forward(U[0]*U[1], F_tmp2[0], ST, dealias=params.dealias)
-    #F_tmp2[1] = FST.forward(U[0]*U[2], F_tmp2[1], ST, dealias=params.dealias)
-    #rhs[0] += 1j*K[1]*F_tmp2[0] # duvdy
-    #rhs[0] += 1j*K[2]*F_tmp2[1] # duwdz
+    F_tmp2[0] = FSTp.forward(U[0]*U[1], F_tmp2[0])
+    F_tmp2[1] = FSTp.forward(U[0]*U[2], F_tmp2[1])
+    rhs[0] += 1j*K[1]*F_tmp2[0] # duvdy
+    rhs[0] += 1j*K[2]*F_tmp2[1] # duwdz
 
-    #F_tmp[0] = FST.forward(U[1]*U[1], F_tmp[0], ST, dealias=params.dealias)
-    #F_tmp[1] = FST.forward(U[1]*U[2], F_tmp[1], ST, dealias=params.dealias)
-    #F_tmp[2] = FST.forward(U[2]*U[2], F_tmp[2], ST, dealias=params.dealias)
-    #rhs[1] += 1j*K[1]*F_tmp[0]  # dvvdy
-    #rhs[1] += 1j*K[2]*F_tmp[1]  # dvwdz
-    #rhs[2] += 1j*K[1]*F_tmp[1]  # dvwdy
-    #rhs[2] += 1j*K[2]*F_tmp[2]  # dwwdz
+    F_tmp[0] = FSTp.forward(U[1]*U[1], F_tmp[0])
+    F_tmp[1] = FSTp.forward(U[1]*U[2], F_tmp[1])
+    F_tmp[2] = FSTp.forward(U[2]*U[2], F_tmp[2])
+    rhs[1] += 1j*K[1]*F_tmp[0]  # dvvdy
+    rhs[1] += 1j*K[2]*F_tmp[1]  # dvwdz
+    rhs[2] += 1j*K[1]*F_tmp[1]  # dvwdy
+    rhs[2] += 1j*K[2]*F_tmp[2]  # dwwdz
 
-    #return rhs
+    return rhs
 
 def getConvection(convection):
 
-    #if convection == "Standard":
+    if convection == "Standard":
 
-        #def Conv(rhs, u_hat, g_hat, K, FST, SB, ST, work, mat, la):
+        def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la):
+            u_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 0)]
+            u_dealias = VFSp.backward(u_hat, u_dealias)
+            rhs = standardConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp,
+                                     FSBp, FCTp, work, mat, la)
+            rhs[:] *= -1
+            return rhs
 
-            #u_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
-            #u_dealias[0] = FST.backward(u_hat[0], u_dealias[0], SB, params.dealias)
-            #for i in range(1, 3):
-                #u_dealias[i] = FST.backward(u_hat[i], u_dealias[i], ST, params.dealias)
+    elif convection == "Divergence":
 
-            #rhs = standardConvection(rhs, u_dealias, u_hat, K, FST, SB, ST,
-                                        #work, mat, la)
-            #rhs[:] *= -1
-            #return rhs
+        def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la):
+            u_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 0)]
+            u_dealias = VFSp.backward(u_hat, u_dealias)
+            rhs = divergenceConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp,
+                                       FSBp, FCTp, work, mat, la, False)
+            rhs[:] *= -1
+            return rhs
 
-    #elif convection == "Divergence":
+    elif convection == "Skew":
 
-        #def Conv(rhs, u_hat, g_hat, K, FST, SB, ST, work, mat, la):
+        def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la):
+            u_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 0)]
+            u_dealias = VFSp.backward(u_hat, u_dealias)
+            rhs = standardConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp,
+                                     FSBp, FCTp, work, mat, la)
+            rhs = divergenceConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp,
+                                       FSBp, FCTp, work, mat, la, True)
+            rhs *= -0.5
+            return rhs
 
-            #u_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
-            #u_dealias[0] = FST.backward(u_hat[0], u_dealias[0], SB, params.dealias)
-            #for i in range(1, 3):
-                #u_dealias[i] = FST.backward(u_hat[i], u_dealias[i], ST, params.dealias)
-
-            #rhs = divergenceConvection(rhs, u_dealias, u_hat, K, FST, SB, ST,
-                                        #work, mat, la, False)
-            #rhs[:] *= -1
-            #return rhs
-
-    #elif convection == "Skew":
-
-        #def Conv(rhs, u_hat, g_hat, K, FST, SB, ST, work, mat, la):
-
-            #u_dealias = work[((3,)+FST.work_shape(params.dealias), float, 0)]
-            #u_dealias[0] = FST.backward(u_hat[0], u_dealias[0], SB, params.dealias)
-            #for i in range(1, 3):
-                #u_dealias[i] = FST.backward(u_hat[i], u_dealias[i], ST, params.dealias)
-
-            #rhs = standardConvection(rhs, u_dealias, u_hat, K, FST, SB, ST,
-                                        #work, mat, la)
-            #rhs = divergenceConvection(rhs, u_dealias, u_hat, K, FST, SB, ST,
-                                        #work, mat, la, True)
-            #rhs *= -0.5
-            #return rhs
-
-    #elif convection == "Vortex":
-        ##@profile
-    def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la):
-
-        u_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 0)]
-        curl_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 1)]
-        u_dealias = VFSp.backward(u_hat, u_dealias)
-        curl_dealias = compute_curl(curl_dealias, u_hat, g_hat, K, FCTp, FSTp, FSBp, work)
-        rhs = Cross(rhs, u_dealias, curl_dealias, FSTp, work)
-        return rhs
+    elif convection == "Vortex":
+        def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la):
+            u_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 0)]
+            curl_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 1)]
+            u_dealias = VFSp.backward(u_hat, u_dealias)
+            curl_dealias = compute_curl(curl_dealias, u_hat, g_hat, K, FCTp, FSTp, FSBp, work)
+            rhs = Cross(rhs, u_dealias, curl_dealias, FSTp, work)
+            return rhs
 
     Conv.convection = convection
     return Conv
@@ -393,7 +421,7 @@ def assembleAB(H_hat0, H_hat, H_hat1):
 @optimizer
 def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
     diff_u = work[(g, 0)]
-    diff_g = work[(g, 1, False)]
+    diff_g = work[(g, 1)]
     u0 = work[(g, 2, False)]
 
     # Compute diffusion for g-equation

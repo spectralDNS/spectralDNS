@@ -294,10 +294,13 @@ class SlabShen_R2C(Slab_R2C):
 
         if self.num_processes == 1:
             if not dealias == '3/2-rule':
+                fup = fu
                 if dealias == '2/3-rule':
-                    fu *= self.dealias
+                    fup = self.work_arrays[(fu, 1, False)]
+                    fup[:] = fu
+                    fup *= self.dealias
 
-                Uc_hat = fun(fu, Uc_hat)
+                Uc_hat = fun(fup, Uc_hat)
                 u = irfft2(Uc_hat, u, axes=(1, 2), overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['irfft2'])
 
             else:

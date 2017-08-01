@@ -22,20 +22,24 @@ def get_context():
     VFS = VectorTensorProductSpace([FSB, FST, FST])
 
     # Padded
-    STp = ShenDirichletBasis(params.N[0], quad=params.Dquad)
-    SBp = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
-    CTp = Basis(params.N[0], quad=params.Dquad)
-    K0p = C2CBasis(params.N[1], padding_factor=1.5, domain=(0, params.L[1]))
-    K1p = R2CBasis(params.N[2], padding_factor=1.5, domain=(0, params.L[2]))
-    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
-    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
-    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
-    VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
+    if params.dealias == '3/2-rule':
+        STp = ShenDirichletBasis(params.N[0], quad=params.Dquad)
+        SBp = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
+        CTp = Basis(params.N[0], quad=params.Dquad)
+        K0p = C2CBasis(params.N[1], padding_factor=1.5, domain=(0, params.L[1]))
+        K1p = R2CBasis(params.N[2], padding_factor=1.5, domain=(0, params.L[2]))
+        FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+        FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+        FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+        VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
 
-    VFSp = VFS
-    FCTp = FCT
-    FSTp = FST
-    FSBp = FSB
+    else:
+        K0p = C2CBasis(params.N[1], domain=(0, params.L[1]), dealias_direct=params.dealias=='2/3-rule')
+        K1p = R2CBasis(params.N[2], domain=(0, params.L[2]), dealias_direct=params.dealias=='2/3-rule')
+        FSTp = TensorProductSpace(comm, (ST, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Dirichlet
+        FSBp = TensorProductSpace(comm, (SB, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Biharmonic
+        FCTp = TensorProductSpace(comm, (CT, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Regular Chebyshev
+        VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
     Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
@@ -87,9 +91,9 @@ def get_context():
     # Collect all matrices
     mat = config.AttributeDict(dict(
         CDD = inner_product((ST, 0), (ST, 1)),
-        AC = [BiharmonicCoeff(kx, nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2[0]),
+        AC = [BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2[0]),
                             -(K2[0] - nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)],
-        AB = [HelmholtzCoeff(kx, -1.0, -(K2[0] - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)],
+        AB = [HelmholtzCoeff(N[0], 1.0, -(K2[0] - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)],
 
         # Matrices for biharmonic equation
         CBD = inner_product((SB, 0), (ST, 1)),
@@ -114,7 +118,7 @@ def get_context():
     rk = 0
     la = config.AttributeDict(dict(
         HelmholtzSolverG = [Helmholtz(mat.ADD, mat.BDD, -np.ones((1,1,1)),
-                                      np.sqrt(K2[0]+2.0/nu/(a[rk]+b[rk])/dt)[np.newaxis, :, :])
+                            (K2[0]+2.0/nu/(a[rk]+b[rk])/dt)[np.newaxis, :, :])
                             for rk in range(3)],
         BiharmonicSolverU = [Biharmonic(mat.SBB, mat.ABB, mat.BBB, -nu*(a[rk]+b[rk])*dt/2.*np.ones((1,1,1)),
                                         (1.+nu*(a[rk]+b[rk])*dt*K2[0])[np.newaxis,:,:],

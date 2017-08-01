@@ -6,9 +6,8 @@ from shenfun.spectralbase import inner_product
 
 class BiharmonicCoeff(object):
 
-    def __init__(self, K, a0, alfa, beta, quad="GL"):
+    def __init__(self, N, a0, alfa, beta, quad="GL"):
         self.quad = quad
-        N = K.shape[0]
         self.shape = (N-4, N-4)
         SB = bases.ShenBiharmonicBasis(N, quad)
         self.S = inner_product((SB, 0), (SB, 4))
@@ -36,13 +35,12 @@ class BiharmonicCoeff(object):
 
 class HelmholtzCoeff(object):
 
-    def __init__(self, K, alfa, beta, quad="GL"):
+    def __init__(self, N, alfa, beta, quad="GL"):
         """alfa*ADD + beta*BDD
         """
         self.quad = quad
-        N = self.N = K.shape[0]-2
-        self.shape = (N, N)
-        SD = bases.ShenDirichletBasis(N+2, quad)
+        self.shape = (N-2, N-2)
+        SD = bases.ShenDirichletBasis(N, quad)
         self.B = inner_product((SD, 0), (SD, 0))
         self.A = inner_product((SD, 0), (SD, 2))
         self.alfa = alfa

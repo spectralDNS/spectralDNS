@@ -83,7 +83,7 @@ def get_context():
         BDN = inner_product((ST, 0), (SN, 0)),
         CDD = inner_product((ST, 0), (ST, 1)),
         BDD = inner_product((ST, 0), (ST, 0)),
-        AB = HelmholtzCoeff(kx, -1.0, -alfa, ST.quad),
+        AB = HelmholtzCoeff(N[0], 1.0, -alfa, ST.quad),
         CDT = inner_product((ST, 0), (CT, 1)),
         CTD = inner_product((CT, 0), (ST, 1)),
         BDT = inner_product((ST, 0), (CT, 0)),

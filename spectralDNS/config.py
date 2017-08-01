@@ -355,8 +355,20 @@ print_div_parser.add_argument('--no-print_divergence_progress', dest='print_dive
 print_div_parser.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true',
                               help='Print the norm of the pressure correction on inner iterations for IPCS')
 IPCS.set_defaults(print_divergence_progress=False)
-
 IPCS.add_argument('--divergence_tol', default=1e-7, type=float,
+                  help='Tolerance on divergence error for pressure velocity coupling for IPCS')
+
+IPCS_mpifft4py = channelsubparsers.add_parser('IPCS_mpifft4py',
+                                    help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
+IPCS_mpifft4py.add_argument('--velocity_pressure_iters', default=1, type=int,
+                  help='Number of inner velocity pressure iterations for IPCS_mpifft4py')
+print_div_parser2 = IPCS_mpifft4py.add_mutually_exclusive_group(required=False)
+print_div_parser2.add_argument('--no-print_divergence_progress', dest='print_divergence_progress', action='store_false',
+                              help='Do not print the norm of the pressure correction on inner iterations for IPCS')
+print_div_parser2.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true',
+                              help='Print the norm of the pressure correction on inner iterations for IPCS')
+IPCS_mpifft4py.set_defaults(print_divergence_progress=False)
+IPCS_mpifft4py.add_argument('--divergence_tol', default=1e-7, type=float,
                   help='Tolerance on divergence error for pressure velocity coupling for IPCS')
 
 IPCSR = channelsubparsers.add_parser('IPCSR',
