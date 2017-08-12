@@ -67,35 +67,35 @@ Scaling
 The most recent simulations of the pencil version of the NS solver are showing excellent scaling up to 65k cores at KAUST and Shaheen II!
 
 <p align="center">
-    <img src="https://www.dropbox.com/s/thkaty8ow6m5xgh/strong_scaling_pencil_col.png?dl=1" width="600" height="400" alt="Strong scaling of Cython optimized NS solver on Shaheen II"/>
+    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/figures/strong_scaling_pencil_col.png" width="600" height="400" alt="Strong scaling of Cython optimized NS solver on Shaheen II"/>
 </p>
 The difference between the red triangles and the blue squares are simply the number of mpi processes sent to each node on Shaheen II. The default version (blue squares) are filling up all nodes with 32 processes on each, whereas the red triangles have only four processes for each node. The green dots have been sampled using the default settings.
 
 Results also from the old Shaheen BlueGene/P:
 
 <p align="center">
-    <img src="https://www.dropbox.com/s/pi4f25c0pyluxz0/weak_scaling_shaheen_numpy_noopt.png?dl=1" width="600" height="400" alt="Weak scaling of pure numpy/mpi4py solver on Shaheen BlueGene/P"/>
+    <img src="https://github.com/spectralDNS/spectralutilities/blob/master/figures/weak_scaling_shaheen_numpy_noopt.png" width="600" height="400" alt="Weak scaling of pure numpy/mpi4py solver on Shaheen BlueGene/P"/>
 </p>
 <p align="center">
     Weak scaling of pure numpy/mpi4py solver on Shaheen BlueGene/P. The C++ solver uses slab decomposition and MPI communication is performed by the FFTW library.
 </p>
 
 <p align="center">
-    <img src="https://www.dropbox.com/s/p7uapi7eaqjmham/strong_scaling_shaheen_512.png?dl=1" width="600" height="400" alt="Strong scaling of optimized Python/Cython solver on Shaheen BlueGene/P"/>
+    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/figures/strong_scaling_shaheen_512.png" width="600" height="400" alt="Strong scaling of optimized Python/Cython solver on Shaheen BlueGene/P"/>
 </p>
 <p align="center">
     Strong scaling of optimized Python/Cython solver on Shaheen BlueGene/P. The C++ solver uses slab decomposition and MPI communication is performed by the FFTW library.
 </p>
 
 <p align="center">
-    <img src="https://www.dropbox.com/s/fsk7xolb2yk60re/Re2000_5.gif?dl=1" width="800" height="266" alt="Channel flow"/>
+    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/movies/Re2000_5.gif" width="800" height="266" alt="Channel flow"/>
 </p>
 <p align="center">
     Turbulent channel flow at Re_tau = 2000. Simulations are performed using 512 cores on Shaheen II with the KMM channel flow solver (solvers/KMM.py) using 512x1024x1024 points in real physical space.
 </p>
 
 <p align="center">
-    <img src="https://www.dropbox.com/s/7mwy70gwul79i3i/KHmovie_3.gif?dl=1" width="600" height="400" alt="Kelvin Helmholtz instability"/>
+    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/movies/KHmovie_3.gif" width="600" height="400" alt="Kelvin Helmholtz instability"/>
 </p>
 
 <p align="center">
