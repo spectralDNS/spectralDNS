@@ -16,6 +16,7 @@ requirements:
     - cython
     - numpy
     - pip
+    - pytest-runner
 
   run:
     - python

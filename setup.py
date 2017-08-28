@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import setuptools
 
 import os, sys, platform
 from distutils.core import setup, Extension
@@ -7,6 +8,7 @@ from numpy import get_include
 from Cython.Distutils import build_ext
 from Cython.Build import cythonize
 from Cython.Compiler.Options import get_directive_defaults
+
 
 #directive_defaults = get_directive_defaults()
 #directive_defaults['linetrace'] = True
@@ -27,11 +29,13 @@ cmdclass = {}
 class build_ext_subclass(build_ext):
     def build_extensions(self):
         extra_compile_args = ['-w', '-Ofast']
-        cmd = "echo | %s -E - %s &>/dev/null" % (
+        devnull = open(os.devnull,"w")
+        cmd = "%s -E - %s &>/dev/null" % (
             self.compiler.compiler[0], " ".join(extra_compile_args))
-        try:
-            subprocess.check_call(cmd, shell=True)
-        except:
+        p = subprocess.Popen([self.compiler.compiler[0], '-E', '-'] + extra_compile_args,
+                             stdin=subprocess.PIPE, stdout=devnull, stderr=devnull)
+        out = p.communicate("")
+        if p.returncode != 0:
             extra_compile_args = ['-w', '-O3']
         for e in self.extensions:
             e.extra_compile_args += extra_compile_args
@@ -55,6 +59,15 @@ if not "sdist" in sys.argv:
     ext0 = cythonize(os.path.join(cdir, "*.pyx"))
     [e.include_dirs.extend([get_include()]) for e in ext0]
     ext += ext0
+
+    try:
+        from pythran import PythranExtension
+        ext.append(PythranExtension('spectralDNS.optimization.pythran_maths',
+                                    sources=['spectralDNS/optimization/pythran_maths.py']))
+    except ImportError:
+        print("Disabling Pythran support, package not available")
+        pass
+
     cmdclass = {'build_ext': build_ext_subclass}
 
 else:

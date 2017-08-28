@@ -190,7 +190,7 @@ parser = argparse.ArgumentParser(prog='spectralDNS', add_help=False)
 parser.add_argument('--precision', default='double',
                     choices=('single', 'double'))
 parser.add_argument('--optimization', default='',
-                    choices=('cython', 'weave', 'numba'),
+                    choices=('cython', 'weave', 'numba', 'pythran'),
                     help='Choose implementation method for optimization')
 parser.add_argument('--make_profile', default=0, type=int,
                     help='Enable cProfile profiler')
