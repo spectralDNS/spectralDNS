@@ -161,14 +161,52 @@ def get_convection(H_hat, U_hat, g, K, FST, SB, ST, work, mat, la, **context):
     H_hat = conv(H_hat, U_hat, g, K, FST, SB, ST, work, mat, la)
     return H_hat
 
-#def get_pressure(P_hat, Ni):
-    #"""Solve for pressure if Ni is fst of convection"""
-    #pass
-    ##F_tmp[0] = 0
-    ##LUsolve.Mult_Div_3D(N[0], K[1, 0], K[2, 0], Ni[0, u_slice], Ni[1, u_slice], Ni[2, u_slice], F_tmp[0, p_slice])
-    ##HelmholtzSolverP = Helmholtz(N[0], sqrt(K2[0]), SN.quad, True)
-    ##P_hat = HelmholtzSolverP(P_hat, F_tmp[0])
-    ##return P_hat
+def get_pressure(context, solver):
+    c = context
+    dt = solver.params.dt
+    FST = c.FST
+
+    U = solver.get_velocity(**c)
+    c.U0[0] = FST.backward(c.U_hat0[0], c.U0[0], c.SB)
+    for i in range(1, 3):
+        c.U0[i] = FST.backward(c.U_hat0[i], c.U0[i], c.ST)
+
+    H_hat = solver.get_convection(**c)
+    Hx = zeros(FST.real_shape(), dtype=float)
+    Hx = FST.backward(H_hat[0], Hx, c.ST)
+    Hx -= 1./dt*(c.U[0]-c.U0[0])
+
+    rhs_hat = zeros(FST.complex_shape(), dtype=complex)
+    w0 = zeros(FST.complex_shape(), dtype=complex)
+
+    ATB = inner_product((c.CT, 0), (c.SB, 2))
+    BTB = inner_product((c.CT, 0), (c.SB, 0))
+    rhs_hat = ATB.matvec(c.U_hat[0] + c.U_hat0[0], rhs_hat)
+    rhs_hat -= c.K2*BTB.matvec(c.U_hat[0] + c.U_hat0[0], w0)
+    rhs_hat *= 0.5*context.nu
+
+    rhs_hat += FST.scalar_product(Hx, w0, c.CT)
+
+    CT = inner_product((c.CT, 0), (c.CT, 1))
+
+    # Should implement fast solver. Just a backwards substitution
+    A = CT.diags().toarray()
+    A[-1, 0] = 1
+    a_i = np.linalg.inv(A)
+
+    p_hat = zeros(FST.complex_shape(), dtype=complex)
+
+    for j in range(p_hat.shape[1]):
+        for k in range(p_hat.shape[2]):
+            p_hat[:, j, k] = np.dot(a_i, rhs_hat[:, j, k])
+
+    p = zeros(FST.real_shape(), dtype=float)
+    p = FST.backward(p_hat, p, c.CT)
+
+    uu = np.sum((0.5*(c.U+c.U0))**2, 0)
+    uu *= 0.5
+
+    return p-uu+3./16.
 
 #@profile
 def Cross(c, a, b, S, FST, work):

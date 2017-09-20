@@ -263,12 +263,13 @@ if __name__ == "__main__":
         },  "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)
-    config.channel.add_argument("--plot_step", type=int, default=5)
+    config.channel.add_argument("--plot_step", type=int, default=1)
     config.channel.add_argument("--refinement_test", type=bool, default=False)
     config.channel.add_argument("--eps_refinement_test", type=bool, default=False)
     config.channel.add_argument("--spatial_refinement_test", type=bool, default=False)
     config.channel.add_argument("--eps", type=float, default=1e-7)
-    solver = get_solver(update=update, regression_test=regression_test, mesh="channel")
+    #solver = get_solver(update=update, regression_test=regression_test, mesh="channel")
+    solver = get_solver(update=update, mesh="channel")
 
     if config.params.eps_refinement_test:
         print("eps refinement-test")
@@ -306,3 +307,12 @@ if __name__ == "__main__":
         initialize(solver, context)
         set_Source(**context)
         solve(solver, context)
+        #c = context
+        #plt.figure()
+        #plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], c.U[0,:,:,0], 100)
+        #plt.colorbar()
+        #plt.figure()
+        #plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], c.U[1,:,:,0], 100)
+        #plt.colorbar()
+
+        #plt.show()

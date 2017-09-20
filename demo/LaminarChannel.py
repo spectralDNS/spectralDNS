@@ -16,7 +16,13 @@ def set_Source(Source, Sk, FST, ST, **context):
     Source[:] = 0
     Source[1, :] = -2./config.params.Re
     Sk[:] = 0
-    Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
+    if hasattr(FST, 'complex_shape'):
+        Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
+
+    else:
+        Sk[1] = FST.scalar_product(Source[1], Sk[1])
+        Sk[1] /= (4*pi**2)
+
 
 def exact(x, Re, t, num_terms=400):
     beta = 2./Re
@@ -52,28 +58,35 @@ def update(context):
         U = solver.get_velocity(**context)
 
     if im1 is None and solver.rank == 0 and params.plot_step > 0:
-        plt.figure()
-        im1 = plt.contourf(X[1][:,:,0], X[0][:,:,0], context.U[1,:,:,0], 100)
-        plt.colorbar(im1)
-        plt.draw()
-        plt.pause(1e-6)
+        plt.figure(1)
+        #im1 = plt.contourf(X[1][:,:,0], X[0][:,:,0], context.U[1,:,:,0], 100)
+        #plt.colorbar(im1)
+        #plt.draw()
+        #plt.pause(1e-6)
+        u_exact = exact(X[0][:,0,0], params.Re, params.t)
+        plt.plot(X[0][:,0,0], U[1,:,0,0], 'r', X[0][:,0,0], u_exact, 'b')
 
     if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
-        im1.ax.clear()
-        im1.ax.contourf(X[1][:,:,0], X[0][:,:,0], U[1, :, :, 0], 100)
-        im1.autoscale()
+        #im1.ax.clear()
+        #im1.ax.contourf(X[1][:,:,0], X[0][:,:,0], U[1, :, :, 0], 100)
+        #im1.autoscale()
+        #plt.pause(1e-6)
+        plt.figure(1)
+        u_exact = exact(X[0][:,0,0], params.Re, params.t)
+        plt.plot(X[0][:,0,0], U[1,:,0,0], 'r', X[0][:,0,0], u_exact, 'b')
+        plt.draw()
         plt.pause(1e-6)
 
     if params.tstep % params.compute_energy == 0:
         u0 = U[1, :, 0, 0].copy()
         uall = None
         if solver.rank == 0:
-            uall = zeros((solver.num_processes, params.N[0]/solver.num_processes))
+            uall = zeros((solver.num_processes, params.N[0]//solver.num_processes))
         solver.comm.Gather(u0, uall, root=0)
 
         if solver.rank == 0:
             uall = uall.reshape((params.N[0],))
-            x0 = context.FST.get_mesh_dim(context.ST, 0)
+            x0 = context.X[0][:,0,0]
             #x = x0
             #pc = zeros(len(x))
             #pc = ST.fct(uall, pc)  # Cheb transform of result
@@ -96,7 +109,7 @@ def regression_test(context):
     solver.comm.Gather(u0, uall, root=0)
     if solver.rank == 0:
         uall = uall.reshape((params.N[0],))
-        x0 = context.FST.get_mesh_dim(context.ST, 0)
+        x0 = context.X[0][:,0,0]
         #x = x0
         #pc = zeros(len(x))
         #pc = ST.fct(uall, pc)  # Cheb transform of result

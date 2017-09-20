@@ -31,6 +31,8 @@ def get_context():
     # Primary variable
     u = U_hat
 
+    Source = None
+
     # RHS and work arrays
     dU = empty((2,) + FFT.complex_shape(), dtype=complex)
     work = work_arrays()

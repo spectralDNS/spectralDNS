@@ -6,8 +6,6 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 raise RuntimeError("Needs to be updated to new TensorProductSpaces")
 
 from .spectralinit import *
-from shenfun.chebyshev.matrices import CDNmat, CDDmat, BDNmat, BDDmat, BDTmat, \
-    CNDmat, BNNmat
 from ..shen import LUsolve
 from ..shen.Matrices import HelmholtzCoeff
 from ..shen.la import Helmholtz

@@ -6,7 +6,7 @@ source:
   git_url: ../../
 
 build:
-  number: 25
+  number: 26
 
 requirements:
 

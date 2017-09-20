@@ -8,7 +8,7 @@ import sys, cProfile
 import numpy as np
 # possibly byte-aligned zeros/empty
 from mpiFFT4py import Slab_R2C, Pencil_R2C, Line_R2C, empty, zeros, \
-     work_arrays, datatypes    
+     work_arrays, datatypes
 from spectralDNS import config
 from spectralDNS.utilities import create_profile, MemoryUsage, Timer, reset_profile
 from spectralDNS.h5io import HDF5Writer
@@ -26,19 +26,19 @@ def get_FFT(params):
     if params.decomposition == 'slab':
         assert len(params.N) == 3
         assert len(params.L) == 3
-        FFT = Slab_R2C(params.N, params.L, comm, params.precision, 
-                       communication=params.communication, 
+        FFT = Slab_R2C(params.N, params.L, comm, params.precision,
+                       communication=params.communication,
                        threads=params.threads,
                        planner_effort=params.planner_effort)
-        
+
     elif params.decomposition == 'pencil':
         assert len(params.N) == 3
         assert len(params.L) == 3
-        FFT = Pencil_R2C(params.N, params.L, comm, params.precision, P1=params.Pencil_P1, 
+        FFT = Pencil_R2C(params.N, params.L, comm, params.precision, P1=params.Pencil_P1,
                          communication=params.communication, threads=params.threads,
                          alignment=params.Pencil_alignment,
                          planner_effort=params.planner_effort)
-            
+
     elif params.decomposition == 'line':
         assert len(params.N) == 2
         assert len(params.L) == 2
@@ -66,15 +66,15 @@ def solve_linear(context):
 def conv(*args):
     """Function used to compute convective term"""
     raise NotImplementedError
-    
+
 def set_source(Source, **context):
     """Return the source term"""
     Source[:] = 0
     return Source
 
 def end_of_tstep(context):
-    """Function called at end of time step. 
-    
+    """Function called at end of time step.
+
     If returning True, the while-loop in time breaks free. Used by adaptive solvers
     to modify the time stepsize.
     """

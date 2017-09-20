@@ -388,6 +388,20 @@ IPCSR.set_defaults(print_divergence_progress=False)
 IPCSR.add_argument('--divergence_tol', default=1e-7, type=float,
                    help='Tolerance on divergence error for pressure velocity coupling for IPCS')
 
+IPCSR_mpifft4py = channelsubparsers.add_parser('IPCSR_mpifft4py',
+                                    help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
+IPCSR_mpifft4py.add_argument('--velocity_pressure_iters', default=1, type=int,
+                  help='Number of inner velocity pressure iterations for IPCSR_mpifft4py')
+print_div_parser2 = IPCSR_mpifft4py.add_mutually_exclusive_group(required=False)
+print_div_parser2.add_argument('--no-print_divergence_progress', dest='print_divergence_progress', action='store_false',
+                              help='Do not print the norm of the pressure correction on inner iterations for IPCS')
+print_div_parser2.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true',
+                              help='Print the norm of the pressure correction on inner iterations for IPCS')
+IPCSR_mpifft4py.set_defaults(print_divergence_progress=False)
+IPCSR_mpifft4py.add_argument('--divergence_tol', default=1e-7, type=float,
+                  help='Tolerance on divergence error for pressure velocity coupling for IPCS')
+
+
 def update(new, mesh="triplyperiodic"):
     global fft_plans
     assert isinstance(new, dict)

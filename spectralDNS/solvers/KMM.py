@@ -6,8 +6,6 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from .spectralinit import *
 from shenfun.chebyshev.bases import ShenDirichletBasis, ShenNeumannBasis, \
     ShenBiharmonicBasis
-from shenfun.chebyshev.matrices import BBBmat, SBBmat, ABBmat, BBDmat, CBDmat, CDDmat, \
-    ADDmat, BDDmat, CDBmat
 from shenfun.spectralbase import inner_product
 from shenfun.la import TDMA
 from shenfun import TensorProductSpace, Array, TestFunction, TrialFunction, \

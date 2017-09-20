@@ -135,7 +135,7 @@ class SlabShen_R2C(Slab_R2C):
     def _forward(self, u, fu, fun, dealias=None):
 
         # Intermediate work arrays
-        Uc_hat = self.work_arrays[(self.complex_shape(), self.complex, 0, False)]
+        Uc_hat = self.work_arrays[(self.complex_shape(), self.complex, 0)]
 
         if self.num_processes == 1:
 

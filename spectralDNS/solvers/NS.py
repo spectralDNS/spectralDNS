@@ -32,7 +32,7 @@ def get_context():
     # RHS array
     dU     = empty((3,) + FFT.complex_shape(), dtype=complex)
     curl   = empty((3,) + FFT.real_shape(), dtype=float)
-    Source = None
+    Source = zeros((3,) + FFT.complex_shape(), dtype=complex) # Possible source term initialized to zero
     work = work_arrays()
 
     hdf5file = NSWriter({"U":U[0], "V":U[1], "W":U[2], "P":P},
@@ -205,7 +205,7 @@ def add_pressure_diffusion(rhs, u_hat, nu, K2, K, P_hat, K_over_K2):
 
     return rhs
 
-def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, K2, K_over_K2, **context):
+def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, K2, K_over_K2, Source, **context):
     """Compute right hand side of Navier Stokes
 
     args:
