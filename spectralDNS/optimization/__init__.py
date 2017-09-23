@@ -41,7 +41,7 @@ def optimizer(func):
             return u0
 
     except: # Otherwise revert to default numpy implementation
-        #print(func.__name__ + ' not optimized')
+        print(func.__name__ + ' not optimized')
         @wraps(func)
         def wrapped_function(*args, **kwargs):
             u0 = func(*args, **kwargs)
@@ -66,3 +66,10 @@ try:
 
 except:
     pass
+
+try:
+    from . import pythran_module as pythran_single
+    from . import pythran_module as pythran_double
+except:
+    pass
+
