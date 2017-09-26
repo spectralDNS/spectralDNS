@@ -70,7 +70,7 @@ def Curl(a, c):
     c[1] = ifftn_mpi(1j*(K[2]*a[0]-K[0]*a[2]), c[1])
     c[0] = ifftn_mpi(1j*(K[1]*a[2]-K[2]*a[1]), c[0])
     return c
-@profile
+#@profile
 def ComputeRHS(dU, rk):
     if rk > 0:
         for i in range(3):
