@@ -12,6 +12,9 @@ def get_context():
     X = FFT.get_local_mesh()
     K = FFT.get_local_wavenumbermesh(scaled=True)
     K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+
+    # Set Nyquist frequency to zero on K that is used for odd derivatives
+    K = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((3,) + FFT.complex_shape())
     for i in range(3):
         K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
@@ -120,7 +123,8 @@ def add_pressure_diffusion(rhs, ub_hat, nu, eta, K2, K, P_hat, K_over_K2):
     P_hat = np.sum(rhs[:3]*K_over_K2, 0, out=P_hat)
 
     # Add pressure gradient
-    rhs[:3] -= P_hat*K
+    for i in range(3):
+        rhs[i] -= P_hat*K[i]
 
     # Add contribution from diffusion
     rhs[:3] -= nu*K2*u_hat

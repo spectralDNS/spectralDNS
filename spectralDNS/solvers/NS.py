@@ -16,6 +16,9 @@ def get_context():
     X = FFT.get_local_mesh()
     K = FFT.get_local_wavenumbermesh(scaled=True)
     K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+
+    # Set Nyquist frequency to zero on K that is used for odd derivatives
+    K = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((3,) + FFT.complex_shape())
     for i in range(3):
         K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
@@ -68,6 +71,12 @@ def get_pressure(P, P_hat, FFT, **context):
     """Compute pressure from context"""
     P = FFT.ifftn(1j*P_hat, P)
 
+def set_velocity(U, U_hat, FFT, **context):
+    """Compute transformed velocity from context"""
+    for i in range(3):
+        U_hat[i] = FFT.fftn(U[i], U_hat[i])
+    return U_hat
+
 def forward_transform(a, a_hat, FFT):
     """A common method for transforming forward """
     for i in range(3):
@@ -92,16 +101,16 @@ def end_of_tstep(context):
 
     return False
 
+#@profile
 def compute_curl(c, a, work, FFT, K, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
     curl_hat = work[(a, 0, False)]
-    #from IPython import embed; embed()
     curl_hat = cross2(curl_hat, K, a)
     c[0] = FFT.ifftn(curl_hat[0], c[0], dealias)
     c[1] = FFT.ifftn(curl_hat[1], c[1], dealias)
     c[2] = FFT.ifftn(curl_hat[2], c[2], dealias)
     return c
-#@profile
+
 def Cross(c, a, b, work, FFT, dealias=None):
     """c_k = F_k(a x b)"""
     Uc = work[(a, 2, False)]

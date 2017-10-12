@@ -266,6 +266,7 @@ parser_MHD.add_argument('--eta', default=0.01, type=float, help='MHD parameter')
 parser_Bq = trippelsubparsers.add_parser('Bq', help='Navier Stokes solver with Boussinesq model')
 parser_Bq.add_argument('--Ri', default=0.1, type=float, help='Richardson number')
 parser_Bq.add_argument('--Pr', default=1.0, type=float, help='Prandtl number')
+parser_NS_shenfun = trippelsubparsers.add_parser('NS_shenfun', help='Regular Navier Stokes solver using shenfun backend for transforms')
 
 # Arguments for 2D periodic solvers
 doublyperiodic = argparse.ArgumentParser(parents=[parser])

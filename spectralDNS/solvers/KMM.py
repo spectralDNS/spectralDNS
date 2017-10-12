@@ -37,24 +37,22 @@ def get_context():
     VFS = VectorTensorProductSpace([FSB, FST, FST])
 
     # Padded
+    kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
+          'dealias_direct': params.dealias == '2/3-rule'}
     if params.dealias == '3/2-rule':
+        # Requires new bases due to planning and transforms on different size arrays
         STp = ShenDirichletBasis(params.N[0], quad=params.Dquad)
         SBp = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
         CTp = Basis(params.N[0], quad=params.Dquad)
-        K0p = C2CBasis(params.N[1], padding_factor=1.5, domain=(0, params.L[1]))
-        K1p = R2CBasis(params.N[2], padding_factor=1.5, domain=(0, params.L[2]))
-        FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
-        FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
-        FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
-        VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
-
     else:
-        K0p = C2CBasis(params.N[1], domain=(0, params.L[1]), dealias_direct=params.dealias=='2/3-rule')
-        K1p = R2CBasis(params.N[2], domain=(0, params.L[2]), dealias_direct=params.dealias=='2/3-rule')
-        FSTp = TensorProductSpace(comm, (ST, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Dirichlet
-        FSBp = TensorProductSpace(comm, (SB, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Biharmonic
-        FCTp = TensorProductSpace(comm, (CT, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Regular Chebyshev
-        VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
+        STp, SBp, CTp = ST, SB, CT
+
+    K0p = C2CBasis(params.N[1], domain=(0, params.L[1]), **kw)
+    K1p = R2CBasis(params.N[2], domain=(0, params.L[2]), **kw)
+    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+    VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
     Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
@@ -89,6 +87,10 @@ def get_context():
     Sk = Array(VFS)
 
     K2 = K[1]*K[1]+K[2]*K[2]
+    K4 = K2**2
+
+    # Set Nyquist frequency to zero on K that is used for odd derivatives
+    K = FST.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = np.zeros((2,)+g.shape)
     for i in range(2):
         K_over_K2[i] = K[i+1] / np.where(K2==0, 1, K2)
@@ -96,7 +98,6 @@ def get_context():
     work = work_arrays()
 
     nu, dt, N = params.nu, params.dt, params.N
-    K4 = K2**2
     kx = K[0][:, 0, 0]
 
     alfa = K2[0] - 2.0/nu/dt

@@ -16,6 +16,9 @@ def get_context():
     X = FFT.get_local_mesh()
     K = FFT.get_local_wavenumbermesh(scaled=True)
     K2 = K[0]*K[0] + K[1]*K[1]
+
+    # Set Nyquist frequency to zero on K that is used for odd derivatives
+    K = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((2,) + FFT.complex_shape())
     for i in range(2):
         K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)

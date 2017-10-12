@@ -39,6 +39,11 @@ def get_context():
     K = FST.get_local_wavenumbermesh(scaled=True)
 
     K2 = K[1]*K[1]+K[2]*K[2]
+    K4 = K2**2
+    kx = K[0][:, 0, 0]
+
+    # Set Nyquist frequency to zero on K that is used for odd derivatives
+    K = FST.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((2,) + FST.complex_shape())
     for i in range(2):
         K_over_K2[i] = K[i+1] / np.where(K2==0, 1, K2)
@@ -64,9 +69,6 @@ def get_context():
     Sk = zeros((3,)+FST.complex_shape(), dtype=complex)
 
     work = work_arrays()
-
-    K4 = K2**2
-    kx = K[0][:, 0, 0]
 
     # RK parameters
     a = (8./15., 5./12., 3./4.)

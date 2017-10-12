@@ -1,6 +1,6 @@
 from __future__ import print_function
 from spectralDNS import config, get_solver, solve
-from numpy import array, pi, zeros, sum, float64, sin, cos
+from numpy import array, pi, zeros, sum, float64, sin, cos, prod, asscalar
 from numpy.linalg import norm
 import warnings
 
@@ -11,31 +11,37 @@ except ImportError:
     warnings.warn("matplotlib not installed")
     plt = None
 
-def initialize(solver, **context):
+def initialize(solver, context):
     if 'NS' in config.params.solver:
-        initialize1(solver, **context)
+        initialize1(solver, context)
 
     else:
-        initialize2(solver, **context)
+        initialize2(solver, context)
     config.params.t = 0.0
     config.params.tstep = 0
 
-def initialize1(solver, U, U_hat, X, FFT, **context):
+def initialize1(solver, context):
+    U, X = context.U, context.X
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0
-    for i in range(3):
-        U_hat[i] = FFT.fftn(U[i], U_hat[i])
+    U_hat = solver.set_velocity(**context)
 
-def initialize2(solver, U, W_hat, X, FFT, K, work, **context):
+def initialize2(solver, context):
+    U, X = context.U, context.X
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0
-    F_tmp = work[(W_hat, 0)]
+    U_hat = context.work[(context.W_hat, 0)]
     for i in range(3):
-        F_tmp[i] = FFT.fftn(U[i], F_tmp[i])
+        U_hat[i] = context.FFT.fftn(U[i], U_hat[i])
+    W_hat = solver.cross2(context.W_hat, context.K, U_hat)
 
-    W_hat = solver.cross2(W_hat, K, F_tmp)
+def energy_fourier(comm, a):
+    N = config.params.N
+    result = 2*sum(abs(a[..., 1:-1])**2) + sum(abs(a[..., 0])**2) + sum(abs(a[..., -1])**2)
+    result =  comm.allreduce(result)
+    return result/prod(N)
 
 k = []
 w = []
@@ -68,36 +74,46 @@ def update(context):
                 im1.autoscale()
             plt.pause(1e-6)
 
+    #if params.tstep == 1:
+        #from spectralDNS.utilities import reset_profile
+        #print("Reset profile")
+        #reset_profile(profile)
+
     if params.tstep % params.compute_energy == 0:
         dx, L = params.dx, params.L
         #if 'NS' in params.solver:
-            #ww = comm.reduce(sum(curl*curl)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+            #ww = comm.reduce(sum(curl*curl)/prod(params.N)/2)
 
             #duidxj = work[(((3,3)+FFT.real_shape()), FFT.float, 0)]
             #for i in range(3):
                 #for j in range(3):
                     #duidxj[i,j] = FFT.ifftn(1j*K[j]*U_hat[i], duidxj[i,j])
-            #ww2 = comm.reduce(sum(duidxj*duidxj)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+            #ww2 = comm.reduce(sum(duidxj*duidxj)/prod(params.N)/2)
 
             #ddU = work[(((3,)+FFT.real_shape()), FFT.float, 0)]
             #dU = ComputeRHS(dU, U_hat)
             #for i in range(3):
                 #ddU[i] = FFT.ifftn(dU[i], ddU[i])
-            #ww3 = comm.reduce(sum(ddU*U)*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+            #ww3 = comm.reduce(sum(ddU*U)/prod(params.N)/2)
 
             #if rank == 0:
                 #print ww, params.nu*ww2, ww3, ww-ww2
 
-        ww = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
-        kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
+        ww = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))/prod(params.N)/2)
+        kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))/prod(params.N)/2) # Compute energy with double precision
+        if 'shenfun' in params.solver:
+            ww2 = energy_fourier(solver.comm, c.U_hat)*prod(params.N)/2
+        else:
+            ww2 = energy_fourier(solver.comm, c.U_hat)/prod(params.N)/2
+
         kold[0] = kk
         if solver.rank == 0:
             k.append(kk)
             w.append(ww)
-            print(params.t, float(kk), float(ww))
+            print(params.t, float(kk), float(ww), float(ww2))
     #if params.tstep % params.compute_energy == 1:
         #if 'NS' in params.solver:
-            #kk2 = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
+            #kk2 = comm.reduce(sum(U.astype(float64)*U.astype(float64))/prod(params.N)/2)
             #if rank == 0:
                 #print 0.5*(kk2-kold[0])/params.dt
 
@@ -107,12 +123,12 @@ def regression_test(context):
     dx, L = params.dx, params.L
     U = solver.get_velocity(**context)
     curl = solver.get_curl(**context)
-    w = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
-    k = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2) # Compute energy with double precision
-    config.solver.MemoryUsage('End', context.FFT.comm)
+    w = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))/prod(params.N)/2)
+    k = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))/prod(params.N)/2) # Compute energy with double precision
+    config.solver.MemoryUsage('End', solver.comm)
     if solver.rank == 0:
-        assert round(w - 0.375249930801, params.ntol) == 0
-        assert round(k - 0.124953117517, params.ntol) == 0
+        assert round(asscalar(w) - 0.375249930801, params.ntol) == 0
+        assert round(asscalar(k) - 0.124953117517, params.ntol) == 0
 
 if __name__ == "__main__":
     config.update(
@@ -122,9 +138,8 @@ if __name__ == "__main__":
         'T': 0.1,                   # End time
         'L': [2*pi, 2.*pi, 2*pi],
         'M': [5, 5, 5],
-        #'planner_effort': {'dct': 'FFTW_EXHAUSTIVE'},
+        #'planner_effort': {'fft': 'FFTW_EXHAUSTIVE'},
         #'decomposition': 'pencil',
-        #'Pencil_alignment': 'Y',
         #'P1': 2
         },  "triplyperiodic"
     )
@@ -150,7 +165,9 @@ if __name__ == "__main__":
 
         context.hdf5file.update_components = update_components
 
-    initialize(sol, **context)
+    initialize(sol, context)
     solve(sol, context)
     #context.hdf5file._init_h5file(config.params, **context)
     #context.hdf5file.f.close()
+
+

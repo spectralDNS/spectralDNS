@@ -373,7 +373,7 @@ if __name__ == "__main__":
         'dt': 0.0005,                  # Time step
         'T': 100.,                    # End time
         'L': [2, 2*pi, pi],
-        'M': [6, 7, 6]
+        'M': [6, 6, 6]
         },  "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=10)

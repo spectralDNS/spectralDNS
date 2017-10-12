@@ -1,5 +1,5 @@
 from collections import defaultdict
-from mpiFFT4py import dct, work_arrays, Slab_R2C, fftfreq, rfft2, \
+from mpiFFT4py import dct, work_arrays, Slab_R2C, fftfreq, rfftfreq, rfft2, \
     irfft2, rfft, irfft, fft, ifft
 from mpi4py import MPI
 from numpy import array, zeros, zeros_like, sum, hstack, meshgrid, abs, \
@@ -77,23 +77,31 @@ class SlabShen_R2C(Slab_R2C):
         X = [np.broadcast_to(x, self.real_shape()) for x in X]
         return X
 
-    def get_local_wavenumbermesh(self, scaled=False):
+    def get_local_wavenumbermesh(self, scaled=False, broadcast=False, eliminate_highest_freq=False):
         """Returns (scaled) local decomposed wavenumbermesh
 
         If scaled is True, then the wavenumbermesh is scaled with physical mesh
         size. This takes care of mapping the physical domain to a computational
         cube of size (2pi)**3
+
+        If eliminate_highest_freq is True, then the Nyquist frequency is set to zero.
         """
         kx = arange(self.N[0]).astype(self.float)
-        ky = fftfreq(self.N[1], 1./self.N[1])[int(self.rank*self.Np[1]):int((self.rank+1)*self.Np[1])]
-        kz = fftfreq(self.N[2], 1./self.N[2])[:self.Nf]
-        kz[-1] *= -1.0
+        ky = fftfreq(self.N[1], 1./self.N[1])
+        kz = rfftfreq(self.N[2], 1./self.N[2])
+        if eliminate_highest_freq:
+            for i, k in enumerate((ky, kz)):
+                if self.N[i+1] % 2 == 0:
+                    k[self.N[i+1]//2] = 0
+            ky = ky[int(self.rank*self.Np[1]):int((self.rank+1)*self.Np[1])]
         Ks = meshgrid(kx, ky, kz, indexing='ij', sparse=True)
         if scaled:
             Lp = array([2, 2*pi, 2*pi])/self.L
             for i in range(3):
                 Ks[i] *= Lp[i]
-        K = [np.broadcast_to(k, self.complex_shape()) for k in Ks]
+        K = Ks
+        if broadcast is True:
+            K = [np.broadcast_to(k, self.complex_shape()) for k in Ks]
         return K
 
     def get_dealias_filter(self):
@@ -110,13 +118,12 @@ class SlabShen_R2C(Slab_R2C):
     def copy_from_padded(fp, fu, N, axis=0):
         if axis == 1:
             fu.fill(0)
-            #fu[:, :N[1]//2+1] = fp[:, :N[1]//2+1, :(N[2]//2+1)]
-            #fu[:, N[1]//2:] += fp[:, -N[1]//2:, :(N[2]//2+1)]
-            fu[:, :N[1]//2] = fp[:, :N[1]//2, :(N[2]//2+1)]
-            fu[:, N[1]//2:] = fp[:, -N[1]//2:, :(N[2]//2+1)]
+            fu[:, :N[1]//2+1] = fp[:, :N[1]//2+1, :(N[2]//2+1)]
+            fu[:, N[1]//2:] += fp[:, -N[1]//2:, :(N[2]//2+1)]
 
         elif axis == 2:
-            fu[:] = fp[:, :, :(N[2]//2+1)]
+            fu[:, :, :N[2]//2] = fp[:, :, :N[2]//2]
+            fu[:, :, N[2]//2] = fp[:, :, N[2]//2].real
 
         return fu
 
@@ -129,7 +136,8 @@ class SlabShen_R2C(Slab_R2C):
             fp[:, :N[1]//2] = fu[:, :N[1]//2]
             fp[:, -N[1]//2:] = fu[:, N[1]//2:]
         elif axis == 2:
-            fp[:, :, :(N[2]//2+1)] = fu[:]
+            fp[:, :, :N[2]//2] = fu[:, :, :N[2]//2]
+            fp[:, :, N[2]//2] = fu[:, :, N[2]//2].real
         return fp
 
     def _forward(self, u, fu, fun, dealias=None):

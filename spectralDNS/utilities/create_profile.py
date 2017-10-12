@@ -8,9 +8,10 @@ def create_profile(profiler, comm, MPI, rank):
     profiler.disable()
     ps = pstats.Stats(profiler).sort_stats('cumulative')
     #ps.print_stats(1000)
-    
+    #from IPython import embed; embed()
+
     results = {}
-    for item in ['ifftn', 
+    for item in ['ifftn',
                  'ifft',
                  'irfftn',
                  'irfft2',
@@ -54,7 +55,7 @@ def create_profile(profiler, comm, MPI, rank):
                                  comm.reduce(val[3], op=MPI.MAX, root=0))
                 del ps.stats[key]
                 break
-    
+
     if rank == 0:
         print("Printing profiling for total min/max cumulative min/max:")
         print(" {0:14s}{1:11s}{2:11s}{3:11s}{4:11s}".format('Method', 'total min', 'total max', 'cum min', 'cum max'))

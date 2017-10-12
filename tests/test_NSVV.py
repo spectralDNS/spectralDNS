@@ -46,18 +46,18 @@ def test_solvers(sol):
     solver = get_solver(regression_test=regression_test,
                         parse_args=sol)
     context = solver.get_context()
-    initialize(solver, **context)
+    initialize(solver, context)
     solve(solver, context)
 
     config.params.make_profile = 1
     config.params.dealias = '3/2-rule'
-    initialize(solver, **context)
+    initialize(solver, context)
     solve(solver, context)
 
     config.params.dealias = '2/3-rule'
     config.params.optimization = 'cython'
     reload_module(solver)
-    initialize(solver, **context)
+    initialize(solver, context)
     solve(solver, context)
 
     config.params.write_result = 1
@@ -88,7 +88,7 @@ def test_integrators(sol):
         else:
             config.params.ntol = 7
         config.params.integrator = integrator
-        initialize(solver, **context)
+        initialize(solver, context)
         solve(solver, context)
 
 if __name__ == '__main__':
