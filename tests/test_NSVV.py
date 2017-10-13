@@ -55,13 +55,14 @@ def test_solvers(sol):
     solve(solver, context)
 
     config.params.dealias = '2/3-rule'
-    config.params.optimization = 'cython'
-    reload_module(solver)
-    initialize(solver, context)
-    solve(solver, context)
+    for opt in ('cython', 'numba', 'pythran'):
+        config.params.optimization = opt
+        reload_module(solver)  # To load optimized methods
+        initialize(solver, context)
+        solve(solver, context)
 
-    config.params.write_result = 1
-    config.params.checkpoint = 1
+    config.params.write_result = 2
+    config.params.checkpoint = 2
     config.params.dt = 0.01
     config.params.t = 0.0
     config.params.tstep = 0
@@ -93,4 +94,4 @@ def test_integrators(sol):
 
 if __name__ == '__main__':
     test_solvers(['NS'])
-    test_integrators(['NS'])
+    #test_integrators(['NS'])

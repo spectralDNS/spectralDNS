@@ -101,7 +101,6 @@ def end_of_tstep(context):
 
     return False
 
-#@profile
 def compute_curl(c, a, work, FFT, K, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
     curl_hat = work[(a, 0, False)]
@@ -111,6 +110,7 @@ def compute_curl(c, a, work, FFT, K, dealias=None):
     c[2] = FFT.ifftn(curl_hat[2], c[2], dealias)
     return c
 
+#@profile
 def Cross(c, a, b, work, FFT, dealias=None):
     """c_k = F_k(a x b)"""
     Uc = work[(a, 2, False)]
@@ -214,7 +214,8 @@ def add_pressure_diffusion(rhs, u_hat, nu, K2, K, P_hat, K_over_K2):
 
     return rhs
 
-def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, K2, K_over_K2, Source, **context):
+#@profile
+def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, K2, K_over_K2, **context):
     """Compute right hand side of Navier Stokes
 
     args:
@@ -234,6 +235,5 @@ def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, K2, K_over_K2, Source, *
 
     """
     rhs = solver.conv(rhs, u_hat, work, FFT, K)
-    rhs = solver.add_pressure_diffusion(rhs, u_hat, params.nu, K2, K, P_hat,
-                                        K_over_K2)
+    rhs = solver.add_pressure_diffusion(rhs, u_hat, params.nu, K2, K, P_hat, K_over_K2)
     return rhs
