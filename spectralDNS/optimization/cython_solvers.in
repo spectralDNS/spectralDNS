@@ -41,7 +41,7 @@ def add_pressure_diffusion_NS(du, u_hat, nu, ksq, kk, p_hat, k_over_k2):
     du = add_pressure_diffusion_NS_(du, u_hat, nu, ksq, kk[0][:,0,0], kk[1][0,:,0], kk[2][0,0,:], p_hat, k_over_k2)
     return du
 
-def add_pressure_diffusion_NS_(np.ndarray[complex_t, ndim=4, mode='c'] du,
+cdef add_pressure_diffusion_NS_(np.ndarray[complex_t, ndim=4, mode='c'] du,
                                np.ndarray[complex_t, ndim=4, mode='c'] u_hat,
                                real_t nu,
                                np.ndarray[real_t, ndim=3, mode='c'] ksq,

@@ -1,6 +1,7 @@
-#cython: boundscheck=False
-#cython: wraparound=False
+#cython: boundscheck=False, wraparound=False, nonecheck=False
+cimport cython
 cimport numpy as np
+from libc.string cimport memcpy
 
 {0}
 
@@ -15,35 +16,39 @@ def RK4(np.ndarray[complex_t, ndim=4] U_hat,
         context):
     cdef complex_t z
     cdef unsigned int rk, i, j, k, l
-    for i in xrange(dU.shape[0]):
-        for j in xrange(dU.shape[1]):
-            for k in xrange(dU.shape[2]):
-                for l in xrange(dU.shape[3]):
-                    z = U_hat[i,j,k,l]
-                    U_hat1[i,j,k,l] = z
-                    U_hat0[i,j,k,l] = z
+    cdef complex_t[:,:,:,::1] U_hat_view = U_hat
+    cdef complex_t[:,:,:,::1] U_hat0_view = U_hat0
+    cdef complex_t[:,:,:,::1] U_hat1_view = U_hat1
+    cdef complex_t[:,:,:,::1] dU_view = dU
+    cdef real_t[::1] a_view = a
+    cdef real_t[::1] b_view = b
+    #cdef int N = dU.shape[0]*dU.shape[1]*dU.shape[2]*dU.shape[3]
 
-    for rk in xrange(4):
+    with nogil:
+        #memcpy(&U_hat0_view[0,0,0,0], &U_hat_view[0,0,0,0], N*sizeof(complex_t))
+        #memcpy(&U_hat1_view[0,0,0,0], &U_hat_view[0,0,0,0], N*sizeof(complex_t))
+        U_hat0_view[:] = U_hat_view
+        U_hat1_view[:] = U_hat_view
+
+    for rk in range(4):
         dU = solver.ComputeRHS(dU, U_hat, solver, **context)
-        if rk < 3:
-            for i in xrange(dU.shape[0]):
-                for j in xrange(dU.shape[1]):
-                    for k in xrange(dU.shape[2]):
-                        for l in xrange(dU.shape[3]):
-                            U_hat[i,j,k,l] = U_hat0[i,j,k,l] + b[rk]*dt*dU[i,j,k,l]
+        with nogil:
+            if rk < 3:
+                for i in range(dU.shape[0]):
+                    for j in range(dU.shape[1]):
+                        for k in range(dU.shape[2]):
+                            for l in range(dU.shape[3]):
+                                U_hat_view[i,j,k,l] = U_hat0_view[i,j,k,l] + b_view[rk]*dt*dU_view[i,j,k,l]
+            for i in range(dU.shape[0]):
+                for j in range(dU.shape[1]):
+                    for k in range(dU.shape[2]):
+                        for l in range(dU.shape[3]):
+                            U_hat1_view[i,j,k,l] += a_view[rk]*dt*dU_view[i,j,k,l]
 
-        for i in xrange(dU.shape[0]):
-            for j in xrange(dU.shape[1]):
-                for k in xrange(dU.shape[2]):
-                    for l in xrange(dU.shape[3]):
-                        U_hat1[i,j,k,l] = U_hat1[i,j,k,l] + a[rk]*dt*dU[i,j,k,l]
 
-    for i in xrange(dU.shape[0]):
-        for j in xrange(dU.shape[1]):
-            for k in xrange(dU.shape[2]):
-                for l in xrange(dU.shape[3]):
-                    U_hat[i,j,k,l] = U_hat1[i,j,k,l]
-
+    with nogil:
+        #memcpy(&U_hat_view[0,0,0,0], &U_hat1_view[0,0,0,0], N*sizeof(complex_t))
+        U_hat_view[:] = U_hat1_view
     return U_hat, dt, dt
 
 def ForwardEuler(np.ndarray[complex_t, ndim=4] U_hat,
@@ -55,10 +60,10 @@ def ForwardEuler(np.ndarray[complex_t, ndim=4] U_hat,
     cdef complex_t z
     cdef unsigned int rk, i, j, k, l
     dU = solver.ComputeRHS(dU, U_hat, solver, **context)
-    for i in xrange(dU.shape[0]):
-        for j in xrange(dU.shape[1]):
-            for k in xrange(dU.shape[2]):
-                for l in xrange(dU.shape[3]):
+    for i in range(dU.shape[0]):
+        for j in range(dU.shape[1]):
+            for k in range(dU.shape[2]):
+                for l in range(dU.shape[3]):
                     U_hat[i,j,k,l] = U_hat[i,j,k,l] + dU[i,j,k,l]*dt
     return U_hat, dt, dt
 
@@ -75,23 +80,23 @@ def AB2(np.ndarray[complex_t, ndim=4] U_hat,
     dU = solver.ComputeRHS(dU, U_hat, solver, **context)
 
     if tstep == 0:
-        for i in xrange(dU.shape[0]):
-            for j in xrange(dU.shape[1]):
-                for k in xrange(dU.shape[2]):
-                    for l in xrange(dU.shape[3]):
+        for i in range(dU.shape[0]):
+            for j in range(dU.shape[1]):
+                for k in range(dU.shape[2]):
+                    for l in range(dU.shape[3]):
                         U_hat[i,j,k,l] = U_hat[i,j,k,l] + dU[i,j,k,l]*dt
 
     else:
-        for i in xrange(dU.shape[0]):
-            for j in xrange(dU.shape[1]):
-                for k in xrange(dU.shape[2]):
-                    for l in xrange(dU.shape[3]):
+        for i in range(dU.shape[0]):
+            for j in range(dU.shape[1]):
+                for k in range(dU.shape[2]):
+                    for l in range(dU.shape[3]):
                         U_hat[i,j,k,l] = U_hat[i,j,k,l] + p0*dU[i,j,k,l]*dt - p1*U_hat0[i,j,k,l]
 
-    for i in xrange(dU.shape[0]):
-        for j in xrange(dU.shape[1]):
-            for k in xrange(dU.shape[2]):
-                for l in xrange(dU.shape[3]):
+    for i in range(dU.shape[0]):
+        for j in range(dU.shape[1]):
+            for k in range(dU.shape[2]):
+                for l in range(dU.shape[3]):
                     U_hat0[i,j,k,l] = dU[i,j,k,l]*dt
     return U_hat, dt, dt
 
@@ -106,29 +111,29 @@ def RK4_2D(np.ndarray[complex_t, ndim=3] U_hat,
         context):
     cdef complex_t z
     cdef unsigned int rk, i, j, k
-    for i in xrange(dU.shape[0]):
-        for j in xrange(dU.shape[1]):
-            for k in xrange(dU.shape[2]):
+    for i in range(dU.shape[0]):
+        for j in range(dU.shape[1]):
+            for k in range(dU.shape[2]):
                 z = U_hat[i,j,k]
                 U_hat1[i,j,k] = z
                 U_hat0[i,j,k] = z
 
-    for rk in xrange(4):
+    for rk in range(4):
         dU = solver.ComputeRHS(dU, U_hat, solver,**context)
         if rk < 3:
-            for i in xrange(dU.shape[0]):
-                for j in xrange(dU.shape[1]):
-                    for k in xrange(dU.shape[2]):
+            for i in range(dU.shape[0]):
+                for j in range(dU.shape[1]):
+                    for k in range(dU.shape[2]):
                         U_hat[i,j,k] = U_hat0[i,j,k] + b[rk]*dt*dU[i,j,k]
 
-        for i in xrange(dU.shape[0]):
-            for j in xrange(dU.shape[1]):
-                for k in xrange(dU.shape[2]):
+        for i in range(dU.shape[0]):
+            for j in range(dU.shape[1]):
+                for k in range(dU.shape[2]):
                     U_hat1[i,j,k] = U_hat1[i,j,k] + a[rk]*dt*dU[i,j,k]
 
-    for i in xrange(dU.shape[0]):
-        for j in xrange(dU.shape[1]):
-            for k in xrange(dU.shape[2]):
+    for i in range(dU.shape[0]):
+        for j in range(dU.shape[1]):
+            for k in range(dU.shape[2]):
                 U_hat[i,j,k] = U_hat1[i,j,k]
 
     return U_hat, dt, dt
@@ -142,9 +147,9 @@ def ForwardEuler_2D(np.ndarray[complex_t, ndim=3] U_hat,
     cdef complex_t z
     cdef unsigned int rk, i, j, k
     dU = solver.ComputeRHS(dU, U_hat, solver, **context)
-    for i in xrange(dU.shape[0]):
-        for j in xrange(dU.shape[1]):
-            for k in xrange(dU.shape[2]):
+    for i in range(dU.shape[0]):
+        for j in range(dU.shape[1]):
+            for k in range(dU.shape[2]):
                 U_hat[i,j,k] = U_hat[i,j,k] + dU[i,j,k]*dt
     return U_hat, dt, dt
 
@@ -161,19 +166,19 @@ def AB2_2D(np.ndarray[complex_t, ndim=3] U_hat,
     dU = solver.ComputeRHS(dU, U_hat, solver, **context)
 
     if tstep == 1:
-        for i in xrange(dU.shape[0]):
-            for j in xrange(dU.shape[1]):
-                for k in xrange(dU.shape[2]):
+        for i in range(dU.shape[0]):
+            for j in range(dU.shape[1]):
+                for k in range(dU.shape[2]):
                     U_hat[i,j,k] = U_hat[i,j,k] + dU[i,j,k]*dt
 
     else:
-        for i in xrange(dU.shape[0]):
-            for j in xrange(dU.shape[1]):
-                for k in xrange(dU.shape[2]):
+        for i in range(dU.shape[0]):
+            for j in range(dU.shape[1]):
+                for k in range(dU.shape[2]):
                     U_hat[i,j,k] = U_hat[i,j,k] + p0*dU[i,j,k]*dt - p1*U_hat0[i,j,k]
 
-    for i in xrange(dU.shape[0]):
-        for j in xrange(dU.shape[1]):
-            for k in xrange(dU.shape[2]):
+    for i in range(dU.shape[0]):
+        for j in range(dU.shape[1]):
+            for k in range(dU.shape[2]):
                 U_hat0[i,j,k] = dU[i,j,k]*dt
     return U_hat, dt, dt

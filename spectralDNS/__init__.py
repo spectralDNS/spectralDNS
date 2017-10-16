@@ -58,6 +58,7 @@ def get_solver(update=None,
 
     return solver
 
+
 def solve(solver, context):
     """Generic solver for spectralDNS
 

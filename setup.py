@@ -14,7 +14,8 @@ from Cython.Compiler.Options import get_directive_defaults
 #directive_defaults['linetrace'] = True
 #directive_defaults['binding'] = True
 
-define_macros=[('CYTHON_TRACE', '1')]
+#define_macros=[('CYTHON_TRACE', '1')]
+define_macros=None
 
 # Version number
 major = 1
@@ -52,11 +53,16 @@ if not "sdist" in sys.argv:
     for s in ("LUsolve", "Matvec"):
         ext += cythonize(Extension("spectralDNS.shen.{0}".format(s),
                                    sources=[os.path.join(sdir, '{0}.pyx'.format(s))],
-                                   language="c++"))  # , define_macros=define_macros
+                                   language="c++", define_macros=define_macros))
     [e.extra_link_args.extend(["-std=c++11"]) for e in ext]
 
     [e.include_dirs.extend([get_include()]) for e in ext]
-    ext0 = cythonize(os.path.join(cdir, "*.pyx"))
+    ext0 = []
+    ff = [files for files in os.listdir(cdir) if files.endswith('.pyx')]
+    for s in ff:
+        ext0 += cythonize(Extension("spectralDNS.optimization.{0}".format(s[:-4]),
+                                    sources=[os.path.join(cdir, '{0}'.format(s))],
+                                    language="c++", define_macros=define_macros))
     [e.include_dirs.extend([get_include()]) for e in ext0]
     ext += ext0
 

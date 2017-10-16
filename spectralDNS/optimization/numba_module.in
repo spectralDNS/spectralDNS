@@ -5,9 +5,14 @@ from numba import {0} as float
 from numba import {1} as complex
 
 
-#@jit(Tuple((complex[:,:,:,:], float, float))(complex[:,:,:,:], complex[:,:,:,:], complex[:,:,:,:],
-                      #complex[:,:,:,:], float[:], float[:], float, pyobject, pyobject))
 #def RK4(U_hat, U_hat0, U_hat1, dU, a, b, dt, solver, context):
+    #globals().update(dict(solver=solver, context=context))
+    #a = RK4_(U_hat, U_hat0, U_hat1, dU, a, b, dt)
+    #return a
+
+#@jit(Tuple((complex[:,:,:,:], float, float))(complex[:,:,:,:], complex[:,:,:,:], complex[:,:,:,:],
+                      #complex[:,:,:,:], float[:], float[:], float))
+#def RK4_(U_hat, U_hat0, U_hat1, dU, a, b, dt):
     #for i in range(dU.shape[0]):
         #for j in range(dU.shape[1]):
             #for k in range(dU.shape[2]):
