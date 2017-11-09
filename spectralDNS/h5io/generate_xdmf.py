@@ -1,6 +1,6 @@
 import h5py
 import copy
-from numpy import pi, float32
+from numpy import pi, float32, dtype
 
 xdmffile = """<?xml version="1.0" encoding="utf-8"?>
 <Xdmf xmlns:xi="http://www.w3.org/2001/XInclude" Version="2.1">
@@ -77,16 +77,16 @@ def generate_xdmf(h5filename):
     L = f.attrs["L"]
     if len(f.attrs.get('N')) == 3:
         xf3d = copy.copy(xdmffile)
-        timesteps = list(f["/".join(("3D", comps[0]))].keys())
+        timesteps = []
+        timesteps = f["/".join(("3D", comps[0]))].visit(timesteps.append)
         tt = ""
         for i in timesteps:
             tt += "%s " %i
 
         xf3d += timeattr.format(tt, len(timesteps))
 
-        #from IPython import embed; embed()
-        dtype = f["/".join(("3D", comps[0]))].get(timesteps[0]).dtype
-        prec = 4 if dtype is float32 else 8
+        datatype = f["/".join(("3D", comps[0], timesteps[0]))].dtype
+        prec = 4 if datatype is dtype('float32') else 8
 
         for tstep in timesteps:
             xf3d += """
@@ -123,14 +123,15 @@ def generate_xdmf(h5filename):
     if not any([isinstance(f["/2D/"+x], h5py.Dataset) for x in names]):
         return
 
-    comps = f["/2D"].keys()
-    [comps.remove(x) for x in ('xy', 'xz', 'yz')]
+    comps = list(f["/2D"].keys())
+    [comps.remove(x) for x in ('xy', 'xz', 'yz') if x in comps]
 
     if len(f["/".join(("2D", comps[0]))]) > 0:
         xf2d = copy.copy(xdmffile)
-        timesteps = f["/".join(("2D", comps[0]))].keys()
-        dtype = f["/".join(("2D", comps[0]))].values()[0].dtype
-        prec = 4 if dtype is float32 else 8
+        timesteps = []
+        f["/".join(("2D", comps[0]))].visit(timesteps.append)
+        datatype = f["/".join(("2D", comps[0], timesteps[0]))].dtype
+        prec = 4 if datatype is dtype('float32') else 8
 
         tt = ""
         for i in timesteps:
@@ -164,119 +165,125 @@ def generate_xdmf(h5filename):
         xf2.write(xf2d)
         xf2.close()
 
-    if len(f["/".join(("2D/yz", comps[0]))]) > 0:
-        xf2d = copy.copy(xdmffile)
-        timesteps = f["/".join(("2D/yz", comps[0]))].keys()
-        dtype = f["/".join(("2D/yz", comps[0]))].values()[0].dtype
-        prec = 4 if dtype is float32 else 8
-        tt = ""
-        for i in timesteps:
-            tt += "%s " %i
+    if hasattr(f["2D"], "yz"):
+        if len(f["/".join(("2D/yz", comps[0]))]) > 0:
+            xf2d = copy.copy(xdmffile)
+            timesteps = []
+            f["/".join(("2D/yz", comps[0]))].visit(timesteps.append)
+            datatype = f["/".join(("2D/yz", comps[0], timesteps[0]))].dtype
+            prec = 4 if datatype is dtype('float32') else 8
+            tt = ""
+            for i in timesteps:
+                tt += "%s " %i
 
-        xf2d += timeattr.format(tt, len(timesteps))
+            xf2d += timeattr.format(tt, len(timesteps))
 
-        for tstep in timesteps:
-            xf2d += """
+            for tstep in timesteps:
+                xf2d += """
       <Grid GridType="Uniform">"""
 
-            if "mesh" in f.keys():
-                xf2d += channel2D.format(prec, N[1], N[2], h5filename, 'y', 'z')
-                xf2d += """
+                if "mesh" in f.keys():
+                    xf2d += channel2D.format(prec, N[1], N[2], h5filename, 'y', 'z')
+                    xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DRectMesh"/>""".format(N[1], N[2])
-            else:
-                xf2d += isotropic2D.format(L[1]/N[1], L[2]/N[2])
-                xf2d += """
+                else:
+                    xf2d += isotropic2D.format(L[1]/N[1], L[2]/N[2])
+                    xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DCoRectMesh"/>""".format(N[1], N[2])
 
-            if len(f["/".join(("2D/yz", comps[0]))]) > 0:
-                for comp in f["2D/yz"]:
-                    xf2d += attribute2Dslice.format(comp, N[1], N[2], h5filename, comp, tstep, prec, 'yz')
-            xf2d += """
+                if len(f["/".join(("2D/yz", comps[0]))]) > 0:
+                    for comp in f["2D/yz"]:
+                        xf2d += attribute2Dslice.format(comp, N[1], N[2], h5filename, comp, tstep, prec, 'yz')
+                xf2d += """
       </Grid>
 """
-        xf2d += """
+            xf2d += """
     </Grid>
   </Domain>
 </Xdmf>"""
-        xf2 = open(h5filename[:-3]+"_yz.xdmf", "w")
-        xf2.write(xf2d)
-        xf2.close()
+            xf2 = open(h5filename[:-3]+"_yz.xdmf", "w")
+            xf2.write(xf2d)
+            xf2.close()
 
-    if len(f["/".join(("2D/xz", comps[0]))]) > 0:
-        xf2d = copy.copy(xdmffile)
-        timesteps = f["/".join(("2D/xz", comps[0]))].keys()
-        dtype = f["/".join(("2D/xz", comps[0]))].values()[0].dtype
-        prec = 4 if dtype is float32 else 8
-        tt = ""
-        for i in timesteps:
-            tt += "%s " %i
+    if hasattr(f["2D"], "xz"):
+        if len(f["/".join(("2D/xz", comps[0]))]) > 0:
+            xf2d = copy.copy(xdmffile)
+            timesteps = []
+            f["/".join(("2D/xz", comps[0]))].visit(timesteps.append)
+            datatype = f["/".join(("2D/xz", comps[0], timesteps[0]))].dtype
+            prec = 4 if datatype is dtype('float32') else 8
+            tt = ""
+            for i in timesteps:
+                tt += "%s " %i
 
-        xf2d += timeattr.format(tt, len(timesteps))
+            xf2d += timeattr.format(tt, len(timesteps))
 
-        for tstep in timesteps:
-            xf2d += """
+            for tstep in timesteps:
+                xf2d += """
       <Grid GridType="Uniform">"""
 
-            if "mesh" in f.keys():
-                xf2d += channel2D.format(prec, N[0], N[2], h5filename, 'x', 'z')
-                xf2d += """
+                if "mesh" in f.keys():
+                    xf2d += channel2D.format(prec, N[0], N[2], h5filename, 'x', 'z')
+                    xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DRectMesh"/>""".format(N[0], N[2])
-            else:
-                xf2d += isotropic2D.format(L[0]/N[0], L[2]/N[2])
-                xf2d += """
+                else:
+                    xf2d += isotropic2D.format(L[0]/N[0], L[2]/N[2])
+                    xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DCoRectMesh"/>""".format(N[0], N[2])
 
-            if len(f["/".join(("2D/xz", comps[0]))]) > 0:
-                for comp in f["2D/xz"]:
-                    xf2d += attribute2Dslice.format(comp, N[0], N[2], h5filename, comp, tstep, prec, 'xz')
-            xf2d += """
+                if len(f["/".join(("2D/xz", comps[0]))]) > 0:
+                    for comp in f["2D/xz"]:
+                        xf2d += attribute2Dslice.format(comp, N[0], N[2], h5filename, comp, tstep, prec, 'xz')
+                xf2d += """
       </Grid>
 """
-        xf2d += """
+            xf2d += """
     </Grid>
   </Domain>
 </Xdmf>"""
-        xf2 = open(h5filename[:-3]+"_xz.xdmf", "w")
-        xf2.write(xf2d)
-        xf2.close()
+            xf2 = open(h5filename[:-3]+"_xz.xdmf", "w")
+            xf2.write(xf2d)
+            xf2.close()
 
-    if len(f["/".join(("2D/xy", comps[0]))]) > 0:
-        xf2d = copy.copy(xdmffile)
-        timesteps = f["/".join(("2D/xy", comps[0]))].keys()
-        dtype = f["/".join(("2D/xy", comps[0]))].values()[0].dtype
-        prec = 4 if dtype is float32 else 8
-        tt = ""
-        for i in timesteps:
-            tt += "%s " %i
+    if hasattr(f["2D"], "xz"):
+        if len(f["/".join(("2D/xy", comps[0]))]) > 0:
+            xf2d = copy.copy(xdmffile)
+            timesteps = []
+            f["/".join(("2D/xy", comps[0]))].visit(timesteps.append)
+            datatype = f["/".join(("2D/xy", comps[0], timesteps[0]))].dtype
+            prec = 4 if datatype is dtype('float32') else 8
+            tt = ""
+            for i in timesteps:
+                tt += "%s " %i
 
-        xf2d += timeattr.format(tt, len(timesteps))
+            xf2d += timeattr.format(tt, len(timesteps))
 
-        for tstep in timesteps:
-            xf2d += """
+            for tstep in timesteps:
+                xf2d += """
       <Grid GridType="Uniform">"""
 
-            if "mesh" in f.keys():
-                xf2d += channel2D.format(prec, N[0], N[1], h5filename, 'x', 'y')
-                xf2d += """
+                if "mesh" in f.keys():
+                    xf2d += channel2D.format(prec, N[0], N[1], h5filename, 'x', 'y')
+                    xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DRectMesh"/>""".format(N[0], N[1])
-            else:
-                xf2d += isotropic2D.format(L[0]/N[0], L[1]/N[1])
-                xf2d += """
+                else:
+                    xf2d += isotropic2D.format(L[0]/N[0], L[1]/N[1])
+                    xf2d += """
         <Topology Dimensions="{0} {1}" Type="2DCoRectMesh"/>""".format(N[0], N[1])
 
-            if len(f["/".join(("2D/xy", comps[0]))]) > 0:
-                for comp in f["2D/xy"]:
-                    xf2d += attribute2Dslice.format(comp, N[0], N[1], h5filename, comp, tstep, prec, 'xy')
-            xf2d += """
+                if len(f["/".join(("2D/xy", comps[0]))]) > 0:
+                    for comp in f["2D/xy"]:
+                        xf2d += attribute2Dslice.format(comp, N[0], N[1], h5filename, comp, tstep, prec, 'xy')
+                xf2d += """
       </Grid>
 """
-        xf2d += """
+            xf2d += """
     </Grid>
   </Domain>
 </Xdmf>"""
-        xf2 = open(h5filename[:-3]+"_xy."+"xdmf", "w")
-        xf2.write(xf2d)
-        xf2.close()
+            xf2 = open(h5filename[:-3]+"_xy."+"xdmf", "w")
+            xf2.write(xf2d)
+            xf2.close()
 
 if __name__ == "__main__":
     import sys

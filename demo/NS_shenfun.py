@@ -24,10 +24,10 @@ U = Array(TV, False)
 U_hat = Array(TV)
 P_hat = Array(T)
 U_hat0 = Array(TV)
-U_hat1 = Array(TV) 
+U_hat1 = Array(TV)
 dU = Array(TV)
-curl = Array(TV, False) 
-K = np.array(T.local_wavenumbers(True, True))
+curl = Array(TV, False)
+K = np.array(T.local_wavenumbers(True, True, True))
 K2 = np.sum(K*K, 0, dtype=int)
 K_over_K2 = K.astype(float) / np.where(K2 == 0, 1, K2).astype(float)
 a = [1./6., 1./3., 1./3., 1./6.]
@@ -70,8 +70,8 @@ while t < end_time-1e-8:
     for rk in range(4):
         dU = ComputeRHS(dU, rk)
         if rk < 3: U_hat[:] = U_hat0 + b[rk]*dt*dU
-        U_hat1[:] += a[rk]*dt*dU
-    U_hat[:] = U_hat1[:]
+        U_hat1 += a[rk]*dt*dU
+    U_hat[:] = U_hat1
     U = TV.backward(U_hat, U)
 
 k = comm.reduce(0.5*np.sum(U*U)/np.prod(np.array(N)))

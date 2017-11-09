@@ -7,6 +7,8 @@ from numpy import *
 from numpy.fft import fftfreq, fft, ifft, irfft2, rfft2
 from mpi4py import MPI
 from time import time
+from spectralDNS.utilities import Timer
+
 try:
     from pyfftw.interfaces.numpy_fft import fft, ifft, irfft2, rfft2
     import pyfftw
@@ -15,6 +17,7 @@ try:
 except:
     pass
 
+timer=Timer()
 nu = 0.000625
 T = 0.1
 dt = 0.01
@@ -102,8 +105,11 @@ while t < T-1e-8:
     U_hat[:] = U_hat1[:]
     for i in range(3):
         U[i] = ifftn_mpi(U_hat[i], U[i])
+    timer()
 
 k = comm.reduce(0.5*sum(U*U)*(1./N)**3)
 if rank == 0:
     print("Time = {}".format(time()-t0))
     assert round(k - 0.124953117517, 7) == 0
+
+timer.final(MPI, comm.Get_rank(), True)

@@ -1,6 +1,6 @@
 from numpy import *
-from spectralDNS.shen.shentransform import ShenBiharmonicBasis, ShenDirichletBasis
-from spectralDNS.shen.la import Helmholtz, TDMA, Biharmonic
+from shenfun import chebyshev, TrialFunction, TestFunction, inner, div, grad
+from spectralDNS.shen.la import Helmholtz, Biharmonic
 from scipy.linalg import solve
 
 nu = 1./5200.
@@ -16,9 +16,9 @@ N = array([64, 128, 256])
 Z = array([0, 200, 1800, 5400])
 M = 100
 
-print "\hline"
-print "z & " + " & ".join([str(n) for n in N]) + " \\\ "
-print "\hline"
+print("\hline")
+print("z & " + " & ".join([str(n) for n in N]) + " \\\ ")
+print("\hline")
 for z in Z:
     err = str(z)
     for n in N:
@@ -42,9 +42,9 @@ for z in Z:
         #err += " & {:2.2e} ".format(errb/M)
         err += " & {:2.2e}  & {:2.2e} ".format(errb/M, errs/M)
     err += " \\\ "
-    print err
+    print(err)
 
-print "\hline"
+print("\hline")
 for z in Z:
     err = str(z)
     for n in N:
@@ -52,7 +52,14 @@ for z in Z:
         vh = zeros(n)
         sh = zeros(n)
         alfa = sqrt(z**2+2.0/nu/dt)
-        HS = Helmholtz(n, alfa, "GC")
+        basis = chebyshev.bases.ShenDirichletBasis(n, plan=True, quad='GC')
+        u = TrialFunction(basis)
+        v = TestFunction(basis)
+        A = inner(v, div(grad(u)))
+        A.axis = 0
+        B = inner(v, u)
+        B.axis = 0
+        HS = chebyshev.la.Helmholtz(A, B, array([1.]), array([alfa]))
         for m in range(M):
             u = random.randn(n)
             u[-2:] = 0
@@ -61,6 +68,6 @@ for z in Z:
             errh += max(abs(sh-u)) / max(abs(u))
         err += " & {:2.2e} ".format(errh/M)
     err += " \\\ "
-    print err
+    print(err)
 
 

@@ -41,7 +41,7 @@ def energy_fourier(comm, a):
     N = config.params.N
     result = 2*sum(abs(a[..., 1:-1])**2) + sum(abs(a[..., 0])**2) + sum(abs(a[..., -1])**2)
     result =  comm.allreduce(result)
-    return result/prod(N)
+    return result
 
 k = []
 w = []
@@ -102,9 +102,9 @@ def update(context):
         ww = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))/prod(params.N)/2)
         kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))/prod(params.N)/2) # Compute energy with double precision
         if 'shenfun' in params.solver:
-            ww2 = energy_fourier(solver.comm, c.U_hat)*prod(params.N)/2
+            ww2 = energy_fourier(solver.comm, c.U_hat)/2
         else:
-            ww2 = energy_fourier(solver.comm, c.U_hat)/prod(params.N)/2
+            ww2 = energy_fourier(solver.comm, c.U_hat)/prod(params.N)**2/2
 
         kold[0] = kk
         if solver.rank == 0:

@@ -110,7 +110,6 @@ def compute_curl(c, a, work, FFT, K, dealias=None):
     c[2] = FFT.ifftn(curl_hat[2], c[2], dealias)
     return c
 
-#@profile
 def Cross(c, a, b, work, FFT, dealias=None):
     """c_k = F_k(a x b)"""
     Uc = work[(a, 2, False)]
