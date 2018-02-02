@@ -14,7 +14,7 @@ def get_context():
     K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
 
     # Set Nyquist frequency to zero on K that is used for odd derivatives
-    K = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
+    Kx = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((3,) + FFT.complex_shape())
     for i in range(3):
         K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
@@ -131,7 +131,7 @@ def add_pressure_diffusion(rhs, ub_hat, nu, eta, K2, K, P_hat, K_over_K2):
     rhs[3:] -= eta*K2*b_hat
     return rhs
 
-def ComputeRHS(rhs, ub_hat, solver, work, FFT, K, K2, K_over_K2, P_hat, **context):
+def ComputeRHS(rhs, ub_hat, solver, work, FFT, K, Kx, K2, K_over_K2, P_hat, **context):
     """Return right hand side of Navier Stokes
 
     args:
@@ -146,12 +146,13 @@ def ComputeRHS(rhs, ub_hat, solver, work, FFT, K, K2, K_over_K2, P_hat, **contex
         work        Work arrays
         FFT         Transform class from mpiFFT4py
         K           Scaled wavenumber mesh
+        Kx          Scaled wavenumber mesh with Nyquist eliminated
         K2          sum_i K[i]*K[i]
         K_over_K2   K / K2
         P_hat       Transfomred pressure
 
     """
-    rhs = solver.conv(rhs, ub_hat, work, FFT, K)
+    rhs = solver.conv(rhs, ub_hat, work, FFT, Kx)
     rhs = solver.add_pressure_diffusion(rhs, ub_hat, params.nu, params.eta, K2,
                                         K, P_hat, K_over_K2)
     return rhs
