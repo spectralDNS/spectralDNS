@@ -18,7 +18,7 @@ def get_context():
     K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
 
     # Set Nyquist frequency to zero on K that is used for odd derivatives
-    K = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
+    Kx = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((3,) + FFT.complex_shape())
     for i in range(3):
         K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
@@ -105,6 +105,7 @@ def compute_curl(c, a, work, FFT, K, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
     curl_hat = work[(a, 0, False)]
     curl_hat = cross2(curl_hat, K, a)
+
     c[0] = FFT.ifftn(curl_hat[0], c[0], dealias)
     c[1] = FFT.ifftn(curl_hat[1], c[1], dealias)
     c[2] = FFT.ifftn(curl_hat[2], c[2], dealias)
@@ -191,6 +192,7 @@ def getConvection(convection):
                 u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
 
             curl_dealias = compute_curl(curl_dealias, u_hat, work, FFT, K, params.dealias)
+
             rhs = Cross(rhs, u_dealias, curl_dealias, work, FFT, params.dealias)
             return rhs
 
@@ -214,7 +216,7 @@ def add_pressure_diffusion(rhs, u_hat, nu, K2, K, P_hat, K_over_K2):
     return rhs
 
 #@profile
-def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, K2, K_over_K2, **context):
+def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, Kx, K2, K_over_K2, **context):
     """Compute right hand side of Navier Stokes
 
     args:
@@ -229,10 +231,11 @@ def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, K2, K_over_K2, **context
         FFT         Transform class from mpiFFT4py
         P_hat       Transformed pressure
         K           Scaled wavenumber mesh
+        Kx          Scaled wavenumber mesh with eliminated Nyquist freq
         K2          sum_i K[i]*K[i]
         K_over_K2   K / K2
 
     """
-    rhs = solver.conv(rhs, u_hat, work, FFT, K)
+    rhs = solver.conv(rhs, u_hat, work, FFT, Kx)
     rhs = solver.add_pressure_diffusion(rhs, u_hat, params.nu, K2, K, P_hat, K_over_K2)
     return rhs

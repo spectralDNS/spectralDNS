@@ -101,9 +101,17 @@ def cross1_2D(np.ndarray[real_t, ndim=2] c,
                 c[i,j] = a0*b1 - a1*b0
     return c
 
-def cross2_2D(np.ndarray[complex_t, ndim=2] c,
-              np.ndarray[T, ndim=3] a,
-              np.ndarray[complex_t, ndim=3] b):
+
+def cross2_2D(c, a, b):
+    if isinstance(a, list):
+        c = _cross3_2D(c, a, b)
+    else:
+        c = _cross2_2D(c, a, b)
+    return c
+
+def _cross2_2D(np.ndarray[complex_t, ndim=2] c,
+               np.ndarray[T, ndim=3] a,
+               np.ndarray[complex_t, ndim=3] b):
     cdef unsigned int i, j
     cdef T a0, a1
     cdef complex_t b0, b1
@@ -111,6 +119,27 @@ def cross2_2D(np.ndarray[complex_t, ndim=2] c,
         for j in xrange(a.shape[2]):
             a0 = a[0,i,j]
             a1 = a[1,i,j]
+            b0 = b[0,i,j]
+            b1 = b[1,i,j]
+            c[i,j].real = -(a0*b1.imag - a1*b0.imag)
+            c[i,j].imag = a0*b1.real - a1*b0.real
+    return c
+
+def _cross3_2D(np.ndarray[complex_t, ndim=2] c,
+               list a,
+               np.ndarray[complex_t, ndim=3] b):
+    cdef unsigned int i, j
+    cdef real_t a0, a1
+    cdef complex_t b0, b1
+    cdef np.ndarray[real_t, ndim=2] kx = a[0]
+    cdef np.ndarray[real_t, ndim=2] ky = a[1]
+
+    #c[:] = 1j*(kx*b[1] - ky*b[0])
+
+    for i in xrange(b.shape[1]):
+        for j in xrange(b.shape[2]):
+            a0 = kx[i,j]
+            a1 = ky[i,j]
             b0 = b[0,i,j]
             b1 = b[1,i,j]
             c[i,j].real = -(a0*b1.imag - a1*b0.imag)

@@ -132,14 +132,12 @@ class Params(AttributeDict):
     def __getattr__(self, key):
         # Called if key is missing in __getattribute__
         if key == 'dx':
-            assert ('M' in self) and ('L' in self)
-            val = self['L']/2**self['M']
-            return val
+            return self.L / self.N
 
         elif key == 'N':
-            mval = self['M']
-            val = 2**mval
-            return val
+            assert ('M' in self)
+            mval = self.M
+            return 2**mval
 
         else:
             raise KeyError
@@ -152,13 +150,13 @@ class Params(AttributeDict):
             return dict.__getattribute__(self, key)
 
     def __setattr__(self, key, val):
-        if key in ('M', 'L'):
+        if key in ('N', 'M', 'L'):
             self.__setitem__(key, val)
         else:
             dict.__setattr__(self, key, val)
 
     def __setitem__(self, key, val):
-        if key == 'M':
+        if key in ('M', 'N'):
             val = array([eval(str(f)) for f in val], dtype=int)
             val.flags.writeable = False
             dict.__setitem__(self, key, val)
@@ -241,7 +239,7 @@ triplyperiodic.add_argument('--Pencil_P1', default=2, type=int,
 triplyperiodic.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'),
                             help="Choose 3D decomposition between slab and pencil.")
 triplyperiodic.add_argument('--M', default=[6, 6, 6], metavar=("Mx", "My", "Mz"), nargs=3,
-                            help='Mesh size is pow(2, M[i]) in direction i')
+                            help='Mesh size is pow(2, M[i]) in direction i. Used if N is missing.')
 triplyperiodic.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'),
                             help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
 triplyperiodic.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'),
@@ -282,7 +280,7 @@ doublyperiodic.add_argument('--decomposition', default='line',
                             choices=('line', ),
                             help="For 2D problems line is the only choice.")
 doublyperiodic.add_argument('--M', default=[6, 6], nargs=2, metavar=('Mx', 'My'),
-                            help='Mesh size is pow(2, M[i]) in direction i')
+                            help='Mesh size is pow(2, M[i]) in direction i. Used if N is missing.')
 
 doublesubparsers = doublyperiodic.add_subparsers(dest='solver')
 
@@ -313,7 +311,7 @@ channel.add_argument('--communication', default='Alltoallw', choices=('Alltoallw
 channel.add_argument('--Pencil_alignment', default='X', choices=('X',),
                      help='Alignment of the complex data for pencil decomposition')
 channel.add_argument('--M', default=[6, 6, 6], nargs=3, metavar=('Mx', 'My', 'Mz'),
-                     help='Mesh size is pow(2, M[i]) in direction i')
+                     help='Mesh size is pow(2, M[i]) in direction i. Used if N is missing.')
 channel.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'),
                      help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
 channel.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'),

@@ -76,7 +76,7 @@ def get_context():
     kx = K[0][:, 0, 0]
 
     # Set Nyquist frequency to zero on K that is used for odd derivatives
-    K = FST.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
+    Kx = FST.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = np.zeros((2,)+g.shape)
     for i in range(2):
         K_over_K2[i] = K[i+1] / np.where(K2==0, 1, K2)
@@ -163,7 +163,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
     return rhs
 
 def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
-               H_hat, VFSp, FSTp, FSBp, FCTp, work, K, K2, K4, hv,
+               H_hat, VFSp, FSTp, FSBp, FCTp, work, K, Kx, K2, K4, hv,
                hg, a, b, K_over_K2, la, mat, **context):
 
     """Compute right hand side of Navier Stokes
@@ -180,16 +180,16 @@ def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
     """
 
     # Nonlinear convection term at current u_hat
-    H_hat = solver.conv(H_hat, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la)
+    H_hat = solver.conv(H_hat, u_hat, g_hat, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la)
 
     w0 = work[(H_hat[0], 0, False)]
     w1 = work[(H_hat[0], 1, False)]
     hv[1] = -K2*mat.BBD.matvec(H_hat[0], w0)
     #hv[:] = FST.scalar_product(H[0], hv, SB)
     #hv *= -K2
-    hv[1] -= 1j*K[1]*mat.CBD.matvec(H_hat[1], w0)
-    hv[1] -= 1j*K[2]*mat.CBD.matvec(H_hat[2], w0)
-    hg[1] = 1j*K[1]*mat.BDD.matvec(H_hat[2], w0) - 1j*K[2]*mat.BDD.matvec(H_hat[1], w1)
+    hv[1] -= 1j*Kx[1]*mat.CBD.matvec(H_hat[1], w0)
+    hv[1] -= 1j*Kx[2]*mat.CBD.matvec(H_hat[2], w0)
+    hg[1] = 1j*Kx[1]*mat.BDD.matvec(H_hat[2], w0) - 1j*Kx[2]*mat.BDD.matvec(H_hat[1], w1)
 
     rhs[0] = (hv[1]*a[rk] + hv[0]*b[rk])*params.dt
     rhs[1] = (hg[1]*a[rk] + hg[0]*b[rk])*2./params.nu/(a[rk]+b[rk])

@@ -51,7 +51,7 @@ def get_context():
     K4 = K2**2
 
     # Set Nyquist frequency to zero on K that is used for odd derivatives
-    K = FST.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
+    Kx = FST.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((2,) + FST.complex_shape())
     for i in range(2):
         K_over_K2[i] = K[i+1] / np.where(K2==0, 1, K2)
@@ -210,6 +210,18 @@ def get_pressure(context, solver):
     uu *= 0.5
 
     return p-uu+3./16.
+
+def Div(U, U_hat, FST, K, work, la, mat, ST, **context):
+    Uc_hat = work[(U_hat[0], 0, True)]
+    Uc = work[(U, 2, True)]
+    Uc_hat = mat.CDB.matvec(U_hat[0], Uc_hat)
+    Uc_hat = la.TDMASolverD(Uc_hat)
+    dudx = Uc[0] = FST.backward(Uc_hat, Uc[0], ST)
+    dvdy_h = 1j*K[1]*U_hat[1]
+    dvdy = Uc[1] = FST.backward(dvdy_h, Uc[1], ST)
+    dwdz_h = 1j*K[2]*U_hat[2]
+    dwdz = Uc[2] = FST.backward(dwdz_h, Uc[2], ST)
+    return dudx+dvdy+dwdz
 
 #@profile
 def Cross(c, a, b, S, FST, work):
@@ -421,7 +433,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
     return rhs
 
 def ComputeRHS(rhs, u_hat, g_hat, solver,
-               H_hat, H_hat1, H_hat0, FST, ST, SB, work, K, K2, K4, hv, hg,
+               H_hat, H_hat1, H_hat0, FST, ST, SB, work, K, Kx, K2, K4, hv, hg,
                mat, la, **context):
     """Compute right hand side of Navier Stokes
 
@@ -435,7 +447,7 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
 
     """
     # Nonlinear convection term at current u_hat
-    H_hat = solver.conv(H_hat, u_hat, g_hat, K, FST, SB, ST, work, mat, la)
+    H_hat = solver.conv(H_hat, u_hat, g_hat, Kx, FST, SB, ST, work, mat, la)
 
     # Assemble convection with Adams-Bashforth at time = n+1/2
     H_hat0 = solver.assembleAB(H_hat0, H_hat, H_hat1)
@@ -444,9 +456,9 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
     w0 = work[(hv, 0, False)]
     w1 = work[(hv, 1, False)]
     hv[:] = -K2*mat.BBD.matvec(H_hat0[0], w0)
-    hv -= 1j*K[1]*mat.CBD.matvec(H_hat0[1], w0)
-    hv -= 1j*K[2]*mat.CBD.matvec(H_hat0[2], w0)
-    hg[:] = 1j*K[1]*mat.BDD.matvec(H_hat0[2], w0) - 1j*K[2]*mat.BDD.matvec(H_hat0[1], w1)
+    hv -= 1j*Kx[1]*mat.CBD.matvec(H_hat0[1], w0)
+    hv -= 1j*Kx[2]*mat.CBD.matvec(H_hat0[2], w0)
+    hg[:] = 1j*Kx[1]*mat.BDD.matvec(H_hat0[2], w0) - 1j*Kx[2]*mat.BDD.matvec(H_hat0[1], w1)
 
     rhs[0] = hv*params.dt
     rhs[1] = hg*2./params.nu

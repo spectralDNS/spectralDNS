@@ -28,7 +28,7 @@ def get_context():
     K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
 
     # Set Nyquist frequency to zero on K that is used for odd derivatives
-    K = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
+    Kx = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((3,) + FFT.complex_shape())
     for i in range(3):
         K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
@@ -37,6 +37,7 @@ def get_context():
     U     = empty((3,) + FFT.real_shape(), dtype=float)
     curl  = empty((3,) + FFT.real_shape(), dtype=float)
     W_hat = empty((3,) + FFT.complex_shape(), dtype=complex) # curl transformed
+    U_hat = empty((3,) + FFT.complex_shape(), dtype=complex) # velocity transformed
 
     # Primary variable
     u = W_hat
@@ -119,7 +120,7 @@ def add_linear(rhs, w_hat, nu, K2, Source):
     rhs += Source
     return rhs
 
-def ComputeRHS(rhs, w_hat, solver, work, FFT, K, K2, K_over_K2, Source, **context):
+def ComputeRHS(rhs, w_hat, solver, work, FFT, K, Kx, K2, K_over_K2, Source, **context):
     """Return right hand side of Navier Stokes in velocity-vorticity form
 
     args:
@@ -133,6 +134,7 @@ def ComputeRHS(rhs, w_hat, solver, work, FFT, K, K2, K_over_K2, Source, **contex
         work        Work arrays
         FFT         Transform class from mpiFFT4py
         K           Scaled wavenumber mesh
+        Kx          Scaled wavenumber mesh with zero Nyquist frequency
         K2          K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
         K_over_K2   K / K2
         Source      Scalar source term

@@ -89,8 +89,8 @@ def get_context():
     K2 = K[1]*K[1]+K[2]*K[2]
     K4 = K2**2
 
-    # Set Nyquist frequency to zero on K that is used for odd derivatives
-    K = FST.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
+    # Set Nyquist frequency to zero on K that is used for odd derivatives in nonlinear terms
+    Kx = FST.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = np.zeros((2,)+g.shape)
     for i in range(2):
         K_over_K2[i] = K[i+1] / np.where(K2==0, 1, K2)
@@ -98,7 +98,6 @@ def get_context():
     work = work_arrays()
 
     nu, dt, N = params.nu, params.dt, params.N
-    kx = K[0][:, 0, 0]
 
     alfa = K2[0] - 2.0/nu/dt
     # Collect all matrices
@@ -186,15 +185,15 @@ def set_velocity(U_hat, U, VFS, **context):
     U_hat = VFS.forward(U, U_hat)
     return U_hat
 
-def get_curl(curl, U_hat, g, work, FST, SB, ST, K, **context):
+def get_curl(curl, U_hat, g, work, FST, SB, ST, Kx, **context):
     """Compute curl from context"""
-    curl = compute_curl(curl, U_hat, g, K, FST, SB, ST, work)
+    curl = compute_curl(curl, U_hat, g, Kx, FST, SB, ST, work)
     return curl
 
-def get_convection(H_hat, U_hat, g, K, VFSp, FSTp, FSBp, FCTp,  work, mat, la, **context):
+def get_convection(H_hat, U_hat, g, Kx, VFSp, FSTp, FSBp, FCTp,  work, mat, la, **context):
     """Compute convection from context"""
     conv = getConvection(params.convection)
-    H_hat = conv(H_hat, U_hat, g, K, VFSp, FSTp, FSBp, FCTp, work, mat, la)
+    H_hat = conv(H_hat, U_hat, g, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la)
     return H_hat
 
 def get_pressure(context, solver):
@@ -239,6 +238,17 @@ def get_pressure(context, solver):
 
     return p-uu+3./16.
 
+def Div(U, U_hat, FST, K, work, la, mat, **context):
+    Uc_hat = work[(U_hat[0], 0, True)]
+    Uc = work[(U, 2, True)]
+    Uc_hat = mat.CDB.matvec(U_hat[0], Uc_hat)
+    Uc_hat = la.TDMASolverD(Uc_hat)
+    dudx = Uc[0] = FST.backward(Uc_hat, Uc[0])
+    dvdy_h = 1j*K[1]*U_hat[1]
+    dvdy = Uc[1] = FST.backward(dvdy_h, Uc[1])
+    dwdz_h = 1j*K[2]*U_hat[2]
+    dwdz = Uc[2] = FST.backward(dwdz_h, Uc[2])
+    return dudx+dvdy+dwdz
 
 #@profile
 def Cross(c, a, b, FSTp, work):
@@ -274,7 +284,7 @@ def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, work):
     c[2] += dvdx
     return c
 
-def compute_derivatives(duidxj, u_hat, FST, FCT, FSB, la, mat, work):
+def compute_derivatives(duidxj, u_hat, FST, FCT, FSB, K, la, mat, work):
     duidxj[:] = 0
     F_tmp = work[(u_hat, 0)]
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
@@ -437,8 +447,8 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
 
 #@profile
 def ComputeRHS(rhs, u_hat, g_hat, solver,
-               H_hat, H_hat1, H_hat0, VFSp, FSTp, FSBp, FCTp, work, K, K2, K4, hv, hg,
-               mat, la, **context):
+               H_hat, H_hat1, H_hat0, VFSp, FSTp, FSBp, FCTp, work, K, Kx, K2,
+               K4, hv, hg, mat, la, **context):
     """Compute right hand side of Navier Stokes
 
     args:
@@ -451,7 +461,7 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
 
     """
     # Nonlinear convection term at current u_hat
-    H_hat = solver.conv(H_hat, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la)
+    H_hat = solver.conv(H_hat, u_hat, g_hat, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la)
 
     # Assemble convection with Adams-Bashforth at time = n+1/2
     H_hat0 = solver.assembleAB(H_hat0, H_hat, H_hat1)
@@ -460,9 +470,9 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
     w0 = work[(hv, 0, False)]
     w1 = work[(hv, 1, False)]
     hv[:] = -K2*mat.BBD.matvec(H_hat0[0], w0)
-    hv -= 1j*K[1]*mat.CBD.matvec(H_hat0[1], w0)
-    hv -= 1j*K[2]*mat.CBD.matvec(H_hat0[2], w0)
-    hg[:] = 1j*K[1]*mat.BDD.matvec(H_hat0[2], w0) - 1j*K[2]*mat.BDD.matvec(H_hat0[1], w1)
+    hv -= 1j*Kx[1]*mat.CBD.matvec(H_hat0[1], w0)
+    hv -= 1j*Kx[2]*mat.CBD.matvec(H_hat0[2], w0)
+    hg[:] = 1j*Kx[1]*mat.BDD.matvec(H_hat0[2], w0) - 1j*Kx[2]*mat.BDD.matvec(H_hat0[1], w1)
 
     rhs[0] = hv*params.dt
     rhs[1] = hg*2./params.nu
