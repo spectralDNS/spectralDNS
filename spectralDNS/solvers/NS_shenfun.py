@@ -32,12 +32,10 @@ def get_context():
     K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
 
     # Set Nyquist frequency to zero on K that is, from now on, used for odd derivatives
-    K0 = T.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
+    Kx = T.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = np.zeros((3,)+VT.local_shape())
-    K0_over_K2 = np.zeros((3,)+VT.local_shape())
     for i in range(3):
         K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
-        K0_over_K2[i] = K0[i] / np.where(K2==0, 1, K2)
 
     # Velocity and pressure
     U = Array(VT, False)
@@ -217,8 +215,8 @@ def add_pressure_diffusion(rhs, u_hat, nu, K2, K, P_hat, K_over_K2):
 
     return rhs
 
-def ComputeRHS(rhs, u_hat, solver, work, T, Tp, VT, VTp, P_hat, K, K0, K2,
-               K_over_K2, K0_over_K2, Source, **context):
+def ComputeRHS(rhs, u_hat, solver, work, T, Tp, VT, VTp, P_hat, K, Kx, K2,
+               K_over_K2, Source, **context):
     """Compute right hand side of Navier Stokes
 
     args:
@@ -236,11 +234,12 @@ def ComputeRHS(rhs, u_hat, solver, work, T, Tp, VT, VTp, P_hat, K, K0, K2,
         VTp         VectorTensorProductSpace for padded transforms
         P_hat       Transformed pressure
         K           Scaled wavenumber mesh
+        Kx          Scaled wavenumber mesh with Nyquist eliminated
         K2          sum_i K[i]*K[i]
         K_over_K2   K / K2
 
     """
-    rhs = solver.conv(rhs, u_hat, work, T, Tp, VT, VTp, K0)
+    rhs = solver.conv(rhs, u_hat, work, T, Tp, VT, VTp, Kx)
     rhs = solver.add_pressure_diffusion(rhs, u_hat, params.nu, K2, K, P_hat,
                                         K_over_K2)
     return rhs
