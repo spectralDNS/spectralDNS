@@ -85,6 +85,12 @@ def get_velocity(W_hat, U, work, FFT, K_over_K2, **context):
     U = compute_velocity(U, W_hat, work, FFT, K_over_K2)
     return U
 
+def get_divergence(FFT, K, U_hat, W_hat, **context):
+    div_u = zeros(FFT.real_shape())
+    U_hat = cross2(U_hat, K, W_hat)
+    div_u = FFT.ifftn(1j*(K[0]*U_hat[0]+K[1]*U_hat[1]+K[2]*U_hat[2]), div_u)
+    return div_u
+
 def get_curl(curl, W_hat, FFT, **context):
     """Compute curl from context"""
     for i in range(3):

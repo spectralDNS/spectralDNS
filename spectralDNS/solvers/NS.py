@@ -71,6 +71,11 @@ def get_pressure(P, P_hat, FFT, **context):
     """Compute pressure from context"""
     P = FFT.ifftn(1j*P_hat, P)
 
+def get_divergence(FFT, K, U_hat, **context):
+    div_u = zeros(FFT.real_shape())
+    div_u = FFT.ifftn(1j*(K[0]*U_hat[0]+K[1]*U_hat[1]+K[2]*U_hat[2]), div_u)
+    return div_u
+
 def set_velocity(U, U_hat, FFT, **context):
     """Compute transformed velocity from context"""
     for i in range(3):

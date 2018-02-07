@@ -13,18 +13,58 @@ except ImportError:
     plt = None
 
 def initialize(solver, context):
-    if 'NS' in config.params.solver:
-        initialize1(solver, context)
+    c = context
+    c.mask = np.where(c.K2 <= config.params.Kf2, 1, 0)
+
+    if 'rogallo' in config.params.initialize:
+        initialize_rogallo(solver, context)
 
     else:
-        initialize2(solver, context)
+        initialize1(solver, context)
     config.params.t = 0.0
     config.params.tstep = 0
-
-    c = context
-    #
-    c.mask = np.where(c.K2 <= config.params.Kf2, 1, 0)
     c.target_energy = energy_fourier(solver.comm, c.U_hat)
+
+def initialize_rogallo(solver, context):
+    c = context
+    u0 = np.prod(config.params.N)/np.prod(config.params.L)
+    if 'shenfun' in config.params.solver:
+        u0 /= np.prod(config.params.N)
+
+    np.random.seed(solver.rank)
+    kf = config.params.Kf2
+    k = np.sqrt(c.K2)
+    k = np.where(k==0, 1, k)
+    K2 = c.K2
+    K2 = np.where(K2==0, 1, K2)
+
+    k1, k2, k3 = c.K[0], c.K[1], c.K[2]
+    E0 = np.sqrt(9./11./kf*c.K2/kf**2)*c.mask
+    E1 = np.sqrt(9./11./kf*(k/kf)**(-5./3.))*(1-c.mask)
+    Ek = E0 + E1
+    theta1, theta2, phi = np.random.sample(c.U_hat.shape)*2j*np.pi
+    alpha = np.sqrt(Ek/4./np.pi/K2)*np.exp(1j*theta1)*np.cos(phi)
+    beta = np.sqrt(Ek/4./np.pi/K2)*np.exp(1j*theta2)*np.sin(phi)
+    ksq = np.sqrt(k1**2+k2**2)
+    ksq = np.where(ksq==0, 1, ksq)
+
+    c.U_hat[0] = u0*(alpha*k*k2 + beta*k1*k2)/(k*ksq)
+    c.U_hat[1] = u0*(beta*k2*k3 - alpha*k*k1)/(k*ksq)
+    c.U_hat[2] = u0*beta*ksq/k
+
+    if 'VV' in config.params.solver:
+        c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
+
+    U = solver.get_velocity(**c)
+    U_hat = solver.set_velocity(**c)
+    # project to zero divergence
+    U_hat[:] -= (c.K[0]*U_hat[0]+c.K[1]*U_hat[1]+c.K[2]*U_hat[2])*c.K_over_K2
+    if solver.rank == 0:
+        c.U_hat[:, 0, 0, 0] = 0.0
+
+    if 'VV' in config.params.solver:
+        c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
+
 
 def initialize1(solver, context):
     c = context
@@ -38,48 +78,16 @@ def initialize1(solver, context):
     if solver.rank == 0:
         c.U_hat[:, 0, 0, 0] = 0.0
 
-    # Set Nyquist frequency to zero
-    Nq0 = np.nonzero(-config.params.N[0]//2==c.K[0][:,0,0])[0]
-    Nq1 = np.nonzero(-config.params.N[1]//2==c.K[1][0,:,0])[0]
-    if len(Nq0) == 1:
-        c.U_hat[:, Nq0[0]] = 0
-    if len(Nq1) == 1:
-        c.U_hat[:, :, Nq1[0]] = 0
-    c.U_hat[..., -1] = 0
+    if 'VV' in config.params.solver:
+        c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
 
     U = solver.get_velocity(**c)
     U_hat = solver.set_velocity(**c)
     # project to zero divergence
     U_hat[:] -= (c.K[0]*U_hat[0]+c.K[1]*U_hat[1]+c.K[2]*U_hat[2])*c.K_over_K2
 
-def initialize2(solver, context):
-    c = context
-    u0 = np.prod(config.params.N)/np.prod(config.params.L)
-    if 'shenfun' in config.params.solver:
-        u0 /= np.prod(config.params.N)
-
-    np.random.seed(solver.rank)
-    c.U_hat[:] = np.random.sample(c.U_hat.shape)*2j*np.pi
-    c.U_hat[:] = u0/(2*np.pi)*c.K2*np.exp(-c.K2/config.params.a0**2)*np.exp(c.U_hat)
-    if solver.rank == 0:
-        c.U_hat[:, 0, 0, 0] = 0.0
-
-    # Set Nyquist frequency to zero
-    Nq0 = np.nonzero(-config.params.N[0]//2==c.K[0][:,0,0])[0]
-    Nq1 = np.nonzero(-config.params.N[1]//2==c.K[1][0,:,0])[0]
-    if len(Nq0) == 1:
-        c.U_hat[:, Nq0[0]] = 0
-    if len(Nq1) == 1:
-        c.U_hat[:, :, Nq1[0]] = 0
-    c.U_hat[..., -1] = 0
-    c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
-
-    U = solver.get_velocity(**c)
-    U_hat = solver.set_velocity(**c)
-
-    # project to zero divergence
-    U_hat[:] -= (c.K[0]*U_hat[0]+c.K[1]*U_hat[1]+c.K[2]*U_hat[2])*c.K_over_K2
-    c.W_hat = solver.cross2(c.W_hat, c.K, U_hat)
+    if 'VV' in config.params.solver:
+        c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
 
 def energy_fourier(comm, a):
     N = config.params.N
@@ -113,9 +121,14 @@ def spectrum(solver, context):
     Ek = np.zeros(Nb)
     for i in range(1, Nb):
         ii = np.where(z == i)
-        Ek[i] = np.sum(uiui[ii]) / len(ii[0])
+        if len(ii[0]) > 0:
+            Ek[i] = np.sum(uiui[ii]) / len(ii[0])
 
     Ek = solver.comm.allreduce(Ek)
+
+    E0 = uiui.mean(axis=(1, 2))
+    E1 = uiui.mean(axis=(0, 2))
+    E2 = uiui.mean(axis=(0, 1))
 
     ## Rij
     #for i in range(3):
@@ -144,7 +157,7 @@ def spectrum(solver, context):
         #Rxx[1, i] = (c.U[0] * np.roll(c.U[0], -i, axis=1)).mean()
         #Rxx[2, i] = (c.U[0] * np.roll(c.U[0], -i, axis=2)).mean()
 
-    return Ek, bins
+    return Ek, bins, E0, E1, E2
 
 k = []
 w = []
@@ -174,8 +187,10 @@ def update(context):
 
     alpha2  = (energy_target - energy_upper) /energy_lower
     alpha = np.sqrt(alpha2)
+    if solver.rank == 0:
+        c.U_hat[:, 0, 0, 0] = 0
 
-    c.dU[:] = alpha*c.mask*c.U_hat
+    #c.dU[:] = alpha*c.mask*c.U_hat
     c.U_hat *= (alpha*c.mask + (1-c.mask))
     #c.U_hat[:] -= (c.K[0]*c.U_hat[0]+c.K[1]*c.U_hat[1]+c.K[2]*c.U_hat[2])*c.K_over_K2
 
@@ -194,11 +209,7 @@ def update(context):
     K = c.K
     if plt is not None:
         if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
-            div_u =  c.work[(U[0], 3, True)]
-            if hasattr(c, 'FFT'):
-                div_u = c.FFT.ifftn(1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]), div_u)
-            else:
-                div_u = c.T.backward(1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]), div_u)
+            #div_u = solver.get_divergence(**c)
 
             if im1 is None:
                 plt.figure()
@@ -215,66 +226,59 @@ def update(context):
             plt.pause(1e-6)
 
     if params.tstep % params.compute_spectrum == 0:
-        Ek, bins = spectrum(solver, context)
+        Ek, bins, E0, E1, E2 = spectrum(solver, context)
         context.hdf5file.f = h5py.File(context.hdf5file.fname, driver='mpio', comm=solver.comm)
         context.hdf5file.f['Turbulence/Ek'].create_dataset(str(params.tstep), data=Ek)
         context.hdf5file.f.close()
 
     if params.tstep % params.compute_energy == 0:
         dx, L = params.dx, params.L
-        if 'NS' in params.solver:
-            #ww = solver.comm.reduce(sum(curl*curl)/np.prod(params.N)/2)
+        #ww = solver.comm.reduce(sum(curl*curl)/np.prod(params.N)/2)
 
-            #curl_hat = c.work[(c.U_hat, 2, True)]
-            #curl_hat = solver.cross2(curl_hat, K, c.U_hat)
-            #ww = energy_fourier(solver.comm, params.N, curl_hat)/np.prod(params.N)/2
+        #curl_hat = c.work[(c.U_hat, 2, True)]
+        #curl_hat = solver.cross2(curl_hat, K, c.U_hat)
+        #ww = energy_fourier(solver.comm, params.N, curl_hat)/np.prod(params.N)/2
 
-            duidxj = c.work[(((3,3)+c.U[0].shape), c.float, 0)]
-            for i in range(3):
-                for j in range(3):
-                    if hasattr(c, 'FFT'):
-                        duidxj[i,j] = c.FFT.ifftn(1j*K[j]*c.U_hat[i], duidxj[i,j])
-                    else:
-                        duidxj[i,j] = c.T.backward(1j*K[j]*c.U_hat[i], duidxj[i,j])
-
-            ww2 = solver.comm.reduce(sum(duidxj*duidxj))
-
-            ddU = c.work[(((3,)+c.U[0].shape), c.float, 0)]
-            dU = solver.ComputeRHS(c.dU, c.U_hat, solver, **c)
-            for i in range(3):
-                if hasattr(c, 'FFT'):
-                    ddU[i] = c.FFT.ifftn(dU[i], ddU[i])
+        duidxj = c.work[(((3,3)+c.U[0].shape), c.float, 0)]
+        for i in range(3):
+            for j in range(3):
+                if 'shenfun' in config.params.solver:
+                    duidxj[i,j] = c.T.backward(1j*K[j]*c.U_hat[i], duidxj[i,j])
                 else:
-                    ddU[i] = c.T.backward(dU[i], ddU[i])
+                    duidxj[i,j] = c.FFT.ifftn(1j*K[j]*c.U_hat[i], duidxj[i,j])
 
-            ww3 = solver.comm.reduce(sum(ddU*U))
+        ww2 = solver.comm.reduce(sum(duidxj*duidxj))
 
-            ##if solver.rank == 0:
-                ##print('W ', params.nu*ww, params.nu*ww2, ww3, ww-ww2)
-            curl_hat = solver.cross2(curl_hat, K, c.U_hat)
-            dissipation = energy_fourier(solver.comm, curl_hat)
-            div_u =  c.work[(c.U[0], 3, True)]
-            if hasattr(c, 'FFT'):
-                div_u = c.FFT.ifftn(1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]), div_u)
+        ddU = c.work[(((3,)+c.U[0].shape), c.float, 0)]
+        dU = solver.ComputeRHS(c.dU, c.U_hat, solver, **c)
+        for i in range(3):
+            if 'shenfun' in config.params.solver:
+                ddU[i] = c.T.backward(dU[i], ddU[i])
             else:
-                div_u = c.T.backward(1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]), div_u)
+                ddU[i] = c.FFT.ifftn(dU[i], ddU[i])
 
-            div_u = np.sum(div_u**2)
-            div_u2 = energy_fourier(solver.comm, 1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]))
+        ww3 = solver.comm.reduce(sum(ddU*U))
 
-            kold[0] = energy_new
-            if solver.rank == 0:
-                k.append(energy_new)
-                w.append(dissipation)
-                print(params.t, alpha, energy_new, dissipation*params.nu, ww2*params.nu, ww3, div_u, div_u2)
+        ##if solver.rank == 0:
+            ##print('W ', params.nu*ww, params.nu*ww2, ww3, ww-ww2)
+        curl_hat = solver.cross2(curl_hat, K, c.U_hat)
+        dissipation = energy_fourier(solver.comm, curl_hat)
+        div_u = solver.get_divergence(**c)
+        div_u = np.sum(div_u**2)
+        div_u2 = energy_fourier(solver.comm, 1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]))
 
-        if 'VV' in params.solver:
-            div_u =  c.work[(c.U[0], 3, True)]
-            div_u = c.FFT.ifftn(1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]), div_u)
-            div_u = np.sum(div_u**2)
-            div_u2 = energy_fourier(solver.comm, 1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]))
-            if solver.rank == 0:
-                print(params.t, alpha, energy_new, div_u, div_u2)
+        kold[0] = energy_new
+        if solver.rank == 0:
+            k.append(energy_new)
+            w.append(dissipation)
+            print(params.t, alpha, energy_new, dissipation*params.nu, ww2*params.nu, ww3, div_u, div_u2)
+
+        #if 'VV' in params.solver:
+            #div_u = solver.get_divergence(**c)
+            #div_u = np.sum(div_u**2)
+            #div_u2 = energy_fourier(solver.comm, 1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]))
+            #if solver.rank == 0:
+                #print(params.t, alpha, energy_new, div_u, div_u2)
 
     #if params.tstep % params.compute_energy == 1:
         #if 'NS' in params.solver:
@@ -304,11 +308,12 @@ if __name__ == "__main__":
     config.triplyperiodic.add_argument("--plot_step", type=int, default=1000)
     config.triplyperiodic.add_argument("--Kf2", type=int, default=2)
     config.triplyperiodic.add_argument("--a0", type=float, default=5.5)
+    config.triplyperiodic.add_argument("--initialize", type=str, default='rogallo')
     sol = get_solver(update=update, mesh="triplyperiodic")
 
     context = sol.get_context()
     initialize(sol, context)
-    Ek, bins = spectrum(sol, context)
+    Ek, bins, E0, E1, E2 = spectrum(sol, context)
     context.hdf5file.fname = "NS_isotropic_{}_{}_{}.h5".format(*config.params.M)
     context.hdf5file.f = h5py.File(context.hdf5file.fname, driver='mpio', comm=sol.comm)
     context.hdf5file._init_h5file(config.params, sol)
