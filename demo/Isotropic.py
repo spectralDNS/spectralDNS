@@ -173,10 +173,10 @@ def update(context):
     solver = config.solver
     curl_hat = c.work[(c.U_hat, 2, True)]
 
-    if energy_target is None:
-        energy_target = energy_fourier(solver.comm, c.U_hat)
-    else:
-        energy_target = energy_new
+    #if energy_target is None:
+        #energy_target = energy_fourier(solver.comm, c.U_hat)
+    #else:
+        #energy_target = energy_new
 
     if params.solver == 'VV':
         c.U_hat = solver.cross2(c.U_hat, c.K_over_K2, c.W_hat)
@@ -185,7 +185,7 @@ def update(context):
     energy_lower = energy_fourier(solver.comm, c.U_hat*c.mask)
     energy_upper = energy_new - energy_lower
 
-    alpha2  = (energy_target - energy_upper) /energy_lower
+    alpha2  = (c.target_energy - energy_upper) /energy_lower
     alpha = np.sqrt(alpha2)
     if solver.rank == 0:
         c.U_hat[:, 0, 0, 0] = 0
@@ -271,20 +271,33 @@ def update(context):
         if solver.rank == 0:
             k.append(energy_new)
             w.append(dissipation)
-            print(params.t, alpha, energy_new, dissipation*params.nu, ww2*params.nu, ww3, div_u, div_u2)
-
-        #if 'VV' in params.solver:
-            #div_u = solver.get_divergence(**c)
-            #div_u = np.sum(div_u**2)
-            #div_u2 = energy_fourier(solver.comm, 1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]))
-            #if solver.rank == 0:
-                #print(params.t, alpha, energy_new, div_u, div_u2)
+            print(params.t, alpha,  energy_new, dissipation*params.nu, ww2*params.nu, ww3, div_u, div_u2)
 
     #if params.tstep % params.compute_energy == 1:
         #if 'NS' in params.solver:
             #kk2 = comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]*dx[2]/L[0]/L[1]/L[2]/2)
             #if rank == 0:
                 #print 0.5*(kk2-kold[0])/params.dt
+
+def init_from_file(filename, solver, context):
+    f = h5py.File(filename, driver="mpio", comm=solver.comm)
+    assert "1" in f["3D/checkpoint/U"]
+    U = context.U
+    N = U.shape[1]
+    s = context.T.local_slice(spectral=False)
+
+    U[:] = f["3D/checkpoint/U/1"][:, s[0], s[1], s[2]]
+    U_hat = solver.set_velocity(**context)
+    U_hat[:] -= (context.K[0]*U_hat[0]+context.K[1]*U_hat[1]+context.K[2]*U_hat[2])*context.K_over_K2
+    if solver.rank == 0:
+        U_hat[:, 0, 0, 0] = 0.0
+
+    if 'VV' in config.params.solver:
+        context.W_hat = solver.cross2(ccontext.W_hat, context.K, context.U_hat)
+
+    context.target_energy = energy_fourier(solver.comm, U_hat)
+
+    f.close()
 
 
 if __name__ == "__main__":
@@ -313,6 +326,8 @@ if __name__ == "__main__":
 
     context = sol.get_context()
     initialize(sol, context)
+    init_from_file("NS_isotropic_{}_{}_{}.h5".format(*config.params.M), sol, context)
+
     Ek, bins, E0, E1, E2 = spectrum(sol, context)
     context.hdf5file.fname = "NS_isotropic_{}_{}_{}.h5".format(*config.params.M)
     context.hdf5file.f = h5py.File(context.hdf5file.fname, driver='mpio', comm=sol.comm)
@@ -323,6 +338,3 @@ if __name__ == "__main__":
     context.hdf5file.f["Turbulence"].create_dataset("bins", data=bins)
     context.hdf5file.f.close()
     solve(sol, context)
-
-    #context.hdf5file._init_h5file(config.params, **context)
-    #context.hdf5file.f.close()
