@@ -29,7 +29,7 @@ def initialize_rogallo(solver, context):
     c = context
     u0 = np.prod(config.params.N)/np.prod(config.params.L)
     if 'shenfun' in config.params.solver:
-        u0 /= np.prod(config.params.N)
+        u0 = 1./np.prod(config.params.L)
 
     np.random.seed(solver.rank)
     kf = config.params.Kf2
@@ -48,9 +48,9 @@ def initialize_rogallo(solver, context):
     ksq = np.sqrt(k1**2+k2**2)
     ksq = np.where(ksq==0, 1, ksq)
 
-    c.U_hat[0] = u0*(alpha*k*k2 + beta*k1*k2)/(k*ksq)
-    c.U_hat[1] = u0*(beta*k2*k3 - alpha*k*k1)/(k*ksq)
-    c.U_hat[2] = u0*beta*ksq/k
+    c.U_hat[0] = (alpha*k*k2 + beta*k1*k3)/(k*ksq)
+    c.U_hat[1] = (beta*k2*k3 - alpha*k*k1)/(k*ksq)
+    c.U_hat[2] = beta*ksq/k
 
     if 'VV' in config.params.solver:
         c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
@@ -61,6 +61,13 @@ def initialize_rogallo(solver, context):
     U_hat[:] -= (c.K[0]*U_hat[0]+c.K[1]*U_hat[1]+c.K[2]*U_hat[2])*c.K_over_K2
     if solver.rank == 0:
         c.U_hat[:, 0, 0, 0] = 0.0
+
+    # Scale to get correct kinetic energy
+    energy = 0.5*energy_fourier(solver.comm, c.U_hat)/np.prod(config.params.N)
+    target = config.params.Re_lam*(config.params.nu*config.params.kd)**2/np.sqrt(20./3.)
+    print(energy, target)
+    c.U_hat *= np.sqrt(target/energy)
+    print(0.5*energy_fourier(solver.comm, c.U_hat)/np.prod(config.params.N))
 
     if 'VV' in config.params.solver:
         c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
@@ -105,9 +112,9 @@ def spectrum(solver, context):
     uiui[..., 0] = np.sum((c.U_hat[..., 0]*np.conj(c.U_hat[..., 0])).real, axis=0)
     uiui[..., -1] = np.sum((c.U_hat[..., -1]*np.conj(c.U_hat[..., -1])).real, axis=0)
     if 'shenfun' in config.params.solver:
-        uiui *= (2*np.pi*c.K2*np.prod(config.params.N))
+        uiui *= (2*np.pi*c.K2)
     else:
-        uiui *= (2*np.pi*c.K2/np.prod(config.params.N))
+        uiui *= (2*np.pi*c.K2/np.prod(config.params.N)**2)
 
     # Create bins for Ek
     Nb = int(np.sqrt(sum((config.params.N/2)**2)))
@@ -173,6 +180,9 @@ def update(context):
     solver = config.solver
     curl_hat = c.work[(c.U_hat, 2, True)]
 
+    if solver.rank == 0:
+        c.U_hat[:, 0, 0, 0] = 0
+
     #if energy_target is None:
         #energy_target = energy_fourier(solver.comm, c.U_hat)
     #else:
@@ -187,14 +197,19 @@ def update(context):
 
     alpha2  = (c.target_energy - energy_upper) /energy_lower
     alpha = np.sqrt(alpha2)
-    if solver.rank == 0:
-        c.U_hat[:, 0, 0, 0] = 0
+
+    #du = c.U_hat*c.mask*(alpha)
+    #dus = energy_fourier(solver.comm, du*c.U_hat)
+
+    energy_old = energy_new
 
     #c.dU[:] = alpha*c.mask*c.U_hat
     c.U_hat *= (alpha*c.mask + (1-c.mask))
     #c.U_hat[:] -= (c.K[0]*c.U_hat[0]+c.K[1]*c.U_hat[1]+c.K[2]*c.U_hat[2])*c.K_over_K2
 
     energy_new = energy_fourier(solver.comm, c.U_hat)
+
+    assert np.sqrt((energy_new-c.target_energy)**2) < 1e-7
 
     if params.solver == 'VV':
         c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
@@ -267,11 +282,17 @@ def update(context):
         div_u = np.sum(div_u**2)
         div_u2 = energy_fourier(solver.comm, 1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]))
 
+        kk = 0.5*energy_new/np.prod(params.N)
+        eps = dissipation*params.nu/np.prod(params.N)
+        Re_lam = np.sqrt(20*kk**2/(3*params.nu*eps))
+        Re_lam2 = kk*np.sqrt(20./3.)/(params.nu*params.kd)**2
+
         kold[0] = energy_new
+        factor = 1./np.prod(params.N)
         if solver.rank == 0:
             k.append(energy_new)
             w.append(dissipation)
-            print(params.t, alpha,  energy_new, dissipation*params.nu, ww2*params.nu, ww3, div_u, div_u2)
+            print(params.t, alpha,  kk, dissipation*params.nu*factor, ww3, div_u, (energy_new-energy_old)/2/params.dt*factor, Re_lam, Re_lam2)
 
     #if params.tstep % params.compute_energy == 1:
         #if 'NS' in params.solver:
@@ -304,8 +325,8 @@ if __name__ == "__main__":
     import h5py
     config.update(
         {
-        'nu': 0.005,             # Viscosity
-        'dt': 0.005,                 # Time step
+        'nu': 0.005428,              # Viscosity (not used, see below)
+        'dt': 0.002,                 # Time step
         'T': 0.05,                   # End time
         'L': [2.*pi, 2.*pi, 2.*pi],
         'M': [7, 7, 7],
@@ -319,14 +340,17 @@ if __name__ == "__main__":
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=10)
     config.triplyperiodic.add_argument("--compute_spectrum", type=int, default=10)
     config.triplyperiodic.add_argument("--plot_step", type=int, default=1000)
-    config.triplyperiodic.add_argument("--Kf2", type=int, default=2)
+    config.triplyperiodic.add_argument("--Kf2", type=int, default=3)
     config.triplyperiodic.add_argument("--a0", type=float, default=5.5)
+    config.triplyperiodic.add_argument("--kd", type=float, default=50.)
+    config.triplyperiodic.add_argument("--Re_lam", type=float, default=84.)
     config.triplyperiodic.add_argument("--initialize", type=str, default='rogallo')
     sol = get_solver(update=update, mesh="triplyperiodic")
+    config.params.nu = (1./config.params.kd**(4./3.))
 
     context = sol.get_context()
     initialize(sol, context)
-    init_from_file("NS_isotropic_{}_{}_{}.h5".format(*config.params.M), sol, context)
+    #init_from_file("NS_isotropic_{}_{}_{}.h5".format(*config.params.M), sol, context)
 
     Ek, bins, E0, E1, E2 = spectrum(sol, context)
     context.hdf5file.fname = "NS_isotropic_{}_{}_{}.h5".format(*config.params.M)
