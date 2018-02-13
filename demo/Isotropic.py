@@ -5,6 +5,20 @@ from numpy import array, pi, zeros, sum, float64, sin, cos
 from numpy.linalg import norm
 import warnings
 
+"""
+Homogeneous turbulence. See [1] for initialization and [2] for a section
+on forcing the lowest wavenumbers to maintain a constant turbulent
+kinetic energy.
+
+[1] R. S. Rogallo, “Numerical experiments in homogeneous turbulence,”
+NASA TM 81315 (1981)
+
+[2] A. G. Lamorgese and D. A. Caughey and S. B. Pope, "Direct numerical simulation
+of homogeneous turbulence with hyperviscosity", Physics of Fluids, 17, 1, 015106,
+2005, (https://doi.org/10.1063/1.1833415)
+
+"""
+
 try:
     import matplotlib.pyplot as plt
 
@@ -27,27 +41,23 @@ def initialize(solver, context):
 
 def initialize_rogallo(solver, context):
     c = context
-    u0 = np.prod(config.params.N)/np.prod(config.params.L)
-    if 'shenfun' in config.params.solver:
-        u0 = 1./np.prod(config.params.L)
-
     np.random.seed(solver.rank)
     kf = config.params.Kf2
     k = np.sqrt(c.K2)
     k = np.where(k==0, 1, k)
     K2 = c.K2
     K2 = np.where(K2==0, 1, K2)
-
     k1, k2, k3 = c.K[0], c.K[1], c.K[2]
-    E0 = np.sqrt(9./11./kf*c.K2/kf**2)*c.mask
-    E1 = np.sqrt(9./11./kf*(k/kf)**(-5./3.))*(1-c.mask)
-    Ek = E0 + E1
-    theta1, theta2, phi = np.random.sample(c.U_hat.shape)*2j*np.pi
-    alpha = np.sqrt(Ek/4./np.pi/K2)*np.exp(1j*theta1)*np.cos(phi)
-    beta = np.sqrt(Ek/4./np.pi/K2)*np.exp(1j*theta2)*np.sin(phi)
     ksq = np.sqrt(k1**2+k2**2)
     ksq = np.where(ksq==0, 1, ksq)
 
+    E0 = np.sqrt(9./11./kf*c.K2/kf**2)*c.mask
+    E1 = np.sqrt(9./11./kf*(k/kf)**(-5./3.))*(1-c.mask)
+    Ek = E0 + E1
+    # theta1, theta2, phi, alpha and beta from [1]
+    theta1, theta2, phi = np.random.sample(c.U_hat.shape)*2j*np.pi
+    alpha = np.sqrt(Ek/4./np.pi/K2)*np.exp(1j*theta1)*np.cos(phi)
+    beta = np.sqrt(Ek/4./np.pi/K2)*np.exp(1j*theta2)*np.sin(phi)
     c.U_hat[0] = (alpha*k*k2 + beta*k1*k3)/(k*ksq)
     c.U_hat[1] = (beta*k2*k3 - alpha*k*k1)/(k*ksq)
     c.U_hat[2] = beta*ksq/k
@@ -62,12 +72,10 @@ def initialize_rogallo(solver, context):
     if solver.rank == 0:
         c.U_hat[:, 0, 0, 0] = 0.0
 
-    # Scale to get correct kinetic energy
-    energy = 0.5*energy_fourier(solver.comm, c.U_hat)/np.prod(config.params.N)
+    # Scale to get correct kinetic energy. Target from [2]
+    energy = 0.5*energy_fourier(solver.comm, c.U_hat)/np.prod(config.params.L)
     target = config.params.Re_lam*(config.params.nu*config.params.kd)**2/np.sqrt(20./3.)
-    print(energy, target)
     c.U_hat *= np.sqrt(target/energy)
-    print(0.5*energy_fourier(solver.comm, c.U_hat)/np.prod(config.params.N))
 
     if 'VV' in config.params.solver:
         c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
@@ -96,14 +104,45 @@ def initialize1(solver, context):
     if 'VV' in config.params.solver:
         c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
 
-def energy_fourier(comm, a):
+def energy_fourier(comm, u_hat):
+    """Using Parceval's identity to compute the L2-norm of u
+
+    Computing \int abs(u)**2 dx as N*\sum abs(u_hat)**2
+
+    See https://en.wikipedia.org/wiki/Parseval's_theorem
+
+    The different scaling of Shenfun and mpiFFT4py based
+    solvers is due to the definition used for the DFT. For
+    Shenfun
+
+        u(x) = \sum_k u_hat(k) exp(1j k x)
+
+    whereas for mpiFFT4py
+
+        u(x) = 1/N \sum_k u_hat(k) exp(1j k x)
+
+    """
     N = config.params.N
-    result = 2*np.sum(np.abs(a[..., 1:-1])**2) + np.sum(np.abs(a[..., 0])**2) + np.sum(np.abs(a[..., -1])**2)
+    L = config.params.L
+    result = (2*np.sum(np.abs(u_hat[..., 1:-1])**2)
+              + np.sum(np.abs(u_hat[..., 0])**2)
+              + np.sum(np.abs(u_hat[..., -1])**2))
     result =  comm.allreduce(result)
     if 'shenfun' in config.params.solver:
-        return result*np.prod(N)
+        return result*np.prod(L)
     else:
-        return result/np.prod(N)
+        return result*np.prod(L)/np.prod(N)**2
+
+def L2_norm(comm, u):
+    """Compute the L2-norm of real array a
+
+    Computing \int abs(u)**2 dx
+
+    """
+    N = config.params.N
+    L = config.params.L
+    result = comm.reduce(sum(u**2))
+    return result*np.prod(L)/np.prod(N)
 
 def spectrum(solver, context):
     c = context
@@ -168,13 +207,11 @@ def spectrum(solver, context):
 
 k = []
 w = []
-im1 = None
 kold = zeros(1)
-
-energy_target = None
+im1 = None
 energy_new = None
 def update(context):
-    global k, w, im1, energy_target, energy_new
+    global k, w, im1, energy_new
     c = context
     params = config.params
     solver = config.solver
@@ -182,11 +219,6 @@ def update(context):
 
     if solver.rank == 0:
         c.U_hat[:, 0, 0, 0] = 0
-
-    #if energy_target is None:
-        #energy_target = energy_fourier(solver.comm, c.U_hat)
-    #else:
-        #energy_target = energy_new
 
     if params.solver == 'VV':
         c.U_hat = solver.cross2(c.U_hat, c.K_over_K2, c.W_hat)
@@ -226,13 +258,12 @@ def update(context):
         if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
             #div_u = solver.get_divergence(**c)
 
-            if im1 is None:
-                plt.figure()
+            if not plt.fignum_exists(1):
+                plt.figure(1)
                 #im1 = plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], div_u[:,:,10], 100)
                 im1 = plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], c.U[0,:,:,10], 100)
                 plt.colorbar(im1)
                 plt.draw()
-                globals().update(im1=im1)
             else:
                 im1.ax.clear()
                 #im1.ax.contourf(c.X[1][:,:,0], c.X[0][:,:,0], div_u[:,:,10], 100)
@@ -262,7 +293,8 @@ def update(context):
                 else:
                     duidxj[i,j] = c.FFT.ifftn(1j*K[j]*c.U_hat[i], duidxj[i,j])
 
-        ww2 = solver.comm.reduce(sum(duidxj*duidxj))
+        ww2 = L2_norm(solver.comm, duidxj)*params.nu/np.prod(params.L)
+        #ww2 = solver.comm.reduce(sum(duidxj*duidxj))
 
         ddU = c.work[(((3,)+c.U[0].shape), c.float, 0)]
         dU = solver.ComputeRHS(c.dU, c.U_hat, solver, **c)
@@ -272,27 +304,27 @@ def update(context):
             else:
                 ddU[i] = c.FFT.ifftn(dU[i], ddU[i])
 
-        ww3 = solver.comm.reduce(sum(ddU*U))
+        ww3 = solver.comm.reduce(sum(ddU*U))/np.prod(params.N)
 
         ##if solver.rank == 0:
             ##print('W ', params.nu*ww, params.nu*ww2, ww3, ww-ww2)
         curl_hat = solver.cross2(curl_hat, K, c.U_hat)
         dissipation = energy_fourier(solver.comm, curl_hat)
         div_u = solver.get_divergence(**c)
-        div_u = np.sum(div_u**2)
+        div_u = L2_norm(solver.comm, div_u)
         div_u2 = energy_fourier(solver.comm, 1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]))
 
-        kk = 0.5*energy_new/np.prod(params.N)
-        eps = dissipation*params.nu/np.prod(params.N)
+        kk = 0.5*energy_new/np.prod(params.L)
+        eps = dissipation*params.nu/np.prod(params.L)
         Re_lam = np.sqrt(20*kk**2/(3*params.nu*eps))
         Re_lam2 = kk*np.sqrt(20./3.)/(params.nu*params.kd)**2
 
         kold[0] = energy_new
-        factor = 1./np.prod(params.N)
+        vol = 1./np.prod(params.L)
         if solver.rank == 0:
             k.append(energy_new)
             w.append(dissipation)
-            print(params.t, alpha,  kk, dissipation*params.nu*factor, ww3, div_u, (energy_new-energy_old)/2/params.dt*factor, Re_lam, Re_lam2)
+            print(params.t, alpha,  kk, eps, ww2, ww3, (energy_new-energy_old)/2/params.dt*vol, div_u, Re_lam, Re_lam2)
 
     #if params.tstep % params.compute_energy == 1:
         #if 'NS' in params.solver:
@@ -338,7 +370,7 @@ if __name__ == "__main__":
         },  "triplyperiodic"
     )
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=10)
-    config.triplyperiodic.add_argument("--compute_spectrum", type=int, default=10)
+    config.triplyperiodic.add_argument("--compute_spectrum", type=int, default=1000)
     config.triplyperiodic.add_argument("--plot_step", type=int, default=1000)
     config.triplyperiodic.add_argument("--Kf2", type=int, default=3)
     config.triplyperiodic.add_argument("--a0", type=float, default=5.5)
