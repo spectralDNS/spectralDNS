@@ -10,7 +10,7 @@ Homogeneous turbulence. See [1] for initialization and [2] for a section
 on forcing the lowest wavenumbers to maintain a constant turbulent
 kinetic energy.
 
-[1] R. S. Rogallo, “Numerical experiments in homogeneous turbulence,”
+[1] R. S. Rogallo, "Numerical experiments in homogeneous turbulence,"
 NASA TM 81315 (1981)
 
 [2] A. G. Lamorgese and D. A. Caughey and S. B. Pope, "Direct numerical simulation
@@ -67,8 +67,9 @@ def initialize_rogallo(solver, context):
 
     U = solver.get_velocity(**c)
     U_hat = solver.set_velocity(**c)
+    K = c.K
     # project to zero divergence
-    U_hat[:] -= (c.K[0]*U_hat[0]+c.K[1]*U_hat[1]+c.K[2]*U_hat[2])*c.K_over_K2
+    U_hat[:] -= (K[0]*U_hat[0]+K[1]*U_hat[1]+K[2]*U_hat[2])*c.K_over_K2
     if solver.rank == 0:
         c.U_hat[:, 0, 0, 0] = 0.0
 
@@ -141,7 +142,7 @@ def L2_norm(comm, u):
     """
     N = config.params.N
     L = config.params.L
-    result = comm.reduce(sum(u**2))
+    result = comm.allreduce(sum(u**2))
     return result*np.prod(L)/np.prod(N)
 
 def spectrum(solver, context):
@@ -151,13 +152,15 @@ def spectrum(solver, context):
     uiui[..., 0] = np.sum((c.U_hat[..., 0]*np.conj(c.U_hat[..., 0])).real, axis=0)
     uiui[..., -1] = np.sum((c.U_hat[..., -1]*np.conj(c.U_hat[..., -1])).real, axis=0)
     if 'shenfun' in config.params.solver:
-        uiui *= (2*np.pi*c.K2)
+        #uiui *= (2*np.pi)
+        uiui *= (4./3.*np.pi)
     else:
-        uiui *= (2*np.pi*c.K2/np.prod(config.params.N)**2)
+        #uiui *= (2*np.pi*c.K2/np.prod(config.params.N)**2)
+        uiui *= (4./3.*np.pi/np.prod(config.params.N)**2)
 
     # Create bins for Ek
-    Nb = int(np.sqrt(sum((config.params.N/2)**2)))
-    bins = range(0, Nb)
+    Nb = int(np.sqrt(sum((config.params.N/2)**2)/3))
+    bins = np.array(range(0, Nb))+0.5
     z = np.digitize(np.sqrt(context.K2), bins, right=True)
     #bins = np.unique(np.sqrt(context.K2))
     #z = np.digitize(np.sqrt(context.K2), bins, right=True)
@@ -165,10 +168,11 @@ def spectrum(solver, context):
 
     # Sample
     Ek = np.zeros(Nb)
-    for i in range(1, Nb):
-        ii = np.where(z == i)
+    for i, k in enumerate(bins[1:]):
+        k0 = bins[i] # lower limit, k is upper
+        ii = np.where((z > k0) & (z < k))
         if len(ii[0]) > 0:
-            Ek[i] = np.sum(uiui[ii]) / len(ii[0])
+            Ek[i] = (k**3 - k0**3)*np.sum(uiui[ii]) / len(ii[0])
 
     Ek = solver.comm.allreduce(Ek)
 
@@ -304,7 +308,7 @@ def update(context):
             else:
                 ddU[i] = c.FFT.ifftn(dU[i], ddU[i])
 
-        ww3 = solver.comm.reduce(sum(ddU*U))/np.prod(params.N)
+        ww3 = solver.comm.allreduce(sum(ddU*U))/np.prod(params.N)
 
         ##if solver.rank == 0:
             ##print('W ', params.nu*ww, params.nu*ww2, ww3, ww-ww2)
@@ -361,14 +365,15 @@ if __name__ == "__main__":
         'dt': 0.002,                 # Time step
         'T': 0.05,                   # End time
         'L': [2.*pi, 2.*pi, 2.*pi],
-        'M': [7, 7, 7],
         'checkpoint': 100,
-        'write_result': 100,
+        'write_result': 1e8,
         #'decomposition': 'pencil',
         #'Pencil_alignment': 'Y',
         #'P1': 2
         },  "triplyperiodic"
     )
+    config.triplyperiodic.add_argument("--N", default=[60, 60, 60], nargs=3,
+                                       help="Mesh size. Trumps M.")
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=10)
     config.triplyperiodic.add_argument("--compute_spectrum", type=int, default=1000)
     config.triplyperiodic.add_argument("--plot_step", type=int, default=1000)
@@ -382,10 +387,10 @@ if __name__ == "__main__":
 
     context = sol.get_context()
     initialize(sol, context)
-    #init_from_file("NS_isotropic_{}_{}_{}.h5".format(*config.params.M), sol, context)
+    init_from_file("NS_isotropic_6_6_6b.h5", sol, context)
 
     Ek, bins, E0, E1, E2 = spectrum(sol, context)
-    context.hdf5file.fname = "NS_isotropic_{}_{}_{}.h5".format(*config.params.M)
+    context.hdf5file.fname = "NS_isotropic_{}_{}_{}b.h5".format(*config.params.N)
     context.hdf5file.f = h5py.File(context.hdf5file.fname, driver='mpio', comm=sol.comm)
     context.hdf5file._init_h5file(config.params, sol)
     context.hdf5file.f.create_group("Turbulence")
