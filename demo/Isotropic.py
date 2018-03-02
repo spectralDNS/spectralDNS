@@ -28,7 +28,7 @@ except ImportError:
 
 def initialize(solver, context):
     c = context
-    c.mask = np.where(c.K2 <= config.params.Kf2, 1, 0)
+    c.mask = np.where(c.K2 <= config.params.Kf2**2, 1, 0)
 
     if 'rogallo' in config.params.initialize:
         initialize_rogallo(solver, context)
@@ -152,29 +152,29 @@ def spectrum(solver, context):
     uiui[..., 0] = np.sum((c.U_hat[..., 0]*np.conj(c.U_hat[..., 0])).real, axis=0)
     uiui[..., -1] = np.sum((c.U_hat[..., -1]*np.conj(c.U_hat[..., -1])).real, axis=0)
     if 'shenfun' in config.params.solver:
-        #uiui *= (2*np.pi)
         uiui *= (4./3.*np.pi)
     else:
-        #uiui *= (2*np.pi*c.K2/np.prod(config.params.N)**2)
         uiui *= (4./3.*np.pi/np.prod(config.params.N)**2)
 
     # Create bins for Ek
     Nb = int(np.sqrt(sum((config.params.N/2)**2)/3))
     bins = np.array(range(0, Nb))+0.5
     z = np.digitize(np.sqrt(context.K2), bins, right=True)
-    #bins = np.unique(np.sqrt(context.K2))
-    #z = np.digitize(np.sqrt(context.K2), bins, right=True)
-    #Nb = len(bins)
 
     # Sample
     Ek = np.zeros(Nb)
+    ll = np.zeros(Nb)
     for i, k in enumerate(bins[1:]):
         k0 = bins[i] # lower limit, k is upper
-        ii = np.where((z > k0) & (z < k))
-        if len(ii[0]) > 0:
-            Ek[i] = (k**3 - k0**3)*np.sum(uiui[ii]) / len(ii[0])
+        ii = np.where((z > k0) & (z <= k))
+        ll[i] = len(ii[0])
+        Ek[i] = (k**3 - k0**3)*np.sum(uiui[ii])
 
-    Ek = solver.comm.allreduce(Ek)
+    Ek = comm.allreduce(Ek)
+    ll = comm.allreduce(ll)
+    for i in range(Nb):
+        if not ll[i] == 0:
+            Ek[i] = Ek[i] / ll[i]
 
     E0 = uiui.mean(axis=(1, 2))
     E1 = uiui.mean(axis=(0, 2))
