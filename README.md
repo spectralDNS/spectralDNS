@@ -8,7 +8,7 @@ spectralDNS
     <img src="https://rawgit.com/spectralDNS/spectralutilities/master/movies/isotropic.gif" width="600" height="400" alt="Isotropic turbulence"/>
 </p>
 <p align="center">
-    Isotropic turbulence with Re_lambda=84 computed using NS_shenfun.
+    Isotropic turbulence with Re_lambda=84 computed using NS_shenfun and a mesh of size 160**3 is physical space.
 </p>
 
 Description
