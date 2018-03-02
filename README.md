@@ -4,6 +4,13 @@ spectralDNS
 [![Build Status](https://travis-ci.org/spectralDNS/spectralDNS.svg?branch=master)](https://travis-ci.org/spectralDNS/spectralDNS)
 [![CircleCI](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master.svg?style=svg)](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master)
 
+<p align="center">
+    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/movies/isotropic.gif" width="600" height="400" alt="Isotropic turbulence"/>
+</p>
+<p align="center">
+    Isotropic turbulence with Re_lambda=84 computed using NS_shenfun.
+</p>
+
 Description
 ----------
 
