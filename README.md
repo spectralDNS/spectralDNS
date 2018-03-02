@@ -5,7 +5,7 @@ spectralDNS
 [![CircleCI](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master.svg?style=svg)](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master)
 
 <p align="center">
-    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/movies/isotropic300.gif" width="600" height="400" alt="Isotropic turbulence"/>
+    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/movies/isotropic300_12.gif" width="600" height="400" alt="Isotropic turbulence"/>
 </p>
 <p align="center">
     Isotropic turbulence with Re_lambda=128 computed using NS_shenfun and a mesh of size 300**3 is physical space.
