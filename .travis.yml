@@ -30,7 +30,6 @@ install:
       conda config --add channels conda-forge
       conda config --add channels spectralDNS
       conda install --yes --quiet conda-forge-build-setup
-      conda update -n root conda-build
       source run_conda_forge_build_setup
 
 script:
