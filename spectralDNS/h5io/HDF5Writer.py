@@ -174,35 +174,32 @@ try:
             if 'write_yz_slice' in params:
                 if params.tstep % params.write_yz_slice[1] == 0:
                     i = params.write_yz_slice[0]
-                    for comp in self.components:
-                        self.f["2D/yz/"+comp].create_dataset(str(params.tstep), shape=(N[1], N[2]), dtype=FFT.float)
 
                     sx = s[0]
                     if i >= sx.start and i < sx.stop:
                         for comp, val in six.iteritems(self.components):
+                            self.f["2D/yz/"+comp].create_dataset(str(params.tstep), shape=(N[1], N[2]), dtype=val.dtype)
                             self.f["2D/yz/%s/%d"%(comp, params.tstep)][s[1], s[2]] = val[i-sx.start]
 
                 if params.tstep % params.write_xz_slice[1] == 0:
                     j = params.write_xz_slice[0]
-                    for comp in self.components:
-                        self.f["2D/xz/"+comp].create_dataset(str(params.tstep), shape=(N[0], N[2]), dtype=FFT.float)
 
                     if params.decomposition == 'slab':
                         for comp, val in six.iteritems(self.components):
+                            self.f["2D/xz/"+comp].create_dataset(str(params.tstep), shape=(N[0], N[2]), dtype=val.dtype)
                             self.f["2D/xz/%s/%d"%(comp, params.tstep)][s[0], s[2]] = val[:, j, :]
 
                     elif params.decomposition == 'pencil':
                         sy = s[1]
                         if j >= sy.start and j < sy.stop:
                             for comp, val in six.iteritems(self.components):
+                                self.f["2D/xz/"+comp].create_dataset(str(params.tstep), shape=(N[0], N[2]), dtype=val.dtype)
                                 self.f["2D/xz/%s/%d"%(comp, params.tstep)][s[0], s[2]] = val[:, j-sy.start, :]
 
                 if params.tstep % params.write_xy_slice[1] == 0:
                     k = params.write_xy_slice[0]
-                    for comp in self.components:
-                        self.f["2D/xy/"+comp].create_dataset(str(params.tstep), shape=(N[0], N[1]), dtype=FFT.float)
-
                     for comp, val in six.iteritems(self.components):
+                        self.f["2D/xy/"+comp].create_dataset(str(params.tstep), shape=(N[0], N[1]), dtype=val.dtype)
                         self.f["2D/xy/%s/%d"%(comp, params.tstep)][s[0], s[1]] = val[:, :, k]
 
             # For channel solver with dynamic pressure

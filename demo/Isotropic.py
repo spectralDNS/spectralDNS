@@ -170,8 +170,8 @@ def spectrum(solver, context):
         ll[i] = len(ii[0])
         Ek[i] = (k**3 - k0**3)*np.sum(uiui[ii])
 
-    Ek = comm.allreduce(Ek)
-    ll = comm.allreduce(ll)
+    Ek = solver.comm.allreduce(Ek)
+    ll = solver.comm.allreduce(ll)
     for i in range(Nb):
         if not ll[i] == 0:
             Ek[i] = Ek[i] / ll[i]
