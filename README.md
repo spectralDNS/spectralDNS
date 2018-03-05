@@ -118,7 +118,7 @@ spectralDNS is developed by
 
 Licence
 -------
-spectralDNS is licensed under the GNU GPL, version 3 or (at your option) any later version. spectralDNS is Copyright (2014-2016) by the authors.
+spectralDNS is licensed under the GNU GPL, version 3 or (at your option) any later version. spectralDNS is Copyright (2014-2018) by the authors.
 
 Contact
 -------
