@@ -12,7 +12,7 @@ try:
     directive_defaults = get_directive_defaults()
     #directive_defaults['linetrace'] = True
     #directive_defaults['binding'] = True
-except:
+except ImportError:
     pass
 
 #define_macros=[('CYTHON_TRACE', '1')]

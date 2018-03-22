@@ -378,4 +378,4 @@ def update(new, mesh="triplyperiodic"):
     if 'planner_effort' in new:
         fft_plans.update(new['planner_effort'])
         new['planner_effort'] = fft_plans
-    exec(mesh + ".set_defaults(**new)")
+    globals()[mesh].set_defaults(**new)

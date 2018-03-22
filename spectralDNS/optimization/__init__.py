@@ -21,9 +21,11 @@ def optimizer(func):
     NS solver.
 
     """
+
     try: # Look for optimized version of function
-        mod = importlib.import_module("_".join((config.params.optimization,
-                                                config.params.precision)))
+        mod = globals()["_".join((config.params.optimization,
+                                  config.params.precision))]
+
 
         # Check for generic implementation first, then solver specific
         name = func.__name__
