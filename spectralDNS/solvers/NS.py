@@ -3,6 +3,8 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__ = "GNU Lesser GPL version 3 or any later version"
 
+#pylint: disable=unused-variable,unused-argument,function-redefined
+
 from .spectralinit import *
 
 def get_context():
@@ -21,20 +23,20 @@ def get_context():
     Kx = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((3,) + FFT.complex_shape())
     for i in range(3):
-        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
+        K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
     # Velocity and pressure
-    U     = empty((3,) + FFT.real_shape(), dtype=float)
+    U = empty((3,) + FFT.real_shape(), dtype=float)
     U_hat = empty((3,) + FFT.complex_shape(), dtype=complex)
-    P     = empty(FFT.real_shape(), dtype=float)
+    P = empty(FFT.real_shape(), dtype=float)
     P_hat = empty(FFT.complex_shape(), dtype=complex)
 
     # Primary variable
     u = U_hat
 
     # RHS array
-    dU     = empty((3,) + FFT.complex_shape(), dtype=complex)
-    curl   = empty((3,) + FFT.real_shape(), dtype=float)
+    dU = empty((3,) + FFT.complex_shape(), dtype=complex)
+    curl = empty((3,) + FFT.real_shape(), dtype=float)
     Source = zeros((3,) + FFT.complex_shape(), dtype=complex) # Possible source term initialized to zero
     work = work_arrays()
 
@@ -53,8 +55,8 @@ class NSWriter(HDF5Writer):
     """
     def update_components(self, **context):
         """Transform to real data before storing the solution"""
-        U = get_velocity(**context)
-        P = get_pressure(**context)
+        get_velocity(**context)
+        get_pressure(**context)
 
 def get_curl(curl, U_hat, work, FFT, K, **context):
     """Compute curl from context"""
@@ -136,7 +138,8 @@ def standard_convection(rhs, u_dealias, U_hat, work, FFT, K, dealias=None):
 
 def divergence_convection(rhs, u_dealias, work, FFT, K, dealias=None, add=False):
     """rhs_i = div(u_i u_j)"""
-    if not add: rhs.fill(0)
+    if not add:
+        rhs.fill(0)
     UUi_hat = work[(rhs, 0, False)]
     for i in range(3):
         UUi_hat[i] = FFT.fftn(u_dealias[0]*u_dealias[i], UUi_hat[i], dealias)
@@ -156,7 +159,7 @@ def getConvection(convection):
 
         def Conv(rhs, u_hat, work, FFT, K):
             u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                            FFT.float, 0, False)]
+                              FFT.float, 0, False)]
             for i in range(3):
                 u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
             rhs = standard_convection(rhs, u_dealias, u_hat, work, FFT, K, params.dealias)
@@ -167,7 +170,7 @@ def getConvection(convection):
 
         def Conv(rhs, u_hat, work, FFT, K):
             u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                            FFT.float, 0, False)]
+                              FFT.float, 0, False)]
             for i in range(3):
                 u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
             rhs = divergence_convection(rhs, u_dealias, work, FFT, K, params.dealias, False)
@@ -178,7 +181,7 @@ def getConvection(convection):
 
         def Conv(rhs, u_hat, work, FFT, K):
             u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                            FFT.float, 0, False)]
+                              FFT.float, 0, False)]
             for i in range(3):
                 u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
             rhs = standard_convection(rhs, u_dealias, u_hat, work, FFT, K, params.dealias)
@@ -190,9 +193,9 @@ def getConvection(convection):
 
         def Conv(rhs, u_hat, work, FFT, K):
             u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                            FFT.float, 0, False)]
+                              FFT.float, 0, False)]
             curl_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                                FFT.float, 1, False)]
+                                 FFT.float, 1, False)]
             for i in range(3):
                 u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
 

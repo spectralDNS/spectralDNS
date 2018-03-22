@@ -1,12 +1,19 @@
+"""
+SpectralDNS
+
+High performance spectral Navier-Stokes (and similar) solvers implemented in
+Python.
+"""
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2015-04-09"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
 
-from . import config
 import importlib
 import cProfile
+from . import config
 
+#pylint: disable=eval-used,unused-variable
 
 def get_solver(update=None,
                regression_test=None,
@@ -35,7 +42,7 @@ def get_solver(update=None,
     """
     assert parse_args is None or isinstance(parse_args, list)
     args = getattr(eval('.'.join(('config', mesh))),
-                    'parse_args')(parse_args)
+                   'parse_args')(parse_args)
     config.params.update(vars(args))
 
     try:
@@ -97,7 +104,7 @@ def solve(solver, context):
 
         solver.timer()
 
-        if len(solver.profiler.getstats()) == 0 and params.make_profile:
+        if not solver.profiler.getstats() and params.make_profile:
             #Enable profiling after first step is finished
             solver.profiler.enable()
 
@@ -106,11 +113,10 @@ def solve(solver, context):
 
     params.dt = dt_in
 
-    solver.timer.final(solver.MPI, solver.rank, params.verbose)
+    solver.timer.final(params.verbose)
 
     if params.make_profile:
-        solver.results = solver.create_profile(solver.profiler, solver.comm,
-                                               solver.MPI, solver.rank)
+        solver.results = solver.create_profile(solver.profiler)
 
     solver.regression_test(context)
 

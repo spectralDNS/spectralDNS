@@ -1,6 +1,6 @@
-from spectralDNS import config, get_solver, solve
-from numpy import pi, sin, cos, exp, zeros, sum, sin, cos, float64
 import warnings
+from numpy import sin, cos, exp, zeros, sum, float64
+from spectralDNS import config, get_solver, solve
 
 try:
     import matplotlib.pyplot as plt
@@ -9,7 +9,7 @@ except ImportError:
     warnings.warn("matplotlib not installed")
     plt = None
 
-def initialize(U, U_hat, X, FFT, **context):    
+def initialize(U, U_hat, X, FFT, **context):
     U[0] = sin(X[0])*cos(X[1])
     U[1] = -sin(X[1])*cos(X[0])
     for i in range(2):
@@ -35,7 +35,7 @@ def update(context):
             im.set_data(curl[:, :])
             im.autoscale()
             plt.pause(1e-6)
-        
+
 def regression_test(context):
     params = config.params
     solver = config.solver
@@ -51,14 +51,11 @@ def regression_test(context):
 
 if __name__ == '__main__':
     config.update(
-    {
-      'nu': 0.01,
-      'dt': 0.05,
-      'T': 10,
-      'write_result': 100,
-      'M': [6, 6]}, 'doublyperiodic'
-    )
-
+        {'nu': 0.01,
+         'dt': 0.05,
+         'T': 10,
+         'write_result': 100,
+         'M': [6, 6]}, 'doublyperiodic')
     config.doublyperiodic.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
     sol = get_solver(update=update, regression_test=regression_test, mesh="doublyperiodic")
     context = sol.get_context()

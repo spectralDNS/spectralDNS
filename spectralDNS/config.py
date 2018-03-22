@@ -68,12 +68,14 @@ Solver specifi parameters channel domain::
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2015-04-08"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
 
 import argparse
-from numpy import pi, array, float32, float64
 import collections
 import json
+from numpy import pi, array, float32, float64
+
+#pylint: disable=global-statement,redefined-outer-name,exec-used
 
 class AttributeDict(collections.MutableMapping, dict):
     """Dictionary class
@@ -135,7 +137,7 @@ class Params(AttributeDict):
             return self.L / self.N
 
         elif key == 'N':
-            assert ('M' in self)
+            assert 'M' in self
             mval = self.M
             return 2**mval
 
@@ -144,10 +146,9 @@ class Params(AttributeDict):
 
     def __getattribute__(self, key):
         if key in ('nu', 'dt', 'Ri', 'Pr', 'eta'):
-            float = float32 if self['precision'] == 'single' else float64
-            return float(dict.__getattribute__(self, key))
-        else:
-            return dict.__getattribute__(self, key)
+            fl = float32 if self['precision'] == 'single' else float64
+            return fl(dict.__getattribute__(self, key))
+        return dict.__getattribute__(self, key)
 
     def __setattr__(self, key, val):
         if key in ('N', 'M', 'L'):
@@ -157,12 +158,13 @@ class Params(AttributeDict):
 
     def __setitem__(self, key, val):
         if key in ('M', 'N'):
-            val = array([eval(str(f)) for f in val], dtype=int)
+            val = array([int(str(f)) for f in val], dtype=int)
             val.flags.writeable = False
             dict.__setitem__(self, key, val)
 
         elif key == 'L':
-            val = array([eval(str(f)) for f in val], dtype=float)
+            val = array([eval(str(f), {"__builtins__": None}, {'pi': pi}) for f in val],
+                        dtype=float)
             val.flags.writeable = False
             dict.__setitem__(self, key, val)
 
@@ -173,6 +175,7 @@ fft_plans = collections.defaultdict(lambda: "FFTW_MEASURE",
                                     {'dct': "FFTW_MEASURE"})
 
 class PlanAction(argparse.Action):
+    """Action for planning FFT"""
     def __call__(self, parser, namespace, values, option_string=None):
         global fft_plans
         fft_plans.update(json.loads(values))
@@ -198,7 +201,7 @@ parser.add_argument('--T', default=0.1, type=float,
                     help='End time')
 parser.add_argument('--write_result', default=1e8, metavar=('tstep'), type=int,
                     help='Write results to HDF5 every tstep')
-parser.add_argument('--checkpoint',  default=1e8, type=int,
+parser.add_argument('--checkpoint', default=1e8, type=int,
                     help='Save intermediate result every...')
 parser.add_argument('--nu', default=0.000625, type=float,
                     help='Viscosity')
@@ -240,11 +243,11 @@ triplyperiodic.add_argument('--decomposition', default='slab', choices=('slab', 
                             help="Choose 3D decomposition between slab and pencil.")
 triplyperiodic.add_argument('--M', default=[6, 6, 6], metavar=("Mx", "My", "Mz"), nargs=3,
                             help='Mesh size is pow(2, M[i]) in direction i. Used if N is missing.')
-triplyperiodic.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'),
+triplyperiodic.add_argument('--write_yz_slice', default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'),
                             help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
-triplyperiodic.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'),
+triplyperiodic.add_argument('--write_xz_slice', default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'),
                             help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
-triplyperiodic.add_argument('--write_xy_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'),
+triplyperiodic.add_argument('--write_xy_slice', default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'),
                             help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
 triplyperiodic.add_argument('--TOL', type=float, default=1e-6,
                             help='Tolerance for adaptive time integrator')
@@ -312,11 +315,11 @@ channel.add_argument('--Pencil_alignment', default='X', choices=('X',),
                      help='Alignment of the complex data for pencil decomposition')
 channel.add_argument('--M', default=[6, 6, 6], nargs=3, metavar=('Mx', 'My', 'Mz'),
                      help='Mesh size is pow(2, M[i]) in direction i. Used if N is missing.')
-channel.add_argument('--write_yz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'),
+channel.add_argument('--write_yz_slice', default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'),
                      help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
-channel.add_argument('--write_xz_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'),
+channel.add_argument('--write_xz_slice', default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'),
                      help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
-channel.add_argument('--write_xy_slice',  default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'),
+channel.add_argument('--write_xy_slice', default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'),
                      help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
 channel.add_argument('--Dquad', default='GC', choices=('GC', 'GL'),
                      help="Choose quadrature scheme for Dirichlet space. GC = Chebyshev-Gauss (x_k=cos((2k+1)/(2N+2)*pi)) and GL = Gauss-Lobatto (x_k=cos(k*pi/N))")
@@ -326,82 +329,50 @@ channel.add_argument('--Nquad', default='GC', choices=('GC', 'GL'),
                      help="Choose quadrature scheme for Neumann space. GC = Chebyshev-Gauss (x_k=cos((2k+1)/(2N+2)*pi)) and GL = Gauss-Lobatto (x_k=cos(k*pi/N))")
 channelsubparsers = channel.add_subparsers(dest='solver')
 
-KMM = channelsubparsers.add_parser('KMM',
-                                   help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
-KMM.add_argument('--integrator', default='implicit', choices=('implicit',),
-                 help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
-KMMRK3 = channelsubparsers.add_parser('KMMRK3',
-                                      help='Kim Moin Moser channel solver with third order semi-implicit Runge-Kutta discretization.')
-KMMRK3.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',),
-                    help='RK3 integrator for channel solver')
-KMM_mpifft4py = channelsubparsers.add_parser('KMM_mpifft4py',
-                                   help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
-KMM_mpifft4py.add_argument('--integrator', default='implicit', choices=('implicit',),
-                 help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
-KMMRK3_mpifft4py = channelsubparsers.add_parser('KMMRK3_mpifft4py',
-                                      help='Kim Moin Moser channel solver with third order semi-implicit Runge-Kutta discretization.')
-KMMRK3_mpifft4py.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',),
-                    help='RK3 integrator for channel solver')
+KMM = channelsubparsers.add_parser('KMM', help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
+KMM.add_argument('--integrator', default='implicit', choices=('implicit',), help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
+KMMRK3 = channelsubparsers.add_parser('KMMRK3', help='Kim Moin Moser channel solver with third order semi-implicit Runge-Kutta discretization.')
+KMMRK3.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',), help='RK3 integrator for channel solver')
+KMM_mpifft4py = channelsubparsers.add_parser('KMM_mpifft4py', help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
+KMM_mpifft4py.add_argument('--integrator', default='implicit', choices=('implicit',), help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
+KMMRK3_mpifft4py = channelsubparsers.add_parser('KMMRK3_mpifft4py', help='Kim Moin Moser channel solver with third order semi-implicit Runge-Kutta discretization.')
+KMMRK3_mpifft4py.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',), help='RK3 integrator for channel solver')
 
-
-IPCS = channelsubparsers.add_parser('IPCS',
-                                    help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
-IPCS.add_argument('--velocity_pressure_iters', default=1, type=int,
-                  help='Number of inner velocity pressure iterations for IPCS')
+IPCS = channelsubparsers.add_parser('IPCS', help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
+IPCS.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations for IPCS')
 print_div_parser = IPCS.add_mutually_exclusive_group(required=False)
-print_div_parser.add_argument('--no-print_divergence_progress', dest='print_divergence_progress', action='store_false',
-                              help='Do not print the norm of the pressure correction on inner iterations for IPCS')
-print_div_parser.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true',
-                              help='Print the norm of the pressure correction on inner iterations for IPCS')
+print_div_parser.add_argument('--no-print_divergence_progress', dest='print_divergence_progress', action='store_false', help='Do not print the norm of the pressure correction on inner iterations for IPCS')
+print_div_parser.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true', help='Print the norm of the pressure correction on inner iterations for IPCS')
 IPCS.set_defaults(print_divergence_progress=False)
-IPCS.add_argument('--divergence_tol', default=1e-7, type=float,
-                  help='Tolerance on divergence error for pressure velocity coupling for IPCS')
+IPCS.add_argument('--divergence_tol', default=1e-7, type=float, help='Tolerance on divergence error for pressure velocity coupling for IPCS')
 
-IPCS_mpifft4py = channelsubparsers.add_parser('IPCS_mpifft4py',
-                                    help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
-IPCS_mpifft4py.add_argument('--velocity_pressure_iters', default=1, type=int,
-                  help='Number of inner velocity pressure iterations for IPCS_mpifft4py')
+IPCS_mpifft4py = channelsubparsers.add_parser('IPCS_mpifft4py', help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
+IPCS_mpifft4py.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations for IPCS_mpifft4py')
 print_div_parser2 = IPCS_mpifft4py.add_mutually_exclusive_group(required=False)
-print_div_parser2.add_argument('--no-print_divergence_progress', dest='print_divergence_progress', action='store_false',
-                              help='Do not print the norm of the pressure correction on inner iterations for IPCS')
-print_div_parser2.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true',
-                              help='Print the norm of the pressure correction on inner iterations for IPCS')
+print_div_parser2.add_argument('--no-print_divergence_progress', dest='print_divergence_progress', action='store_false', help='Do not print the norm of the pressure correction on inner iterations for IPCS')
+print_div_parser2.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true', help='Print the norm of the pressure correction on inner iterations for IPCS')
 IPCS_mpifft4py.set_defaults(print_divergence_progress=False)
-IPCS_mpifft4py.add_argument('--divergence_tol', default=1e-7, type=float,
-                  help='Tolerance on divergence error for pressure velocity coupling for IPCS')
+IPCS_mpifft4py.add_argument('--divergence_tol', default=1e-7, type=float, help='Tolerance on divergence error for pressure velocity coupling for IPCS')
 
-IPCSR = channelsubparsers.add_parser('IPCSR',
-                                     help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
-IPCSR.add_argument('--velocity_pressure_iters', default=1, type=int,
-                   help='Number of inner velocity pressure iterations for IPCS')
+IPCSR = channelsubparsers.add_parser('IPCSR', help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
+IPCSR.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations for IPCS')
 print_div_parser = IPCSR.add_mutually_exclusive_group(required=False)
-print_div_parser.add_argument('--no-print_divergence_progress',
-                              dest='print_divergence_progress',
-                              action='store_false',
-                              help='Do not print the norm of the pressure correction on inner iterations for IPCSR')
-print_div_parser.add_argument('--print_divergence_progress',
-                              dest='print_divergence_progress',
-                              action='store_true',
-                              help='Print the norm of the pressure correction on inner iterations for IPCSR')
+print_div_parser.add_argument('--no-print_divergence_progress', dest='print_divergence_progress', action='store_false', help='Do not print the norm of the pressure correction on inner iterations for IPCSR')
+print_div_parser.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true', help='Print the norm of the pressure correction on inner iterations for IPCSR')
 IPCSR.set_defaults(print_divergence_progress=False)
-IPCSR.add_argument('--divergence_tol', default=1e-7, type=float,
-                   help='Tolerance on divergence error for pressure velocity coupling for IPCS')
+IPCSR.add_argument('--divergence_tol', default=1e-7, type=float, help='Tolerance on divergence error for pressure velocity coupling for IPCS')
 
-IPCSR_mpifft4py = channelsubparsers.add_parser('IPCSR_mpifft4py',
-                                    help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
-IPCSR_mpifft4py.add_argument('--velocity_pressure_iters', default=1, type=int,
-                  help='Number of inner velocity pressure iterations for IPCSR_mpifft4py')
+IPCSR_mpifft4py = channelsubparsers.add_parser('IPCSR_mpifft4py', help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
+IPCSR_mpifft4py.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations for IPCSR_mpifft4py')
 print_div_parser2 = IPCSR_mpifft4py.add_mutually_exclusive_group(required=False)
-print_div_parser2.add_argument('--no-print_divergence_progress', dest='print_divergence_progress', action='store_false',
-                              help='Do not print the norm of the pressure correction on inner iterations for IPCS')
-print_div_parser2.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true',
-                              help='Print the norm of the pressure correction on inner iterations for IPCS')
+print_div_parser2.add_argument('--no-print_divergence_progress', dest='print_divergence_progress', action='store_false', help='Do not print the norm of the pressure correction on inner iterations for IPCS')
+print_div_parser2.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true', help='Print the norm of the pressure correction on inner iterations for IPCS')
 IPCSR_mpifft4py.set_defaults(print_divergence_progress=False)
-IPCSR_mpifft4py.add_argument('--divergence_tol', default=1e-7, type=float,
-                  help='Tolerance on divergence error for pressure velocity coupling for IPCS')
+IPCSR_mpifft4py.add_argument('--divergence_tol', default=1e-7, type=float, help='Tolerance on divergence error for pressure velocity coupling for IPCS')
 
 
 def update(new, mesh="triplyperiodic"):
+    """Update spectralDNS parameters"""
     global fft_plans
     assert isinstance(new, dict)
     if 'planner_effort' in new:

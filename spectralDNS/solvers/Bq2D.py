@@ -1,10 +1,12 @@
+#pylint: disable=unused-variable,unused-argument,unused-import
+
 __author__ = "Mikael Mortensen <mikaem@math.uio.no> and Diako Darian <diako.darian@mn.uio.no>"
 __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
 
 from .spectralinit import *
-from .NS2D import get_curl, get_velocity, get_pressure, end_of_tstep
+from .NS2D import get_curl, get_pressure, end_of_tstep
 
 def get_context():
     """Set up context for Bq2D solver"""
@@ -21,20 +23,20 @@ def get_context():
     Kx = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((2,) + FFT.complex_shape())
     for i in range(2):
-        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
+        K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
     # Solution variables
-    Ur     = empty((3,) + FFT.real_shape(), dtype=float)
+    Ur = empty((3,) + FFT.real_shape(), dtype=float)
     Ur_hat = empty((3,) + FFT.complex_shape(), dtype=complex)
-    P      = empty(FFT.real_shape(), dtype=float)
-    P_hat  = empty(FFT.complex_shape(), dtype=complex)
-    curl   = empty(FFT.real_shape(), dtype=float)
+    P = empty(FFT.real_shape(), dtype=float)
+    P_hat = empty(FFT.complex_shape(), dtype=complex)
+    curl = empty(FFT.real_shape(), dtype=float)
 
     # Create views into large data structures
-    rho     = Ur[2]
+    rho = Ur[2]
     rho_hat = Ur_hat[2]
-    U       = Ur[:2]
-    U_hat   = Ur_hat[:2]
+    U = Ur[:2]
+    U_hat = Ur_hat[:2]
 
     # Primary variable
     u = Ur_hat

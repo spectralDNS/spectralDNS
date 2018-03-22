@@ -1,11 +1,10 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2015-10-29"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
 
-from .spectralinit import *
-from shenfun.chebyshev.bases import ShenDirichletBasis, ShenNeumannBasis, \
-    ShenBiharmonicBasis
+#pylint: disable=unbalanced-tuple-unpacking,unused-variable,function-redefined,unused-argument
+
 from shenfun.spectralbase import inner_product
 from shenfun.la import TDMA
 from shenfun import TensorProductSpace, Array, TestFunction, TrialFunction, \
@@ -14,10 +13,10 @@ from shenfun.chebyshev.bases import ShenDirichletBasis, ShenBiharmonicBasis, Bas
 from shenfun.fourier.bases import R2CBasis, C2CBasis
 from shenfun.chebyshev.la import Helmholtz, Biharmonic
 
+from .spectralinit import *
 from ..shen.Matrices import BiharmonicCoeff, HelmholtzCoeff
 from ..shen import LUsolve
 from ..shen.la import Helmholtz as old_Helmholtz
-from ..shen.la import Biharmonic as old_Biharmonic
 
 def get_context():
     """Set up context for solver"""
@@ -67,16 +66,16 @@ def get_context():
     K = FST.local_wavenumbers(scaled=True)
 
     # Solution variables
-    U  = Array(VFS, False)
+    U = Array(VFS, False)
     U0 = Array(VFS, False)
-    U_hat  = Array(VFS)
+    U_hat = Array(VFS)
     U_hat0 = Array(VFS)
     g = Array(FST)
 
     # primary variable
     u = (U_hat, g)
 
-    H_hat  = Array(VFS)
+    H_hat = Array(VFS)
     H_hat0 = Array(VFS)
     H_hat1 = Array(VFS)
 
@@ -93,7 +92,7 @@ def get_context():
     Kx = FST.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = np.zeros((2,)+g.shape)
     for i in range(2):
-        K_over_K2[i] = K[i+1] / np.where(K2==0, 1, K2)
+        K_over_K2[i] = K[i+1] / np.where(K2 == 0, 1, K2)
 
     work = work_arrays()
 
@@ -101,24 +100,22 @@ def get_context():
 
     alfa = K2[0] - 2.0/nu/dt
     # Collect all matrices
-    mat = config.AttributeDict(dict(
-        CDD = inner_product((ST, 0), (ST, 1)),
-        AB = HelmholtzCoeff(N[0], 1.0, -alfa, ST.quad),
-        AC = BiharmonicCoeff(N[0], nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad),
-        # Matrices for biharmonic equation
-        CBD = inner_product((SB, 0), (ST, 1)),
-        ABB = inner_product((SB, 0), (SB, 2)),
-        BBB = inner_product((SB, 0), (SB, 0)),
-        SBB = inner_product((SB, 0), (SB, 4)),
-        # Matrices for Helmholtz equation
-        ADD = inner_product((ST, 0), (ST, 2)),
-        BDD = inner_product((ST, 0), (ST, 0)),
-        BBD = inner_product((SB, 0), (ST, 0)),
-        CDB = inner_product((ST, 0), (SB, 1)),
-        ADD0 = inner_product((ST0, 0), (ST0, 2)),
-        BDD0 = inner_product((ST0, 0), (ST0, 0)),
-        )
-    )
+    mat = config.AttributeDict(
+        dict(CDD=inner_product((ST, 0), (ST, 1)),
+             AB=HelmholtzCoeff(N[0], 1.0, -alfa, ST.quad),
+             AC=BiharmonicCoeff(N[0], nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad),
+             # Matrices for biharmonic equation
+             CBD=inner_product((SB, 0), (ST, 1)),
+             ABB=inner_product((SB, 0), (SB, 2)),
+             BBB=inner_product((SB, 0), (SB, 0)),
+             SBB=inner_product((SB, 0), (SB, 4)),
+             # Matrices for Helmholtz equation
+             ADD=inner_product((ST, 0), (ST, 2)),
+             BDD=inner_product((ST, 0), (ST, 0)),
+             BBD=inner_product((SB, 0), (ST, 0)),
+             CDB=inner_product((ST, 0), (SB, 1)),
+             ADD0=inner_product((ST0, 0), (ST0, 2)),
+             BDD0=inner_product((ST0, 0), (ST0, 0)),))
 
     ## Collect all linear algebra solvers
     #la = config.AttributeDict(dict(
@@ -135,17 +132,14 @@ def get_context():
     mat.BDD.axis = 0
     mat.SBB.axis = 0
 
-    la = config.AttributeDict(dict(
-        HelmholtzSolverG = Helmholtz(mat.ADD, mat.BDD, -np.ones((1,1,1)),
-                                     (K2[0]+2.0/nu/dt)[np.newaxis,:,:]),
-        BiharmonicSolverU = Biharmonic(mat.SBB, mat.ABB, mat.BBB, -nu*dt/2.*np.ones((1,1,1)),
-                                       (1.+nu*dt*K2[0])[np.newaxis,:,:],
-                                       (-(K2[0] + nu*dt/2.*K4[0]))[np.newaxis,:,:]),
-        HelmholtzSolverU0 = old_Helmholtz(N[0], np.sqrt(2./nu/dt), ST),
-        TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0)))
-        )
-    )
-
+    la = config.AttributeDict(
+        dict(HelmholtzSolverG=Helmholtz(mat.ADD, mat.BDD, -np.ones((1, 1, 1)),
+                                        (K2[0]+2.0/nu/dt)[np.newaxis, :, :]),
+             BiharmonicSolverU=Biharmonic(mat.SBB, mat.ABB, mat.BBB, -nu*dt/2.*np.ones((1, 1, 1)),
+                                          (1.+nu*dt*K2[0])[np.newaxis, :, :],
+                                          (-(K2[0] + nu*dt/2.*K4[0]))[np.newaxis, :, :]),
+             HelmholtzSolverU0=old_Helmholtz(N[0], np.sqrt(2./nu/dt), ST),
+             TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0)))))
 
     hdf5file = KMMWriter({"U":U[0], "V":U[1], "W":U[2]},
                          chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
@@ -190,10 +184,10 @@ def get_curl(curl, U_hat, g, work, FST, SB, ST, Kx, **context):
     curl = compute_curl(curl, U_hat, g, Kx, FST, SB, ST, work)
     return curl
 
-def get_convection(H_hat, U_hat, g, Kx, VFSp, FSTp, FSBp, FCTp,  work, mat, la, **context):
+def get_convection(H_hat, U_hat, g, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la, **context):
     """Compute convection from context"""
-    conv = getConvection(params.convection)
-    H_hat = conv(H_hat, U_hat, g, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la)
+    conv_ = getConvection(params.convection)
+    H_hat = conv_(H_hat, U_hat, g, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la)
     return H_hat
 
 def get_pressure(context, solver):
@@ -289,7 +283,7 @@ def compute_derivatives(duidxj, u_hat, FST, FCT, FSB, K, la, mat, work):
     F_tmp = work[(u_hat, 0)]
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = mat.CDB.matvec(U_hat[0], F_tmp0)
+    F_tmp[0] = mat.CDB.matvec(u_hat[0], F_tmp[0])
     F_tmp[0] = la.TDMASolverD(F_tmp[0])
     duidxj[0, 0] = FST.backward(F_tmp[0], duidxj[0, 0])
     LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
@@ -342,8 +336,9 @@ def standardConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp, FSBp, FCTp, work,
 def divergenceConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp, FSBp, FCTp, work,
                          mat, la, add=False):
     """c_i = div(u_i u_j)"""
-    if not add: rhs.fill(0)
-    F_tmp  = work[(rhs, 0)]
+    if not add:
+        rhs.fill(0)
+    F_tmp = work[(rhs, 0)]
     F_tmp2 = work[(rhs, 1)]
     U = u_dealias
 
@@ -447,7 +442,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
 
 #@profile
 def ComputeRHS(rhs, u_hat, g_hat, solver,
-               H_hat, H_hat1, H_hat0, VFSp, FSTp, FSBp, FCTp, work, K, Kx, K2,
+               H_hat, H_hat1, H_hat0, VFSp, FSTp, FSBp, FCTp, work, Kx, K2,
                K4, hv, hg, mat, la, **context):
     """Compute right hand side of Navier Stokes
 
@@ -491,7 +486,7 @@ def compute_vw(u_hat, f_hat, g_hat, K_over_K2):
 #@profile
 def solve_linear(u_hat, g_hat, rhs,
                  work, la, mat, K_over_K2, H_hat0, U_hat0, Sk, **context):
-    """"""
+    """Solve for Fourier wavenumbers 0"""
     f_hat = work[(u_hat[0], 0)]
     w0 = work[(u_hat[0], 1, False)]
 

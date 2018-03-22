@@ -1,7 +1,9 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2015-10-29"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
+
+#pylint: disable=function-redefined,unbalanced-tuple-unpacking,unused-variable,unused-argument
 
 from .KMM import *
 from .spectralinit import end_of_tstep
@@ -79,7 +81,7 @@ def get_context():
     Kx = FST.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = np.zeros((2,)+g.shape)
     for i in range(2):
-        K_over_K2[i] = K[i+1] / np.where(K2==0, 1, K2)
+        K_over_K2[i] = K[i+1] / np.where(K2 == 0, 1, K2)
 
     work = work_arrays()
 
@@ -89,26 +91,23 @@ def get_context():
 
     alfa = K2[0] - 2.0/nu/dt
     # Collect all matrices
-    mat = config.AttributeDict(dict(
-        CDD = inner_product((ST, 0), (ST, 1)),
-        AC = [BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2[0]),
-                            -(K2[0] - nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)],
-        AB = [HelmholtzCoeff(N[0], 1.0, -(K2[0] - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)],
-
-        # Matrices for biharmonic equation
-        CBD = inner_product((SB, 0), (ST, 1)),
-        ABB = inner_product((SB, 0), (SB, 2)),
-        BBB = inner_product((SB, 0), (SB, 0)),
-        SBB = inner_product((SB, 0), (SB, 4)),
-        # Matrices for Helmholtz equation
-        ADD = inner_product((ST, 0), (ST, 2)),
-        BDD = inner_product((ST, 0), (ST, 0)),
-        BBD = inner_product((SB, 0), (ST, 0)),
-        CDB = inner_product((ST, 0), (SB, 1)),
-        ADD0 = inner_product((ST0, 0), (ST0, 2)),
-        BDD0 = inner_product((ST0, 0), (ST0, 0)),
-        )
-    )
+    mat = config.AttributeDict(
+        dict(CDD=inner_product((ST, 0), (ST, 1)),
+             AC=[BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2[0]),
+                                 -(K2[0] - nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)],
+             AB=[HelmholtzCoeff(N[0], 1.0, -(K2[0] - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)],
+             # Matrices for biharmonic equation
+             CBD=inner_product((SB, 0), (ST, 1)),
+             ABB=inner_product((SB, 0), (SB, 2)),
+             BBB=inner_product((SB, 0), (SB, 0)),
+             SBB=inner_product((SB, 0), (SB, 4)),
+             # Matrices for Helmholtz equation
+             ADD=inner_product((ST, 0), (ST, 2)),
+             BDD=inner_product((ST, 0), (ST, 0)),
+             BBD=inner_product((SB, 0), (ST, 0)),
+             CDB=inner_product((ST, 0), (SB, 1)),
+             ADD0=inner_product((ST0, 0), (ST0, 2)),
+             BDD0=inner_product((ST0, 0), (ST0, 0)),))
     mat.ADD.axis = 0
     mat.BDD.axis = 0
     mat.SBB.axis = 0
@@ -116,25 +115,23 @@ def get_context():
     # Collect all linear algebra solvers
     # RK 3 requires three solvers because of the three different coefficients
     rk = 0
-    la = config.AttributeDict(dict(
-        HelmholtzSolverG = [Helmholtz(mat.ADD, mat.BDD, -np.ones((1,1,1)),
-                            (K2[0]+2.0/nu/(a[rk]+b[rk])/dt)[np.newaxis, :, :])
-                            for rk in range(3)],
-        BiharmonicSolverU = [Biharmonic(mat.SBB, mat.ABB, mat.BBB, -nu*(a[rk]+b[rk])*dt/2.*np.ones((1,1,1)),
-                                        (1.+nu*(a[rk]+b[rk])*dt*K2[0])[np.newaxis,:,:],
-                                        -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0])[np.newaxis,:,:])
-                             for rk in range(3)],
-        HelmholtzSolverU0 = [old_Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST) for rk in range(3)],
-        TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0)))
-        )
-    )
+    la = config.AttributeDict(
+        dict(HelmholtzSolverG=[Helmholtz(mat.ADD, mat.BDD, -np.ones((1, 1, 1)),
+                                         (K2[0]+2.0/nu/(a[rk]+b[rk])/dt)[np.newaxis, :, :])
+                               for rk in range(3)],
+             BiharmonicSolverU=[Biharmonic(mat.SBB, mat.ABB, mat.BBB, -nu*(a[rk]+b[rk])*dt/2.*np.ones((1, 1, 1)),
+                                           (1.+nu*(a[rk]+b[rk])*dt*K2[0])[np.newaxis, :, :],
+                                           -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0])[np.newaxis, :, :])
+                                for rk in range(3)],
+             HelmholtzSolverU0=[old_Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST) for rk in range(3)],
+             TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0)))))
 
     del rk
 
     hdf5file = KMMRK3Writer({"U":U[0], "V":U[1], "W":U[2]},
-                             chkpoint={'current':{'U':U}, 'previous':{}},
-                             filename=params.solver+".h5",
-                             mesh={"x": x0, "y": x1, "z": x2})
+                            chkpoint={'current':{'U':U}, 'previous':{}},
+                            filename=params.solver+".h5",
+                            mesh={"x": x0, "y": x1, "z": x2})
 
     return config.AttributeDict(locals())
 
@@ -155,7 +152,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
     # Compute diffusion++ for u-equation
     diff_u[:] = nu*(a+b)*dt/2.*SBB.matvec(u, w0)
     diff_u += (1. - nu*(a+b)*dt*K2)*ABB.matvec(u, w0)
-    diff_u -= (K2 - nu*(a+b)*dt/2.*K2**2)*BBB.matvec(u, w0)
+    diff_u -= (K2 - nu*(a+b)*dt/2.*K4)*BBB.matvec(u, w0)
 
     rhs[0] += diff_u
     rhs[1] += diff_g
@@ -163,8 +160,8 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
     return rhs
 
 def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
-               H_hat, VFSp, FSTp, FSBp, FCTp, work, K, Kx, K2, K4, hv,
-               hg, a, b, K_over_K2, la, mat, **context):
+               H_hat, VFSp, FSTp, FSBp, FCTp, work, Kx, K2, K4, hv,
+               hg, a, b, la, mat, **context):
 
     """Compute right hand side of Navier Stokes
 

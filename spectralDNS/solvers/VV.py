@@ -1,7 +1,3 @@
-__author__ = "Mikael Mortensen <mikaem@math.uio.no>"
-__date__ = "2015-01-02"
-__copyright__ = "Copyright (C) 2014-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
 """
 Velocity-vorticity formulation
 
@@ -13,6 +9,13 @@ This solver inherits most features from the NS solver.
 Overloading just a few routines.
 
 """
+__author__ = "Mikael Mortensen <mikaem@math.uio.no>"
+__date__ = "2015-01-02"
+__copyright__ = "Copyright (C) 2014-2016 " + __author__
+__license__ = "GNU Lesser GPL version 3 or any later version"
+
+#pylint: disable=unused-variable,unused-argument,function-redefined
+
 from .NS import *
 
 def get_context():
@@ -31,11 +34,11 @@ def get_context():
     Kx = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((3,) + FFT.complex_shape())
     for i in range(3):
-        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
+        K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
     # Solution variables
-    U     = empty((3,) + FFT.real_shape(), dtype=float)
-    curl  = empty((3,) + FFT.real_shape(), dtype=float)
+    U = empty((3,) + FFT.real_shape(), dtype=float)
+    curl = empty((3,) + FFT.real_shape(), dtype=float)
     W_hat = empty((3,) + FFT.complex_shape(), dtype=complex) # curl transformed
     U_hat = empty((3,) + FFT.complex_shape(), dtype=complex) # velocity transformed
 
@@ -43,7 +46,7 @@ def get_context():
     u = W_hat
 
     # RHS, source and work arrays
-    dU     = empty((3,) + FFT.complex_shape(), dtype=complex)
+    dU = empty((3,) + FFT.complex_shape(), dtype=complex)
     Source = zeros((3,) + FFT.complex_shape(), dtype=complex) # Possible source term initialized to zero
     work = work_arrays()
 
@@ -58,8 +61,8 @@ class VVWriter(HDF5Writer):
     """Subclass HDF5Writer for appropriate updating of real components"""
     def update_components(self, **context):
         """Transform to real data when storing the solution"""
-        U = get_velocity(**context)
-        curl = get_curl(**context)
+        get_velocity(**context)
+        get_curl(**context)
 
 def compute_velocity(c, w_hat, work, FFT, K_over_K2, dealias=None):
     """Compute u from curl(u)

@@ -1,25 +1,28 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2015-10-29"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
+
+#pylint: disable=unused-variable,unused-argument,unused-import,function-redefined,unreachable
 
 raise RuntimeError("Needs to be updated to new TensorProductSpaces")
 
+from functools import wraps
+from shenfun.chebyshev.bases import ShenDirichletBasis, ShenNeumannBasis, \
+    ShenBiharmonicBasis
+from shenfun.spectralbase import inner_product
+from shenfun.la import TDMA
 from .spectralinit import *
 from ..shen import LUsolve
 from ..shen.Matrices import HelmholtzCoeff
 from ..shen.la import Helmholtz
 from ..shen.shentransform import SlabShen_R2C
-from shenfun.chebyshev.bases import ShenDirichletBasis, ShenNeumannBasis, \
-    ShenBiharmonicBasis
-from shenfun.spectralbase import inner_product
-from shenfun.la import TDMA
 
-from functools import wraps
 
 def get_context():
     """Set up context for solver"""
 
+    #pylint: disable=unexpected-keyword-arg
     # Get points and weights for Chebyshev weighted integrals
     ST = ShenDirichletBasis(params.N[0], quad=params.Dquad, threads=params.threads,
                             planner_effort=params.planner_effort["dct"])
@@ -44,30 +47,30 @@ def get_context():
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
 
-    U     = zeros((3,)+FST.real_shape(), dtype=float)
+    U = zeros((3,)+FST.real_shape(), dtype=float)
     U_hat = zeros((3,)+FST.complex_shape(), dtype=complex)
-    P     = zeros(FST.real_shape(), dtype=float)
+    P = zeros(FST.real_shape(), dtype=float)
     P_hat = zeros(FST.complex_shape(), dtype=complex)
     Pcorr = zeros(FST.complex_shape(), dtype=complex)
-    U0      = zeros((3,)+FST.real_shape(), dtype=float)
-    U_hat0  = zeros((3,)+FST.complex_shape(), dtype=complex)
-    U_hat1  = zeros((3,)+FST.complex_shape(), dtype=complex)
-    dU      = zeros((3,)+FST.complex_shape(), dtype=complex)
-    H_hat    = zeros((3,)+FST.complex_shape(), dtype=complex)
-    H_hat0   = zeros((3,)+FST.complex_shape(), dtype=complex)
-    H_hat1   = zeros((3,)+FST.complex_shape(), dtype=complex)
+    U0 = zeros((3,)+FST.real_shape(), dtype=float)
+    U_hat0 = zeros((3,)+FST.complex_shape(), dtype=complex)
+    U_hat1 = zeros((3,)+FST.complex_shape(), dtype=complex)
+    dU = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat0 = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat1 = zeros((3,)+FST.complex_shape(), dtype=complex)
 
-    diff0   = zeros((3,)+FST.complex_shape(), dtype=complex)
-    Source  = zeros((3,)+FST.real_shape(), dtype=float)
-    Sk      = zeros((3,)+FST.complex_shape(), dtype=complex)
+    diff0 = zeros((3,)+FST.complex_shape(), dtype=complex)
+    Source = zeros((3,)+FST.real_shape(), dtype=float)
+    Sk = zeros((3,)+FST.complex_shape(), dtype=complex)
 
     K = FST.get_local_wavenumbermesh(scaled=True)
-    K2 = K[1]*K[1]+K[2]*K[2]
+    K2 = K[1]*K[1] + K[2]*K[2]
     # Set Nyquist frequency to zero on K that is used for odd derivatives
     K = FST.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((3,) + FST.complex_shape())
     for i in range(3):
-        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
+        K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
     work = work_arrays()
 
     # Primary variable
@@ -76,28 +79,24 @@ def get_context():
     nu, dt, N = params.nu, params.dt, params.N
 
     # Collect all linear algebra solvers
-    la = config.AttributeDict(dict(
-        HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST),
-        HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K2[0]), SN),
-        TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0))),
-        TDMASolverN = TDMA(inner_product((SN, 0), (SN, 0)))
-        )
-    )
+    la = config.AttributeDict(
+        dict(HelmholtzSolverU=Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST),
+             HelmholtzSolverP=Helmholtz(N[0], np.sqrt(K2[0]), SN),
+             TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0))),
+             TDMASolverN=TDMA(inner_product((SN, 0), (SN, 0)))))
 
     alfa = K2[0]-2.0/nu/dt
 
     # Collect all matrices
     kx = K[0][:, 0, 0]
-    mat = config.AttributeDict(dict(
-        CDN = inner_product((ST, 0), (SN, 1)),
-        CND = inner_product((SN, 0), (ST, 1)),
-        BDN = inner_product((ST, 0), (SN, 0)),
-        CDD = inner_product((ST, 0), (ST, 1)),
-        BDD = inner_product((ST, 0), (ST, 0)),
-        BDT = inner_product((ST, 0), (CT, 0)),
-        AB = HelmholtzCoeff(N[0], 1.0, -alfa, ST.quad)
-        )
-    )
+    mat = config.AttributeDict(
+        dict(CDN=inner_product((ST, 0), (SN, 1)),
+             CND=inner_product((SN, 0), (ST, 1)),
+             BDN=inner_product((ST, 0), (SN, 0)),
+             CDD=inner_product((ST, 0), (ST, 1)),
+             BDD=inner_product((ST, 0), (ST, 0)),
+             BDT=inner_product((ST, 0), (CT, 0)),
+             AB=HelmholtzCoeff(N[0], 1.0, -alfa, ST.quad)))
 
     hdf5file = IPCSWriter({"U":U[0], "V":U[1], "W":U[2], "P":P},
                           chkpoint={'current':{'U':U, 'P':P}, 'previous':{'U':U0}},
@@ -141,8 +140,8 @@ def set_velocity(U_hat, U, FST, ST, **context):
 
 def get_convection(H_hat, U_hat, K, FST, ST, work, mat, la, **context):
     """Compute convection from context"""
-    conv = getConvection(params.convection)
-    H_hat = conv(H_hat, U_hat, K, FST, ST, work, mat, la)
+    conv_ = getConvection(params.convection)
+    H_hat = conv_(H_hat, U_hat, K, FST, ST, work, mat, la)
     return H_hat
 
 def get_pressure(P_hat, P, FST, SN, **context):
@@ -158,8 +157,8 @@ def compute_pressure(P_hat, H_hat, U_hat, U_hat0, K, FST, ST, work, mat, la,
     k and k+1, computes the pressure at k+1/2
 
     """
-    conv = getConvection(params.convection)
-    H_hat = conv(H_hat, 0.5*(U_hat+U_hat0), K, FST, ST, work, mat, la)
+    conv_ = getConvection(params.convection)
+    H_hat = conv_(H_hat, 0.5*(U_hat+U_hat0), K, FST, ST, work, mat, la)
     for i in range(3):
         H_hat[i] = la.TDMASolverD(H_hat[i])
     H_hat *= -1
@@ -221,24 +220,24 @@ def compute_curl(c, u_hat, K, FST, ST, work):
     c[2] += dvdx
     return c
 
-def Div(a_hat):
-    Uc_hat = work[(a_hat[0], 0)]
-    Uc = work[(U, 2)]
-    Uc_hat = CDD.matvec(a_hat[0], Uc_hat)
-    Uc_hat = TDMASolverD(Uc_hat)
-    dudx = Uc[0] = FST.backward(Uc_hat, Uc[0], ST)
-    dvdy_h = 1j*K[1]*a_hat[1]
-    dvdy = Uc[1] = FST.backward(dvdy_h, Uc[1], ST)
-    dwdz_h = 1j*K[2]*a_hat[2]
-    dwdz = Uc[2] = FST.backward(dwdz_h, Uc[2], ST)
-    return dudx+dvdy+dwdz
+#def Div(a_hat):
+    #Uc_hat = work[(a_hat[0], 0)]
+    #Uc = work[(U, 2)]
+    #Uc_hat = CDD.matvec(a_hat[0], Uc_hat)
+    #Uc_hat = TDMASolverD(Uc_hat)
+    #dudx = Uc[0] = FST.backward(Uc_hat, Uc[0], ST)
+    #dvdy_h = 1j*K[1]*a_hat[1]
+    #dvdy = Uc[1] = FST.backward(dvdy_h, Uc[1], ST)
+    #dwdz_h = 1j*K[2]*a_hat[2]
+    #dwdz = Uc[2] = FST.backward(dwdz_h, Uc[2], ST)
+    #return dudx+dvdy+dwdz
 
-def Divu(U_hat, c):
-    c[:] = 0
-    LUsolve.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], U_hat[0, u_slice],
-                        U_hat[1, u_slice], U_hat[2, u_slice], c[p_slice])
-    c = TDMASolverN(c)
-    return c
+#def Divu(U_hat, c):
+    #c[:] = 0
+    #LUsolve.Mult_Div_3D(params.N[0], K[1, 0], K[2, 0], U_hat[0, u_slice],
+                        #U_hat[1, u_slice], U_hat[2, u_slice], c[p_slice])
+    #c = TDMASolverN(c)
+    #return c
 
 #@profile
 def standardConvection(c, U, U_hat, K, FST, ST, work, mat, la):
@@ -299,7 +298,8 @@ def standardConvection(c, U, U_hat, K, FST, ST, work, mat, la):
 
 def divergenceConvection(c, U, U_hat, K, FST, ST, work, mat, la, add=False):
     """c_i = div(u_i u_j)"""
-    if not add: c.fill(0)
+    if not add:
+        c.fill(0)
     F_tmp = work[(U_hat, 0)]
     F_tmp2 = work[(U_hat, 1)]
 
@@ -379,7 +379,7 @@ def getConvection(convection):
             for i in range(3):
                 u_dealias[i] = FST.backward(u_hat[i], u_dealias[i], ST, params.dealias)
 
-            curl_dealias[:] = compute_curl(curl_dealias, u_hat,K, FST, ST, work)
+            curl_dealias[:] = compute_curl(curl_dealias, u_hat, K, FST, ST, work)
             rhs = Cross(rhs, u_dealias, curl_dealias, FST, ST, work)
             return rhs
 

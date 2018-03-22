@@ -1,8 +1,7 @@
 from __future__ import print_function
-from spectralDNS import config, get_solver, solve
-from numpy import array, pi, zeros, sum, float64, sin, cos, prod, asscalar
-from numpy.linalg import norm
 import warnings
+from numpy import pi, zeros, sum, float64, sin, cos, prod, asscalar
+from spectralDNS import config, get_solver, solve
 
 try:
     import matplotlib.pyplot as plt
@@ -23,14 +22,14 @@ def initialize(solver, context):
 def initialize1(solver, context):
     U, X = context.U, context.X
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
-    U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
+    U[1] = -cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0
     U_hat = solver.set_velocity(**context)
 
 def initialize2(solver, context):
     U, X = context.U, context.X
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
-    U[1] =-cos(X[0])*sin(X[1])*cos(X[2])
+    U[1] = -cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0
     U_hat = context.work[(context.W_hat, 0)]
     for i in range(3):
@@ -40,7 +39,7 @@ def initialize2(solver, context):
 def energy_fourier(comm, a):
     N = config.params.N
     result = 2*sum(abs(a[..., 1:-1])**2) + sum(abs(a[..., 0])**2) + sum(abs(a[..., -1])**2)
-    result =  comm.allreduce(result)
+    result = comm.allreduce(result)
     return result
 
 k = []
@@ -54,7 +53,7 @@ def update(context):
     solver = config.solver
 
     if (params.tstep % params.compute_energy == 0 or
-          params.tstep % params.plot_step == 0 and params.plot_step > 0):
+            params.tstep % params.plot_step == 0 and params.plot_step > 0):
         U = solver.get_velocity(**c)
         curl = solver.get_curl(**c)
         if params.solver == 'NS':
@@ -64,13 +63,13 @@ def update(context):
         if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
             if im1 is None:
                 plt.figure()
-                im1 = plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], U[0,:,:,10], 100)
+                im1 = plt.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], U[0, :, :, 10], 100)
                 plt.colorbar(im1)
                 plt.draw()
                 globals().update(im1=im1)
             else:
                 im1.ax.clear()
-                im1.ax.contourf(c.X[1][:,:,0], c.X[0][:,:,0], U[0,:,:,10], 100)
+                im1.ax.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], U[0, :, :, 10], 100)
                 im1.autoscale()
             plt.pause(1e-6)
 
@@ -125,24 +124,22 @@ def regression_test(context):
     curl = solver.get_curl(**context)
     w = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))/prod(params.N)/2)
     k = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))/prod(params.N)/2) # Compute energy with double precision
-    config.solver.MemoryUsage('End', solver.comm)
+    config.solver.MemoryUsage('End')
     if solver.rank == 0:
         assert round(asscalar(w) - 0.375249930801, params.ntol) == 0
         assert round(asscalar(k) - 0.124953117517, params.ntol) == 0
 
 if __name__ == "__main__":
     config.update(
-        {
-        'nu': 0.000625,             # Viscosity
-        'dt': 0.01,                 # Time step
-        'T': 0.1,                   # End time
-        'L': [2*pi, 2.*pi, 2*pi],
-        'M': [5, 5, 5],
-        #'planner_effort': {'fft': 'FFTW_EXHAUSTIVE'},
-        #'decomposition': 'pencil',
-        #'P1': 2
-        },  "triplyperiodic"
-    )
+        {'nu': 0.000625,             # Viscosity
+         'dt': 0.01,                 # Time step
+         'T': 0.1,                   # End time
+         'L': [2*pi, 2.*pi, 2*pi],
+         'M': [5, 5, 5],
+         #'planner_effort': {'fft': 'FFTW_EXHAUSTIVE'},
+         #'decomposition': 'pencil',
+         #'P1': 2
+        }, "triplyperiodic")
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=2)
     config.triplyperiodic.add_argument("--plot_step", type=int, default=2)
     sol = get_solver(update=update, regression_test=regression_test,

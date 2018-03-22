@@ -1,13 +1,13 @@
 import pytest
-from spectralDNS.shen.shentransform import SlabShen_R2C
-from spectralDNS.shen.la import Helmholtz, Biharmonic
-from spectralDNS.shen.Matrices import HelmholtzCoeff
-from spectralDNS.shen import LUsolve
-from scipy.linalg import solve
 from mpi4py import MPI
-from sympy import chebyshevt, Symbol, sin, cos, pi, lambdify
+from sympy import Symbol, sin, pi, lambdify
 import numpy as np
 import scipy.sparse.linalg as la
+from scipy.linalg import solve
+from spectralDNS.shen.shentransform import SlabShen_R2C
+from spectralDNS.shen.la import Helmholtz
+from spectralDNS.shen.Matrices import HelmholtzCoeff
+from spectralDNS.shen import LUsolve
 from shenfun.spectralbase import inner_product
 from shenfun.chebyshev.bases import Basis, ShenDirichletBasis, \
     ShenNeumannBasis, ShenBiharmonicBasis
@@ -46,7 +46,7 @@ def test_FST(ST, quad):
         A = np.zeros((N, N, N), dtype=FST.float)
         B2 = np.zeros((N, N, N//2+1), dtype=FST.complex)
 
-    atol, rtol = (1e-10, 1e-8) if FST.float is np.float64 else (5e-7, 1e-4)
+    _, rtol = (1e-10, 1e-8) if FST.float is np.float64 else (5e-7, 1e-4)
     FST.comm.Bcast(A, root=0)
     FST.comm.Bcast(B2, root=0)
 
@@ -94,7 +94,7 @@ def test_FST_padded(ST, quad):
         A_pad = np.zeros(FST_SELF.real_shape_padded(), dtype=FST.float)
         A_hat = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
 
-    atol, rtol = (1e-10, 1e-8) if FST.float is np.float64 else (5e-7, 1e-4)
+    _, rtol = (1e-10, 1e-8) if FST.float is np.float64 else (5e-7, 1e-4)
     FST.comm.Bcast(A_pad, root=0)
     FST.comm.Bcast(A_hat, root=0)
 
@@ -134,13 +134,13 @@ def test_Mult_Div():
     wk0 = np.zeros(N, dtype=np.complex)
 
     uk0 = SD.forward(uk, uk0)
-    uk  = SD.backward(uk0, uk)
+    uk = SD.backward(uk0, uk)
     uk0 = SD.forward(uk, uk0)
     vk0 = SD.forward(vk, vk0)
-    vk  = SD.backward(vk0, vk)
+    vk = SD.backward(vk0, vk)
     vk0 = SD.forward(vk, vk0)
     wk0 = SD.forward(wk, wk0)
-    wk  = SD.backward(wk0, wk)
+    wk = SD.backward(wk0, wk)
     wk0 = SD.forward(wk, wk0)
 
     LUsolve.Mult_Div_1D(N, 7, 7, uk0[:N-2], vk0[:N-2], wk0[:N-2], b[1:N-2])
@@ -154,12 +154,12 @@ def test_Mult_Div():
     #from IPython import embed; embed()
     assert np.allclose(uu, b)
 
-    uk0 = uk0.repeat(4*4).reshape((N,4,4)) + 1j*uk0.repeat(4*4).reshape((N,4,4))
-    vk0 = vk0.repeat(4*4).reshape((N,4,4)) + 1j*vk0.repeat(4*4).reshape((N,4,4))
-    wk0 = wk0.repeat(4*4).reshape((N,4,4)) + 1j*wk0.repeat(4*4).reshape((N,4,4))
-    b = np.zeros((N,4,4), dtype=np.complex)
-    m = np.zeros((4,4))+7
-    n = np.zeros((4,4))+7
+    uk0 = uk0.repeat(4*4).reshape((N, 4, 4)) + 1j*uk0.repeat(4*4).reshape((N, 4, 4))
+    vk0 = vk0.repeat(4*4).reshape((N, 4, 4)) + 1j*vk0.repeat(4*4).reshape((N, 4, 4))
+    wk0 = wk0.repeat(4*4).reshape((N, 4, 4)) + 1j*wk0.repeat(4*4).reshape((N, 4, 4))
+    b = np.zeros((N, 4, 4), dtype=np.complex)
+    m = np.zeros((4, 4))+7
+    n = np.zeros((4, 4))+7
     LUsolve.Mult_Div_3D(N, m, n, uk0[:N-2], vk0[:N-2], wk0[:N-2], b[1:N-2])
 
     uu = np.zeros_like(uk0)
@@ -178,8 +178,6 @@ def test_Helmholtz(ST, quad):
     M = 4*N
     ST = ST(M, quad=quad, plan=True)
     kx = 12
-
-    points, weights = ST.points_and_weights(M)
 
     fj = np.random.randn(M)
     f_hat = np.zeros(M)
@@ -236,7 +234,7 @@ def test_Helmholtz(ST, quad):
     u0 = np.zeros((M, 4, 4), dtype=np.complex)
     u0 = ST.backward(u0_hat, u0)
 
-    A.scale = np.ones((1,1,1))
+    A.scale = np.ones((1, 1, 1))
     B.scale = 12**2*np.ones((1, 4, 4))
     A.axis = 0
     B.axis = 0
@@ -258,7 +256,6 @@ def test_Helmholtz2(quad):
     M = 2*N
     SD = ShenDirichletBasis(M, quad=quad, plan=True)
     kx = 12
-    points, weights = SD.points_and_weights(M)
     uj = np.random.randn(M)
     u_hat = np.zeros(M)
     u_hat = SD.forward(uj, u_hat)
@@ -267,7 +264,6 @@ def test_Helmholtz2(quad):
     #from IPython import embed; embed()
     A = inner_product((SD, 0), (SD, 2))
     B = inner_product((SD, 0), (SD, 0))
-    s = SD.slice()
 
     u1 = np.zeros(M)
     u1 = SD.forward(uj, u1)
@@ -299,7 +295,6 @@ def test_Mult_CTD(quad):
     C = inner_product((SD.CT, 0), (SD, 1))
     B = inner_product((SD.CT, 0), (SD.CT, 0))
 
-    uk = np.random.randn((N))+np.random.randn((N))*1j
     vk = np.random.randn((N))+np.random.randn((N))*1j
     wk = np.random.randn((N))+np.random.randn((N))*1j
 
@@ -311,10 +306,10 @@ def test_Mult_CTD(quad):
     cw = np.zeros(N, dtype=np.complex)
 
     vk0 = SD.forward(vk, vk0)
-    vk  = SD.backward(vk0, vk)
+    vk = SD.backward(vk0, vk)
     vk0 = SD.forward(vk, vk0)
     wk0 = SD.forward(wk, wk0)
-    wk  = SD.backward(wk0, wk)
+    wk = SD.backward(wk0, wk)
     wk0 = SD.forward(wk, wk0)
 
     LUsolve.Mult_CTD_1D(N, vk0, wk0, bv, bw)
@@ -339,22 +334,21 @@ def test_Mult_CTD_3D(quad):
     C = inner_product((SD.CT, 0), (SD, 1))
     B = inner_product((SD.CT, 0), (SD.CT, 0))
 
-    uk = np.random.random((N,4,4))+np.random.random((N,4,4))*1j
-    vk = np.random.random((N,4,4))+np.random.random((N,4,4))*1j
-    wk = np.random.random((N,4,4))+np.random.random((N,4,4))*1j
+    vk = np.random.random((N, 4, 4))+np.random.random((N, 4, 4))*1j
+    wk = np.random.random((N, 4, 4))+np.random.random((N, 4, 4))*1j
 
-    bv = np.zeros((N,4,4), dtype=np.complex)
-    bw = np.zeros((N,4,4), dtype=np.complex)
-    vk0 = np.zeros((N,4,4), dtype=np.complex)
-    wk0 = np.zeros((N,4,4), dtype=np.complex)
-    cv = np.zeros((N,4,4), dtype=np.complex)
-    cw = np.zeros((N,4,4), dtype=np.complex)
+    bv = np.zeros((N, 4, 4), dtype=np.complex)
+    bw = np.zeros((N, 4, 4), dtype=np.complex)
+    vk0 = np.zeros((N, 4, 4), dtype=np.complex)
+    wk0 = np.zeros((N, 4, 4), dtype=np.complex)
+    cv = np.zeros((N, 4, 4), dtype=np.complex)
+    cw = np.zeros((N, 4, 4), dtype=np.complex)
 
     vk0 = SD.forward(vk, vk0)
-    vk  = SD.backward(vk0, vk)
+    vk = SD.backward(vk0, vk)
     vk0 = SD.forward(vk, vk0)
     wk0 = SD.forward(wk, wk0)
-    wk  = SD.backward(wk0, wk)
+    wk = SD.backward(wk0, wk)
     wk0 = SD.forward(wk, wk0)
 
     #from IPython import embed; embed()
@@ -384,7 +378,7 @@ def test_Biharmonic(quad):
 
     ul = lambdify(x, u, 'numpy')
     fl = lambdify(x, f, 'numpy')
-    points, weights = SB.points_and_weights(M)
+    points, _ = SB.points_and_weights(M)
     uj = ul(points)
     fj = fl(points)
 
@@ -410,7 +404,6 @@ def test_Helmholtz_matvec(quad):
     M = 2*N
     SD = ShenDirichletBasis(M, quad=quad, plan=True)
     kx = 11
-    points, weights = SD.points_and_weights(M)
     uj = np.random.randn(M)
     u_hat = np.zeros(M)
     u_hat = SD.forward(uj, u_hat)
@@ -420,7 +413,6 @@ def test_Helmholtz_matvec(quad):
     A = inner_product((SD, 0), (SD, 2))
 
     AB = HelmholtzCoeff(M, 1, kx**2, SD.quad)
-    s = SD.slice()
 
     u1 = np.zeros(M)
     u1 = SD.forward(uj, u1)

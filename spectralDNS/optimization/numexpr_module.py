@@ -1,5 +1,7 @@
 import numexpr
 
+#pylint: disable=unused-variable,unused-argument
+
 __all__ = ['add_pressure_diffusion', 'cross1', 'cross2']
 
 def cross1(c, a, b):

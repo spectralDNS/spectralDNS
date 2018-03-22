@@ -1,7 +1,7 @@
-from .Matvec import Biharmonic_matvec, Biharmonic_matvec3D, Helmholtz_matvec3D, \
-    Helmholtz_matvec
 from shenfun.chebyshev import bases
 from shenfun.spectralbase import inner_product
+from .Matvec import Biharmonic_matvec, Biharmonic_matvec3D, Helmholtz_matvec3D, \
+    Helmholtz_matvec
 
 
 class BiharmonicCoeff(object):

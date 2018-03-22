@@ -1,7 +1,7 @@
 import pytest
 from six.moves import reload_module
 from spectralDNS import config, get_solver, solve
-from TG2D import initialize, regression_test, pi
+from TG2D import initialize, regression_test
 
 @pytest.fixture(params=('1', '2'))
 def args(request):
@@ -15,11 +15,11 @@ def args(request):
 
 def test_NS2D(args):
     config.update(
-    {
-        'nu': 0.01,
-        'dt': 0.05,
-        'T': 10}, 'doublyperiodic'
-    )
+        {
+            'nu': 0.01,
+            'dt': 0.05,
+            'T': 10
+        }, 'doublyperiodic')
     solver = get_solver(regression_test=regression_test,
                         mesh='doublyperiodic',
                         parse_args=args)

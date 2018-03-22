@@ -1,10 +1,3 @@
-from __future__ import print_function
-from spectralDNS import config, get_solver, solve
-import numpy as np
-from numpy import array, pi, zeros, sum, float64, sin, cos
-from numpy.linalg import norm
-import warnings
-
 """
 Homogeneous turbulence. See [1] for initialization and [2] for a section
 on forcing the lowest wavenumbers to maintain a constant turbulent
@@ -18,6 +11,11 @@ of homogeneous turbulence with hyperviscosity", Physics of Fluids, 17, 1, 015106
 2005, (https://doi.org/10.1063/1.1833415)
 
 """
+from __future__ import print_function
+import warnings
+import numpy as np
+from numpy import pi, zeros, sum
+from spectralDNS import config, get_solver, solve
 
 try:
     import matplotlib.pyplot as plt
@@ -44,12 +42,12 @@ def initialize_rogallo(solver, context):
     np.random.seed(solver.rank)
     kf = config.params.Kf2
     k = np.sqrt(c.K2)
-    k = np.where(k==0, 1, k)
+    k = np.where(k == 0, 1, k)
     K2 = c.K2
-    K2 = np.where(K2==0, 1, K2)
+    K2 = np.where(K2 == 0, 1, K2)
     k1, k2, k3 = c.K[0], c.K[1], c.K[2]
     ksq = np.sqrt(k1**2+k2**2)
-    ksq = np.where(ksq==0, 1, ksq)
+    ksq = np.where(ksq == 0, 1, ksq)
 
     E0 = np.sqrt(9./11./kf*c.K2/kf**2)*c.mask
     E1 = np.sqrt(9./11./kf*(k/kf)**(-5./3.))*(1-c.mask)
@@ -65,7 +63,7 @@ def initialize_rogallo(solver, context):
     if 'VV' in config.params.solver:
         c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
 
-    U = solver.get_velocity(**c)
+    solver.get_velocity(**c)
     U_hat = solver.set_velocity(**c)
     K = c.K
     # project to zero divergence
@@ -97,7 +95,7 @@ def initialize1(solver, context):
     if 'VV' in config.params.solver:
         c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
 
-    U = solver.get_velocity(**c)
+    solver.get_velocity(**c)
     U_hat = solver.set_velocity(**c)
     # project to zero divergence
     U_hat[:] -= (c.K[0]*U_hat[0]+c.K[1]*U_hat[1]+c.K[2]*U_hat[2])*c.K_over_K2
@@ -106,7 +104,7 @@ def initialize1(solver, context):
         c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
 
 def energy_fourier(comm, u_hat):
-    """Using Parceval's identity to compute the L2-norm of u
+    r"""Using Parceval's identity to compute the L2-norm of u
 
     Computing \int abs(u)**2 dx as N*\sum abs(u_hat)**2
 
@@ -128,14 +126,13 @@ def energy_fourier(comm, u_hat):
     result = (2*np.sum(np.abs(u_hat[..., 1:-1])**2)
               + np.sum(np.abs(u_hat[..., 0])**2)
               + np.sum(np.abs(u_hat[..., -1])**2))
-    result =  comm.allreduce(result)
+    result = comm.allreduce(result)
     if 'shenfun' in config.params.solver:
         return result*np.prod(L)
-    else:
-        return result*np.prod(L)/np.prod(N)**2
+    return result*np.prod(L)/np.prod(N)**2
 
 def L2_norm(comm, u):
-    """Compute the L2-norm of real array a
+    r"""Compute the L2-norm of real array a
 
     Computing \int abs(u)**2 dx
 
@@ -148,7 +145,7 @@ def L2_norm(comm, u):
 def spectrum(solver, context):
     c = context
     uiui = np.zeros(c.U_hat[0].shape)
-    uiui[..., 1:-1] = 2*np.sum((c.U_hat[...,1:-1]*np.conj(c.U_hat[..., 1:-1])).real, axis=0)
+    uiui[..., 1:-1] = 2*np.sum((c.U_hat[..., 1:-1]*np.conj(c.U_hat[..., 1:-1])).real, axis=0)
     uiui[..., 0] = np.sum((c.U_hat[..., 0]*np.conj(c.U_hat[..., 0])).real, axis=0)
     uiui[..., -1] = np.sum((c.U_hat[..., -1]*np.conj(c.U_hat[..., -1])).real, axis=0)
     if 'shenfun' in config.params.solver:
@@ -231,7 +228,7 @@ def update(context):
     energy_lower = energy_fourier(solver.comm, c.U_hat*c.mask)
     energy_upper = energy_new - energy_lower
 
-    alpha2  = (c.target_energy - energy_upper) /energy_lower
+    alpha2 = (c.target_energy - energy_upper) /energy_lower
     alpha = np.sqrt(alpha2)
 
     #du = c.U_hat*c.mask*(alpha)
@@ -251,11 +248,11 @@ def update(context):
         c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
 
     if (params.tstep % params.compute_energy == 0 or
-          params.tstep % params.plot_step == 0 and params.plot_step > 0):
+            params.tstep % params.plot_step == 0 and params.plot_step > 0):
         U = solver.get_velocity(**c)
         curl = solver.get_curl(**c)
         if params.solver == 'NS':
-            P = solver.get_pressure(**c)
+            solver.get_pressure(**c)
 
     K = c.K
     if plt is not None:
@@ -265,13 +262,13 @@ def update(context):
             if not plt.fignum_exists(1):
                 plt.figure(1)
                 #im1 = plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], div_u[:,:,10], 100)
-                im1 = plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], c.U[0,:,:,10], 100)
+                im1 = plt.contourf(c.X[1][..., 0], c.X[0][..., 0], c.U[0, ..., 10], 100)
                 plt.colorbar(im1)
                 plt.draw()
             else:
                 im1.ax.clear()
                 #im1.ax.contourf(c.X[1][:,:,0], c.X[0][:,:,0], div_u[:,:,10], 100)
-                im1.ax.contourf(c.X[1][:,:,0], c.X[0][:,:,0], c.U[0,:,:,10], 100)
+                im1.ax.contourf(c.X[1][..., 0], c.X[0][..., 0], c.U[0, ..., 10], 100)
                 im1.autoscale()
             plt.pause(1e-6)
 
@@ -289,15 +286,15 @@ def update(context):
         #curl_hat = solver.cross2(curl_hat, K, c.U_hat)
         #ww = energy_fourier(solver.comm, params.N, curl_hat)/np.prod(params.N)/2
 
-        duidxj = c.work[(((3,3)+c.U[0].shape), c.float, 0)]
+        duidxj = c.work[(((3, 3)+c.U[0].shape), c.float, 0)]
         for i in range(3):
             for j in range(3):
                 if 'shenfun' in config.params.solver:
-                    duidxj[i,j] = c.T.backward(1j*K[j]*c.U_hat[i], duidxj[i,j])
+                    duidxj[i, j] = c.T.backward(1j*K[j]*c.U_hat[i], duidxj[i, j])
                 else:
-                    duidxj[i,j] = c.FFT.ifftn(1j*K[j]*c.U_hat[i], duidxj[i,j])
+                    duidxj[i, j] = c.FFT.ifftn(1j*K[j]*c.U_hat[i], duidxj[i, j])
 
-        ww2 = L2_norm(solver.comm, duidxj)*params.nu/np.prod(params.L)
+        ww2 = L2_norm(solver.comm, duidxj)*params.nu/np.prod(L)
         #ww2 = solver.comm.reduce(sum(duidxj*duidxj))
 
         ddU = c.work[(((3,)+c.U[0].shape), c.float, 0)]
@@ -328,7 +325,7 @@ def update(context):
         if solver.rank == 0:
             k.append(energy_new)
             w.append(dissipation)
-            print(params.t, alpha,  kk, eps, ww2, ww3, (energy_new-energy_old)/2/params.dt*vol, div_u, Re_lam, Re_lam2)
+            print(params.t, alpha, kk, eps, ww2, ww3, (energy_new-energy_old)/2/params.dt*vol, div_u, Re_lam, Re_lam2)
 
     #if params.tstep % params.compute_energy == 1:
         #if 'NS' in params.solver:
@@ -340,7 +337,6 @@ def init_from_file(filename, solver, context):
     f = h5py.File(filename, driver="mpio", comm=solver.comm)
     assert "1" in f["3D/checkpoint/U"]
     U = context.U
-    N = U.shape[1]
     s = context.T.local_slice(spectral=False)
 
     U[:] = f["3D/checkpoint/U/1"][:, s[0], s[1], s[2]]
@@ -350,7 +346,7 @@ def init_from_file(filename, solver, context):
         U_hat[:, 0, 0, 0] = 0.0
 
     if 'VV' in config.params.solver:
-        context.W_hat = solver.cross2(ccontext.W_hat, context.K, context.U_hat)
+        context.W_hat = solver.cross2(context.W_hat, context.K, context.U_hat)
 
     context.target_energy = energy_fourier(solver.comm, U_hat)
 
@@ -360,17 +356,16 @@ def init_from_file(filename, solver, context):
 if __name__ == "__main__":
     import h5py
     config.update(
-        {
-        'nu': 0.005428,              # Viscosity (not used, see below)
-        'dt': 0.002,                 # Time step
-        'T': 0.05,                   # End time
-        'L': [2.*pi, 2.*pi, 2.*pi],
-        'checkpoint': 100,
-        'write_result': 1e8,
-        #'decomposition': 'pencil',
-        #'Pencil_alignment': 'Y',
-        #'P1': 2
-        },  "triplyperiodic"
+        {'nu': 0.005428,              # Viscosity (not used, see below)
+         'dt': 0.002,                 # Time step
+         'T': 0.05,                   # End time
+         'L': [2.*pi, 2.*pi, 2.*pi],
+         'checkpoint': 100,
+         'write_result': 1e8,
+         #'decomposition': 'pencil',
+         #'Pencil_alignment': 'Y',
+         #'P1': 2
+        }, "triplyperiodic"
     )
     config.triplyperiodic.add_argument("--N", default=[60, 60, 60], nargs=3,
                                        help="Mesh size. Trumps M.")

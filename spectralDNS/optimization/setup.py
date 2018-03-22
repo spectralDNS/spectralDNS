@@ -2,7 +2,7 @@
 This setup file is called by the top setup and is used to generate
 files with different precision
 """
-import sys, os
+import os
 
 # Note to self. May be solved more elegantly using fused types,
 # but this leads to much heavier modules (templates) that are slower
@@ -55,9 +55,9 @@ for module in ("integrators", "maths", "solvers"):
 prec = {"single": ("float32", "complex64"),
         "double": ("float64", "complex128")}
 
-t0 = os.path.getmtime("numba_module.in".format(module))
+t0 = os.path.getmtime("numba_module.in")
 compile_new = False
-if not os.path.exists("numba_module.py".format(module)):
+if not os.path.exists("numba_module.py"):
     compile_new = True
 elif os.path.getmtime("numba_module.py") < t0:
     compile_new = True

@@ -1,8 +1,8 @@
 import pytest
 from six.moves import reload_module
-from spectralDNS import config, get_solver, solve
-from TG import initialize, regression_test, pi
 from mpi4py import MPI
+from spectralDNS import config, get_solver, solve
+from TG import initialize, regression_test
 
 comm = MPI.COMM_WORLD
 
@@ -80,8 +80,7 @@ def test_integrators(sol):
         }
     )
 
-    solver = get_solver(regression_test=regression_test,
-                        parse_args=sol)
+    solver = get_solver(regression_test=regression_test, parse_args=sol)
     context = solver.get_context()
     for integrator in ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed'):
         if integrator in ('ForwardEuler', 'AB2'):

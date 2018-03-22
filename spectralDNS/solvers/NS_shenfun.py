@@ -3,9 +3,11 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
 __license__ = "GNU Lesser GPL version 3 or any later version"
 
-from .spectralinit import *
+#pylint: disable=unused-variable,unused-argument,function-redefined
+
 from shenfun.fourier.bases import R2CBasis, C2CBasis
 from shenfun import TensorProductSpace, VectorTensorProductSpace, Array
+from .spectralinit import *
 
 def get_context():
     """Set up context for classical (NS) solver"""
@@ -35,7 +37,7 @@ def get_context():
     Kx = T.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = np.zeros((3,)+VT.local_shape())
     for i in range(3):
-        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
+        K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
     # Velocity and pressure
     U = Array(VT, False)
@@ -136,7 +138,8 @@ def standard_convection(rhs, u_dealias, U_hat, work, T, Tp, K, dealias=None):
 
 def divergence_convection(rhs, u_dealias, work, T, Tp, K, dealias=None, add=False):
     """rhs_i = div(u_i u_j)"""
-    if not add: rhs.fill(0)
+    if not add:
+        rhs.fill(0)
     UUi_hat = work[(rhs, 0, False)]
     T = T if dealias is None else Tp
     for i in range(3):
@@ -157,7 +160,7 @@ def getConvection(convection):
 
         def Conv(rhs, u_hat, work, T, Tp, VT, VTp, K):
             u_dealias = work[((3,)+Tp.backward.output_array.shape,
-                             Tp.backward.output_array.dtype, 0, False)]
+                              Tp.backward.output_array.dtype, 0, False)]
             u_dealias = VTp.backward(u_hat, u_dealias)
             rhs = standard_convection(rhs, u_dealias, u_hat, work, T, Tp, K, params.dealias)
             rhs[:] *= -1
@@ -167,7 +170,7 @@ def getConvection(convection):
 
         def Conv(rhs, u_hat, work, T, Tp, VT, VTp, K):
             u_dealias = work[((3,)+Tp.backward.output_array.shape,
-                             Tp.backward.output_array.dtype, 0, False)]
+                              Tp.backward.output_array.dtype, 0, False)]
             u_dealias = VTp.backward(u_hat, u_dealias)
             rhs = divergence_convection(rhs, u_dealias, work, T, Tp, K, params.dealias, False)
             rhs[:] *= -1
@@ -177,7 +180,7 @@ def getConvection(convection):
 
         def Conv(rhs, u_hat, work, T, Tp, VT, VTp, K):
             u_dealias = work[((3,)+Tp.backward.output_array.shape,
-                             Tp.backward.output_array.dtype, 0, False)]
+                              Tp.backward.output_array.dtype, 0, False)]
             u_dealias = VTp.backward(u_hat, u_dealias)
             rhs = standard_convection(rhs, u_dealias, u_hat, work, T, Tp, K, params.dealias)
             rhs = divergence_convection(rhs, u_dealias, work, T, Tp, K, params.dealias, True)
@@ -188,9 +191,9 @@ def getConvection(convection):
 
         def Conv(rhs, u_hat, work, T, Tp, VT, VTp, K):
             u_dealias = work[((3,)+Tp.backward.output_array.shape,
-                             Tp.backward.output_array.dtype, 0, False)]
+                              Tp.backward.output_array.dtype, 0, False)]
             curl_dealias = work[((3,)+Tp.backward.output_array.shape,
-                                Tp.backward.output_array.dtype, 1, False)]
+                                 Tp.backward.output_array.dtype, 1, False)]
             u_dealias = VTp.backward(u_hat, u_dealias)
             curl_dealias = compute_curl(curl_dealias, u_hat, work, VT, VTp, K, params.dealias)
             rhs = Cross(rhs, u_dealias, curl_dealias, work, VT, VTp, params.dealias)

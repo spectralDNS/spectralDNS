@@ -1,15 +1,18 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2015-10-29"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
 
-from .IPCS import *
+#pylint: disable=unused-variable,unused-argument,unused-import,function-redefined
+
 from shenfun.chebyshev.matrices import CDTmat, CTDmat, BDTmat, BTDmat, BTTmat,\
     BTNmat, CNDmat, BNDmat, BNNmat, BDDmat
+from .IPCS import *
 
 def get_context():
     """Set up context for solver"""
 
+    #pylint: disable=unexpected-keyword-arg
     # Get points and weights for Chebyshev weighted integrals
     ST = ShenDirichletBasis(params.N[0], quad=params.Dquad, threads=params.threads,
                             planner_effort=params.planner_effort["dct"])
@@ -34,22 +37,22 @@ def get_context():
     X = FST.get_local_mesh(ST)
     x0, x1, x2 = FST.get_mesh_dims(ST)
 
-    U     = zeros((3,)+FST.real_shape(), dtype=float)
+    U = zeros((3,)+FST.real_shape(), dtype=float)
     U_hat = zeros((3,)+FST.complex_shape(), dtype=complex)
-    P     = zeros(FST.real_shape(), dtype=float)
+    P = zeros(FST.real_shape(), dtype=float)
     P_hat = zeros(FST.complex_shape(), dtype=complex)
     Pcorr = zeros(FST.complex_shape(), dtype=complex)
-    U0      = zeros((3,)+FST.real_shape(), dtype=float)
-    U_hat0  = zeros((3,)+FST.complex_shape(), dtype=complex)
-    U_hat1  = zeros((3,)+FST.complex_shape(), dtype=complex)
-    dU      = zeros((3,)+FST.complex_shape(), dtype=complex)
-    H_hat    = zeros((3,)+FST.complex_shape(), dtype=complex)
-    H_hat0   = zeros((3,)+FST.complex_shape(), dtype=complex)
-    H_hat1   = zeros((3,)+FST.complex_shape(), dtype=complex)
+    U0 = zeros((3,)+FST.real_shape(), dtype=float)
+    U_hat0 = zeros((3,)+FST.complex_shape(), dtype=complex)
+    U_hat1 = zeros((3,)+FST.complex_shape(), dtype=complex)
+    dU = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat0 = zeros((3,)+FST.complex_shape(), dtype=complex)
+    H_hat1 = zeros((3,)+FST.complex_shape(), dtype=complex)
 
-    diff0   = zeros((3,)+FST.complex_shape(), dtype=complex)
-    Source  = zeros((3,)+FST.real_shape(), dtype=float)
-    Sk      = zeros((3,)+FST.complex_shape(), dtype=complex)
+    diff0 = zeros((3,)+FST.complex_shape(), dtype=complex)
+    Source = zeros((3,)+FST.real_shape(), dtype=float)
+    Sk = zeros((3,)+FST.complex_shape(), dtype=complex)
 
     K = FST.get_local_wavenumbermesh(scaled=True)
     K2 = K[1]*K[1]+K[2]*K[2]
@@ -58,7 +61,7 @@ def get_context():
     K = FST.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((3,) + FST.complex_shape())
     for i in range(3):
-        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
+        K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
     work = work_arrays()
 
@@ -69,42 +72,36 @@ def get_context():
     kx = K[0][:, 0, 0]
 
     # Collect all linear algebra solvers
-    la = config.AttributeDict(dict(
-        HelmholtzSolverU = Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST),
-        HelmholtzSolverP = Helmholtz(N[0], np.sqrt(K2[0]), SN),
-        TDMASolverD = TDMA(inner_product((ST, 0), (ST, 0))),
-        TDMASolverN = TDMA(inner_product((SN, 0), (SN, 0)))
-        )
-    )
+    la = config.AttributeDict(
+        dict(HelmholtzSolverU=Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST),
+             HelmholtzSolverP=Helmholtz(N[0], np.sqrt(K2[0]), SN),
+             TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0))),
+             TDMASolverN=TDMA(inner_product((SN, 0), (SN, 0)))))
 
     alfa = K2[0]-2.0/nu/dt
 
     # Collect all matrices
-    mat = config.AttributeDict(dict(
-        CDN = inner_product((ST, 0), (SN, 1)),
-        CND = inner_product((SN, 0), (ST, 1)),
-        BDN = inner_product((ST, 0), (SN, 0)),
-        CDD = inner_product((ST, 0), (ST, 1)),
-        BDD = inner_product((ST, 0), (ST, 0)),
-        AB = HelmholtzCoeff(N[0], 1.0, -alfa, ST.quad),
-        CDT = inner_product((ST, 0), (CT, 1)),
-        CTD = inner_product((CT, 0), (ST, 1)),
-        BDT = inner_product((ST, 0), (CT, 0)),
-        BTD = inner_product((CT, 0), (ST, 0)),
-        BTT = inner_product((CT, 0), (CT, 0)),
-        BTN = inner_product((CT, 0), (SN, 0)),
-        BND = inner_product((SN, 0), (ST, 0)),
-        )
-    )
+    mat = config.AttributeDict(
+        dict(CDN=inner_product((ST, 0), (SN, 1)),
+             CND=inner_product((SN, 0), (ST, 1)),
+             BDN=inner_product((ST, 0), (SN, 0)),
+             CDD=inner_product((ST, 0), (ST, 1)),
+             BDD=inner_product((ST, 0), (ST, 0)),
+             AB=HelmholtzCoeff(N[0], 1.0, -alfa, ST.quad),
+             CDT=inner_product((ST, 0), (CT, 1)),
+             CTD=inner_product((CT, 0), (ST, 1)),
+             BDT=inner_product((ST, 0), (CT, 0)),
+             BTD=inner_product((CT, 0), (ST, 0)),
+             BTT=inner_product((CT, 0), (CT, 0)),
+             BTN=inner_product((CT, 0), (SN, 0)),
+             BND=inner_product((SN, 0), (ST, 0)),))
 
     dd = mat.BTT[0].repeat(np.array(P_hat.shape[1:]).prod()).reshape(P_hat.shape)
-
 
     hdf5file = IPCSRWriter({"U":U[0], "V":U[1], "W":U[2], "P":P},
                            chkpoint={'current':{'U':U, 'P':P}, 'previous':{'U':U0}},
                            filename=params.solver+".h5",
                            mesh={"x": x0, "xp": FST.get_mesh_dim(SN, 0), "y": x1, "z": x2})
-
 
     return config.AttributeDict(locals())
 
@@ -169,22 +166,22 @@ def pressuregrad2(rhs, p_corr, K, mat, work, Nu):
 def compute_pressure(P_hat, H_hat, U_hat, U_hat0, K, FST, ST, work, mat, la,
                      u_slice, p_slice, P, SN, **context):
     """Solve for pressure if Ni is fst of convection"""
-    conv = getConvection(params.convection)
-    H_hat = conv(H_hat, 0.5*(U_hat+U_hat0), K, FST, ST, work, mat, la)
+    conv_ = getConvection(params.convection)
+    H_hat = conv_(H_hat, 0.5*(U_hat+U_hat0), K, FST, ST, work, mat, la)
     for i in range(3):
         H_hat[i] = la.TDMASolverD(H_hat[i])
     H_hat *= -1
 
     F_tmp = work[(P_hat, 0)]
     LUsolve.Mult_Div_3D(params.N[0], K[1][0], K[2][0], H_hat[0, u_slice],
-                     H_hat[1, u_slice], H_hat[2, u_slice], F_tmp[p_slice])
+                        H_hat[1, u_slice], H_hat[2, u_slice], F_tmp[p_slice])
     P_hat = la.HelmholtzSolverP(P_hat, F_tmp)
 
     # P in Chebyshev basis for this solver
     P[:] = FST.backward(P_hat, P, SN)
-    P_hat  = FST.forward(P, P_hat, SN.CT)
+    P_hat = FST.forward(P, P_hat, SN.CT)
     P[:] = FST.backward(P_hat, P, SN.CT)
-    P_hat  = FST.forward(P, P_hat, SN.CT)
+    P_hat = FST.forward(P, P_hat, SN.CT)
     return P_hat
 
 def updatepressure(p_hat, p_corr, u_hat, K, mat, dd, work):

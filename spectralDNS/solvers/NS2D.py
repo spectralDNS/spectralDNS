@@ -1,7 +1,9 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
+
+#pylint: disable=unused-variable,unused-argument,function-redefined
 
 from .NS import *
 
@@ -22,14 +24,14 @@ def get_context():
     Kx = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((2,) + FFT.complex_shape())
     for i in range(2):
-        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
+        K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
     # Solution variables
-    U     = empty((2,) + FFT.real_shape(), dtype=float)
+    U = empty((2,) + FFT.real_shape(), dtype=float)
     U_hat = empty((2,) + FFT.complex_shape(), dtype=complex)
-    P     = empty(FFT.real_shape(), dtype=float)
+    P = empty(FFT.real_shape(), dtype=float)
     P_hat = empty(FFT.complex_shape(), dtype=complex)
-    curl  = empty(FFT.real_shape(), dtype=float)
+    curl = empty(FFT.real_shape(), dtype=float)
 
     # Primary variable
     u = U_hat
@@ -49,8 +51,8 @@ def get_context():
 class NS2DWriter(HDF5Writer):
     def update_components(self, **context):
         """Transform to real data before storing the solution"""
-        U = get_velocity(**context)
-        P = get_pressure(**context)
+        get_velocity(**context)
+        get_pressure(**context)
 
 def get_curl(curl, U_hat, work, FFT, K, **context):
     curl_hat = work[(FFT.complex_shape(), complex, 0)]
@@ -91,4 +93,3 @@ def getConvection(convection):
 
     Conv.convection = convection
     return Conv
-

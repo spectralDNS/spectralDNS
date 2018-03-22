@@ -1,8 +1,8 @@
 import pytest
 from six.moves import reload_module
+from mpi4py import MPI
 from spectralDNS import config, get_solver, solve
 from TGMHD import initialize, regression_test, pi
-from mpi4py import MPI
 
 comm = MPI.COMM_WORLD
 
@@ -32,13 +32,13 @@ def sol(request):
 def test_MHD(sol):
     config.update(
         {
-        'nu': 0.000625,             # Viscosity
-        'dt': 0.01,                 # Time step
-        'T': 0.1,                   # End time
-        'eta': 0.01,
-        'L': [2*pi, 4*pi, 6*pi],
-        'M': [4, 5, 6],
-        'convection': 'Divergence'
+            'nu': 0.000625,             # Viscosity
+            'dt': 0.01,                 # Time step
+            'T': 0.1,                   # End time
+            'eta': 0.01,
+            'L': [2*pi, 4*pi, 6*pi],
+            'M': [4, 5, 6],
+            'convection': 'Divergence'
         }
     )
 

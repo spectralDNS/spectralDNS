@@ -1,10 +1,11 @@
+#pylint: disable=bad-whitespace,arguments-differ
 from collections import defaultdict
-from mpiFFT4py import dct, work_arrays, Slab_R2C, fftfreq, rfftfreq, rfft2, \
-    irfft2, rfft, irfft, fft, ifft
-from mpi4py import MPI
 from numpy import array, zeros, zeros_like, sum, hstack, meshgrid, abs, \
     pi, uint8, rollaxis, arange
 import numpy as np
+from mpi4py import MPI
+from mpiFFT4py import dct, work_arrays, Slab_R2C, fftfreq, rfftfreq, rfft2, \
+    irfft2, rfft, irfft, fft, ifft
 from ..optimization import optimizer
 
 work = work_arrays()
@@ -22,21 +23,18 @@ class SlabShen_R2C(Slab_R2C):
         """The local shape of the transposed complex data padded in x and z directions"""
         if self.dealias_cheb:
             return (int(self.padsize*self.Np[0]), int(self.padsize*self.N[1]), int(self.padsize*self.N[2]/2+1))
-        else:
-            return (self.Np[0], int(self.padsize*self.N[1]), int(self.padsize*self.N[2]/2+1))
+        return (self.Np[0], int(self.padsize*self.N[1]), int(self.padsize*self.N[2]/2+1))
 
     def real_shape_padded(self):
         """The local shape of the real data"""
         if self.dealias_cheb:
             return (int(self.padsize*self.Np[0]), int(self.padsize*self.N[1]), int(self.padsize*self.N[2]))
-        else:
-            return (self.Np[0], int(self.padsize*self.N[1]), int(self.padsize*self.N[2]))
+        return (self.Np[0], int(self.padsize*self.N[1]), int(self.padsize*self.N[2]))
 
     def complex_shape_padded(self):
         if self.dealias_cheb:
             return (int(self.padsize*self.N[0]), int(self.padsize*self.Np[1]), int(self.padsize*self.N[2]/2+1))
-        else:
-            return (self.N[0], int(self.padsize*self.Np[1]), int(self.padsize*self.N[2]/2+1))
+        return (self.N[0], int(self.padsize*self.Np[1]), int(self.padsize*self.N[2]/2+1))
 
     def get_mesh_dims(self, ST):
         return [self.get_mesh_dim(ST, i) for i in range(3)]
@@ -46,27 +44,25 @@ class SlabShen_R2C(Slab_R2C):
             return (slice(self.rank*padsize*self.Np[0], (self.rank+1)*padsize*self.Np[0], 1),
                     slice(0, int(padsize*self.N[1]), 1),
                     slice(0, int(padsize*self.N[2]), 1))
-        else:
-            return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
-                    slice(0, int(padsize*self.N[1]), 1),
-                    slice(0, int(padsize*self.N[2]), 1))
+        return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
+                slice(0, int(padsize*self.N[1]), 1),
+                slice(0, int(padsize*self.N[2]), 1))
 
     def global_complex_shape(self, padsize=1.0):
         """Global size of problem in complex wavenumber space"""
         if self.dealias_cheb:
             return (int(padsize*self.N[0]), int(padsize*self.N[1]),
                     int(padsize*self.N[2]/2+1))
-        else:
-            return (self.N[0], int(padsize*self.N[1]),
-                    int(padsize*self.N[2]/2+1))
+        return (self.N[0], int(padsize*self.N[1]),
+                int(padsize*self.N[2]/2+1))
 
     def get_mesh_dim(self, ST, d):
         if d == 0:
             return ST.points_and_weights(self.N[0])[0]
         elif d == 1:
             return arange(self.N[1], dtype=self.float)*self.L[1]/self.N[1]
-        elif d == 2:
-            return arange(self.N[2], dtype=self.float)*self.L[2]/self.N[2]
+        assert d == 2
+        return arange(self.N[2], dtype=self.float)*self.L[2]/self.N[2]
 
     def get_local_mesh(self, ST):
         x0, x1, x2 = self.get_mesh_dims(ST)
@@ -209,7 +205,7 @@ class SlabShen_R2C(Slab_R2C):
 
 
             elif self.communication == 'Alltoallw':
-                if len(self._subarraysA) == 0:
+                if not self._subarraysA:
                     self._subarraysA, self._subarraysB, self._counts_displs = self.get_subarrays()
 
                 # Do 2 ffts in y-z directions on owned data
@@ -244,7 +240,7 @@ class SlabShen_R2C(Slab_R2C):
                     self.comm.Alltoall([Uc_mpi, self.mpitype], [Uc_hat, self.mpitype])
 
                 elif self.communication == 'Alltoallw':
-                    if len(self._subarraysA) == 0:
+                    if not self._subarraysA:
                         self._subarraysA, self._subarraysB, self._counts_displs = self.get_subarrays()
                     self.comm.Alltoallw(
                         [Uc_hatT, self._counts_displs, self._subarraysB],
@@ -276,7 +272,7 @@ class SlabShen_R2C(Slab_R2C):
                     self.comm.Alltoall(MPI.IN_PLACE, [Upad_hat, self.mpitype])
 
                 elif self.communication == 'Alltoallw':
-                    if len(self._subarraysA_pad) == 0:
+                    if not self._subarraysA_pad:
                         self._subarraysA_pad, self._subarraysB_pad, self._counts_displs = self.get_subarrays(padsize=self.padsize)
 
                     self.comm.Alltoallw(
@@ -358,7 +354,7 @@ class SlabShen_R2C(Slab_R2C):
                 #Uc_hatT = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
 
             elif self.communication == 'Alltoallw':
-                if len(self._subarraysA) == 0:
+                if not self._subarraysA:
                     self._subarraysA, self._subarraysB, self._counts_displs = self.get_subarrays()
                 Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
                 self.comm.Alltoallw(
@@ -384,7 +380,7 @@ class SlabShen_R2C(Slab_R2C):
                     Uc_hatT[:] = rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
 
                 elif self.communication == 'Alltoallw':
-                    if len(self._subarraysA) == 0:
+                    if not self._subarraysA:
                         self._subarraysA, self._subarraysB, self._counts_displs = self.get_subarrays()
 
                     self.comm.Alltoallw(
@@ -419,7 +415,7 @@ class SlabShen_R2C(Slab_R2C):
                     Upad_hat1[:] = rollaxis(U_mpi, 1).reshape(Upad_hat1.shape)
 
                 elif self.communication == 'Alltoallw':
-                    if len(self._subarraysA_pad) == 0:
+                    if not self._subarraysA_pad:
                         self._subarraysA_pad, self._subarraysB_pad, self._counts_displs = self.get_subarrays(padsize=self.padsize)
                     self.comm.Alltoallw(
                         [Upad_hat,  self._counts_displs, self._subarraysA_pad],
@@ -498,12 +494,12 @@ class SlabShen_R2C(Slab_R2C):
                 w[1::2] = 0
                 return sum(ak*w)*self.L[1]*self.L[2]/self.N[1]/self.N[2]
 
-            elif quad == 'GC':
-                d = zeros(self.N[0])
-                k = 2*(1 + arange((self.N[0]-1)//2))
-                d[::2] = (2./self.N[0])/hstack((1., 1.-k*k))
-                w = zeros_like(d)
-                w = dct(d, w, type=3, axis=0)
-                return sum(c*w)*self.L[1]*self.L[2]/self.N[1]/self.N[2]
-        else:
-            return 0
+            assert quad == 'GC'
+            d = zeros(self.N[0])
+            k = 2*(1 + arange((self.N[0]-1)//2))
+            d[::2] = (2./self.N[0])/hstack((1., 1.-k*k))
+            w = zeros_like(d)
+            w = dct(d, w, type=3, axis=0)
+            return sum(c*w)*self.L[1]*self.L[2]/self.N[1]/self.N[2]
+
+        return 0

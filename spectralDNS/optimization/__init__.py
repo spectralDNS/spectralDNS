@@ -1,10 +1,13 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2015-03-24"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
 
+import importlib
 from functools import wraps
 from spectralDNS import config
+
+#pylint: disable=bare-except,no-member
 
 def optimizer(func):
     """Decorator used to wrap calls to optimized versions of functions.
@@ -19,7 +22,8 @@ def optimizer(func):
 
     """
     try: # Look for optimized version of function
-        mod = eval("_".join((config.params.optimization, config.params.precision)))
+        mod = importlib.import_module("_".join((config.params.optimization,
+                                                config.params.precision)))
 
         # Check for generic implementation first, then solver specific
         name = func.__name__
@@ -72,4 +76,3 @@ try:
     from . import pythran_module as pythran_double
 except:
     pass
-

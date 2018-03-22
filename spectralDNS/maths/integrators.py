@@ -1,10 +1,12 @@
+#pylint: disable=inconsistent-return-statements,fixme,unreachable
 __author__ = "Mikael Mortensen <mikaem@math.uio.no> and Nathanael Schilling <nathanael.schilling@in.tum.de>"
 __date__ = "2015-04-07"
 __copyright__ = "Copyright (C) 2015-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
 
-from ..optimization import optimizer, wraps
 import numpy as np
+from mpi4py import MPI
+from ..optimization import optimizer, wraps
 
 __all__ = ['getintegrator']
 
@@ -59,10 +61,10 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
         if fsal:
             offset[0] = (offset[0] - 1) % s
         for i in range(0, s):
-            if not fsal or (tstep == 0 or i != 0 ):
-                fY_hat[(i + offset[0]) % s] =  u0
-                for j in range(0,i):
-                    fY_hat[(i+offset[0]) % s] += dt*A[i,j]*fY_hat[(j+offset[0]) % s]
+            if not fsal or (tstep == 0 or i != 0):
+                fY_hat[(i + offset[0]) % s] = u0
+                for j in range(0, i):
+                    fY_hat[(i+offset[0]) % s] += dt*A[i, j]*fY_hat[(j+offset[0]) % s]
                 #Compute F(Y)
                 rhs = solver.ComputeRHS(rhs, fY_hat[(i+offset[0]) % s], solver, **context)
                 fY_hat[(i+offset[0]) % s] = rhs
@@ -76,12 +78,12 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
         u0_new[:] += dt*b[0]*fY_hat[(0+offset[0]) % s]
         err[:] = dt*(b[0] - bhat[0])*fY_hat[(0+offset[0]) % s]
 
-        for j in range(1,s):
+        for j in range(1, s):
             u0_new[:] += dt*b[j]*fY_hat[(j+offset[0])%s]
             err[:] += dt*(b[j] - bhat[j])*fY_hat[(j+offset[0])%s]
 
         est = 0.0
-        sc[:] = aTOL + np.maximum(np.abs(u0),np.abs(u0_new))*rTOL
+        sc[:] = aTOL + np.maximum(np.abs(u0), np.abs(u0_new))*rTOL
         if errnorm == "2":
             est_to_bcast = None
             nsquared = np.zeros(u0.shape[0])
@@ -92,13 +94,13 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
                 est = np.max(np.sqrt(nsquared))
                 est /= np.sqrt(np.array(FFT.global_complex_shape()).prod())
                 est_to_bcast[0] = est
-            est_to_bcast = FFT.comm.bcast(est_to_bcast,root=0)
+            est_to_bcast = FFT.comm.bcast(est_to_bcast, root=0)
             est = est_to_bcast[0]
 
         elif errnorm == "inf":
             raise AssertionError("Don't use this, not sure if it works")
             #TODO: Test this error norm
-            sc[:] = aTOL + np.maximum(np.abs(u0),np.abs(u0_new))*rTOL
+            sc[:] = aTOL + np.maximum(np.abs(u0), np.abs(u0_new))*rTOL
             err[:] = err[:] / sc[:]
             err = np.abs(err, out=err)
             asdf = np.max(err)
@@ -126,7 +128,7 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
             dt = dt*factor
             if  est > 1.0:
                 facmax = 1
-                context.is_step_rejected_callback=True
+                context.is_step_rejected_callback = True
                 context.dt_rejected = dt_prev
                 additional_callback(context)
                 #The offset gets decreased in the  next step, which is something we do not want.
@@ -157,7 +159,7 @@ def RK4(u0, u1, u2, rhs, a, b, dt, solver, context):
     return u0, dt, dt
 
 @optimizer
-def ForwardEuler(u0, u1, rhs, dt, solver, context):
+def ForwardEuler(u0, rhs, dt, solver, context):
     rhs = solver.ComputeRHS(rhs, u0, solver, **context)
     u0 += rhs*dt
     return u0, dt, dt
@@ -216,7 +218,7 @@ def getintegrator(rhs, u0, solver, context):
     elif params.integrator == "ForwardEuler":
         @wraps(ForwardEuler)
         def func():
-            return ForwardEuler(u0, u1, rhs, params.dt, solver, context)
+            return ForwardEuler(u0, rhs, params.dt, solver, context)
         return func
 
     elif params.integrator == "AB2":

@@ -4,46 +4,59 @@ Solve the Orr-Sommerfeld eigenvalue problem
 Using Shen's biharmonic basis
 
 """
+import warnings
+import six
 from scipy.linalg import eig
 #from numpy.linalg import eig
+#from numpy.linalg import inv
 import numpy as np
-from numpy.linalg import inv
 from shenfun.chebyshev.bases import ShenBiharmonicBasis, \
-    ShenDirichletBasis, Basis
+    ShenDirichletBasis
 from shenfun.spectralbase import inner_product
 from shenfun.matrixbase import extract_diagonal_matrix
 
-import six
-import warnings
 np.seterr(divide='ignore')
 
 try:
     from matplotlib import pyplot as plt
-    from pylab import find
 
 except ImportError:
     warnings.warn("matplotlib not installed")
 
 
 class OrrSommerfeld(object):
-    def __init__(self,**kwargs):
-        self.par={'alfa':1.,
-                  'Re':8000.,
-                  'N':80,
-                  'quad': 'GC'}
+    def __init__(self, **kwargs):
+        self.par = {'alfa':1.,
+                    'Re':8000.,
+                    'N':80,
+                    'quad': 'GC'}
         self.par.update(**kwargs)
-        [setattr(self, name, val) for name, val in six.iteritems(self.par)]
+        for name, val in six.iteritems(self.par):
+            setattr(self, name, val)
         self.P4 = np.zeros(0)
         self.T4x = np.zeros(0)
-        self.SB = None
+        self.SB, self.SD, self.CDB, self.V = (None,)*4
+        self.x, self.w = None, None
 
-    def interp(self, y, eigval=1, same_mesh=False, verbose=False):
+    def interp(self, y, eigvals, eigvectors, eigval=1, same_mesh=False, verbose=False):
         """Interpolate solution eigenvector and it's derivative onto y
+
+        args:
+            y            Interpolation points
+            eigvals      All computed eigenvalues
+            eigvectors   All computed eigenvectors
+        kwargs:
+            eigval       The chosen eigenvalue, ranked with descending imaginary
+                         part. The largest imaginary part is 1, the second
+                         largest is 2, etc.
+            same_mesh    Boolean. Whether or not to interpolate to the same
+                         quadrature points as used for computing the eigenvectors
+            verbose      Boolean. Print information or not
         """
         N = self.N
-        nx, eigval = self.get_eigval(eigval, verbose)
+        nx, eigval = self.get_eigval(eigval, eigvals, verbose)
         phi_hat = np.zeros(N, np.complex)
-        phi_hat[:-4] = np.squeeze(self.eigvectors[:, nx])
+        phi_hat[:-4] = np.squeeze(eigvectors[:, nx])
         if same_mesh:
             phi = np.zeros_like(phi_hat)
             dphidy = np.zeros_like(phi_hat)
@@ -67,7 +80,7 @@ class OrrSommerfeld(object):
             phi = np.dot(self.P4, phi_hat)
             dphidy = np.dot(self.T4x, phi_hat)
 
-        return phi, dphidy
+        return eigval, phi, dphidy
 
     def assemble(self):
         N = self.N
@@ -110,8 +123,9 @@ class OrrSommerfeld(object):
 
         Re = self.Re
         a = self.alfa
-        self.B = -Re*a*1j*(K-a**2*M)
-        self.A = Q-2*a**2*K+a**4*M - 2*a*Re*1j*M - 1j*a*Re*(K2-a**2*K1)
+        B = -Re*a*1j*(K-a**2*M)
+        A = Q-2*a**2*K+a**4*M - 2*a*Re*1j*M - 1j*a*Re*(K2-a**2*K1)
+        return A, B
 
     def solve(self, verbose=False):
         """Solve the Orr-Sommerfeld eigenvalue problem
@@ -119,23 +133,25 @@ class OrrSommerfeld(object):
         if verbose:
             print('Solving the Orr-Sommerfeld eigenvalue problem...')
             print('Re = '+str(self.par['Re'])+' and alfa = '+str(self.par['alfa']))
-        self.assemble()
-        self.eigvals, self.eigvectors = eig(self.A[:-4, :-4],self.B[:-4, :-4])
-        #self.eigvals, self.eigvectors = eig(np.dot(inv(self.B[:-4, :-4]), self.A[:-4, :-4]))
+        A, B = self.assemble()
+        return eig(A[:-4, :-4], B[:-4, :-4])
+        # return eig(np.dot(inv(B[:-4, :-4]), A[:-4, :-4]))
 
-    def get_eigval(self, nx, verbose=False):
+    @staticmethod
+    def get_eigval(nx, eigvals, verbose=False):
         """Get the chosen eigenvalue
 
         Args:
             nx       The chosen eigenvalue. nx=1 corresponds to the one with the
                      largest imaginary part, nx=2 the second largest etc.
+            eigvals  Computed eigenvalues
 
             verbose  Print the value of the chosen eigenvalue
 
         """
-        indices = np.argsort(np.imag(self.eigvals))
-        indi = indices[-np.array(nx)]
-        eigval = self.eigval = self.eigvals[indi]
+        indices = np.argsort(np.imag(eigvals))
+        indi = indices[-1*np.array(nx)]
+        eigval = eigvals[indi]
         if verbose:
             ev = list(eigval) if np.ndim(eigval) else [eigval]
             indi = list(indi) if np.ndim(indi) else [indi]
@@ -143,8 +159,7 @@ class OrrSommerfeld(object):
                 print('Eigenvalue {} ({}) = {:2.16e}'.format(i+1, v, e))
         return indi, eigval
 
-
-if __name__=='__main__':
+if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Orr Sommerfeld parameters')
     parser.add_argument('--N', type=int, default=120,
@@ -162,14 +177,14 @@ if __name__=='__main__':
     args = parser.parse_args()
     #z = OrrSommerfeld(N=120, Re=5772.2219, alfa=1.02056)
     z = OrrSommerfeld(**vars(args))
-    z.solve(args.verbose)
-    d = z.get_eigval(1, args.verbose)
+    eigvals, eigvectors = z.solve(args.verbose)
+    d = z.get_eigval(1, eigvals, args.verbose)
     if args.Re == 8000.0 and args.alfa == 1.0 and args.N > 80:
         assert abs(d[1] - (0.24707506017508621+0.0026644103710965817j)) < 1e-12
 
     if args.plot:
         plt.figure()
-        ev = z.eigvals*z.alfa
+        ev = eigvals*z.alfa
         plt.plot(ev.imag, ev.real, 'o')
         plt.axis([-10, 0.1, 0, 1])
         plt.show()

@@ -1,11 +1,11 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2017-09-26"
 __copyright__ = "Copyright (C) 2017 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
 
+from time import time
 import numpy as np
 from mpi4py import MPI
-from time import time
 from shenfun import *
 
 nu = 0.000625
@@ -57,7 +57,7 @@ def ComputeRHS(dU, rk):
 
 X = T.local_mesh(True)
 U[0] = np.sin(X[0])*np.cos(X[1])*np.cos(X[2])
-U[1] =-np.cos(X[0])*np.sin(X[1])*np.cos(X[2])
+U[1] = -np.cos(X[0])*np.sin(X[1])*np.cos(X[2])
 U[2] = 0
 U_hat = TV.forward(U, U_hat)
 
@@ -65,11 +65,13 @@ t = 0.0
 tstep = 0
 t0 = time()
 while t < end_time-1e-8:
-    t += dt; tstep += 1
+    t += dt
+    tstep += 1
     U_hat1[:] = U_hat0[:] = U_hat
     for rk in range(4):
         dU = ComputeRHS(dU, rk)
-        if rk < 3: U_hat[:] = U_hat0 + b[rk]*dt*dU
+        if rk < 3:
+            U_hat[:] = U_hat0 + b[rk]*dt*dU
         U_hat1 += a[rk]*dt*dU
     U_hat[:] = U_hat1
     U = TV.backward(U_hat, U)

@@ -1,11 +1,14 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
 
-from mpi4py import MPI
-import sys, cProfile
+#pylint: disable=unused-argument,redefined-outer-name,unused-import
+
+import sys
+import cProfile
 import numpy as np
+from mpi4py import MPI
 # possibly byte-aligned zeros/empty
 from mpiFFT4py import Slab_R2C, Pencil_R2C, Line_R2C, empty, zeros, \
      work_arrays, datatypes

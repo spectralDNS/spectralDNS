@@ -1,17 +1,17 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2014-11-19"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
 
-"""Wrap call to hdf5 to allow running without installing h5py
-"""
-from numpy import all, squeeze
-from numpy.linalg import norm
 import warnings
 import six
+from numpy import all, squeeze
 
 __all__ = ['HDF5Writer']
 
+#pylint: disable=dangerous-default-value,unused-argument
+
+# Wrap call to hdf5 to allow running without installing h5py
 try:
     import h5py
     class HDF5Writer(object):
@@ -29,7 +29,7 @@ try:
             self.f = h5py.File(self.fname, "w", driver="mpio", comm=comm)
             self.f.create_group("3D")
             self.f.create_group("2D")
-            if len(self.mesh) > 0:
+            if self.mesh:
                 self.f.create_group("mesh")
                 for key, val in six.iteritems(self.mesh):
                     val = squeeze(val)
@@ -63,7 +63,7 @@ try:
 
         def update(self, params, **kw):
             if (self.check_if_write(params) or
-                  params.tstep % params.checkpoint == 0):
+                    params.tstep % params.checkpoint == 0):
                 self.update_components(**kw)
 
             if self.check_if_write(params):
@@ -72,14 +72,15 @@ try:
             if params.tstep % params.checkpoint == 0:
                 self._checkpoint(params, **kw)
 
-        def check_if_write(self, params):
+        @staticmethod
+        def check_if_write(params):
             if params.tstep % params.write_result == 0:
                 return True
 
             if 'write_xy_slice' in params:
                 if (params.tstep % params.write_xy_slice[1] == 0 or
-                    params.tstep % params.write_yz_slice[1] == 0 or
-                    params.tstep % params.write_xz_slice[1] == 0):
+                        params.tstep % params.write_yz_slice[1] == 0 or
+                        params.tstep % params.write_xz_slice[1] == 0):
                     return True
             return False
 
@@ -98,7 +99,7 @@ try:
             create_new_dataset = False
             for key in keys:
                 kk = "{}/checkpoint/{}".format(dim, key)
-                if not "1" in list(self.f[kk].keys()):
+                if "1" not in list(self.f[kk].keys()):
                     create_new_dataset = True
             FFT.comm.barrier()
             if create_new_dataset:
@@ -111,7 +112,7 @@ try:
 
             try:
                 s = FFT.real_local_slice()
-            except:
+            except AttributeError:
                 s = tuple(FFT.local_slice(False))
 
             # Get new values
@@ -144,7 +145,7 @@ try:
 
             # For channel solver with dynamic pressure
             if 'Sk' in kw:
-                z0 = kw['Sk'][1,0,0,0].real
+                z0 = kw['Sk'][1, 0, 0, 0].real
                 z0 = FFT.comm.bcast(z0)
                 self.f.attrs["Sk"] = z0
             self.f.close()
@@ -162,7 +163,7 @@ try:
             N = params.N
             try:
                 s = FFT.real_local_slice()
-            except:
+            except AttributeError:
                 s = FFT.local_slice(False)
 
             if params.tstep % params.write_result == 0:
@@ -204,7 +205,7 @@ try:
 
             # For channel solver with dynamic pressure
             if 'Sk' in kw:
-                z0 = kw['Sk'][1,0,0,0].real
+                z0 = kw['Sk'][1, 0, 0, 0].real
                 z0 = FFT.comm.bcast(z0)
                 self.f.attrs["Sk"] = z0
 
@@ -214,14 +215,16 @@ try:
             pass
 
         def close(self):
-            if self.f: self.f.close()
+            if self.f:
+                self.f.close()
 
-except:
+except ImportError:
     class HDF5Writer(object):
         def __init__(self, comps, chkpoint={}, filename="U.h5", mesh={}):
             warnings.warn("Need to install h5py to allow storing results")
 
-        def check_if_write(self, params):
+        @staticmethod
+        def check_if_write(params):
             return False
 
         def _checkpoint(self, params, **context):
@@ -230,5 +233,8 @@ except:
         def _write(self, params, **context):
             pass
 
+        def update_components(self, **kw):
+            pass
+
         def close(self):
-            del self
+            pass

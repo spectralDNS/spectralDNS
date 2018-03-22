@@ -1,6 +1,8 @@
-import h5py
 import copy
-from numpy import pi, float32, dtype
+from numpy import float32, dtype, array
+import h5py
+
+#pylint: disable=bare-except,unsubscriptable-object,expression-not-assigned,len-as-condition
 
 xdmffile = """<?xml version="1.0" encoding="utf-8"?>
 <Xdmf xmlns:xi="http://www.w3.org/2001/XInclude" Version="2.1">
@@ -35,7 +37,7 @@ isotropic = """
           <DataItem DataType="Float" Dimensions="3" Format="XML" Precision="4">{0} {1} {2}</DataItem>
         </Geometry>"""
 
-channel =  """
+channel = """
         <Geometry Type="VXVYVZ">
           <DataItem Format="HDF" NumberType="Float" Precision="{0}" Dimensions="{3}">
            {4}:/mesh/z
@@ -54,7 +56,7 @@ isotropic2D = """
           <DataItem DataType="Float" Dimensions="2" Format="XML" Precision="4">{0} {1}</DataItem>
         </Geometry>"""
 
-channel2D =  """
+channel2D = """
         <Geometry Type="VXVY">
           <DataItem Format="HDF" NumberType="Float" Precision="{0}" Dimensions="{1}">
            {3}:/mesh/{4}
@@ -69,16 +71,16 @@ def generate_xdmf(h5filename):
     comps = list(f["3D"].keys())
     for i in ("checkpoint", "oldcheckpoint", "mesh"):
         try:
-            popped = comps.remove(i)
+            comps.remove(i)
         except:
             pass
 
-    N = f.attrs["N"]
-    L = f.attrs["L"]
+    N = array(f.attrs["N"])
+    L = array(f.attrs["L"])
     if len(f.attrs.get('N')) == 3:
         xf3d = copy.copy(xdmffile)
         timesteps = []
-        timesteps = f["/".join(("3D", comps[0]))].visit(timesteps.append)
+        f["/".join(("3D", comps[0]))].visit(timesteps.append)
         tt = ""
         for i in timesteps:
             tt += "%s " %i

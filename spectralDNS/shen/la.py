@@ -1,9 +1,11 @@
-from numpy import zeros, ones, arange, pi, float, complex, int, complex128, array
+#pylint: disable=unused-import
+from numpy import zeros, arange, float, complex128
+from scipy.linalg import lu_factor, lu_solve, solve_banded, decomp_cholesky
+import scipy.sparse.linalg as la_solve
 from shenfun.spectralbase import inner_product
 from shenfun.chebyshev import bases
 from . import LUsolve, Matvec
-from scipy.linalg import lu_factor, lu_solve, solve, solve_banded, decomp_cholesky
-import scipy.sparse.linalg as la_solve
+
 
 class Helmholtz(object):
     """Helmholtz solver -u'' + alfa*u = b
@@ -30,14 +32,14 @@ class Helmholtz(object):
             self.u0 = zeros((2, M+1, Ny, Nz), float)   # Diagonal entries of U
             self.u1 = zeros((2, M, Ny, Nz), float)     # Diagonal+1 entries of U
             self.u2 = zeros((2, M-1, Ny, Nz), float)   # Diagonal+2 entries of U
-            self.L  = zeros((2, M, Ny, Nz), float)     # The single nonzero row of L
-            LUsolve.LU_Helmholtz_3D(N, self.neumann, quad=="GL", self.alfa, self.u0, self.u1, self.u2, self.L)
+            self.L = zeros((2, M, Ny, Nz), float)      # The single nonzero row of L
+            LUsolve.LU_Helmholtz_3D(N, self.neumann, quad == "GL", self.alfa, self.u0, self.u1, self.u2, self.L)
         else:
             self.u0 = zeros((2, M+1), float)   # Diagonal entries of U
             self.u1 = zeros((2, M), float)     # Diagonal+1 entries of U
             self.u2 = zeros((2, M-1), float)   # Diagonal+2 entries of U
-            self.L  = zeros((2, M), float)     # The single nonzero row of L
-            LUsolve.LU_Helmholtz_1D(N, self.neumann, quad=="GL", self.alfa, self.u0, self.u1, self.u2, self.L)
+            self.L = zeros((2, M), float)      # The single nonzero row of L
+            LUsolve.LU_Helmholtz_1D(N, self.neumann, quad == "GL", self.alfa, self.u0, self.u1, self.u2, self.L)
         if not self.neumann:
             self.B = inner_product((basis, 0), (basis, 0))
             self.A = inner_product((basis, 0), (basis, 2))
@@ -85,7 +87,6 @@ class Biharmonic(object):
     def __init__(self, N, a0, alfa, beta, quad="GL", solver="cython"):
         self.quad = quad
         self.solver = solver
-        k = arange(N)
         SB = bases.ShenBiharmonicBasis(N, quad=quad)
         self.S = S = inner_product((SB, 0), (SB, 4))
         self.B = B = inner_product((SB, 0), (SB, 0))
@@ -93,7 +94,7 @@ class Biharmonic(object):
         self.a0 = a0
         self.alfa = alfa
         self.beta = beta
-        if not solver == "scipy":
+        if  solver != "scipy":
             sii, siu, siuu = S[0], S[2], S[4]
             ail, aii, aiu = A[-2], A[0], A[2]
             bill, bil, bii, biu, biuu = B[-4], B[-2], B[0], B[2], B[4]
@@ -175,15 +176,13 @@ class Biharmonic(object):
         return u
 
     def matvec(self, v, c):
-        N = v.shape[0]
         c[:] = 0
         if len(v.shape) > 1:
             Matvec.Biharmonic_matvec3D(v, c, self.a0, self.alfa, self.beta, self.S[0], self.S[2],
-                                self.S[4], self.A[-2], self.A[0], self.A[2],
-                                self.B[-4], self.B[-2], self.B[0], self.B[2], self.B[4])
+                                       self.S[4], self.A[-2], self.A[0], self.A[2],
+                                       self.B[-4], self.B[-2], self.B[0], self.B[2], self.B[4])
         else:
             Matvec.Biharmonic_matvec(v, c, self.a0, self.alfa, self.beta, self.S[0], self.S[2],
-                                self.S[4], self.A[-2], self.A[0], self.A[2],
-                                self.B[-4], self.B[-2], self.B[0], self.B[2], self.B[4])
+                                     self.S[4], self.A[-2], self.A[0], self.A[2],
+                                     self.B[-4], self.B[-2], self.B[0], self.B[2], self.B[4])
         return c
-

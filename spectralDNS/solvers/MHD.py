@@ -1,7 +1,9 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014-2016 " + __author__
-__license__  = "GNU Lesser GPL version 3 or any later version"
+__license__ = "GNU Lesser GPL version 3 or any later version"
+
+#pylint: disable=unused-variable,unused-argument
 
 from .spectralinit import *
 from .NS import end_of_tstep
@@ -17,10 +19,10 @@ def get_context():
     Kx = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = zeros((3,) + FFT.complex_shape())
     for i in range(3):
-        K_over_K2[i] = K[i] / np.where(K2==0, 1, K2)
+        K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
     UB = empty((6,) + FFT.real_shape(), dtype=float)
-    P  = empty(FFT.real_shape(), dtype=float)
+    P = empty(FFT.real_shape(), dtype=float)
     curl = empty((3,) + FFT.real_shape(), dtype=float)
     UB_hat = empty((6,) + FFT.complex_shape(), dtype=complex)
     P_hat = empty(FFT.complex_shape(), dtype=complex)
@@ -28,9 +30,9 @@ def get_context():
     Source = None
 
     # Create views into large data structures
-    U     = UB[:3]
+    U = UB[:3]
     U_hat = UB_hat[:3]
-    B     = UB[3:]
+    B = UB[3:]
     B_hat = UB_hat[3:]
 
     # Primary variable
@@ -39,7 +41,7 @@ def get_context():
     work = work_arrays()
 
     hdf5file = MHDWriter({'U':U[0], 'V':U[1], 'W':U[2], 'P':P,
-                         'Bx':B[0], 'By':B[1], 'Bz':B[2]},
+                          'Bx':B[0], 'By':B[1], 'Bz':B[2]},
                          chkpoint={'current':{'UB':UB, 'P':P}, 'previous':{}},
                          filename=params.h5filename+'.h5')
 
@@ -69,12 +71,12 @@ def get_UB(UB, UB_hat, FFT, **context):
 
 def set_Elsasser(c, F_tmp, K):
     c[:3] = -1j*(K[0]*(F_tmp[:, 0] + F_tmp[0, :])
-                +K[1]*(F_tmp[:, 1] + F_tmp[1, :])
-                +K[2]*(F_tmp[:, 2] + F_tmp[2, :]))/2.0
+                 + K[1]*(F_tmp[:, 1] + F_tmp[1, :])
+                 + K[2]*(F_tmp[:, 2] + F_tmp[2, :]))/2.0
 
-    c[3:] =  1j*(K[0]*(F_tmp[0, :] - F_tmp[:, 0])
-                +K[1]*(F_tmp[1, :] - F_tmp[:, 1])
-                +K[2]*(F_tmp[2, :] - F_tmp[:, 2]))/2.0
+    c[3:] = 1j*(K[0]*(F_tmp[0, :] - F_tmp[:, 0])
+                + K[1]*(F_tmp[1, :] - F_tmp[:, 1])
+                + K[2]*(F_tmp[2, :] - F_tmp[:, 2]))/2.0
     return c
 
 def divergenceConvection(c, z0, z1, work, FFT, K, dealias=None):

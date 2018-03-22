@@ -1,6 +1,6 @@
 import pytest
-from spectralDNS import config, get_solver, solve
 from six.moves import reload_module
+from spectralDNS import config, get_solver, solve
 from OrrSommerfeld import initialize, regression_test, set_Source, pi
 
 @pytest.fixture(params=('KMMRK3', 'KMM', 'IPCS', 'IPCSR', 'KMMRK3_mpifft4py', 'KMM_mpifft4py'))
@@ -20,7 +20,7 @@ def test_channel(sol):
             'L': [2, 2*pi, 4*pi/3.],
             'M': [7, 5, 2],
             'eps': 1e-7
-        },  "channel"
+        }, "channel"
     )
 
     solver = get_solver(regression_test=regression_test,
@@ -43,5 +43,5 @@ def test_channel(sol):
     initialize(solver, context)
     solve(solver, context)
 
-if __name__=='__main__':
+if __name__ == '__main__':
     test_channel('IPCS')

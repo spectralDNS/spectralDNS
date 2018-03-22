@@ -1,21 +1,19 @@
 """Orr-Sommerfeld"""
-import pyfftw  # Hack because of https://github.com/pyFFTW/pyFFTW/issues/40
-from spectralDNS import config, get_solver, solve
-from spectralDNS.utilities import reset_profile
-from OrrSommerfeld_shen import OrrSommerfeld
-#from OrrSommerfeld_eig import OrrSommerfeld
-from numpy import dot, real, pi, cos, exp, sum, zeros, arange, imag, sqrt, \
-    array, zeros_like, log10, hstack
-from numpy.linalg import norm
-from mpiFFT4py import dct
-from scipy.fftpack import ifft
+#import pyfftw  # Hack because of https://github.com/pyFFTW/pyFFTW/issues/40
 import warnings
 from mpi4py import MPI
+from numpy import real, pi, exp, sum, zeros, arange, imag, sqrt, \
+    zeros_like, log10, hstack
+from mpiFFT4py import dct
+from spectralDNS import config, get_solver, solve
+#from spectralDNS.utilities import reset_profile
+from OrrSommerfeld_shen import OrrSommerfeld
+#from OrrSommerfeld_eig import OrrSommerfeld
 
 try:
     import matplotlib.pyplot as plt
     import matplotlib.cbook
-    warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
+    warnings.filterwarnings("ignore", category=matplotlib.cbook.mplDeprecation)
 
 except ImportError:
     warnings.warn("matplotlib not installed")
@@ -34,13 +32,14 @@ except ImportError:
             #U[1, i, j, :] = v
     #U[2] = 0
 
-def initOS(OS, U, X, t=0.):
+def initOS(OS, eigvals, eigvectors, U, X, t=0.):
     x = X[0][:, 0, 0]
-    phi, dphidy = OS.interp(x, 1, same_mesh=False, verbose=False)
+    eigval, phi, dphidy = OS.interp(x, eigvals, eigvectors, eigval=1, same_mesh=False, verbose=False)
+    OS.eigval = eigval
     for j in range(U.shape[2]):
         y = X[1][0, j, 0]
-        v = (1-x**2) + config.params.eps*real(dphidy*exp(1j*(y-OS.eigval*t)))
-        u = -config.params.eps*real(1j*phi*exp(1j*(y-OS.eigval*t)))
+        v = (1-x**2) + config.params.eps*real(dphidy*exp(1j*(y-eigval*t)))
+        u = -config.params.eps*real(1j*phi*exp(1j*(y-eigval*t)))
         U[0, :, j, :] = u.repeat(U.shape[3]).reshape((len(x), U.shape[3]))
         U[1, :, j, :] = v.repeat(U.shape[3]).reshape((len(x), U.shape[3]))
     U[2] = 0
@@ -67,16 +66,14 @@ def dx(u, FST):
             w[1::2] = 0
             return sum(ak*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
 
-        elif quad == 'GC':
-            d = zeros(M)
-            k = 2*(1 + arange((M-1)//2))
-            d[::2] = (2./M)/hstack((1., 1.-k*k))
-            w = zeros_like(d)
-            w = dct(d, w, type=3, axis=0)
-            return sum(c*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
-    else:
-        return 0
-
+        assert quad == 'GC'
+        d = zeros(M)
+        k = 2*(1 + arange((M-1)//2))
+        d[::2] = (2./M)/hstack((1., 1.-k*k))
+        w = zeros_like(d)
+        w = dct(d, w, type=3, axis=0)
+        return sum(c*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
+    return 0
 
 acc = zeros(1)
 OS, e0 = None, None
@@ -84,11 +81,12 @@ def initialize(solver, context):
     global OS, e0
     params = config.params
     OS = OrrSommerfeld(Re=params.Re, N=128)
-    OS.solve(False)
+    eigvals, eigvectors = OS.solve(False)
+    OS.eigvals, OS.eigvectors = eigvals, eigvectors
     U = context.U
     X = context.X
     FST = context.FST
-    initOS(OS, U, X)
+    initOS(OS, eigvals, eigvectors, U, X)
 
     U_hat = solver.set_velocity(**context)
     U = solver.get_velocity(**context)
@@ -105,7 +103,7 @@ def initialize(solver, context):
     if not 'KMMRK3' in params.solver:
         # Initialize at t = dt
         context.H_hat1[:] = solver.get_convection(**context)
-        initOS(OS, U, X, t=params.dt)
+        initOS(OS, eigvals, eigvectors, U, X, t=params.dt)
         U_hat = solver.set_velocity(**context)
         U = solver.get_velocity(**context)
         context.U_hat0[:] = U_hat
@@ -149,7 +147,7 @@ def set_Source(Source, Sk, FST, ST, N, **kw):
     else:
         Sk[1] = FST.scalar_product(Source[1], Sk[1])
         Sk[1] /= (4*pi**2)
-    Sk[1, -2:,0,0] = 0
+    Sk[1, -2:, 0, 0] = 0
 
 im1, im2, im3, im4 = (None, )*4
 def update(context):
@@ -161,7 +159,7 @@ def update(context):
     #if params.tstep == 2: reset_profile(profile)
 
     if (params.tstep % params.plot_step == 0 or
-        params.tstep % params.compute_energy == 0):
+            params.tstep % params.compute_energy == 0):
         U = solver.get_velocity(**context)
 
     #U = solver.get_velocity(**context)
@@ -173,29 +171,29 @@ def update(context):
     if not plt is None:
         if im1 is None and solver.rank == 0 and params.plot_step > 0:
             plt.figure()
-            im1 = plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], c.U[0,:,:,0], 100)
+            im1 = plt.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], c.U[0, :, :, 0], 100)
             plt.colorbar(im1)
             plt.draw()
 
             plt.figure()
-            im2 = plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], c.U[1,:,:,0] - (1-c.X[0][:,:,0]**2), 100)
+            im2 = plt.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], c.U[1, :, :, 0] - (1-c.X[0][:, :, 0]**2), 100)
             plt.colorbar(im2)
             plt.draw()
 
             plt.figure()
-            im3 = plt.quiver(c.X[1][:,:,0], c.X[0][:,:,0], c.U[1,:,:,0]-(1-c.X[0][:,:,0]**2), c.U[0,:,:,0])
+            im3 = plt.quiver(c.X[1][:, :, 0], c.X[0][:, :, 0], c.U[1, :, :, 0]-(1-c.X[0][:, :, 0]**2), c.U[0, :, :, 0])
             plt.draw()
 
             plt.pause(1e-6)
 
         if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
             im1.ax.clear()
-            im1.ax.contourf(c.X[1][:,:,0], c.X[0][:,:,0], U[0, :, :, 0], 100)
+            im1.ax.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], U[0, :, :, 0], 100)
             im1.autoscale()
             im2.ax.clear()
-            im2.ax.contourf(c.X[1][:,:,0], c.X[0][:,:,0], U[1, :, :, 0]-(1-c.X[0][:,:,0]**2), 100)
+            im2.ax.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], U[1, :, :, 0]-(1-c.X[0][:, :, 0]**2), 100)
             im2.autoscale()
-            im3.set_UVC(U[1,:,:,0]-(1-c.X[0][:,:,0]**2), U[0,:,:,0])
+            im3.set_UVC(U[1, :, :, 0]-(1-c.X[0][:, :, 0]**2), U[0, :, :, 0])
             plt.pause(1e-6)
 
     if params.tstep % params.compute_energy == 0:
@@ -218,7 +216,7 @@ def compute_error(context):
 
     exact = exp(2*imag(OS.eigval)*params.t)
     U0 = c.work[(c.U, 0)]
-    initOS(OS, U0, c.X, t=params.t)
+    initOS(OS, OS.eigvals, OS.eigvectors, U0, c.X, t=params.t)
     #pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
     pert = (U[0] - U0[0])**2
     if hasattr(context.FST, 'dx'):
@@ -241,26 +239,25 @@ def refinement_test(context):
 def eps_refinement_test(context):
     e1, e2, exact = compute_error(context)
     if config.solver.rank == 0:
-        print(" %2d & %2.8e & %2.8e \\\ " %(-int(log10(config.params.eps)), sqrt(e2)/config.params.eps, e1/e0-exact))
+        print(r" %2d & %2.8e & %2.8e \\\ " %(-int(log10(config.params.eps)), sqrt(e2)/config.params.eps, e1/e0-exact))
 
 def spatial_refinement_test(context):
     e1, e2, exact = compute_error(context)
     if config.solver.rank == 0:
-        print(" %2d & %2.8e & %2.8e \\\ " %(2**config.params.M[0], sqrt(e2)/config.params.eps, acc[0]))
+        print(r" %2d & %2.8e & %2.8e \\\ " %(2**config.params.M[0], sqrt(e2)/config.params.eps, acc[0]))
 
 if __name__ == "__main__":
     config.update(
-        {
-        'Re': 8000.,
-        'nu': 1./8000.,             # Viscosity
-        'dt': 0.001,                 # Time step
-        'T': 0.01,                   # End time
-        'L': [2, 2*pi, pi],
-        'M': [7, 5, 2],
-        'Dquad': 'GC',
-        'Bquad': 'GC',
-        'dealias': None
-        },  "channel"
+        {'Re': 8000.,
+         'nu': 1./8000.,              # Viscosity
+         'dt': 0.001,                 # Time step
+         'T': 0.01,                   # End time
+         'L': [2, 2*pi, pi],
+         'M': [7, 5, 2],
+         'Dquad': 'GC',
+         'Bquad': 'GC',
+         'dealias': None
+        }, "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)
     config.channel.add_argument("--plot_step", type=int, default=1)
@@ -291,12 +288,13 @@ if __name__ == "__main__":
             acc[0] += abs(e1/e0-exact)
         solver.update = update
         solver.regression_test = spatial_refinement_test
-        config.params.verbose=False
+        config.params.verbose = False
         for M in [4, 5, 6, 7, 8]:
             config.params.M = [M, 3, 1]
             context = solver.get_context()
             initialize(solver, context)
             set_Source(**context)
+
             solve(solver, context)
 
     else:

@@ -1,23 +1,19 @@
 """Turbulent channel"""
-import pyfftw
-from spectralDNS import config, get_solver, solve
-from spectralDNS.utilities import reset_profile
-from numpy import dot, real, pi, exp, sum, complex, float, zeros, arange, imag, \
-    cos, where, pi, random, exp, sin, log, array, zeros_like, hstack
-import h5py
-from mpiFFT4py import dct
-import matplotlib.pyplot as plt
 import warnings
-import matplotlib.cbook
-#from OrrSommerfeld_eig import OrrSommerfeld
-warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
-from spectralDNS.utilities import reset_profile
 from mpi4py import MPI
 import numpy as np
+import h5py
+import matplotlib.pyplot as plt
+import matplotlib.cbook
+from mpiFFT4py import dct
+#from spectralDNS.utilities import reset_profile
+from spectralDNS import config, get_solver, solve
+
+warnings.filterwarnings("ignore", category=matplotlib.cbook.mplDeprecation)
 
 # Use constant flux and adjust pressure gradient dynamically
-#flux = array([1645.46])
-flux = array([736.43])
+#flux = np.array([1645.46])
+flux = np.array([736.43])
 
 def initOS(OS, U, X, t=0.):
     for i in range(U.shape[1]):
@@ -25,8 +21,8 @@ def initOS(OS, U, X, t=0.):
         OS.interp(x)
         for j in range(U.shape[2]):
             y = X[1][i, j, 0]
-            v =  dot(OS.f, real(OS.dphidy*exp(1j*(y-OS.eigval*t))))
-            u = -dot(OS.f, real(1j*OS.phi*exp(1j*(y-OS.eigval*t))))
+            v = np.dot(OS.f, np.real(OS.dphidy*np.exp(1j*(y-OS.eigval*t))))
+            u = -np.dot(OS.f, np.real(1j*OS.phi*np.exp(1j*(y-OS.eigval*t))))
             U[0, i, j, :] = u
             U[1, i, j, :] = v
     U[2] = 0
@@ -36,9 +32,8 @@ def initialize(solver, context):
     U = context.U
     X = context.X
     params = config.params
-
-    Y = where(X[0]<0, 1+X[0], 1-X[0])
-    utau = params.nu * params.Re_tau
+    Y = np.where(X[0] < 0, 1+X[0], 1-X[0])
+    utau = params.nu*params.Re_tau
     #Um = 46.9091*utau
     Um = 56.*utau
     Xplus = Y*params.Re_tau
@@ -51,11 +46,11 @@ def initialize(solver, context):
     epsilon = Um/200.   #Um/200.
     U[:] = 0
     U[1] = Um*(Y-0.5*Y**2)
-    dev = 1+0.0001*random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dev = 1+0.0001*np.random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
     #dev = np.fromfile('dev.dat').reshape((64, 64, 64))
-    dd = utau*duplus/2.0*Xplus/40.*exp(-sigma*Xplus**2+0.5)*cos(betaplus*Zplus)*dev
+    dd = utau*duplus/2.0*Xplus/40.*np.exp(-sigma*Xplus**2+0.5)*np.cos(betaplus*Zplus)*dev
     U[1] += dd
-    U[2] += epsilon*sin(alfaplus*Yplus)*Xplus*exp(-sigma*Xplus**2)*dev
+    U[2] += epsilon*np.sin(alfaplus*Yplus)*Xplus*np.exp(-sigma*Xplus**2)*dev
 
     U_hat = solver.set_velocity(**context)
     U = solver.get_velocity(**context)
@@ -121,41 +116,40 @@ def set_Source(Source, Sk, ST, FST, **context):
         Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
     else:
         Sk[1] = FST.scalar_product(Source[1], Sk[1])
-        Sk[1] /= (4*pi**2)
+        Sk[1] /= (4*np.pi**2)
 
 def dx(u, FST):
     """Compute integral of u over domain"""
-    uu = sum(u, axis=(1, 2))
+    uu = np.sum(u, axis=(1, 2))
     N = u.shape[0]
     sl = FST.local_slice(False)[0]
     M = FST.shape()[0]
-    c = zeros(M)
-    cc = zeros(M)
+    c = np.zeros(M)
+    cc = np.zeros(M)
     cc[sl] = uu
     FST.comm.Reduce(cc, c, op=MPI.SUM, root=0)
     quad = FST.bases[0].quad
     if FST.comm.Get_rank() == 0:
         if quad == 'GL':
-            ak = zeros_like(c)
+            ak = np.zeros_like(c)
             ak = dct(c, ak, 1, axis=0)
             ak /= (M-1)
-            w = arange(0, M, 1, dtype=float)
+            w = np.arange(0, M, 1, dtype=float)
             w[2:] = 2./(1-w[2:]**2)
             w[0] = 1
             w[1::2] = 0
             return sum(ak*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
 
-        elif quad == 'GC':
-            d = zeros(M)
-            k = 2*(1 + arange((M-1)//2))
-            d[::2] = (2./M)/hstack((1., 1.-k*k))
-            w = zeros_like(d)
-            w = dct(d, w, type=3, axis=0)
-            return sum(c*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
-    else:
-        return 0
+        assert quad == 'GC'
+        d = np.zeros(M)
+        k = 2*(1 + np.arange((M-1)//2))
+        d[::2] = (2./M)/np.hstack((1., 1.-k*k))
+        w = np.zeros_like(d)
+        w = dct(d, w, type=3, axis=0)
+        return np.sum(c*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
+    return 0
 
-beta = zeros(1)
+beta = np.zeros(1)
 def update(context):
     global im1, im2, im3, flux
 
@@ -177,17 +171,18 @@ def update(context):
 
         #solver.comm.Bcast(beta)
         q = (flux[0] - beta[0])  # array(params.L).prod()
-        ##U_tmp = c.work[(U[0], 0)]
-        ##F_tmp = c.work[(U_hat[0], 0)]
-        ##U_tmp[:] = beta[0]
-        ##F_tmp = c.FST.forward(U_tmp, F_tmp, c.ST)
-        ##U_hat[1] += q/beta[0]*U_hat[1]
-        #if solver.rank == 0:
+        #U_tmp = c.work[(U[0], 0)]
+        #F_tmp = c.work[(U_hat[0], 0)]
+        #U_tmp[:] = beta[0]
+        #F_tmp = c.FST.forward(U_tmp, F_tmp, c.ST)
+        #U_hat[1] += q/beta[0]*U_hat[1]
+        if solver.rank == 0:
             #d0 = zeros(U_hat.shape[1], dtype=U_hat.dtype)
             #d1 = zeros(U_hat.shape[1], dtype=U_hat.dtype)
             #d0 = c.mat.ADD.matvec(U_hat[1,:,0,0], d0)
             #d1 = c.mat.BDD.matvec(U_hat[1,:,0,0], d1)
             #c.Sk[1,0,0,0] -= (flux[0]/beta[0]-1)/params.dt*(-params.nu*params.dt/2.*d0[0] + d1[0])*0.025
+            c.Sk[1, 0, 0, 0] -= (flux[0]/beta[0]-1)*0.1
 
         #c.Source[1] -= q/array(params.L).prod()
         #c.Sk[1] = c.FST.scalar_product(c.Source[1], c.Sk[1], c.ST)
@@ -212,13 +207,13 @@ def update(context):
         #Sk[i] = FST.scalar_product(Source[i], Sk[i], ST)
 
     if (params.tstep % params.compute_energy == 0 or
-        params.tstep % params.plot_result == 0 and params.plot_result > 0 or
-        params.tstep % params.sample_stats == 0):
+            params.tstep % params.plot_result == 0 and params.plot_result > 0 or
+            params.tstep % params.sample_stats == 0):
         U = solver.get_velocity(**c)
 
     if params.tstep % params.print_energy0 == 0 and solver.rank == 0:
-        print( (c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 2)))
-        print( (c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 1)))
+        print((c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 2)))
+        print((c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 1)))
         #print(params.tstep, (c.U_hat[0]*c.U_hat[0]).mean()/4096**2, (c.U[0]*c.U[0]).mean())
         #print(params.tstep, (c.U_hat[1]*c.U_hat[1]).mean()/4096**2, (c.U[1]*c.U[1]).mean())
         #print(params.tstep, (c.U_hat[2]*c.U_hat[2]).mean()/4096**2, (c.U[2]*c.U[2]).mean())
@@ -226,17 +221,17 @@ def update(context):
     if params.tstep == 1 and solver.rank == 0 and params.plot_result > 0:
         # Initialize figures
         plt.figure()
-        im1 = plt.contourf(X[1][:,:,0], X[0][:,:,0], U[0,:,:,0], 100)
+        im1 = plt.contourf(X[1][:, :, 0], X[0][:, :, 0], U[0, :, :, 0], 100)
         plt.colorbar(im1)
         plt.draw()
 
         plt.figure()
-        im2 = plt.contourf(X[1][:,:,0], X[0][:,:,0], U[1,:,:,0], 100)
+        im2 = plt.contourf(X[1][:, :, 0], X[0][:, :, 0], U[1, :, :, 0], 100)
         plt.colorbar(im2)
         plt.draw()
 
         plt.figure()
-        im3 = plt.contourf(X[2][:,0,:], X[0][:,0,:], U[0, :,0 ,:], 100)
+        im3 = plt.contourf(X[2][:, 0, :], X[0][:, 0, :], U[0, :, 0, :], 100)
         plt.colorbar(im3)
         plt.draw()
 
@@ -244,18 +239,18 @@ def update(context):
 
     if params.tstep % params.plot_result == 0 and solver.rank == 0 and params.plot_result > 0:
         im1.ax.clear()
-        im1.ax.contourf(X[1][:,:,0], X[0][:,:,0], U[0, :, :, 0], 100)
+        im1.ax.contourf(X[1][:, :, 0], X[0][:, :, 0], U[0, :, :, 0], 100)
         im1.autoscale()
         plt.figure(1)
         plt.pause(1e-6)
         im2.ax.clear()
-        im2.ax.contourf(X[1][:,:,0], X[0][:,:,0], U[1, :, :, 0], 100)
+        im2.ax.contourf(X[1][:, :, 0], X[0][:, :, 0], U[1, :, :, 0], 100)
         im2.autoscale()
         plt.figure(2)
         plt.pause(1e-6)
         im3.ax.clear()
         #im3.ax.contourf(X[1, :,:,0], X[0, :,:,0], P[:, :, 0], 100)
-        im3.ax.contourf(X[2][:,0,:], X[0][:,0,:], U[0, :,0 ,:], 100)
+        im3.ax.contourf(X[2][:, 0, :], X[0][:, 0, :], U[0, :, 0, :], 100)
         im3.autoscale()
         plt.figure(3)
         plt.pause(1e-6)
@@ -272,7 +267,7 @@ def update(context):
             e2 = dx(U[2]*U[2], c.FST)
             q = dx(U[1], c.FST)
         if solver.rank == 0:
-            print("Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.6e Q %2.6e %2.6e %2.6e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, c.Sk[1,0,0,0], flux[0]/beta[0]-1))
+            print("Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.6e Q %2.6e %2.6e %2.6e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, c.Sk[1, 0, 0, 0], flux[0]/beta[0]-1))
 
     if params.tstep % params.sample_stats == 0:
         solver.stats(U)
@@ -289,9 +284,9 @@ class Stats(object):
 
     def __init__(self, U, comm, fromstats="", filename=""):
         self.shape = U.shape[1:]
-        self.Umean = zeros(U.shape[:2])
-        self.Pmean = zeros(U.shape[1])
-        self.UU = zeros((6, U.shape[1]))
+        self.Umean = np.zeros(U.shape[:2])
+        self.Pmean = np.zeros(U.shape[1])
+        self.UU = np.zeros((6, U.shape[1]))
         self.num_samples = 0
         self.rank = comm.Get_rank()
         self.fname = filename
@@ -312,15 +307,15 @@ class Stats(object):
 
     def __call__(self, U, P=None):
         self.num_samples += 1
-        self.Umean += sum(U, axis=(2,3))
+        self.Umean += sum(U, axis=(2, 3))
         if not P is None:
-            self.Pmean += sum(P, axis=(1,2))
-        self.UU[0] += sum(U[0]*U[0], axis=(1,2))
-        self.UU[1] += sum(U[1]*U[1], axis=(1,2))
-        self.UU[2] += sum(U[2]*U[2], axis=(1,2))
-        self.UU[3] += sum(U[0]*U[1], axis=(1,2))
-        self.UU[4] += sum(U[0]*U[2], axis=(1,2))
-        self.UU[5] += sum(U[1]*U[2], axis=(1,2))
+            self.Pmean += sum(P, axis=(1, 2))
+        self.UU[0] += sum(U[0]*U[0], axis=(1, 2))
+        self.UU[1] += sum(U[1]*U[1], axis=(1, 2))
+        self.UU[2] += sum(U[2]*U[2], axis=(1, 2))
+        self.UU[3] += sum(U[0]*U[1], axis=(1, 2))
+        self.UU[4] += sum(U[0]*U[2], axis=(1, 2))
+        self.UU[5] += sum(U[1]*U[2], axis=(1, 2))
         self.get_stats()
 
     def get_stats(self, tofile=True):
@@ -344,6 +339,7 @@ class Stats(object):
 
         if self.comm.Get_size() == 1:
             return self.Umean/Nd, self.Pmean/Nd, self.UU/Nd
+        return 0
 
     def reset_stats(self):
         self.num_samples = 0
@@ -367,14 +363,13 @@ class Stats(object):
 
 if __name__ == "__main__":
     config.update(
-        {
-        'nu': 1./590.,                  # Viscosity
-        'Re_tau': 590.,
-        'dt': 0.0005,                  # Time step
-        'T': 100.,                    # End time
-        'L': [2, 2*pi, pi],
-        'M': [6, 6, 6]
-        },  "channel"
+        {'nu': 1./590.,                  # Viscosity
+         'Re_tau': 590.,
+         'dt': 0.0005,                  # Time step
+         'T': 100.,                    # End time
+         'L': [2, 2*np.pi, np.pi],
+         'M': [6, 6, 6]
+        }, "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=10)
     config.channel.add_argument("--plot_result", type=int, default=100)
