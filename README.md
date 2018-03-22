@@ -4,6 +4,13 @@ spectralDNS
 [![Build Status](https://travis-ci.org/spectralDNS/spectralDNS.svg?branch=master)](https://travis-ci.org/spectralDNS/spectralDNS)
 [![CircleCI](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master.svg?style=svg)](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master)
 
+<p align="center">
+    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/movies/isotropic300_12.gif" width="600" height="400" alt="Isotropic turbulence"/>
+</p>
+<p align="center">
+    Isotropic turbulence with Re_lambda=128 computed using NS_shenfun and a mesh of size 300**3 is physical space.
+</p>
+
 Description
 ----------
 
@@ -111,7 +118,7 @@ spectralDNS is developed by
 
 Licence
 -------
-spectralDNS is licensed under the GNU GPL, version 3 or (at your option) any later version. spectralDNS is Copyright (2014-2016) by the authors.
+spectralDNS is licensed under the GNU GPL, version 3 or (at your option) any later version. spectralDNS is Copyright (2014-2018) by the authors.
 
 Contact
 -------
