@@ -24,7 +24,7 @@ def initialize1(solver, context):
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] = -cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0
-    U_hat = solver.set_velocity(**context)
+    solver.set_velocity(**context)
 
 def initialize2(solver, context):
     U, X = context.U, context.X
@@ -37,7 +37,6 @@ def initialize2(solver, context):
     solver.cross2(context.W_hat, context.K, U_hat)
 
 def energy_fourier(comm, a):
-    N = config.params.N
     result = 2*sum(abs(a[..., 1:-1])**2) + sum(abs(a[..., 0])**2) + sum(abs(a[..., -1])**2)
     result = comm.allreduce(result)
     return result
@@ -119,7 +118,6 @@ def update(context):
 def regression_test(context):
     params = config.params
     solver = config.solver
-    dx, L = params.dx, params.L
     U = solver.get_velocity(**context)
     curl = solver.get_curl(**context)
     w = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))/prod(params.N)/2)

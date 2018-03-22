@@ -54,9 +54,9 @@ if __name__ == '__main__':
     context.hdf5file.components['curl'] = context.curl
     def update_components(**context):
         """Overload default because we want to store the curl as well"""
-        U = solver.get_velocity(**context)
-        P = solver.get_pressure(**context)
-        curl = solver.get_curl(**context)
+        solver.get_velocity(**context)
+        solver.get_pressure(**context)
+        solver.get_curl(**context)
 
     context.hdf5file.update_components = update_components
     initialize(**context)

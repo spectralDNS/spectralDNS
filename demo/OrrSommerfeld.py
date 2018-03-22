@@ -283,7 +283,7 @@ if __name__ == "__main__":
     elif config.params.spatial_refinement_test:
         print("spatial refinement-test")
         def update_(con):
-            e1, e2, exact = compute_error(con)
+            e1, _, exact = compute_error(con)
             acc[0] += abs(e1/e0-exact)
         solver.update = update_
         solver.regression_test = spatial_refinement_test

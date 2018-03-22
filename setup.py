@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-import os, sys, platform
+import os
+import sys
 from distutils.core import setup, Extension
 import subprocess
 from numpy import get_include
@@ -70,7 +71,6 @@ if not "sdist" in sys.argv:
                                     sources=['spectralDNS/optimization/pythran_maths.py']))
     except ImportError:
         print("Disabling Pythran support, package not available")
-        pass
 
     cmdclass = {'build_ext': build_ext_subclass}
 
