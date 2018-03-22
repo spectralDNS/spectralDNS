@@ -25,7 +25,6 @@ def update(context):
 
     dx, L, N = params.dx, params.L, params.N
     if (params.tstep % params.plot_result == 0 and params.plot_result > 0):
-        P = solver.get_pressure(**context)
         curl = solver.get_curl(**context)
         rho = solver.get_rho(**context)
 

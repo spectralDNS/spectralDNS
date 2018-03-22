@@ -249,8 +249,8 @@ def update(context):
 
     if (params.tstep % params.compute_energy == 0 or
             params.tstep % params.plot_step == 0 and params.plot_step > 0):
-        U = solver.get_velocity(**c)
-        curl = solver.get_curl(**c)
+        solver.get_velocity(**c)
+        solver.get_curl(**c)
         if params.solver == 'NS':
             solver.get_pressure(**c)
 
@@ -273,7 +273,7 @@ def update(context):
             plt.pause(1e-6)
 
     if params.tstep % params.compute_spectrum == 0:
-        Ek, bins, E0, E1, E2 = spectrum(solver, context)
+        Ek, _, _, _, _ = spectrum(solver, context)
         context.hdf5file.f = h5py.File(context.hdf5file.fname, driver='mpio', comm=solver.comm)
         context.hdf5file.f['Turbulence/Ek'].create_dataset(str(params.tstep), data=Ek)
         context.hdf5file.f.close()
@@ -313,7 +313,7 @@ def update(context):
         dissipation = energy_fourier(solver.comm, curl_hat)
         div_u = solver.get_divergence(**c)
         div_u = L2_norm(solver.comm, div_u)
-        div_u2 = energy_fourier(solver.comm, 1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]))
+        #div_u2 = energy_fourier(solver.comm, 1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]))
 
         kk = 0.5*energy_new/np.prod(params.L)
         eps = dissipation*params.nu/np.prod(params.L)

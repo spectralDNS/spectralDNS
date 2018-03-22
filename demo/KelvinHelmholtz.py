@@ -19,7 +19,6 @@ im, im2 = None, None
 count = 0
 def update(context):
     global im, im2, count
-    c = context
     params = config.params
     solver = config.solver
     dx, L, N = params.dx, params.L, params.N

@@ -121,7 +121,6 @@ def set_Source(Source, Sk, ST, FST, **context):
 def dx(u, FST):
     """Compute integral of u over domain"""
     uu = np.sum(u, axis=(1, 2))
-    N = u.shape[0]
     sl = FST.local_slice(False)[0]
     M = FST.shape()[0]
     c = np.zeros(M)

@@ -87,7 +87,6 @@ class OrrSommerfeld(object):
         SB = ShenBiharmonicBasis(N, quad=self.quad)
         SB.plan((N, N), 0, np.float, {})
 
-        CT = SB.CT
         x, w = self.x, self.w = SB.points_and_weights(N)
         V = SB.vandermonde(x)
 
