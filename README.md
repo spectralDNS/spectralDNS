@@ -1,6 +1,7 @@
 spectralDNS
 =======
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/9f6923d0baeb4deb842d819a6b598f99)](https://app.codacy.com/app/mikaem/spectralDNS?utm_source=github.com&utm_medium=referral&utm_content=spectralDNS/spectralDNS&utm_campaign=badger)
 [![Build Status](https://travis-ci.org/spectralDNS/spectralDNS.svg?branch=master)](https://travis-ci.org/spectralDNS/spectralDNS)
 [![CircleCI](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master.svg?style=svg)](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master)
 
