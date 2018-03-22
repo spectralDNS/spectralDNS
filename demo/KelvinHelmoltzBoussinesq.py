@@ -6,7 +6,6 @@ def initialize(X, U, Ur, Ur_hat, rho, FFT, float, **kwargs):
 
     params = config.params
     N = params.N
-    Um = 0.5*(params.U1 - params.U2)
     U[1] = params.A*sin(2*X[0])
     rho0 = 0.5*(params.rho1 + params.rho2)
     U[0, :, :N[1]//2] = tanh((X[1][:, :N[1]//2] -0.5*pi)/params.delta)
@@ -21,7 +20,6 @@ def initialize(X, U, Ur, Ur_hat, rho, FFT, float, **kwargs):
 im, im2 = None, None
 def update(context):
     global im, im2
-    c = context
     params = config.params
     solver = config.solver
 

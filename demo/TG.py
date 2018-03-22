@@ -34,7 +34,7 @@ def initialize2(solver, context):
     U_hat = context.work[(context.W_hat, 0)]
     for i in range(3):
         U_hat[i] = context.FFT.fftn(U[i], U_hat[i])
-    W_hat = solver.cross2(context.W_hat, context.K, U_hat)
+    solver.cross2(context.W_hat, context.K, U_hat)
 
 def energy_fourier(comm, a):
     N = config.params.N
@@ -57,7 +57,7 @@ def update(context):
         U = solver.get_velocity(**c)
         curl = solver.get_curl(**c)
         if params.solver == 'NS':
-            P = solver.get_pressure(**c)
+            solver.get_pressure(**c)
 
     if plt is not None:
         if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
@@ -79,7 +79,7 @@ def update(context):
         #reset_profile(profile)
 
     if params.tstep % params.compute_energy == 0:
-        dx, L = params.dx, params.L
+        #dx, L = params.dx, params.L
         #if 'NS' in params.solver:
             #ww = comm.reduce(sum(curl*curl)/prod(params.N)/2)
 
@@ -156,9 +156,9 @@ if __name__ == "__main__":
         context.hdf5file.components["curlz"] = context.curl[2]
         def update_components(**context):
             """Overload default because we want to store the curl as well"""
-            U = sol.get_velocity(**context)
-            P = sol.get_pressure(**context)
-            curl = sol.get_curl(**context)
+            sol.get_velocity(**context)
+            sol.get_pressure(**context)
+            sol.get_curl(**context)
 
         context.hdf5file.update_components = update_components
 

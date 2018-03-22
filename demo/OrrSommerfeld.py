@@ -47,7 +47,6 @@ def initOS(OS, eigvals, eigvectors, U, X, t=0.):
 def dx(u, FST):
     """Compute integral of u over domain"""
     uu = sum(u, axis=(1, 2))
-    N = u.shape[0]
     sl = FST.local_slice(False)[0]
     M = FST.shape()[0]
     c = zeros(M)
@@ -227,12 +226,12 @@ def compute_error(context):
     return e1, e2, exact
 
 def regression_test(context):
-    e1, e2, exact = compute_error(context)
+    _, e2, _ = compute_error(context)
     if config.solver.rank == 0:
         assert sqrt(e2) < 1e-12
 
 def refinement_test(context):
-    e1, e2, exact = compute_error(context)
+    _, e2, _ = compute_error(context)
     if config.solver.rank == 0:
         print("Computed error = %2.8e %2.8e %2.8e" %(sqrt(e2)/config.params.eps, config.params.dt, config.params.eps))
 
@@ -242,7 +241,7 @@ def eps_refinement_test(context):
         print(r" %2d & %2.8e & %2.8e \\\ " %(-int(log10(config.params.eps)), sqrt(e2)/config.params.eps, e1/e0-exact))
 
 def spatial_refinement_test(context):
-    e1, e2, exact = compute_error(context)
+    _, e2, _ = compute_error(context)
     if config.solver.rank == 0:
         print(r" %2d & %2.8e & %2.8e \\\ " %(2**config.params.M[0], sqrt(e2)/config.params.eps, acc[0]))
 

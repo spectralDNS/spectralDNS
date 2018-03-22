@@ -15,14 +15,13 @@ typedef double precision;
 
 int main( int argc, char *argv[] )
 {
-  int rank, num_processes, M, N, Nf;
+  int rank, M, N, Nf;
   double wtime, L, dx;
   precision nu, dt, T;
   double t0, t1, fastest_time, slowest_time, start_time;
   MPI::Init ( argc, argv );
   fftw_mpi_init();
 
-  num_processes = MPI::COMM_WORLD.Get_size();
   rank = MPI::COMM_WORLD.Get_rank();
   precision pi = 3.141592653589793238;
   ptrdiff_t alloc_local, local_n0, local_0_start, local_n1, local_1_start, i, j, k;

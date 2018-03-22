@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-import setuptools
-
 import os, sys, platform
 from distutils.core import setup, Extension
 import subprocess
@@ -32,11 +30,9 @@ class build_ext_subclass(build_ext):
     def build_extensions(self):
         extra_compile_args = ['-w', '-Ofast']
         devnull = open(os.devnull,"w")
-        cmd = "%s -E - %s &>/dev/null" % (
-            self.compiler.compiler[0], " ".join(extra_compile_args))
         p = subprocess.Popen([self.compiler.compiler[0], '-E', '-'] + extra_compile_args,
                              stdin=subprocess.PIPE, stdout=devnull, stderr=devnull)
-        out = p.communicate("")
+        p.communicate("")
         if p.returncode != 0:
             extra_compile_args = ['-w', '-O3']
         for e in self.extensions:
@@ -55,16 +51,17 @@ if not "sdist" in sys.argv:
         ext += cythonize(Extension("spectralDNS.shen.{0}".format(s),
                                    sources=[os.path.join(sdir, '{0}.pyx'.format(s))],
                                    language="c++", define_macros=define_macros))
-    [e.extra_link_args.extend(["-std=c++11"]) for e in ext]
-
-    [e.include_dirs.extend([get_include()]) for e in ext]
+    for e in ext:
+        e.extra_link_args.extend(["-std=c++11"])
+    for e in ext:
+        e.include_dirs.extend([get_include()])
     ext0 = []
-    ff = [files for files in os.listdir(cdir) if files.endswith('.pyx')]
-    for s in ff:
+    for s in [files for files in os.listdir(cdir) if files.endswith('.pyx')]:
         ext0 += cythonize(Extension("spectralDNS.optimization.{0}".format(s[:-4]),
                                     sources=[os.path.join(cdir, '{0}'.format(s))],
                                     language="c++", define_macros=define_macros))
-    [e.include_dirs.extend([get_include()]) for e in ext0]
+    for e in ext0:
+        e.include_dirs.extend([get_include()])
     ext += ext0
 
     try:

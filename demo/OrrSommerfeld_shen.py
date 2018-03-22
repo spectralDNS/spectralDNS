@@ -35,7 +35,7 @@ class OrrSommerfeld(object):
             setattr(self, name, val)
         self.P4 = np.zeros(0)
         self.T4x = np.zeros(0)
-        self.SB, self.SD, self.CDB, self.V = (None,)*4
+        self.SB, self.SD, self.CDB = (None,)*3
         self.x, self.w = None, None
 
     def interp(self, y, eigvals, eigvectors, eigval=1, same_mesh=False, verbose=False):
@@ -74,9 +74,9 @@ class OrrSommerfeld(object):
             # Recompute interpolation matrices if necessary
             if not len(self.P4) == len(y):
                 SB = ShenBiharmonicBasis(N, quad=self.quad)
-                V = self.V = SB.vandermonde(y)
-                P4 = self.P4 = SB.get_vandermonde_basis(V)
-                T4x = self.T4x = SB.get_vandermonde_basis_derivative(V, 1)
+                V = SB.vandermonde(y)
+                self.P4 = SB.get_vandermonde_basis(V)
+                self.T4x = SB.get_vandermonde_basis_derivative(V, 1)
             phi = np.dot(self.P4, phi_hat)
             dphidy = np.dot(self.T4x, phi_hat)
 

@@ -41,8 +41,7 @@ def get_solver(update=None,
 
     """
     assert parse_args is None or isinstance(parse_args, list)
-    args = getattr(eval('.'.join(('config', mesh))),
-                   'parse_args')(parse_args)
+    args = getattr(getattr(config, mesh), 'parse_args')(parse_args)
     config.params.update(vars(args))
 
     try:

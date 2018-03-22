@@ -100,7 +100,7 @@ def init_from_file(filename, solver, context):
 
     if config.params.solver in ("IPCS", "IPCSR"):
         context.P[:] = f["3D/checkpoint/P/1"][s]
-        P_hat = solver.set_pressure(**context)
+        solver.set_pressure(**context)
 
     elif "KMM" in config.params.solver:
         context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
