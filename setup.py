@@ -19,7 +19,7 @@ define_macros=None
 
 # Version number
 major = 1
-minor = 0
+minor = 1
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 cdir = os.path.join(cwd, "spectralDNS", "optimization")
@@ -82,7 +82,7 @@ else:
 
 setup(name = "spectralDNS",
       version = "%d.%d" % (major, minor),
-      description = "spectralDNS -- Spectral Navier-Stokes solvers framework",
+      description = "spectralDNS -- Spectral Navier-Stokes (and similar) solvers framework",
       long_description = "",
       author = "Mikael Mortensen",
       author_email = "mikaem@math.uio.no",
@@ -93,7 +93,7 @@ setup(name = "spectralDNS",
           'Intended Audience :: Developers',
           'Intended Audience :: Science/Research',
           'Intended Audience :: Education',
-          'Programming Language :: Python :: 2.7',
+          'Programming Language :: Python',
           'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)',
           'Topic :: Scientific/Engineering :: Mathematics',
           'Topic :: Software Development :: Libraries :: Python Modules',

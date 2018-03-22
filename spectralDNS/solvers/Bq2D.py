@@ -2,7 +2,7 @@
 
 __author__ = "Mikael Mortensen <mikaem@math.uio.no> and Diako Darian <diako.darian@mn.uio.no>"
 __date__ = "2014-11-07"
-__copyright__ = "Copyright (C) 2014-2016 " + __author__
+__copyright__ = "Copyright (C) 2014-2018 " + __author__
 __license__ = "GNU Lesser GPL version 3 or any later version"
 
 from .spectralinit import *

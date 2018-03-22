@@ -1,7 +1,7 @@
 #pylint: disable=inconsistent-return-statements,fixme,unreachable
 __author__ = "Mikael Mortensen <mikaem@math.uio.no> and Nathanael Schilling <nathanael.schilling@in.tum.de>"
 __date__ = "2015-04-07"
-__copyright__ = "Copyright (C) 2015-2016 " + __author__
+__copyright__ = "Copyright (C) 2015-2018 " + __author__
 __license__ = "GNU Lesser GPL version 3 or any later version"
 
 import numpy as np
