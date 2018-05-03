@@ -25,7 +25,7 @@ A channel flow solver is implemented using the Shen basis (Jie Shen, SIAM Journa
 
 Installation
 -----------
-spectralDNS is installed by cloning or forking the repository and then with regular python distutils
+spectralDNS contains a setup.py script and can be installed by cloning or forking the repository and then with regular python distutils
 
     python setup.py install --prefix="path used for installation. Must be on the PYTHONPATH"
     
@@ -33,9 +33,9 @@ or in-place using
 
     python setup.py build_ext --inplace
 
-spectralDNS depends on three other modules in the [spectralDNS](https://github.com/spectralDNS) organization: [mpiFFT4py](https://github.com/spectralDNS/mpiFFT4py), [shenfun](https://github.com/spectralDNS/shenfun) and [mpi4py-fft](https://github.com/spectralDNS/mpi4py-fft). Other than that, it requires [*h5py*](http://www.h5py.org) built with parallel HDF5, for visualizing the results, and [*cython*](http://cython.org) is used to optimize a few routines. 
+However, spectralDNS depends on three other modules in the [spectralDNS](https://github.com/spectralDNS) organization: [mpiFFT4py](https://github.com/spectralDNS/mpiFFT4py), [shenfun](https://github.com/spectralDNS/shenfun) and [mpi4py-fft](https://github.com/spectralDNS/mpi4py-fft). And besides that, it requires [*h5py*](http://www.h5py.org) built with parallel HDF5, for visualizing the results, and [*cython*](http://cython.org) is used to optimize a few routines. The regular "python setup.py ..." will not install these dependencies for you, and, as such, it is strongly adviced to install spectralDNS using Anaconda, as shown below.
 
-To install using Anaconda, you may compile it yourselves using (from the main directory)
+To install using Anaconda, you may compile it yourselves using (from the main directory after cloning)
 
     conda build -c conda-forge -c spectralDNS conf/conda
     conda install spectralDNS --use-local
@@ -46,14 +46,14 @@ You may also use precompiled binaries in the [*spectralDNS*](https://anaconda.or
     conda create --name spectralDNS -c conda-forge -c spectralDNS spectralDNS
     source activate spectralDNS
 
-which installs both spectralDNS, mpiFFT4py and all required dependencies, most of which are pulled in from the conda-forge channel. There are binaries compiled for both OSX and linux, for either Python version 2.7 or 3.4. To specify the Python version as 3.4 instead of default (used above) you can for exampel do
+which installs both spectralDNS, mpiFFT4py and all required dependencies, most of which are pulled in from the conda-forge channel. There are binaries compiled for both OSX and linux, for either Python version 2.7 or 3.6. To specify the Python version as 3.6 instead of default (used above) you can for exampel do
 
     conda create --name spectralDNS_py3 -c conda-forge -c spectralDNS python=3 spectralDNS
     source activate spectralDNS_py3
 
 Usage
 -----
-See the demo folder for usage.
+See the demo folder for extensive usage.
 
 There are different solvers. For example, there are two Navier Stokes solvers for the triply periodic domain. A regular one (solvers/NS.py), and one based on a velocity-vorticity formulation (solvers/VV.py). The solver of your choice is required as an argument when running:
     
