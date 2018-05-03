@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 import os
 import sys
-from distutils.core import setup, Extension
+from setuptools import setup, Extension
+#from distutils.core import setup, Extension
 import subprocess
 from numpy import get_include
 from Cython.Distutils import build_ext
@@ -80,14 +81,14 @@ else:
         if "single" in name or "double" in name:
             os.remove(os.path.join(cdir, name))
 
-setup(name = "spectralDNS",
-      version = "%d.%d" % (major, minor),
-      description = "spectralDNS -- Spectral Navier-Stokes (and similar) solvers framework",
-      long_description = "",
-      author = "Mikael Mortensen",
-      author_email = "mikaem@math.uio.no",
-      url = 'https://github.com/spectralDNS/spectralDNS',
-      classifiers = [
+setup(name="spectralDNS",
+      version="%d.%d" % (major, minor),
+      description="spectralDNS -- Spectral Navier-Stokes (and similar) solvers framework",
+      long_description="",
+      author="Mikael Mortensen",
+      author_email="mikaem@math.uio.no",
+      url='https://github.com/spectralDNS/spectralDNS',
+      classifiers=[
           'Development Status :: 5 - Production/Stable',
           'Environment :: Console',
           'Intended Audience :: Developers',
@@ -98,7 +99,12 @@ setup(name = "spectralDNS",
           'Topic :: Scientific/Engineering :: Mathematics',
           'Topic :: Software Development :: Libraries :: Python Modules',
           ],
-      packages = ["spectralDNS",
+      install_requires=[
+          'numpy',
+          'cython',
+          'mpi4py'
+          ],
+      packages=["spectralDNS",
                   "spectralDNS.h5io",
                   "spectralDNS.utilities",
                   "spectralDNS.maths",
@@ -106,7 +112,7 @@ setup(name = "spectralDNS",
                   "spectralDNS.solvers",
                   "spectralDNS.optimization",
                   ],
-      package_dir = {"spectralDNS": "spectralDNS"},
-      ext_modules = ext,
-      cmdclass = cmdclass
+      package_dir={"spectralDNS": "spectralDNS"},
+      ext_modules=ext,
+      cmdclass=cmdclass
     )

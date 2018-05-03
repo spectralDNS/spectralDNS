@@ -26,25 +26,14 @@ except ImportError:
 
 def initialize(solver, context):
     c = context
-    c.mask = np.where(c.K2 <= config.params.Kf2**2, 1, 0)
-
-    if 'rogallo' in config.params.initialize:
-        initialize_rogallo(solver, context)
-
-    else:
-        initialize1(solver, context)
-    config.params.t = 0.0
-    config.params.tstep = 0
-    c.target_energy = energy_fourier(solver.comm, c.U_hat)
-
-def initialize_rogallo(solver, context):
-    c = context
-    np.random.seed(solver.rank)
+    # Create mask with ones where |k| < Kf2 and zeros elsewhere
     kf = config.params.Kf2
+    c.mask = np.where(c.K2 <= kf**2, 1, 0)
+    np.random.seed(solver.rank)
     k = np.sqrt(c.K2)
     k = np.where(k == 0, 1, k)
-    K2 = c.K2
-    K2 = np.where(K2 == 0, 1, K2)
+    kk = c.K2.copy()
+    kk = np.where(kk == 0, 1, kk)
     k1, k2, k3 = c.K[0], c.K[1], c.K[2]
     ksq = np.sqrt(k1**2+k2**2)
     ksq = np.where(ksq == 0, 1, ksq)
@@ -54,8 +43,8 @@ def initialize_rogallo(solver, context):
     Ek = E0 + E1
     # theta1, theta2, phi, alpha and beta from [1]
     theta1, theta2, phi = np.random.sample(c.U_hat.shape)*2j*np.pi
-    alpha = np.sqrt(Ek/4./np.pi/K2)*np.exp(1j*theta1)*np.cos(phi)
-    beta = np.sqrt(Ek/4./np.pi/K2)*np.exp(1j*theta2)*np.sin(phi)
+    alpha = np.sqrt(Ek/4./np.pi/kk)*np.exp(1j*theta1)*np.cos(phi)
+    beta = np.sqrt(Ek/4./np.pi/kk)*np.exp(1j*theta2)*np.sin(phi)
     c.U_hat[0] = (alpha*k*k2 + beta*k1*k3)/(k*ksq)
     c.U_hat[1] = (beta*k2*k3 - alpha*k*k1)/(k*ksq)
     c.U_hat[2] = beta*ksq/k
@@ -79,29 +68,10 @@ def initialize_rogallo(solver, context):
     if 'VV' in config.params.solver:
         c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
 
+    config.params.t = 0.0
+    config.params.tstep = 0
+    c.target_energy = energy_fourier(solver.comm, c.U_hat)
 
-def initialize1(solver, context):
-    c = context
-    u0 = np.prod(config.params.N)/np.prod(config.params.L)
-    if 'shenfun' in config.params.solver:
-        u0 /= np.prod(config.params.N)
-
-    np.random.seed(solver.rank)
-    c.U_hat[:] = np.random.sample(c.U_hat.shape)*2j*np.pi
-    c.U_hat[:] = u0/(2*np.pi)*c.K2*np.exp(-c.K2/config.params.a0**2)*np.exp(c.U_hat)
-    if solver.rank == 0:
-        c.U_hat[:, 0, 0, 0] = 0.0
-
-    if 'VV' in config.params.solver:
-        c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
-
-    solver.get_velocity(**c)
-    U_hat = solver.set_velocity(**c)
-    # project to zero divergence
-    U_hat[:] -= (c.K[0]*U_hat[0]+c.K[1]*U_hat[1]+c.K[2]*U_hat[2])*c.K_over_K2
-
-    if 'VV' in config.params.solver:
-        c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
 
 def energy_fourier(comm, u_hat):
     r"""Using Parceval's identity to compute the L2-norm of u
@@ -305,7 +275,7 @@ def update(context):
             else:
                 ddU[i] = c.FFT.ifftn(dU[i], ddU[i])
 
-        ww3 = solver.comm.allreduce(sum(ddU*U))/np.prod(params.N)
+        ww3 = solver.comm.allreduce(sum(ddU*c.U))/np.prod(params.N)
 
         ##if solver.rank == 0:
             ##print('W ', params.nu*ww, params.nu*ww2, ww3, ww-ww2)
@@ -358,7 +328,7 @@ if __name__ == "__main__":
     config.update(
         {'nu': 0.005428,              # Viscosity (not used, see below)
          'dt': 0.002,                 # Time step
-         'T': 0.05,                   # End time
+         'T': 5,                      # End time
          'L': [2.*pi, 2.*pi, 2.*pi],
          'checkpoint': 100,
          'write_result': 1e8,
@@ -373,10 +343,8 @@ if __name__ == "__main__":
     config.triplyperiodic.add_argument("--compute_spectrum", type=int, default=1000)
     config.triplyperiodic.add_argument("--plot_step", type=int, default=1000)
     config.triplyperiodic.add_argument("--Kf2", type=int, default=3)
-    config.triplyperiodic.add_argument("--a0", type=float, default=5.5)
     config.triplyperiodic.add_argument("--kd", type=float, default=50.)
     config.triplyperiodic.add_argument("--Re_lam", type=float, default=84.)
-    config.triplyperiodic.add_argument("--initialize", type=str, default='rogallo')
     sol = get_solver(update=update, mesh="triplyperiodic")
     config.params.nu = (1./config.params.kd**(4./3.))
 
