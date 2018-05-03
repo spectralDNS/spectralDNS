@@ -350,7 +350,7 @@ if __name__ == "__main__":
 
     context = sol.get_context()
     initialize(sol, context)
-    init_from_file("NS_isotropic_6_6_6b.h5", sol, context)
+    #init_from_file("NS_isotropic_6_6_6b.h5", sol, context)
 
     Ek, bins, E0, E1, E2 = spectrum(sol, context)
     context.hdf5file.fname = "NS_isotropic_{}_{}_{}b.h5".format(*config.params.N)
