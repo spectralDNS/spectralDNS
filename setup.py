@@ -101,8 +101,7 @@ setup(name="spectralDNS",
           ],
       install_requires=[
           'numpy',
-          'cython',
-          'mpi4py'
+          'cython'
           ],
       packages=["spectralDNS",
                   "spectralDNS.h5io",
