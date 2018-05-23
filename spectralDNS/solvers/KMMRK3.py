@@ -10,12 +10,12 @@ from .spectralinit import end_of_tstep
 
 def get_context():
     # Get points and weights for Chebyshev weighted integrals
-    ST = ShenDirichletBasis(params.N[0], quad=params.Dquad)
-    SB = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
-    CT = Basis(params.N[0], quad=params.Dquad)
-    ST0 = ShenDirichletBasis(params.N[0], quad=params.Dquad, plan=True) # For 1D problem
-    K0 = C2CBasis(params.N[1], domain=(0, params.L[1]))
-    K1 = R2CBasis(params.N[2], domain=(0, params.L[2]))
+    ST = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
+    SB = Basis(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
+    CT = Basis(params.N[0], 'C', quad=params.Dquad)
+    ST0 = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad, plan=True) # For 1D problem
+    K0 = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype='D')
+    K1 = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype='d')
 
     #CT = ST.CT  # Chebyshev transform
     FST = TensorProductSpace(comm, (ST, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Dirichlet
@@ -34,8 +34,8 @@ def get_context():
     else:
         STp, SBp, CTp = ST, SB, CT
 
-    K0p = C2CBasis(params.N[1], domain=(0, params.L[1]), **kw)
-    K1p = R2CBasis(params.N[2], domain=(0, params.L[2]), **kw)
+    K0p = Basis(params.N[1], 'F', dtype='D', domain=(0, params.L[1]), **kw)
+    K1p = Basis(params.N[2], 'F', dtype='d', domain=(0, params.L[2]), **kw)
     FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
     FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
     FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
@@ -54,24 +54,24 @@ def get_context():
     K = FST.local_wavenumbers(scaled=True)
 
     # Solution variables
-    U = Array(VFS, False)
-    U_hat = Array(VFS)
-    g = Array(FST)
+    U = Array(VFS)
+    U_hat = Function(VFS)
+    g = Function(FST)
 
     # primary variable
     u = (U_hat, g)
 
     nu, dt, N = params.nu, params.dt, params.N
 
-    H_hat = Array(VFS)
+    H_hat = Function(VFS)
 
-    dU = Array(VFS)
+    dU = Function(VFS)
     hv = zeros((2,)+FST.local_shape(), dtype=complex)
     hg = zeros((2,)+FST.local_shape(), dtype=complex)
     h1 = zeros((2, 2, N[0]), dtype=complex)
 
-    Source = Array(VFS, False)
-    Sk = Array(VFS)
+    Source = Array(VFS)
+    Sk = Function(VFS)
 
     K2 = K[1]*K[1]+K[2]*K[2]
     K4 = K2**2

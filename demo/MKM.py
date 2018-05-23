@@ -70,8 +70,9 @@ def initialize(solver, context):
         P_hat = solver.compute_pressure(**context)
         P = context.FST.backward(P_hat, context.P, context.SN)
 
-    context.U_hat0[:] = context.U_hat[:]
-    context.H_hat1[:] = solver.get_convection(**context)
+    if not 'RK3' in params.solver:
+        context.U_hat0[:] = context.U_hat[:]
+        context.H_hat1[:] = solver.get_convection(**context)
 
 def init_from_file(filename, solver, context):
     f = h5py.File(filename, driver="mpio", comm=solver.comm)
