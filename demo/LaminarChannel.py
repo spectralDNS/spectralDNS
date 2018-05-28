@@ -19,8 +19,6 @@ def set_Source(Source, Sk, FST, ST, **context):
 
     else:
         Sk[1] = FST.scalar_product(Source[1], Sk[1])
-        Sk[1] /= (4*np.pi**2)
-
 
 def exact(x, Re, t, num_terms=400):
     beta = 2./Re

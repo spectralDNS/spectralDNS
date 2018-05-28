@@ -117,7 +117,6 @@ def set_Source(Source, Sk, ST, FST, **context):
         Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
     else:
         Sk[1] = FST.scalar_product(Source[1], Sk[1])
-        Sk[1] /= (4*np.pi**2)
 
 def dx(u, FST):
     """Compute integral of u over domain"""

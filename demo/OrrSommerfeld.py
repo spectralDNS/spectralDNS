@@ -145,7 +145,6 @@ def set_Source(Source, Sk, FST, ST, N, **kw):
 
     else:
         Sk[1] = FST.scalar_product(Source[1], Sk[1])
-        Sk[1] /= (4*pi**2)
     Sk[1, -2:, 0, 0] = 0
 
 im1, im2, im3, im4 = (None, )*4
