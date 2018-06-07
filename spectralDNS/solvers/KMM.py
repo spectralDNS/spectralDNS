@@ -38,9 +38,9 @@ def get_context():
           'dealias_direct': params.dealias == '2/3-rule'}
     if params.dealias == '3/2-rule':
         # Requires new bases due to planning and transforms on different size arrays
-        STp = ShenDirichletBasis(params.N[0], quad=params.Dquad)
-        SBp = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
-        CTp = Basis(params.N[0], quad=params.Dquad)
+        STp = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
+        SBp = Basis(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
+        CTp = Basis(params.N[0], 'C', quad=params.Dquad)
     else:
         STp, SBp, CTp = ST, SB, CT
 
