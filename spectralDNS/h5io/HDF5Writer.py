@@ -165,6 +165,7 @@ try:
 except:
     class HDF5Writer(object):
         def __init__(self, context,  comps, filename="U.h5", mesh={}, fromfile=None):
+            comm = context.comm
             if comm.Get_rank() == 0:
                 print Warning("Need to install h5py to allow storing results")
         

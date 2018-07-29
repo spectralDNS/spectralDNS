@@ -16,10 +16,13 @@ def setupDNS(context):
     FFT = context.FFT
 
     X = FFT.get_local_mesh()
-    K = numpy.array(FFT.get_local_wavenumbermesh(scaled=True))
-    K2 = sum(K*K, 0, dtype=float)
-    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
-    
+    K = FFT.get_local_wavenumbermesh(scaled=True)
+    K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+
+    K_over_K2 = zeros((3,) + FFT.complex_shape())
+    for i in range(3):
+        K_over_K2[i] = K[i] / numpy.where(K2 == 0, 1, K2)
+
     U     = empty((3,) + FFT.real_shape(), dtype=float)  
     U_hat = empty((3,) + FFT.complex_shape(), dtype=complex)
     P     = empty(FFT.real_shape(), dtype=float)
@@ -46,9 +49,13 @@ def setupDNS_Boussinesq(context):
     FFT = context.FFT
 
     X = FFT.get_local_mesh()
-    K = numpy.array(FFT.get_local_wavenumbermesh(scaled=True))
-    K2 = sum(K*K, 0, dtype=float)
-    K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)    
+    K = FFT.get_local_wavenumbermesh(scaled=True)
+    K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+
+    K_over_K2 = zeros((3,) + FFT.complex_shape())
+    for i in range(3):
+        K_over_K2[i] = K[i] / numpy.where(K2 == 0, 1, K2)
+
     
     Ur     = empty((4,) + FFT.real_shape(), dtype=float)  
     Ur_hat = empty((4,) + FFT.complex_shape(), dtype=complex)
@@ -82,7 +89,7 @@ def setupMHD(context):
     X = FFT.get_local_mesh()
     K = nump.array(FFT.get_local_wavenumbermesh(scaled=True))
 
-    K2 = sum(K*K, 0, dtype=float)
+    K2 = numpy.sum(K*K, 0, dtype=float)
     K_over_K2 = K.astype(float) / where(K2==0, 1, K2).astype(float)
 
     UB     = empty((6,) + FFT.real_shape(), dtype=float)  

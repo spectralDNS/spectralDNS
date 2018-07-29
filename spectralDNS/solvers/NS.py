@@ -151,7 +151,8 @@ def add_pressure(context,dU, U_hat):
     P_hat = np.sum(dU*K_over_K2, 0, out=P_hat)
         
     # Subtract pressure gradient
-    dU -= P_hat*K
+    for i in range(dU.shape[0]):
+        dU[i] -= P_hat*K[i]
     
     return dU
 
