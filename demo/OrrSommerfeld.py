@@ -303,12 +303,9 @@ if __name__ == "__main__":
         initialize(solver, context)
         set_Source(**context)
         solve(solver, context)
-        #c = context
-        #plt.figure()
-        #plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], c.U[0,:,:,0], 100)
-        #plt.colorbar()
-        #plt.figure()
-        #plt.contourf(c.X[1][:,:,0], c.X[0][:,:,0], c.U[1,:,:,0], 100)
-        #plt.colorbar()
-
-        #plt.show()
+        c = context
+        duidxj = solver.compute_derivatives(**context)
+        plt.figure()
+        plt.contourf(c.X[1][:, :, 0], c.X[0][: ,: , 0], duidxj[0, 0, :, :, 0], 100)
+        plt.colorbar()
+        plt.show()

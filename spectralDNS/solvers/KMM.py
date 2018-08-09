@@ -276,23 +276,23 @@ def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, work):
     c[2] += dvdx
     return c
 
-def compute_derivatives(duidxj, u_hat, FST, FCT, FSB, K, la, mat, work):
-    duidxj[:] = 0
-    F_tmp = work[(u_hat, 0)]
+def compute_derivatives(U, U_hat, FST, FCT, FSB, K, la, mat, work, **context):
+    duidxj = np.zeros((3, 3)+U.shape[1:])
+    F_tmp = work[(U_hat, 0)]
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = mat.CDB.matvec(u_hat[0], F_tmp[0])
+    F_tmp[0] = mat.CDB.matvec(U_hat[0], F_tmp[0])
     F_tmp[0] = la.TDMASolverD(F_tmp[0])
     duidxj[0, 0] = FST.backward(F_tmp[0], duidxj[0, 0])
-    LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
+    LUsolve.Mult_CTD_3D_n(params.N[0], U_hat[1], U_hat[2], F_tmp[1], F_tmp[2])
     duidxj[1, 0] = dvdx = FCT.backward(F_tmp[1], duidxj[1, 0])  # proj to Cheb
     duidxj[2, 0] = dwdx = FCT.backward(F_tmp[2], duidxj[2, 0])  # proj to Cheb
-    duidxj[0, 1] = dudy = FSB.backward(1j*K[1]*u_hat[0], duidxj[0, 1]) # ShenB
-    duidxj[0, 2] = dudz = FSB.backward(1j*K[2]*u_hat[0], duidxj[0, 2])
-    duidxj[1, 1] = dvdy = FST.backward(1j*K[1]*u_hat[1], duidxj[1, 1])
-    duidxj[1, 2] = dvdz = FST.backward(1j*K[2]*u_hat[1], duidxj[1, 2])
-    duidxj[2, 1] = dwdy = FST.backward(1j*K[1]*u_hat[2], duidxj[2, 1])
-    duidxj[2, 2] = dwdz = FST.backward(1j*K[2]*u_hat[2], duidxj[2, 2])
+    duidxj[0, 1] = dudy = FSB.backward(1j*K[1]*U_hat[0], duidxj[0, 1]) # ShenB
+    duidxj[0, 2] = dudz = FSB.backward(1j*K[2]*U_hat[0], duidxj[0, 2])
+    duidxj[1, 1] = dvdy = FST.backward(1j*K[1]*U_hat[1], duidxj[1, 1])
+    duidxj[1, 2] = dvdz = FST.backward(1j*K[2]*U_hat[1], duidxj[1, 2])
+    duidxj[2, 1] = dwdy = FST.backward(1j*K[1]*U_hat[2], duidxj[2, 1])
+    duidxj[2, 2] = dwdz = FST.backward(1j*K[2]*U_hat[2], duidxj[2, 2])
     return duidxj
 
 def standardConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp, FSBp, FCTp, work,
