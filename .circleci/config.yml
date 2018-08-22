@@ -24,7 +24,7 @@ jobs:
             conda config --add channels spectralDNS
             conda install -n root conda-build
             conda install --yes --quiet conda-forge-build-setup
-            source run_conda_forge_build_setup
+            #source run_conda_forge_build_setup
 
       - save_cache:
           key: v1-miniconda-{{ .Branch }}
