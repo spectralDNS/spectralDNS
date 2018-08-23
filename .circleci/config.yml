@@ -21,6 +21,7 @@ jobs:
             conda config --set always_yes yes
             conda config --add channels conda-forge
             conda config --add channels spectralDNS
+            conda clean --lock
             conda install --yes --quiet conda-forge-build-setup
             source run_conda_forge_build_setup
 
