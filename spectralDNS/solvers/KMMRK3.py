@@ -13,7 +13,7 @@ def get_context():
     ST = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
     SB = Basis(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
     CT = Basis(params.N[0], 'C', quad=params.Dquad)
-    ST0 = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad, plan=True) # For 1D problem
+    ST0 = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad) # For 1D problem
     K0 = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype='D')
     K1 = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype='d')
 
@@ -28,9 +28,9 @@ def get_context():
           'dealias_direct': params.dealias == '2/3-rule'}
     if params.dealias == '3/2-rule':
         # Requires new bases due to planning and transforms on different size arrays
-        STp = ShenDirichletBasis(params.N[0], quad=params.Dquad)
-        SBp = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
-        CTp = Basis(params.N[0], quad=params.Dquad)
+        STp = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
+        SBp = Basis(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
+        CTp = Basis(params.N[0], 'C', quad=params.Dquad)
     else:
         STp, SBp, CTp = ST, SB, CT
 
@@ -246,6 +246,7 @@ def solve_linear(u_hat, g_hat, rhs, rk,
 
         u_hat[1, :, 0, 0] = u0_hat[0]
         u_hat[2, :, 0, 0] = u0_hat[1]
+        u_hat[0, :, 0, 0] = 0
 
     return u_hat, g_hat
 

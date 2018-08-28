@@ -265,8 +265,10 @@ def update(context):
             e1 = dx(U[1]*U[1], c.FST)
             e2 = dx(U[2]*U[2], c.FST)
             q = dx(U[1], c.FST)
+            div_u = solver.get_divergence(**c)
+            e3 = dx(div_u**2, c.FST)
         if solver.rank == 0:
-            print("Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.6e Q %2.6e %2.6e %2.6e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, c.Sk[1, 0, 0, 0], flux[0]/beta[0]-1))
+            print("Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.6e Q %2.6e %2.6e %2.6e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, e3, flux[0]/beta[0]-1))
 
     if params.tstep % params.sample_stats == 0:
         solver.stats(U)
@@ -306,15 +308,15 @@ class Stats(object):
 
     def __call__(self, U, P=None):
         self.num_samples += 1
-        self.Umean += sum(U, axis=(2, 3))
+        self.Umean += np.sum(U, axis=(2, 3))
         if not P is None:
-            self.Pmean += sum(P, axis=(1, 2))
-        self.UU[0] += sum(U[0]*U[0], axis=(1, 2))
-        self.UU[1] += sum(U[1]*U[1], axis=(1, 2))
-        self.UU[2] += sum(U[2]*U[2], axis=(1, 2))
-        self.UU[3] += sum(U[0]*U[1], axis=(1, 2))
-        self.UU[4] += sum(U[0]*U[2], axis=(1, 2))
-        self.UU[5] += sum(U[1]*U[2], axis=(1, 2))
+            self.Pmean += np.sum(P, axis=(1, 2))
+        self.UU[0] += np.sum(U[0]*U[0], axis=(1, 2))
+        self.UU[1] += np.sum(U[1]*U[1], axis=(1, 2))
+        self.UU[2] += np.sum(U[2]*U[2], axis=(1, 2))
+        self.UU[3] += np.sum(U[0]*U[1], axis=(1, 2))
+        self.UU[4] += np.sum(U[0]*U[2], axis=(1, 2))
+        self.UU[5] += np.sum(U[1]*U[2], axis=(1, 2))
         self.get_stats()
 
     def get_stats(self, tofile=True):

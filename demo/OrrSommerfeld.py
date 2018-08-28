@@ -196,9 +196,10 @@ def update(context):
 
     if params.tstep % params.compute_energy == 0:
         e1, e2, exact = compute_error(c)
+        div_u = solver.get_divergence(**c)
         if solver.rank == 0 and not config.params.spatial_refinement_test:
             acc[0] += abs(e1/e0-exact)
-            print("Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2)))
+            print("Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2), dx(div_u**2, c.FST)))
 
 def compute_error(context):
     global OS, e0, acc

@@ -109,7 +109,7 @@ def L2_norm(comm, u):
     """
     N = config.params.N
     L = config.params.L
-    result = comm.allreduce(sum(u**2))
+    result = comm.allreduce(np.sum(u**2))
     return result*np.prod(L)/np.prod(N)
 
 def spectrum(solver, context):

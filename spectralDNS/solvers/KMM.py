@@ -24,7 +24,7 @@ def get_context():
     ST = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
     SB = Basis(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
     CT = Basis(params.N[0], 'C', quad=params.Dquad)
-    ST0 = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad, plan=True) # For 1D problem
+    ST0 = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad) # For 1D problem
     K0 = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype='D')
     K1 = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype='d')
 
@@ -230,11 +230,14 @@ def get_pressure(context, solver):
 
     return p-uu+3./16.
 
-def Div(U, U_hat, FST, K, work, la, mat, **context):
+def get_divergence(U, U_hat, FST, K, Kx, work, la, mat, **context):
     Uc_hat = work[(U_hat[0], 0, True)]
     Uc = work[(U, 2, True)]
     Uc_hat = mat.CDB.matvec(U_hat[0], Uc_hat)
     Uc_hat = la.TDMASolverD(Uc_hat)
+    #Uc_hat[:, config.params.N[1]//2, :] = 0
+    #Uc_hat[:, :, -1] = 0
+
     dudx = Uc[0] = FST.backward(Uc_hat, Uc[0])
     dvdy_h = 1j*K[1]*U_hat[1]
     dvdy = Uc[1] = FST.backward(dvdy_h, Uc[1])
@@ -522,6 +525,7 @@ def solve_linear(u_hat, g_hat, rhs,
 
         u_hat[1, :, 0, 0] = u0_hat[0]
         u_hat[2, :, 0, 0] = u0_hat[1]
+        u_hat[0, :, 0, 0] = 0           # This required for continuity
 
     return u_hat, g_hat
 

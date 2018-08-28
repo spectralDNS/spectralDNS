@@ -176,7 +176,7 @@ def test_Mult_Div():
 @pytest.mark.parametrize('quad', quads)
 def test_Helmholtz(ST, quad):
     M = 4*N
-    ST = ST(M, quad=quad, plan=True)
+    ST = ST(M, quad=quad)
     kx = 12
 
     fj = np.random.randn(M)
@@ -254,7 +254,7 @@ def test_Helmholtz(ST, quad):
 @pytest.mark.parametrize('quad', quads)
 def test_Helmholtz2(quad):
     M = 2*N
-    SD = ShenDirichletBasis(M, quad=quad, plan=True)
+    SD = ShenDirichletBasis(M, quad=quad)
     kx = 12
     uj = np.random.randn(M)
     u_hat = np.zeros(M)
@@ -369,7 +369,7 @@ def test_Mult_CTD_3D(quad):
 @pytest.mark.parametrize('quad', quads)
 def test_Biharmonic(quad):
     M = 128
-    SB = ShenBiharmonicBasis(M, quad=quad, plan=True)
+    SB = ShenBiharmonicBasis(M, quad=quad)
     x = Symbol("x")
     u = sin(6*pi*x)**2
     a = 1.0
@@ -402,7 +402,7 @@ def test_Biharmonic(quad):
 @pytest.mark.parametrize('quad', quads)
 def test_Helmholtz_matvec(quad):
     M = 2*N
-    SD = ShenDirichletBasis(M, quad=quad, plan=True)
+    SD = ShenDirichletBasis(M, quad=quad)
     kx = 11
     uj = np.random.randn(M)
     u_hat = np.zeros(M)
