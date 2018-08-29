@@ -9,7 +9,7 @@ from spectralDNS import config, get_solver, solve
 #from spectralDNS.utilities import reset_profile
 from OrrSommerfeld_shen import OrrSommerfeld
 #from OrrSommerfeld_eig import OrrSommerfeld
-from MKM import dx
+from spectralDNS.utilities import dx
 
 try:
     import matplotlib.pyplot as plt

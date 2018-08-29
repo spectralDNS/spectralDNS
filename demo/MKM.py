@@ -8,6 +8,7 @@ import matplotlib.cbook
 from mpiFFT4py import dct
 #from spectralDNS.utilities import reset_profile
 from spectralDNS import config, get_solver, solve
+from spectralDNS.utilities import dx
 
 warnings.filterwarnings("ignore", category=matplotlib.cbook.mplDeprecation)
 
@@ -117,36 +118,6 @@ def set_Source(Source, Sk, ST, FST, **context):
         Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
     else:
         Sk[1] = FST.scalar_product(Source[1], Sk[1])
-
-def dx(u, FST):
-    """Compute integral of u over domain"""
-    uu = np.sum(u, axis=(1, 2))
-    sl = FST.local_slice(False)[0]
-    M = FST.shape()[0]
-    c = np.zeros(M)
-    cc = np.zeros(M)
-    cc[sl] = uu
-    FST.comm.Reduce(cc, c, op=MPI.SUM, root=0)
-    quad = FST.bases[0].quad
-    if FST.comm.Get_rank() == 0:
-        if quad == 'GL':
-            ak = np.zeros_like(c)
-            ak = dct(c, ak, 1, axis=0)
-            ak /= (M-1)
-            w = np.arange(0, M, 1, dtype=float)
-            w[2:] = 2./(1-w[2:]**2)
-            w[0] = 1
-            w[1::2] = 0
-            return sum(ak*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
-
-        assert quad == 'GC'
-        d = np.zeros(M)
-        k = 2*(1 + np.arange((M-1)//2))
-        d[::2] = (2./M)/np.hstack((1., 1.-k*k))
-        w = np.zeros_like(d)
-        w = dct(d, w, type=3, axis=0)
-        return np.sum(c*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
-    return 0
 
 beta = np.zeros(1)
 def update(context):
