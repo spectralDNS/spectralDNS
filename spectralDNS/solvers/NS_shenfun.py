@@ -5,25 +5,25 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 
 #pylint: disable=unused-variable,unused-argument,function-redefined
 
-from shenfun.fourier.bases import R2CBasis, C2CBasis
-from shenfun import TensorProductSpace, VectorTensorProductSpace, Array
+from shenfun import Basis, TensorProductSpace, VectorTensorProductSpace, \
+    Array, Function
 from .spectralinit import *
 
 def get_context():
     """Set up context for classical (NS) solver"""
-    V0 = C2CBasis(params.N[0], domain=(0, params.L[0]))
-    V1 = C2CBasis(params.N[1], domain=(0, params.L[1]))
-    V2 = R2CBasis(params.N[2], domain=(0, params.L[2]))
+    V0 = Basis(params.N[0], 'F', domain=(0, params.L[0]), dtype='D')
+    V1 = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype='D')
+    V2 = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype='d')
     T = TensorProductSpace(comm, (V0, V1, V2), **{'threads': params.threads})
-    VT = VectorTensorProductSpace([T]*3)
+    VT = VectorTensorProductSpace(T)
 
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
-    V0p = C2CBasis(params.N[0], domain=(0, params.L[0]), **kw)
-    V1p = C2CBasis(params.N[1], domain=(0, params.L[1]), **kw)
-    V2p = R2CBasis(params.N[2], domain=(0, params.L[2]), **kw)
+    V0p = Basis(params.N[0], 'F', domain=(0, params.L[0]), dtype='D', **kw)
+    V1p = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype='D', **kw)
+    V2p = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype='d', **kw)
     Tp = TensorProductSpace(comm, (V0p, V1p, V2p), **{'threads': params.threads})
-    VTp = VectorTensorProductSpace([Tp]*3)
+    VTp = VectorTensorProductSpace(Tp)
 
     float, complex, mpitype = datatypes(params.precision)
     FFT = T  # For compatibility - to be removed
@@ -40,17 +40,17 @@ def get_context():
         K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
     # Velocity and pressure
-    U = Array(VT, False)
-    U_hat = Array(VT)
-    P = Array(T, False)
-    P_hat = Array(T)
+    U = Array(VT)
+    U_hat = Function(VT)
+    P = Array(T)
+    P_hat = Function(T)
 
     # Primary variable
     u = U_hat
 
     # RHS array
-    dU = Array(VT)
-    curl = Array(VT, False)
+    dU = Function(VT)
+    curl = Array(VT)
     Source = Array(VT) # Possible source term initialized to zero
     work = work_arrays()
 

@@ -9,6 +9,7 @@ from spectralDNS import config, get_solver, solve
 #from spectralDNS.utilities import reset_profile
 from OrrSommerfeld_shen import OrrSommerfeld
 #from OrrSommerfeld_eig import OrrSommerfeld
+from MKM import dx
 
 try:
     import matplotlib.pyplot as plt
@@ -43,36 +44,6 @@ def initOS(OS, eigvals, eigvectors, U, X, t=0.):
         U[0, :, j, :] = u.repeat(U.shape[3]).reshape((len(x), U.shape[3]))
         U[1, :, j, :] = v.repeat(U.shape[3]).reshape((len(x), U.shape[3]))
     U[2] = 0
-
-def dx(u, FST):
-    """Compute integral of u over domain"""
-    uu = sum(u, axis=(1, 2))
-    sl = FST.local_slice(False)[0]
-    M = FST.shape()[0]
-    c = zeros(M)
-    cc = zeros(M)
-    cc[sl] = uu
-    FST.comm.Reduce(cc, c, op=MPI.SUM, root=0)
-    quad = FST.bases[0].quad
-    if FST.comm.Get_rank() == 0:
-        if quad == 'GL':
-            ak = zeros_like(c)
-            ak = dct(c, ak, 1, axis=0)
-            ak /= (M-1)
-            w = arange(0, M, 1, dtype=float)
-            w[2:] = 2./(1-w[2:]**2)
-            w[0] = 1
-            w[1::2] = 0
-            return sum(ak*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
-
-        assert quad == 'GC'
-        d = zeros(M)
-        k = 2*(1 + arange((M-1)//2))
-        d[::2] = (2./M)/hstack((1., 1.-k*k))
-        w = zeros_like(d)
-        w = dct(d, w, type=3, axis=0)
-        return sum(c*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
-    return 0
 
 acc = zeros(1)
 OS, e0 = None, None

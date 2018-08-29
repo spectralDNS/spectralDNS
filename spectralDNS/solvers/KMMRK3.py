@@ -21,7 +21,8 @@ def get_context():
     FST = TensorProductSpace(comm, (ST, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Dirichlet
     FSB = TensorProductSpace(comm, (SB, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Biharmonic
     FCT = TensorProductSpace(comm, (CT, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Regular Chebyshev
-    VFS = VectorTensorProductSpace([FSB, FST, FST])
+    VFS = MixedTensorProductSpace([FSB, FST, FST])
+    VUG = MixedTensorProductSpace([FSB, FST])
 
     # Padded
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
@@ -39,7 +40,7 @@ def get_context():
     FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
     FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
     FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
-    VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
+    VFSp = MixedTensorProductSpace([FSBp, FSTp, FSTp])
 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
     Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
@@ -65,7 +66,7 @@ def get_context():
 
     H_hat = Function(VFS)
 
-    dU = Function(VFS)
+    dU = Function(VUG)
     hv = zeros((2,)+FST.local_shape(), dtype=complex)
     hg = zeros((2,)+FST.local_shape(), dtype=complex)
     h1 = zeros((2, 2, N[0]), dtype=complex)

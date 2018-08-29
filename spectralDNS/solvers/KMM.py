@@ -8,7 +8,7 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 from shenfun.spectralbase import inner_product
 from shenfun.la import TDMA
 from shenfun import TensorProductSpace, Array, TestFunction, TrialFunction, \
-    VectorTensorProductSpace, div, grad, Dx, inner, Function, Basis
+    MixedTensorProductSpace, div, grad, Dx, inner, Function, Basis
 from shenfun.chebyshev.la import Helmholtz, Biharmonic
 
 from .spectralinit import *
@@ -31,7 +31,8 @@ def get_context():
     FST = TensorProductSpace(comm, (ST, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Dirichlet
     FSB = TensorProductSpace(comm, (SB, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Biharmonic
     FCT = TensorProductSpace(comm, (CT, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Regular Chebyshev
-    VFS = VectorTensorProductSpace([FSB, FST, FST])
+    VFS = MixedTensorProductSpace([FSB, FST, FST])
+    VUG = MixedTensorProductSpace([FSB, FST])
 
     # Padded
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
@@ -49,7 +50,7 @@ def get_context():
     FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
     FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
     FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
-    VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
+    VFSp = MixedTensorProductSpace([FSBp, FSTp, FSTp])
 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
     Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
@@ -77,7 +78,7 @@ def get_context():
     H_hat0 = Function(VFS)
     H_hat1 = Function(VFS)
 
-    dU = Function(VFS)
+    dU = Function(VUG)
     hv = Function(FST)
     hg = Function(FST)
     Source = Array(VFS)
@@ -487,7 +488,7 @@ def compute_vw(u_hat, f_hat, g_hat, K_over_K2):
 #@profile
 def solve_linear(u_hat, g_hat, rhs,
                  work, la, mat, K_over_K2, H_hat0, U_hat0, Sk, **context):
-    """Solve for Fourier wavenumbers 0"""
+    """Solve final linear algebra systems"""
     f_hat = work[(u_hat[0], 0)]
     w0 = work[(u_hat[0], 1, False)]
 

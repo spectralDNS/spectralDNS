@@ -370,6 +370,12 @@ print_div_parser2.add_argument('--print_divergence_progress', dest='print_diverg
 IPCSR_mpifft4py.set_defaults(print_divergence_progress=False)
 IPCSR_mpifft4py.add_argument('--divergence_tol', default=1e-7, type=float, help='Tolerance on divergence error for pressure velocity coupling for IPCS')
 
+KMM_RB = channelsubparsers.add_parser('KMM_RB', help='Rayleigh-Benard channel solver using KMM')
+KMM_RB.add_argument('--integrator', default='implicit', choices=('implicit',), help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
+
+KMMRK3_RB = channelsubparsers.add_parser('KMMRK3_RB', help='Rayleigh-Benard channel solver using KMMRK3.')
+KMMRK3_RB.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',), help='RK3 integrator for channel solver')
+
 
 def update(new, mesh="triplyperiodic"):
     """Update spectralDNS parameters"""

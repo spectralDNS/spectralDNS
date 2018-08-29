@@ -21,9 +21,12 @@ def initialize(solver, context):
 
 def initialize1(solver, context):
     U, X = context.U, context.X
-    U[0] = sin(X[0])*cos(X[1])*cos(X[2])
-    U[1] = -cos(X[0])*sin(X[1])*cos(X[2])
-    U[2] = 0
+    #U[0] = sin(X[0])*cos(X[1])*cos(X[2])
+    #U[1] = -cos(X[0])*sin(X[1])*cos(X[2])
+    #U[2] = 0
+    U[0] = X[0]
+    U[1] = X[1]
+    U[2] = X[2]
     solver.set_velocity(**context)
 
 def initialize2(solver, context):
@@ -128,11 +131,12 @@ def regression_test(context):
         assert round(asscalar(k) - 0.124953117517, params.ntol) == 0
 
 if __name__ == "__main__":
+    from shenfun.utilities.h5py_writer import HDF5Writer
     config.update(
         {'nu': 0.000625,             # Viscosity
          'dt': 0.01,                 # Time step
          'T': 0.1,                   # End time
-         'L': [2*pi, 2.*pi, 2*pi],
+         'L': [2*pi, 3.*pi, 4*pi],
          'M': [5, 5, 5],
          #'planner_effort': {'fft': 'FFTW_EXHAUSTIVE'},
          #'decomposition': 'pencil',
@@ -148,7 +152,7 @@ if __name__ == "__main__":
     # Add curl to the stored results. For this we need to update the update_components
     # method used by the HDF5Writer class to compute the real fields that are stored
     if config.params.solver == 'NS':
-        context.hdf5file.fname = "NS8.h5"
+        context.hdf5file.fname = "NS9.h5"
         context.hdf5file.components["curlx"] = context.curl[0]
         context.hdf5file.components["curly"] = context.curl[1]
         context.hdf5file.components["curlz"] = context.curl[2]
@@ -161,6 +165,9 @@ if __name__ == "__main__":
         context.hdf5file.update_components = update_components
 
     initialize(sol, context)
-    solve(sol, context)
+    #context.hdf5file._write(config.params, **context)
+    file = HDF5Writer("TGx.h5", ['U', 'V', 'W'], context.VT)
+    file.write_tstep(0, context.U)
+    #solve(sol, context)
     #context.hdf5file._init_h5file(config.params, **context)
     #context.hdf5file.f.close()
