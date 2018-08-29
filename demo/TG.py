@@ -21,12 +21,9 @@ def initialize(solver, context):
 
 def initialize1(solver, context):
     U, X = context.U, context.X
-    #U[0] = sin(X[0])*cos(X[1])*cos(X[2])
-    #U[1] = -cos(X[0])*sin(X[1])*cos(X[2])
-    #U[2] = 0
-    U[0] = X[0]
-    U[1] = X[1]
-    U[2] = X[2]
+    U[0] = sin(X[0])*cos(X[1])*cos(X[2])
+    U[1] = -cos(X[0])*sin(X[1])*cos(X[2])
+    U[2] = 0
     solver.set_velocity(**context)
 
 def initialize2(solver, context):
@@ -111,7 +108,7 @@ def update(context):
         if solver.rank == 0:
             k.append(kk)
             w.append(ww)
-            print(params.t, float(kk), float(ww), float(ww2))
+            print("%2.2f %2.8f %2.8f %2.8f" %(params.t, float(kk), float(ww), float(ww2)))
     #if params.tstep % params.compute_energy == 1:
         #if 'NS' in params.solver:
             #kk2 = comm.reduce(sum(U.astype(float64)*U.astype(float64))/prod(params.N)/2)
@@ -136,7 +133,7 @@ if __name__ == "__main__":
         {'nu': 0.000625,             # Viscosity
          'dt': 0.01,                 # Time step
          'T': 0.1,                   # End time
-         'L': [2*pi, 3.*pi, 4*pi],
+         'L': [2*pi, 2.*pi, 2*pi],
          'M': [5, 5, 5],
          #'planner_effort': {'fft': 'FFTW_EXHAUSTIVE'},
          #'decomposition': 'pencil',
@@ -166,8 +163,6 @@ if __name__ == "__main__":
 
     initialize(sol, context)
     #context.hdf5file._write(config.params, **context)
-    file = HDF5Writer("TGx.h5", ['U', 'V', 'W'], context.VT)
-    file.write_tstep(0, context.U)
-    #solve(sol, context)
+    solve(sol, context)
     #context.hdf5file._init_h5file(config.params, **context)
     #context.hdf5file.f.close()
