@@ -21,7 +21,7 @@ def get_context():
 
     # Set Nyquist frequency to zero on K that is used for odd derivatives
     Kx = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
-    K_over_K2 = zeros((3,) + FFT.complex_shape())
+    K_over_K2 = zeros((3,) + FFT.complex_shape(), dtype=float)
     for i in range(3):
         K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
@@ -210,7 +210,6 @@ def getConvection(convection):
 @optimizer
 def add_pressure_diffusion(rhs, u_hat, nu, K2, K, P_hat, K_over_K2):
     """Add contributions from pressure and diffusion to the rhs"""
-
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat = np.sum(rhs*K_over_K2, 0, out=P_hat)
 
@@ -223,7 +222,6 @@ def add_pressure_diffusion(rhs, u_hat, nu, K2, K, P_hat, K_over_K2):
 
     return rhs
 
-#@profile
 def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, Kx, K2, K_over_K2, **context):
     """Compute right hand side of Navier Stokes
 

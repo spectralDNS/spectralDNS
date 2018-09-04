@@ -10,32 +10,43 @@ from shenfun import Basis, TensorProductSpace, VectorTensorProductSpace, \
 from .spectralinit import *
 
 def get_context():
+    float, complex, mpitype = datatypes(params.precision)
+
     """Set up context for classical (NS) solver"""
-    V0 = Basis(params.N[0], 'F', domain=(0, params.L[0]), dtype='D')
-    V1 = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype='D')
-    V2 = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype='d')
-    T = TensorProductSpace(comm, (V0, V1, V2), **{'threads': params.threads})
+    V0 = Basis(params.N[0], 'F', domain=(0, params.L[0]), dtype=complex)
+    V1 = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype=complex)
+    V2 = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype=float)
+    kw0 = {'threads': params.threads,
+           'planner_effort': params.planner_effort['fft']}
+    T = TensorProductSpace(comm, (V0, V1, V2), dtype=float,
+                           slab=params.decomposition=='slab', **kw0)
     VT = VectorTensorProductSpace(T)
 
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
-    V0p = Basis(params.N[0], 'F', domain=(0, params.L[0]), dtype='D', **kw)
-    V1p = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype='D', **kw)
-    V2p = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype='d', **kw)
-    Tp = TensorProductSpace(comm, (V0p, V1p, V2p), **{'threads': params.threads})
+    V0p = Basis(params.N[0], 'F', domain=(0, params.L[0]), dtype=complex, **kw)
+    V1p = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype=complex, **kw)
+    V2p = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype=float, **kw)
+    Tp = TensorProductSpace(comm, (V0p, V1p, V2p), dtype=float,
+                            slab=params.decomposition=='slab', **kw0)
     VTp = VectorTensorProductSpace(Tp)
 
-    float, complex, mpitype = datatypes(params.precision)
     FFT = T  # For compatibility - to be removed
 
     # Mesh variables
     X = T.local_mesh(True)
     K = T.local_wavenumbers(scaled=True)
+    for i in range(3):
+        X[i] = X[i].astype(float)
+        K[i] = K[i].astype(float)
     K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
 
     # Set Nyquist frequency to zero on K that is, from now on, used for odd derivatives
     Kx = T.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
-    K_over_K2 = np.zeros((3,)+VT.local_shape())
+    for i in range(3):
+        Kx[i] = Kx[i].astype(float)
+
+    K_over_K2 = np.zeros((3,)+VT.local_shape(), dtype=float)
     for i in range(3):
         K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
@@ -109,7 +120,6 @@ def end_of_tstep(context):
 
     return False
 
-#@profile
 def compute_curl(c, a, work, VT, VTp, K, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
     curl_hat = work[(a, 0, False)]
@@ -120,9 +130,9 @@ def compute_curl(c, a, work, VT, VTp, K, dealias=None):
 
 def Cross(c, a, b, work, VT, VTp, dealias=None):
     """c_k = F_k(a x b)"""
+    V = VT if dealias is None else VTp
     Uc = work[(a, 2, False)]
     Uc = cross1(Uc, a, b)
-    V = VT if dealias is None else VTp
     c = V.forward(Uc, c)
     return c
 

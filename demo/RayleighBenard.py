@@ -78,9 +78,7 @@ def update(context):
 
 if __name__ == "__main__":
     config.update(
-        {'Ra': 2e4,
-         'Pr': 0.7,
-         'dt': 0.01,               # Time step
+        {'dt': 0.01,               # Time step
          'T': 10.,                  # End time
          'L': [2, 2*np.pi, 2*np.pi],
          'M': [6, 6, 6]
@@ -89,6 +87,8 @@ if __name__ == "__main__":
 
     config.channel.add_argument("--compute_energy", type=int, default=10)
     config.channel.add_argument("--plot_result", type=int, default=100)
+    config.channel.add_argument("--Ra", type=float, default=20000.0)
+    config.channel.add_argument("--Pr", type=float, default=0.7)
     solver = get_solver(update=update, mesh="channel")
     config.params.nu = np.sqrt(config.params.Pr/config.params.Ra)
     config.params.kappa = 1./np.sqrt(config.params.Pr*config.params.Ra)

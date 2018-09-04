@@ -18,9 +18,11 @@ def get_context():
     K1 = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype='d')
 
     #CT = ST.CT  # Chebyshev transform
-    FST = TensorProductSpace(comm, (ST, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Dirichlet
-    FSB = TensorProductSpace(comm, (SB, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Biharmonic
-    FCT = TensorProductSpace(comm, (CT, K0, K1), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})    # Regular Chebyshev
+    kw0 = {'threads':params.threads,
+           'planner_effort':params.planner_effort["dct"]}
+    FST = TensorProductSpace(comm, (ST, K0, K1), **kw0)    # Dirichlet
+    FSB = TensorProductSpace(comm, (SB, K0, K1), **kw0)    # Biharmonic
+    FCT = TensorProductSpace(comm, (CT, K0, K1), **kw0)    # Regular Chebyshev
     VFS = MixedTensorProductSpace([FSB, FST, FST])
     VUG = MixedTensorProductSpace([FSB, FST])
 
@@ -37,9 +39,9 @@ def get_context():
 
     K0p = Basis(params.N[1], 'F', dtype='D', domain=(0, params.L[1]), **kw)
     K1p = Basis(params.N[2], 'F', dtype='d', domain=(0, params.L[2]), **kw)
-    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
-    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
-    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **{'threads':params.threads, 'planner_effort':params.planner_effort["dct"]})
+    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **kw0)
+    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **kw0)
+    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **kw0)
     VFSp = MixedTensorProductSpace([FSBp, FSTp, FSTp])
 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis

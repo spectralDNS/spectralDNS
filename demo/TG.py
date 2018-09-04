@@ -31,10 +31,8 @@ def initialize2(solver, context):
     U[0] = sin(X[0])*cos(X[1])*cos(X[2])
     U[1] = -cos(X[0])*sin(X[1])*cos(X[2])
     U[2] = 0
-    U_hat = context.work[(context.W_hat, 0)]
-    for i in range(3):
-        U_hat[i] = context.FFT.fftn(U[i], U_hat[i])
-    solver.cross2(context.W_hat, context.K, U_hat)
+    solver.set_velocity(**context)
+    solver.cross2(context.W_hat, context.K, context.U_hat)
 
 def energy_fourier(comm, a):
     result = 2*sum(abs(a[..., 1:-1])**2) + sum(abs(a[..., 0])**2) + sum(abs(a[..., -1])**2)
@@ -73,9 +71,9 @@ def update(context):
             plt.pause(1e-6)
 
     #if params.tstep == 1:
-        #from spectralDNS.utilities import reset_profile
-        #print("Reset profile")
-        #reset_profile(profile)
+    #    from spectralDNS.utilities import reset_profile
+    #    print("Reset profile")
+    #    reset_profile(profile)
 
     if params.tstep % params.compute_energy == 0:
         #dx, L = params.dx, params.L
@@ -124,18 +122,19 @@ def regression_test(context):
     k = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))/prod(params.N)/2) # Compute energy with double precision
     config.solver.MemoryUsage('End')
     if solver.rank == 0:
-        assert round(asscalar(w) - 0.375249930801, params.ntol) == 0
-        assert round(asscalar(k) - 0.124953117517, params.ntol) == 0
+        assert round(asscalar(w) - 0.375249930801, params.ntol) == 0, w
+        assert round(asscalar(k) - 0.124953117517, params.ntol) == 0, k
 
 if __name__ == "__main__":
-    from shenfun.utilities.h5py_writer import HDF5Writer
     config.update(
         {'nu': 0.000625,             # Viscosity
          'dt': 0.01,                 # Time step
          'T': 0.1,                   # End time
          'L': [2*pi, 2.*pi, 2*pi],
          'M': [5, 5, 5],
-         #'planner_effort': {'fft': 'FFTW_EXHAUSTIVE'},
+         'planner_effort': {'fft': 'FFTW_ESTIMATE',
+                            'rfftn': 'FFTW_ESTIMATE',
+                            'irfftn': 'FFTW_ESTIMATE'},
          #'decomposition': 'pencil',
          #'P1': 2
         }, "triplyperiodic")

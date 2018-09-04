@@ -4,81 +4,90 @@ from numba import {0} as float
 from numba import {1} as complex
 
 
-#def RK4(U_hat, U_hat0, U_hat1, dU, a, b, dt, solver, context):
-    #globals().update(dict(solver=solver, context=context))
-    #a = RK4_(U_hat, U_hat0, U_hat1, dU, a, b, dt)
-    #return a
+@jit((complex[:, :, :, :], complex[:, :, :, :], complex[:, :, :, :]), nopython=True, fastmath=True)
+def loop1(U_hat, U_hat0, U_hat1):
+    for i in range(U_hat.shape[0]):
+        for j in range(U_hat.shape[1]):
+            for k in range(U_hat.shape[2]):
+                for l in range(U_hat.shape[3]):
+                    z = U_hat[i, j, k, l]
+                    U_hat1[i, j, k, l] = z
+                    U_hat0[i, j, k, l] = z
 
-#@jit(Tuple((complex[:, :, :, :], float, float))(complex[:, :, :, :], complex[:, :, :, :], complex[:, :, :, :],
-                      #complex[:, :, :, :], float[:], float[:], float))
-#def RK4_(U_hat, U_hat0, U_hat1, dU, a, b, dt):
-    #for i in range(dU.shape[0]):
-        #for j in range(dU.shape[1]):
-            #for k in range(dU.shape[2]):
-                #for l in range(dU.shape[3]):
-                    #z = U_hat[i, j, k, l]
-                    #U_hat1[i, j, k, l] = z
-                    #U_hat0[i, j, k, l] = z
-    #c = context
-    #for rk in range(4):
-        #dU = solver.ComputeRHS(dU, U_hat, solver, c.work, c.FFT, c.P_hat, c.K, c.K2, c.K_over_K2)
-        #if rk < 3:
-            #for i in range(dU.shape[0]):
-                #for j in range(dU.shape[1]):
-                    #for k in range(dU.shape[2]):
-                        #for l in range(dU.shape[3]):
-                            #U_hat[i, j, k, l] = U_hat0[i, j, k, l] + b[rk]*dt*dU[i, j, k, l]
+@jit((complex[:, :, :, :], complex[:, :, :, :], complex[:, :, :, :], float, float), nopython=True, fastmath=True)
+def loop2(dU, U_hat, U_hat0, b, dt):
+    for i in range(dU.shape[0]):
+       for j in range(dU.shape[1]):
+           for k in range(dU.shape[2]):
+               for l in range(dU.shape[3]):
+                   U_hat[i, j, k, l] = U_hat0[i, j, k, l] + b*dt*dU[i, j, k, l]
 
-        #for i in range(dU.shape[0]):
-            #for j in range(dU.shape[1]):
-                #for k in range(dU.shape[2]):
-                    #for l in range(dU.shape[3]):
-                        #U_hat1[i, j, k, l] = U_hat1[i, j, k, l] + a[rk]*dt*dU[i, j, k, l]
+@jit((complex[:, :, :, :], complex[:, :, :, :], float, float), nopython=True, fastmath=True)
+def loop3(dU, U_hat1, a, dt):
+    for i in range(dU.shape[0]):
+        for j in range(dU.shape[1]):
+            for k in range(dU.shape[2]):
+                for l in range(dU.shape[3]):
+                    U_hat1[i, j, k, l] = U_hat1[i, j, k, l] + a*dt*dU[i, j, k, l]
 
-    #for i in range(dU.shape[0]):
-        #for j in range(dU.shape[1]):
-            #for k in range(dU.shape[2]):
-                #for l in range(dU.shape[3]):
-                    #U_hat[i, j, k, l] = U_hat1[i, j, k, l]
+@jit((complex[:, :, :, :], complex[:, :, :, :]), nopython=True, fastmath=True)
+def loop4(U_hat, U_hat1):
+    for i in range(U_hat.shape[0]):
+        for j in range(U_hat.shape[1]):
+            for k in range(U_hat.shape[2]):
+                for l in range(U_hat.shape[3]):
+                    U_hat[i, j, k, l] = U_hat1[i, j, k, l]
 
-    #return U_hat, dt, dt
+def RK4(U_hat, U_hat0, U_hat1, dU, a, b, dt, solver, context):
+    loop1(U_hat, U_hat0, U_hat1)
+    c = context
+    for rk in range(4):
+        dU = solver.ComputeRHS(dU, U_hat, solver, **c)
+        if rk < 3:
+            loop2(dU, U_hat, U_hat0, b[rk], dt)
+        loop3(dU, U_hat1, a[rk], dt)
+    loop4(U_hat, U_hat1)
+    return U_hat, dt, dt
 
-#@jit(complex[:, :, :, :](complex[:, :, :, :], complex[:, :, :, :], complex[:, :, :, :], float))
-#def ForwardEuler(U_hat, U_hat0, dU, dt):
-    #dU = ComputeRHS(dU, 0)
-    #for i in range(dU.shape[0]):
-        #for j in range(dU.shape[1]):
-            #for k in range(dU.shape[2]):
-                #for l in range(dU.shape[3]):
-                    #U_hat[i, j, k, l] = U_hat[i, j, k, l] + dU[i, j, k, l]*dt
+@jit((complex[:, :, :, :], complex[:, :, :, :], float), nopython=True, fastmath=True)
+def loop5(dU, U_hat, dt):
+    for i in range(dU.shape[0]):
+        for j in range(dU.shape[1]):
+            for k in range(dU.shape[2]):
+                for l in range(dU.shape[3]):
+                    U_hat[i, j, k, l] += dU[i, j, k, l]*dt
 
-#@jit(complex[:, :, :, :](complex[:, :, :, :], complex[:, :, :, :], complex[:, :, :, :], float, int64))
-#def AB2(U_hat, U_hat0, dU, dt, tstep):
-    #p0 = 1.5
-    #p1 = 0.5
-    #dU = ComputeRHS(dU, 0)
+@jit((complex[:, :, :, :], complex[:, :, :, :], complex[:, :, :, :], float), nopython=True, fastmath=True)
+def loop6(dU, U_hat, U_hat0, dt):
+    for i in range(dU.shape[0]):
+        for j in range(dU.shape[1]):
+            for k in range(dU.shape[2]):
+                for l in range(dU.shape[3]):
+                    U_hat[i, j, k, l] = U_hat[i, j, k, l] + 1.5*dU[i, j, k, l]*dt - 0.5*U_hat0[i, j, k, l]
 
-    #if tstep == 1:
-        #for i in range(dU.shape[0]):
-            #for j in range(dU.shape[1]):
-                #for k in range(dU.shape[2]):
-                    #for l in range(dU.shape[3]):
-                        #U_hat[i, j, k, l] = U_hat[i, j, k, l] + dU[i, j, k, l]*dt
+@jit((complex[:, :, :, :], complex[:, :, :, :], float), nopython=True, fastmath=True)
+def loop7(dU, U_hat0, dt):
+    for i in range(dU.shape[0]):
+        for j in range(dU.shape[1]):
+            for k in range(dU.shape[2]):
+                for l in range(dU.shape[3]):
+                    U_hat0[i, j, k, l] = dU[i, j, k, l]*dt
 
-    #else:
-        #for i in range(dU.shape[0]):
-            #for j in range(dU.shape[1]):
-                #for k in range(dU.shape[2]):
-                    #for l in range(dU.shape[3]):
-                        #U_hat[i, j, k, l] = U_hat[i, j, k, l] + p0*dU[i, j, k, l]*dt - p1*U_hat0[i, j, k, l]
-
-    #for i in range(dU.shape[0]):
-        #for j in range(dU.shape[1]):
-            #for k in range(dU.shape[2]):
-                #for l in range(dU.shape[3]):
-                    #U_hat0[i, j, k, l] = dU[i, j, k, l]*dt
-
-@jit(float[:, :, :, :](float[:, :, :, :], float[:, :, :, :], float[:, :, :, :]), nopython=True)
+def ForwardEuler(U_hat, dU, dt, solver, context):
+    dU = solver.ComputeRHS(dU, U_hat, solver, **context)
+    loop5(dU, U_hat, dt)
+    return U_hat, dt, dt
+    
+def AB2(U_hat, U_hat0, dU, dt, tstep, solver, context):
+    dU = solver.ComputeRHS(dU, U_hat, solver, **context)
+    if tstep == 0:
+        loop5(dU, U_hat, dt)
+    else:
+        loop6(dU, U_hat, U_hat0, dt)
+    loop7(dU, U_hat0, dt)
+    return U_hat, dt, dt
+    
+@jit(float[:, :, :, :](float[:, :, :, :], float[:, :, :, :], float[:, :, :, :]), nopython=True, fastmath=True)
 def cross1(c, a, b):
     """Regular c = a x b"""
     for i in range(a.shape[1]):
@@ -95,7 +104,7 @@ def cross1(c, a, b):
                 c[2, i, j, k] = a0*b1 - a1*b0
     return c
 
-@jit(complex[:, :, :, :](complex[:, :, :, :], int64[:, :, :, :], complex[:, :, :, :]), nopython=True)
+@jit(complex[:, :, :, :](complex[:, :, :, :], int64[:, :, :, :], complex[:, :, :, :]), nopython=True, fastmath=True)
 def cross2a(c, a, b):
     """ c = 1j*(a x b)"""
     for i in range(a.shape[1]):
@@ -112,7 +121,7 @@ def cross2a(c, a, b):
                 c[2, i, j, k] = -(a0*b1.imag - a1*b0.imag) + 1j*(a0*b1.real - a1*b0.real)
     return c
 
-@jit(complex[:, :, :, :](complex[:, :, :, :], float[:, :, :, :], complex[:, :, :, :]), nopython=True)
+@jit(complex[:, :, :, :](complex[:, :, :, :], float[:, :, :, :], complex[:, :, :, :]), nopython=True, fastmath=True)
 def cross2b(c, a, b):
     """ c = 1j*(a x b)"""
     for i in range(a.shape[1]):
@@ -155,6 +164,10 @@ def cross2(c, a, b):
         c = cross2b(c, a, b)
     return c
 
+def add_pressure_diffusion_NS_shenfun(du, u_hat, nu, ksq, kk, p_hat, k_over_k2):
+    du = add_pressure_diffusion_NS_(du, u_hat, nu, ksq, kk[0][:, 0, 0],
+                                    kk[1][0, :, 0], kk[2][0, 0, :], p_hat, k_over_k2)
+    return du
 
 def add_pressure_diffusion_NS(du, u_hat, nu, ksq, kk, p_hat, k_over_k2):
     du = add_pressure_diffusion_NS_(du, u_hat, nu, ksq, kk[0][:, 0, 0],
@@ -163,7 +176,7 @@ def add_pressure_diffusion_NS(du, u_hat, nu, ksq, kk, p_hat, k_over_k2):
 
 @jit(complex[:, :, :, :](complex[:, :, :, :], complex[:, :, :, :], float,
                          float[:, :, :], float[:], float[:], float[:],
-                         complex[:, :, :], float[:, :, :, :]), nopython=True)
+                         complex[:, :, :], float[:, :, :, :]), nopython=True, fastmath=True)
 def add_pressure_diffusion_NS_(du, u_hat, nu, ksq, kx, ky, kz, p_hat, k_over_k2):
     for i in range(ksq.shape[0]):
         k0 = kx[i]
