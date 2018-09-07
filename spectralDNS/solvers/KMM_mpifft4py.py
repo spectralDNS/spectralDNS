@@ -89,7 +89,7 @@ def get_context():
              HelmholtzSolverU0=Helmholtz(N[0], np.sqrt(2./nu/dt), ST),
              TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0)))))
 
-    alfa = K2[0] - 2.0/nu/dt
+    alfa = K2 - 2.0/nu/dt
     # Collect all matrices
     mat = config.AttributeDict(
         dict(CDD=inner_product((ST, 0), (ST, 1)),
@@ -206,7 +206,7 @@ def get_pressure(context, solver):
 
     return p-uu+3./16.
 
-def Div(U, U_hat, FST, K, work, la, mat, ST, **context):
+def get_divergence(U, U_hat, FST, K, work, la, mat, ST, **context):
     Uc_hat = work[(U_hat[0], 0, True)]
     Uc = work[(U, 2, True)]
     Uc_hat = mat.CDB.matvec(U_hat[0], Uc_hat)

@@ -79,16 +79,18 @@ def inheritdocstrings(cls):
                     break
     return cls
 
-def dx(u, FST):
+def dx(u, FST, axis=0):
     """Compute integral of u over domain for channel solvers"""
-    uu = np.sum(u, axis=(1, 2))
-    sl = FST.local_slice(False)[0]
-    M = FST.shape()[0]
+    sx = list(range(3))
+    sx.pop(axis)
+    uu = np.sum(u, axis=tuple(sx))
+    sl = FST.local_slice(False)[axis]
+    M = FST.shape()[axis]
     c = np.zeros(M)
     cc = np.zeros(M)
     cc[sl] = uu
     FST.comm.Reduce(cc, c, op=MPI.SUM, root=0)
-    quad = FST.bases[0].quad
+    quad = FST.bases[axis].quad
     if FST.comm.Get_rank() == 0:
         if quad == 'GL':
             ak = np.zeros_like(c)
@@ -98,7 +100,7 @@ def dx(u, FST):
             w[2:] = 2./(1-w[2:]**2)
             w[0] = 1
             w[1::2] = 0
-            return sum(ak*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
+            return sum(ak*w)*np.prod(np.take(config.params.L/config.params.N, sx))
 
         assert quad == 'GC'
         d = np.zeros(M)
@@ -106,5 +108,5 @@ def dx(u, FST):
         d[::2] = (2./M)/np.hstack((1., 1.-k*k))
         w = np.zeros_like(d)
         w = dct(d, w, type=3, axis=0)
-        return np.sum(c*w)*config.params.L[1]*config.params.L[2]/config.params.N[1]/config.params.N[2]
+        return np.sum(c*w)*np.prod(np.take(config.params.L/config.params.N, sx))
     return 0

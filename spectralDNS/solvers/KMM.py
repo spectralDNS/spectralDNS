@@ -14,7 +14,6 @@ from shenfun.chebyshev.la import Helmholtz, Biharmonic
 from .spectralinit import *
 from ..shen.Matrices import BiharmonicCoeff, HelmholtzCoeff
 from ..shen import LUsolve
-from ..shen.la import Helmholtz as old_Helmholtz
 
 def get_context():
     """Set up context for solver"""
@@ -30,9 +29,9 @@ def get_context():
 
     kw0 = {'threads':params.threads,
            'planner_effort':params.planner_effort["dct"]}
-    FST = TensorProductSpace(comm, (ST, K0, K1), **kw0)    # Dirichlet
-    FSB = TensorProductSpace(comm, (SB, K0, K1), **kw0)    # Biharmonic
-    FCT = TensorProductSpace(comm, (CT, K0, K1), **kw0)    # Regular Chebyshev
+    FST = TensorProductSpace(comm, (ST, K0, K1), axes=(0, 1, 2), collapse_fourier=False, **kw0)    # Dirichlet
+    FSB = TensorProductSpace(comm, (SB, K0, K1), axes=(0, 1, 2), collapse_fourier=False, **kw0)    # Biharmonic
+    FCT = TensorProductSpace(comm, (CT, K0, K1), axes=(0, 1, 2), collapse_fourier=False, **kw0)    # Regular Chebyshev
     VFS = MixedTensorProductSpace([FSB, FST, FST])
     VUG = MixedTensorProductSpace([FSB, FST])
 
@@ -48,9 +47,9 @@ def get_context():
         STp, SBp, CTp = ST, SB, CT
     K0p = Basis(params.N[1], 'F', dtype='D', domain=(0, params.L[1]), **kw)
     K1p = Basis(params.N[2], 'F', dtype='d', domain=(0, params.L[2]), **kw)
-    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **kw0)
-    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **kw0)
-    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **kw0)
+    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), axes=(0, 1, 2), collapse_fourier=False, **kw0)
+    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), axes=(0, 1, 2), collapse_fourier=False, **kw0)
+    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), axes=(0, 1, 2), collapse_fourier=False, **kw0)
     VFSp = MixedTensorProductSpace([FSBp, FSTp, FSTp])
 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
@@ -102,8 +101,8 @@ def get_context():
     # Collect all matrices
     mat = config.AttributeDict(
         dict(CDD=inner_product((ST, 0), (ST, 1)),
-             AB=HelmholtzCoeff(N[0], 1.0, -alfa, ST.quad),
-             AC=BiharmonicCoeff(N[0], nu*dt/2., (1. - nu*dt*K2[0]), -(K2[0] - nu*dt/2.*K4[0]), quad=SB.quad),
+             AB=HelmholtzCoeff(N[0], 1.0, -(K2 - 2.0/nu/dt), ST.quad),
+             AC=BiharmonicCoeff(N[0], nu*dt/2., (1. - nu*dt*K2), -(K2 - nu*dt/2.*K4), quad=SB.quad),
              # Matrices for biharmonic equation
              CBD=inner_product((SB, 0), (ST, 1)),
              ABB=inner_product((SB, 0), (SB, 2)),
@@ -138,7 +137,7 @@ def get_context():
              BiharmonicSolverU=Biharmonic(mat.SBB, mat.ABB, mat.BBB, -nu*dt/2.*np.ones((1, 1, 1)),
                                           (1.+nu*dt*K2[0])[np.newaxis, :, :],
                                           (-(K2[0] + nu*dt/2.*K4[0]))[np.newaxis, :, :]),
-             HelmholtzSolverU0=old_Helmholtz(N[0], np.sqrt(2./nu/dt), ST),
+             HelmholtzSolverU0=Helmholtz(mat.ADD0, mat.BDD0, np.array([-1.]), np.array([2./nu/dt])),
              TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0)))))
 
     hdf5file = KMMWriter({"U":U[0], "V":U[1], "W":U[2]},

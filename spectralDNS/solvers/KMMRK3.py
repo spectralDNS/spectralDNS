@@ -20,9 +20,9 @@ def get_context():
     #CT = ST.CT  # Chebyshev transform
     kw0 = {'threads':params.threads,
            'planner_effort':params.planner_effort["dct"]}
-    FST = TensorProductSpace(comm, (ST, K0, K1), **kw0)    # Dirichlet
-    FSB = TensorProductSpace(comm, (SB, K0, K1), **kw0)    # Biharmonic
-    FCT = TensorProductSpace(comm, (CT, K0, K1), **kw0)    # Regular Chebyshev
+    FST = TensorProductSpace(comm, (ST, K0, K1), collapse_fourier=False, **kw0)    # Dirichlet
+    FSB = TensorProductSpace(comm, (SB, K0, K1), collapse_fourier=False, **kw0)    # Biharmonic
+    FCT = TensorProductSpace(comm, (CT, K0, K1), collapse_fourier=False, **kw0)    # Regular Chebyshev
     VFS = MixedTensorProductSpace([FSB, FST, FST])
     VUG = MixedTensorProductSpace([FSB, FST])
 
@@ -39,9 +39,9 @@ def get_context():
 
     K0p = Basis(params.N[1], 'F', dtype='D', domain=(0, params.L[1]), **kw)
     K1p = Basis(params.N[2], 'F', dtype='d', domain=(0, params.L[2]), **kw)
-    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **kw0)
-    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **kw0)
-    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **kw0)
+    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), collapse_fourier=False, **kw0)
+    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), collapse_fourier=False, **kw0)
+    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), collapse_fourier=False, **kw0)
     VFSp = MixedTensorProductSpace([FSBp, FSTp, FSTp])
 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
@@ -96,9 +96,9 @@ def get_context():
     # Collect all matrices
     mat = config.AttributeDict(
         dict(CDD=inner_product((ST, 0), (ST, 1)),
-             AC=[BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2[0]),
-                                 -(K2[0] - nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)],
-             AB=[HelmholtzCoeff(N[0], 1.0, -(K2[0] - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)],
+             AC=[BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2),
+                                 -(K2 - nu*(a[rk]+b[rk])*dt/2.*K4), SB.quad) for rk in range(3)],
+             AB=[HelmholtzCoeff(N[0], 1.0, -(K2 - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)],
              # Matrices for biharmonic equation
              CBD=inner_product((SB, 0), (ST, 1)),
              ABB=inner_product((SB, 0), (SB, 2)),
@@ -126,7 +126,7 @@ def get_context():
                                            (1.+nu*(a[rk]+b[rk])*dt*K2[0])[np.newaxis, :, :],
                                            -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0])[np.newaxis, :, :])
                                 for rk in range(3)],
-             HelmholtzSolverU0=[old_Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST) for rk in range(3)],
+             HelmholtzSolverU0=[Helmholtz(mat.ADD0, mat.BDD0, np.array([-1]), np.array([2./nu/(a[rk]+b[rk])/dt])) for rk in range(3)],
              TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0)))))
 
     del rk

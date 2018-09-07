@@ -87,13 +87,13 @@ def get_context():
              HelmholtzSolverU0=[Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST) for rk in range(3)],
              TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0)))))
 
-    alfa = K2[0] - 2.0/nu/dt
+    alfa = K2 - 2.0/nu/dt
     # Collect all matrices
     mat = config.AttributeDict(
         dict(CDD=inner_product((ST, 0), (ST, 1)),
-             AC=[BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2[0]),
-                                 -(K2[0] - nu*(a[rk]+b[rk])*dt/2.*K4[0]), SB.quad) for rk in range(3)],
-             AB=[HelmholtzCoeff(N[0], 1.0, -(K2[0] - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)],
+             AC=[BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2),
+                                 -(K2 - nu*(a[rk]+b[rk])*dt/2.*K4), SB.quad) for rk in range(3)],
+             AB=[HelmholtzCoeff(N[0], 1.0, -(K2 - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)],
              # Matrices for biharmonic equation
              CBD=inner_product((SB, 0), (ST, 1)),
              ABB=inner_product((SB, 0), (SB, 2)),

@@ -428,7 +428,7 @@ def test_Helmholtz_matvec(quad):
 
     b = np.zeros((M, 4, 4), dtype=np.complex)
     u1 = u1.repeat(16).reshape((M, 4, 4)) +1j*u1.repeat(16).reshape((M, 4, 4))
-    kx = np.zeros((4, 4))+kx
+    kx = np.zeros((1, 4, 4))+kx
     #LUsolve.Mult_Helmholtz_3D_complex(M, SD.quad=="GL", 1.0, kx**2, u1, b)
     AB = HelmholtzCoeff(M, 1, kx**2, SD.quad)
     b = AB.matvec(u1, b)

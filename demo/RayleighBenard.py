@@ -1,4 +1,4 @@
-"""Turbulent channel"""
+"""Rayleigh Benard flow in channel"""
 import warnings
 from mpi4py import MPI
 import numpy as np

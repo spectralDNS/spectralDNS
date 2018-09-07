@@ -331,6 +331,10 @@ channelsubparsers = channel.add_subparsers(dest='solver')
 
 KMM = channelsubparsers.add_parser('KMM', help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
 KMM.add_argument('--integrator', default='implicit', choices=('implicit',), help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
+
+KMMr = channelsubparsers.add_parser('KMMr', help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
+KMMr.add_argument('--integrator', default='implicit', choices=('implicit',), help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
+
 KMMRK3 = channelsubparsers.add_parser('KMMRK3', help='Kim Moin Moser channel solver with third order semi-implicit Runge-Kutta discretization.')
 KMMRK3.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',), help='RK3 integrator for channel solver')
 KMM_mpifft4py = channelsubparsers.add_parser('KMM_mpifft4py', help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
