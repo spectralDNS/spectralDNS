@@ -7,7 +7,6 @@ from spectralDNS.utilities import dx
 import shenfun
 #from spectralDNS.utilities import reset_profile
 from OrrSommerfeld_shen import OrrSommerfeld
-#from OrrSommerfeld_eig import OrrSommerfeld
 
 try:
     import matplotlib.pyplot as plt
@@ -19,29 +18,18 @@ except ImportError:
     plt = None
 
 #params.eps = 1e-9
-#def initOS(OS, U, X, t=0.):
-    #for i in range(U.shape[1]):
-        #x = X[0, i, 0, 0]
-        #OS.interp(x, 1)
-        #for j in range(U.shape[2]):
-            #y = X[1, i, j, 0]
-            #v = (1-x**2) + config.params.eps*dot(OS.f, real(OS.dphidy*exp(1j*(y-OS.eigval*t))))
-            #u = -config.params.eps*dot(OS.f, real(1j*OS.phi*exp(1j*(y-OS.eigval*t))))
-            #U[0, i, j, :] = u
-            #U[1, i, j, :] = v
-    #U[2] = 0
 
 def initOS(OS, eigvals, eigvectors, U, X, t=0.):
-    x = X[0][:, 0, 0]
+    x = X[2][0, 0]
     eigval, phi, dphidy = OS.interp(x, eigvals, eigvectors, eigval=1, verbose=False)
     OS.eigval = eigval
-    for j in range(U.shape[2]):
-        y = X[1][0, j, 0]
+    for j in range(U.shape[1]):
+        y = X[0][j, 0, 0]
         v = (1-x**2) + config.params.eps*real(dphidy*exp(1j*(y-eigval*t)))
         u = -config.params.eps*real(1j*phi*exp(1j*(y-eigval*t)))
-        U[0, :, j, :] = u.repeat(U.shape[3]).reshape((len(x), U.shape[3]))
-        U[1, :, j, :] = v.repeat(U.shape[3]).reshape((len(x), U.shape[3]))
-    U[2] = 0
+        U[2, j, :, :] = u.repeat(U.shape[2]).reshape((len(x), U.shape[2])).T
+        U[0, j, :, :] = v.repeat(U.shape[2]).reshape((len(x), U.shape[2])).T
+    U[1] = 0
 
 acc = zeros(1)
 OS, e0 = None, None
@@ -61,10 +49,7 @@ def initialize(solver, context):
 
     # Compute convection from data in context (i.e., context.U_hat and context.g)
     # This is the convection at t=0
-    if hasattr(context.FST, 'dx'):
-        e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.ST.quad)
-    else:
-        e0 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
+    e0 = 0.5*dx(U[2]**2+(U[0]-(1-X[2]**2))**2, context.FST, axis=2)
     #print(e0)
     acc[0] = 0.0
 
@@ -77,10 +62,7 @@ def initialize(solver, context):
         context.U_hat0[:] = U_hat
         params.t = params.dt
         params.tstep = 1
-        if hasattr(context.FST, 'dx'):
-            e1 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.ST.quad)
-        else:
-            e1 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
+        e1 = 0.5*dx(U[2]**2+(U[0]-(1-X[2]**2))**2, context.FST, axis=2)
 
         if solver.rank == 0:
             acc[0] += abs(e1/e0 - exp(2*imag(OS.eigval)*params.t))
@@ -98,14 +80,14 @@ def initialize(solver, context):
 
 def set_Source(Source, Sk, FST, ST, N, **kw):
     Source[:] = 0
-    Source[1] = -2./config.params.Re
+    Source[0] = -2./config.params.Re
     Sk[:] = 0
     if hasattr(FST, 'complex_shape'):
-        Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
+        Sk[0] = FST.scalar_product(Source[0], Sk[0], ST)
 
     else:
-        Sk[1] = FST.scalar_product(Source[1], Sk[1])
-    Sk[1, -2:, 0, 0] = 0
+        Sk[0] = FST.scalar_product(Source[0], Sk[0])
+    Sk[0, 0, 0, -2:] = 0
 
 im1, im2, im3, im4 = (None, )*4
 def update(context):
@@ -124,38 +106,35 @@ def update(context):
     if not plt is None:
         if im1 is None and solver.rank == 0 and params.plot_step > 0:
             plt.figure()
-            im1 = plt.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], c.U[0, :, :, 0], 100)
+            im1 = plt.contourf(c.X[0][:, 0, :], c.X[2][:, 0, :], c.U[2, :, 0, :], 100)
             plt.colorbar(im1)
             plt.draw()
 
             plt.figure()
-            im2 = plt.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], c.U[1, :, :, 0] - (1-c.X[0][:, :, 0]**2), 100)
+            im2 = plt.contourf(c.X[0][:, 0, :], c.X[2][:, 0, :], c.U[0, :, 0, :] - (1-c.X[2][:, 0, :]**2), 100)
             plt.colorbar(im2)
             plt.draw()
 
             plt.figure()
-            im3 = plt.quiver(c.X[1][:, :, 0], c.X[0][:, :, 0], c.U[1, :, :, 0]-(1-c.X[0][:, :, 0]**2), c.U[0, :, :, 0])
+            im3 = plt.quiver(c.X[0][:, 0, :], c.X[2][:, 0, :], c.U[0, :, 0, :]-(1-c.X[2][:, 0, :]**2), c.U[2, :, 0, :])
             plt.draw()
 
             plt.pause(1e-6)
 
         if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
             im1.ax.clear()
-            im1.ax.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], U[0, :, :, 0], 100)
+            im1.ax.contourf(c.X[0][:, 0, :], c.X[2][:, 0, :], U[0, :, 0, :], 100)
             im1.autoscale()
             im2.ax.clear()
-            im2.ax.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], U[1, :, :, 0]-(1-c.X[0][:, :, 0]**2), 100)
+            im2.ax.contourf(c.X[0][:, 0, :], c.X[2][:, 0, :], U[0, :, 0, :]-(1-c.X[2][:, 0, :]**2), 100)
             im2.autoscale()
-            im3.set_UVC(U[1, :, :, 0]-(1-c.X[0][:, :, 0]**2), U[0, :, :, 0])
+            im3.set_UVC(U[0, :, 0, :]-(1-c.X[2][:, 0, :]**2), U[2, :, 0, :])
             plt.pause(1e-6)
 
     if params.tstep % params.compute_energy == 0:
         e1, e2, exact = compute_error(c)
         div_u = solver.get_divergence(**c)
-        if hasattr(c.FST, 'dx'):
-            e3 = 0.5*c.FST.dx(div_u**2, c.ST.quad)
-        else:
-            e3 = dx(div_u**2, c.FST)
+        e3 = dx(div_u**2, c.FST, axis=2)
         if solver.rank == 0 and not config.params.spatial_refinement_test:
             acc[0] += abs(e1/e0-exact)
             print("Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2), e3))
@@ -166,21 +145,15 @@ def compute_error(context):
     params = config.params
     solver = config.solver
     U = solver.get_velocity(**c)
-    pert = (U[1] - (1-c.X[0]**2))**2 + U[0]**2
-    if hasattr(context.FST, 'dx'):
-        e1 = 0.5*c.FST.dx(pert, c.ST.quad)
-    else:
-        e1 = 0.5*dx(pert, c.FST)
+    pert = (U[0] - (1-c.X[2]**2))**2 + U[2]**2
+    e1 = 0.5*dx(pert, c.FST, axis=2)
 
     exact = exp(2*imag(OS.eigval)*params.t)
     U0 = c.work[(c.U, 0)]
     initOS(OS, OS.eigvals, OS.eigvectors, U0, c.X, t=params.t)
     #pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
-    pert = (U[0] - U0[0])**2
-    if hasattr(context.FST, 'dx'):
-        e2 = 0.5*c.FST.dx(pert, c.ST.quad)
-    else:
-        e2 = 0.5*dx(pert, c.FST)
+    pert = (U[2] - U0[2])**2
+    e2 = 0.5*dx(pert, c.FST, axis=2)
 
     return e1, e2, exact
 
@@ -210,8 +183,8 @@ if __name__ == "__main__":
          'nu': 1./8000.,              # Viscosity
          'dt': 0.001,                 # Time step
          'T': 0.01,                   # End time
-         'L': [2, 2*pi, pi],
-         'M': [7, 5, 2],
+         'L': [2*pi, pi, 2],
+         'M': [5, 2, 7],
          'Dquad': 'GC',
          'Bquad': 'GC',
          'dealias': None
@@ -252,7 +225,6 @@ if __name__ == "__main__":
             context = solver.get_context()
             initialize(solver, context)
             set_Source(**context)
-
             solve(solver, context)
 
     else:

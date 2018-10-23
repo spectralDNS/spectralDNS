@@ -10,16 +10,17 @@ from shenfun import Basis, TensorProductSpace, VectorTensorProductSpace, \
 from .spectralinit import *
 
 def get_context():
-    float, complex, mpitype = datatypes(params.precision)
-
     """Set up context for classical (NS) solver"""
+    float, complex, mpitype = datatypes(params.precision)
+    collapse_fourier = False if params.dealias == '3/2-rule' else True
     V0 = Basis(params.N[0], 'F', domain=(0, params.L[0]), dtype=complex)
     V1 = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype=complex)
     V2 = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype=float)
     kw0 = {'threads': params.threads,
            'planner_effort': params.planner_effort['fft']}
     T = TensorProductSpace(comm, (V0, V1, V2), dtype=float,
-                           slab=params.decomposition=='slab', **kw0)
+                           slab=(params.decomposition == 'slab'),
+                           collapse_fourier=collapse_fourier, **kw0)
     VT = VectorTensorProductSpace(T)
 
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
@@ -28,7 +29,8 @@ def get_context():
     V1p = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype=complex, **kw)
     V2p = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype=float, **kw)
     Tp = TensorProductSpace(comm, (V0p, V1p, V2p), dtype=float,
-                            slab=params.decomposition=='slab', **kw0)
+                            slab=(params.decomposition == 'slab'),
+                            collapse_fourier=collapse_fourier, **kw0)
     VTp = VectorTensorProductSpace(Tp)
 
     FFT = T  # For compatibility - to be removed
@@ -104,7 +106,7 @@ def set_velocity(U, U_hat, VT, **context):
     return U_hat
 
 def get_divergence(T, K, U_hat, **context):
-    div_u = Array(T, False)
+    div_u = Array(T)
     div_u = T.backward(1j*(K[0]*U_hat[0]+K[1]*U_hat[1]+K[2]*U_hat[2]), div_u)
     return div_u
 
@@ -232,24 +234,37 @@ def ComputeRHS(rhs, u_hat, solver, work, T, Tp, VT, VTp, P_hat, K, Kx, K2,
                K_over_K2, Source, **context):
     """Compute right hand side of Navier Stokes
 
-    args:
-        rhs         The right hand side to be returned
-        u_hat       The FFT of the velocity at current time. May differ from
-                    context.U_hat since it is set by the integrator
-        solver      The solver module. Included for possible inheritance
-                    and flexibility of integrators.
+    Parameters
+    ----------
+        rhs : array
+            The right hand side to be returned
+        u_hat : array
+            The FFT of the velocity at current time. May differ from
+            context.U_hat since it is set by the integrator
+        solver : module
+            The solver module. Included for possible inheritance
+            and flexibility of integrators.
 
-    Remaining args extracted from context:
-        work        Work arrays
-        T           TensorProductSpace
-        Tp          TensorProductSpace for padded transforms
-        VT          VectorTensorProductSpace
-        VTp         VectorTensorProductSpace for padded transforms
-        P_hat       Transformed pressure
-        K           Scaled wavenumber mesh
-        Kx          Scaled wavenumber mesh with Nyquist eliminated
-        K2          sum_i K[i]*K[i]
-        K_over_K2   K / K2
+    Other Parameters
+    ----------------
+        work : dict
+            Work arrays
+        T : TensorProductSpace
+        Tp : TensorProductSpace
+            for padded transforms
+        VT : VectorTensorProductSpace
+        VTp : VectorTensorProductSpace
+            for padded transforms
+        P_hat : array
+            Transformed pressure
+        K : list of arrays
+            Scaled wavenumber mesh
+        Kx : list of arrays
+            Scaled wavenumber mesh with Nyquist eliminated
+        K2 : array
+            sum_i K[i]*K[i]
+        K_over_K2 : array
+            K / K2
 
     """
     rhs = solver.conv(rhs, u_hat, work, T, Tp, VT, VTp, Kx)

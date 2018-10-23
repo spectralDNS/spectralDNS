@@ -89,7 +89,7 @@ class SlabShen_R2C(Slab_R2C):
             for i, k in enumerate((ky, kz)):
                 if self.N[i+1] % 2 == 0:
                     k[self.N[i+1]//2] = 0
-            ky = ky[int(self.rank*self.Np[1]):int((self.rank+1)*self.Np[1])]
+        ky = ky[int(self.rank*self.Np[1]):int((self.rank+1)*self.Np[1])]
         Ks = meshgrid(kx, ky, kz, indexing='ij', sparse=True)
         if scaled:
             Lp = array([2, 2*pi, 2*pi])/self.L

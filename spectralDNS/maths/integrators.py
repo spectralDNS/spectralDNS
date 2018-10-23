@@ -92,7 +92,10 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
             if FFT.comm.rank == 0:
                 est_to_bcast = np.zeros(1)
                 est = np.max(np.sqrt(nsquared))
-                est /= np.sqrt(np.array(FFT.global_complex_shape()).prod())
+                if hasattr(FFT, 'global_complex_shape'):
+                    est /= np.sqrt(np.array(FFT.global_complex_shape()).prod())
+                else:
+                    est /= np.sqrt(np.array(FFT.shape(forward_output=True)).prod())
                 est_to_bcast[0] = est
             est_to_bcast = FFT.comm.bcast(est_to_bcast, root=0)
             est = est_to_bcast[0]
@@ -107,7 +110,10 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
             x = np.zeros(asdf.shape)
             FFT.comm.Allreduce(asdf, x, op=MPI.MAX)
             est = np.abs(np.max(x))
-            est /= np.sqrt(np.array(FFT.global_complex_shape()).prod())
+            if hasattr(FFT, 'global_complex_shape'):
+                est /= np.sqrt(np.array(FFT.global_complex_shape()).prod())
+            else:
+                est /= np.sqrt(np.array(FFT.shape(forward_output=True)).prod())
         else:
             assert False, "Wrong error norm"
 

@@ -21,43 +21,43 @@ def get_context():
     # Get points and weights for Chebyshev weighted integrals
     assert params.Dquad == params.Bquad
     collapse_fourier = False if params.dealias == '3/2-rule' else True
-    ST = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
-    SB = Basis(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
-    CT = Basis(params.N[0], 'C', quad=params.Dquad)
-    ST0 = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad) # For 1D problem
-    K0 = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype='D')
-    K1 = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype='d')
+    ST = Basis(params.N[2], 'C', bc=(0, 0), quad=params.Dquad)
+    SB = Basis(params.N[2], 'C', bc='Biharmonic', quad=params.Bquad)
+    CT = Basis(params.N[2], 'C', quad=params.Dquad)
+    ST0 = Basis(params.N[2], 'C', bc=(0, 0), quad=params.Dquad) # For 1D problem
+    K0 = Basis(params.N[0], 'F', domain=(0, params.L[0]), dtype='D')
+    K1 = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype='d')
 
-    kw0 = {'threads': params.threads,
-           'planner_effort': params.planner_effort["dct"],
+    kw0 = {'threads':params.threads,
+           'planner_effort':params.planner_effort["dct"],
            'slab': (params.decomposition == 'slab'),
            'collapse_fourier': collapse_fourier}
-    FST = TensorProductSpace(comm, (ST, K0, K1), **kw0)    # Dirichlet
-    FSB = TensorProductSpace(comm, (SB, K0, K1), **kw0)    # Biharmonic
-    FCT = TensorProductSpace(comm, (CT, K0, K1), **kw0)    # Regular Chebyshev
-    VFS = MixedTensorProductSpace([FSB, FST, FST])
+    FST = TensorProductSpace(comm, (K0, K1, ST), axes=(2, 0, 1), **kw0)    # Dirichlet
+    FSB = TensorProductSpace(comm, (K0, K1, SB), axes=(2, 0, 1), **kw0)    # Biharmonic
+    FCT = TensorProductSpace(comm, (K0, K1, CT), axes=(2, 0, 1), **kw0)    # Regular Chebyshev
+    VFS = MixedTensorProductSpace([FST, FST, FSB])
     VFST = MixedTensorProductSpace([FST, FST, FST])
-    VUG = MixedTensorProductSpace([FSB, FST])
+    VUG = MixedTensorProductSpace([FST, FSB])
 
     # Padded
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
     if params.dealias == '3/2-rule':
         # Requires new bases due to planning and transforms on different size arrays
-        STp = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
-        SBp = Basis(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
-        CTp = Basis(params.N[0], 'C', quad=params.Dquad)
+        STp = Basis(params.N[2], 'C', bc=(0, 0), quad=params.Dquad)
+        SBp = Basis(params.N[2], 'C', bc='Biharmonic', quad=params.Bquad)
+        CTp = Basis(params.N[2], 'C', quad=params.Dquad)
     else:
         STp, SBp, CTp = ST, SB, CT
-    K0p = Basis(params.N[1], 'F', dtype='D', domain=(0, params.L[1]), **kw)
-    K1p = Basis(params.N[2], 'F', dtype='d', domain=(0, params.L[2]), **kw)
-    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **kw0)
-    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **kw0)
-    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **kw0)
-    VFSp = MixedTensorProductSpace([FSBp, FSTp, FSTp])
+    K0p = Basis(params.N[0], 'F', dtype='D', domain=(0, params.L[0]), **kw)
+    K1p = Basis(params.N[1], 'F', dtype='d', domain=(0, params.L[1]), **kw)
+    FSTp = TensorProductSpace(comm, (K0p, K1p, STp), axes=(2, 0, 1), **kw0)
+    FSBp = TensorProductSpace(comm, (K0p, K1p, SBp), axes=(2, 0, 1), **kw0)
+    FCTp = TensorProductSpace(comm, (K0p, K1p, CTp), axes=(2, 0, 1), **kw0)
+    VFSp = MixedTensorProductSpace([FSTp, FSTp, FSBp])
 
-    Nu = params.N[0]-2   # Number of velocity modes in Shen basis
-    Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
+    Nu = params.N[2]-2   # Number of velocity modes in Shen basis
+    Nb = params.N[2]-4   # Number of velocity modes in Shen biharmonic basis
     u_slice = slice(0, Nu)
     v_slice = slice(0, Nb)
 
@@ -88,25 +88,26 @@ def get_context():
     Source = Array(VFS)
     Sk = Function(VFS)
 
-    K2 = K[1]*K[1]+K[2]*K[2]
+    K2 = K[0]*K[0]+K[1]*K[1]
     K4 = K2**2
 
     # Set Nyquist frequency to zero on K that is used for odd derivatives in nonlinear terms
     Kx = FST.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
     K_over_K2 = np.zeros((2,)+g.shape)
     for i in range(2):
-        K_over_K2[i] = K[i+1] / np.where(K2 == 0, 1, K2)
+        K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
     work = work_arrays()
 
     nu, dt, N = params.nu, params.dt, params.N
 
-    alfa = K2[0] - 2.0/nu/dt
     # Collect all matrices
     mat = config.AttributeDict(
         dict(CDD=inner_product((ST, 0), (ST, 1)),
-             AB=HelmholtzCoeff(N[0], 1.0, -(K2 - 2.0/nu/dt), ST.quad),
-             AC=BiharmonicCoeff(N[0], nu*dt/2., (1. - nu*dt*K2), -(K2 - nu*dt/2.*K4), quad=SB.quad),
+             CTD=inner_product((CT, 0), (ST, 1)),
+             BTT=inner_product((CT, 0), (CT, 0)),
+             AB=HelmholtzCoeff(N[2], 1.0, -(K2 - 2.0/nu/dt), ST.quad),
+             AC=BiharmonicCoeff(N[2], nu*dt/2., (1. - nu*dt*K2), -(K2 - nu*dt/2.*K4), quad=SB.quad),
              # Matrices for biharmonic equation
              CBD=inner_product((SB, 0), (ST, 1)),
              ABB=inner_product((SB, 0), (SB, 2)),
@@ -118,11 +119,11 @@ def get_context():
              BBD=inner_product((SB, 0), (ST, 0)),
              CDB=inner_product((ST, 0), (SB, 1)),
              ADD0=inner_product((ST0, 0), (ST0, 2)),
-             BDD0=inner_product((ST0, 0), (ST0, 0)),))
+             BDD0=inner_product((ST0, 0), (ST0, 0))))
 
-    mat.ADD.axis = 0
-    mat.BDD.axis = 0
-    mat.SBB.axis = 0
+    mat.ADD.axis = 2
+    mat.BDD.axis = 2
+    mat.SBB.axis = 2
 
     la = config.AttributeDict(
         dict(HelmholtzSolverG=Helmholtz(mat.ADD, mat.BDD, -np.ones((1, 1, 1)),
@@ -227,14 +228,14 @@ def get_pressure(context, solver):
 def get_divergence(U, U_hat, FST, K, Kx, work, la, mat, **context):
     Uc_hat = work[(U_hat[0], 0, True)]
     Uc = work[(U, 2, True)]
-    Uc_hat = mat.CDB.matvec(U_hat[0], Uc_hat)
-    Uc_hat = la.TDMASolverD(Uc_hat)
+    Uc_hat = mat.CDB.matvec(U_hat[2], Uc_hat, axis=2)
+    Uc_hat = la.TDMASolverD(Uc_hat, axis=2)
 
-    dudx = Uc[0] = FST.backward(Uc_hat, Uc[0])
+    dwdz = Uc[2] = FST.backward(Uc_hat, Uc[2])
+    dudx_h = 1j*K[0]*U_hat[0]
+    dudx = Uc[0] = FST.backward(dudx_h, Uc[0])
     dvdy_h = 1j*K[1]*U_hat[1]
     dvdy = Uc[1] = FST.backward(dvdy_h, Uc[1])
-    dwdz_h = 1j*K[2]*U_hat[2]
-    dwdz = Uc[2] = FST.backward(dwdz_h, Uc[2])
     return dudx+dvdy+dwdz
 
 #@profile
@@ -246,29 +247,34 @@ def Cross(c, a, b, FSTp, work):
     c[2] = FSTp.forward(Uc[2], c[2])
     return c
 
-@optimizer
-def mult_K1j(K, a, f):
-    f[0] = 1j*K[2]*a
-    f[1] = -1j*K[1]*a
-    return f
+#@optimizer
+#def mult_K1j(K, a, f):
+#    f[0] = 1j*K[0]*a
+#    f[1] = -1j*K[1]*a
+#    return f
 #@profile
-def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, work):
+def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, mat, work):
     F_tmp = work[(u_hat, 0, False)]
     F_tmp2 = work[(u_hat, 2, False)]
     Uc = work[(c, 2, False)]
-    # Mult_CTD_3D_n is projection to T of d(u_hat)/dx (for components 1 and 2 of u_hat)
-    # Corresponds to CTD.matvec(u_hat[1])/BTT.dd, CTD.matvec(u_hat[2])/BTT.dd
-    #from IPython import embed; embed()
-    LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = Uc[1] = FCTp.backward(F_tmp[1], Uc[1])
-    dwdx = Uc[2] = FCTp.backward(F_tmp[2], Uc[2])
-    c[0] = FSTp.backward(g, c[0])
-    F_tmp2[:2] = mult_K1j(K, u_hat[0], F_tmp2[:2])
+    # Mult_CTD_3D_n is projection to T of d(u_hat)/dz (for components 0 and 1 of u_hat)
+    # Corresponds to CTD.matvec(u_hat[0])/BTT.dd, CTD.matvec(u_hat[1])/BTT.dd
+    F_tmp[0] = mat.CTD.matvec(u_hat[0], F_tmp[0], axis=2)
+    F_tmp[0] /= mat.BTT[0][np.newaxis, np.newaxis, :]
+    F_tmp[1] = mat.CTD.matvec(u_hat[1], F_tmp[1], axis=2)
+    F_tmp[1] /= mat.BTT[0][np.newaxis, np.newaxis, :]
 
-    c[1] = FSBp.backward(F_tmp2[0], c[1])
-    c[1] -= dwdx
-    c[2] = FSBp.backward(F_tmp2[1], c[2])
-    c[2] += dvdx
+    dudz = Uc[0] = FCTp.backward(F_tmp[0], Uc[0])
+    dvdz = Uc[1] = FCTp.backward(F_tmp[1], Uc[1])
+    c[2] = FSTp.backward(g, c[2])
+    #F_tmp2[:2] = mult_K1j(K, u_hat[2], F_tmp2[:2])
+    dwdy = F_tmp2[0] = 1j*K[1]*u_hat[2]
+    dwdx = F_tmp2[1] = 1j*K[0]*u_hat[2]
+
+    c[0] = FSBp.backward(F_tmp2[0], c[0])
+    c[0] -= dvdz
+    c[1] = FSBp.backward(-F_tmp2[1], c[1])
+    c[1] += dudz
     return c
 
 def compute_derivatives(U, U_hat, FST, FCT, FSB, K, la, mat, work, **context):
@@ -403,7 +409,7 @@ def getConvection(convection):
             u_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 0)]
             curl_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 1)]
             u_dealias = VFSp.backward(u_hat, u_dealias)
-            curl_dealias = compute_curl(curl_dealias, u_hat, g_hat, K, FCTp, FSTp, FSBp, work)
+            curl_dealias = compute_curl(curl_dealias, u_hat, g_hat, K, FCTp, FSTp, FSBp, mat, work)
             rhs = Cross(rhs, u_dealias, curl_dealias, FSTp, work)
             return rhs
 
@@ -422,12 +428,12 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
     u0 = work[(g, 2, False)]
 
     # Compute diffusion for g-equation
-    diff_g = AB.matvec(g, diff_g)
+    diff_g = AB.matvec(g, diff_g, axis=2)
 
     # Compute diffusion++ for u-equation
-    diff_u[:] = nu*dt/2.*SBB.matvec(u, u0)
-    diff_u += (1. - nu*dt*K2)*ABB.matvec(u, u0)
-    diff_u -= (K2 - nu*dt/2.*K4)*BBB.matvec(u, u0)
+    diff_u[:] = nu*dt/2.*SBB.matvec(u, u0, axis=2)
+    diff_u += (1. - nu*dt*K2)*ABB.matvec(u, u0, axis=2)
+    diff_u -= (K2 - nu*dt/2.*K4)*BBB.matvec(u, u0, axis=2)
 
     rhs[0] += diff_u
     rhs[1] += diff_g
@@ -439,16 +445,11 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
                K4, hv, hg, mat, la, **context):
     """Compute right hand side of Navier Stokes
 
-    Parameters
-    ----------
-        rhs : array
-            The right hand side to be returned
-        u_hat : array
-            The FST of the velocity at current time
-        g_hat : array
-            The FST of the curl in wall normal direction
-        solver : module
-            The current solver module
+    args:
+        rhs         The right hand side to be returned
+        u_hat       The FST of the velocity at current time
+        g_hat       The FST of the curl in wall normal direction
+        solver      The current solver module
 
     Remaining args are extracted from context
 
@@ -462,54 +463,54 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
     # Assemble hv, hg and remaining rhs
     w0 = work[(hv, 0, False)]
     w1 = work[(hv, 1, False)]
-    hv[:] = -K2*mat.BBD.matvec(H_hat0[0], w0)
-    hv -= 1j*Kx[1]*mat.CBD.matvec(H_hat0[1], w0)
-    hv -= 1j*Kx[2]*mat.CBD.matvec(H_hat0[2], w0)
-    hg[:] = 1j*Kx[1]*mat.BDD.matvec(H_hat0[2], w0) - 1j*Kx[2]*mat.BDD.matvec(H_hat0[1], w1)
+    hv[:] = -1j*Kx[0]*mat.CBD.matvec(H_hat0[0], w0, axis=2)
+    hv -= 1j*Kx[1]*mat.CBD.matvec(H_hat0[1], w0, axis=2)
+    hv -= K2*mat.BBD.matvec(H_hat0[2], w0, axis=2)
+    hg[:] = 1j*Kx[0]*mat.BDD.matvec(H_hat0[1], w0, axis=2) - 1j*Kx[1]*mat.BDD.matvec(H_hat0[0], w1, axis=2)
 
     rhs[0] = hv*params.dt
     rhs[1] = hg*2./params.nu
 
-    rhs = solver.add_linear(rhs, u_hat[0], g_hat, work, mat.AB, mat.AC, mat.SBB,
+    rhs = solver.add_linear(rhs, u_hat[2], g_hat, work, mat.AB, mat.AC, mat.SBB,
                             mat.ABB, mat.BBB, params.nu, params.dt, K2, K4)
 
     return rhs
 
 @optimizer
 def compute_vw(u_hat, f_hat, g_hat, K_over_K2):
-    u_hat[1] = -1j*(K_over_K2[0]*f_hat - K_over_K2[1]*g_hat)
-    u_hat[2] = -1j*(K_over_K2[1]*f_hat + K_over_K2[0]*g_hat)
+    u_hat[0] = -1j*(K_over_K2[0]*f_hat - K_over_K2[1]*g_hat)
+    u_hat[1] = -1j*(K_over_K2[1]*f_hat + K_over_K2[0]*g_hat)
     return u_hat
 
 #@profile
 def solve_linear(u_hat, g_hat, rhs,
                  work, la, mat, K_over_K2, H_hat0, U_hat0, Sk, **context):
     """Solve final linear algebra systems"""
-    f_hat = work[(u_hat[0], 0)]
-    w0 = work[(u_hat[0], 1, False)]
+    f_hat = work[(u_hat[2], 0)]
+    w0 = work[(u_hat[2], 1, False)]
 
-    u_hat[0] = la.BiharmonicSolverU(u_hat[0], rhs[0])
+    u_hat[2] = la.BiharmonicSolverU(u_hat[2], rhs[0])
     g_hat = la.HelmholtzSolverG(g_hat, rhs[1])
 
     # Compute v_hat and w_hat from u_hat and g_hat
-    f_hat -= mat.CDB.matvec(u_hat[0], w0)
-    f_hat = la.TDMASolverD(f_hat)
+    f_hat -= mat.CDB.matvec(u_hat[2], w0, axis=2)
+    f_hat = la.TDMASolverD(f_hat, axis=2)
     u_hat = compute_vw(u_hat, f_hat, g_hat, K_over_K2)
 
     # Remains to fix wavenumber 0
     if rank == 0:
-        u0_hat = work[((2, params.N[0]), complex, 0)]
-        h0_hat = work[((2, params.N[0]), complex, 1)]
-        w = work[((params.N[0], ), complex, 0, False)]
-        w1 = work[((params.N[0], ), complex, 1, False)]
+        u0_hat = work[((2, params.N[2]), complex, 0)]
+        h0_hat = work[((2, params.N[2]), complex, 1)]
+        w = work[((params.N[2], ), complex, 0, False)]
+        w1 = work[((params.N[2], ), complex, 1, False)]
 
-        h0_hat[0] = H_hat0[1, :, 0, 0]
-        h0_hat[1] = H_hat0[2, :, 0, 0]
-        u0_hat[0] = U_hat0[1, :, 0, 0]
-        u0_hat[1] = U_hat0[2, :, 0, 0]
+        h0_hat[0] = H_hat0[0, 0, 0]
+        h0_hat[1] = H_hat0[1, 0, 0]
+        u0_hat[0] = U_hat0[0, 0, 0]
+        u0_hat[1] = U_hat0[1, 0, 0]
 
         w = mat.BDD0.matvec(2./params.nu*h0_hat[0], w)
-        w -= 2./params.nu * Sk[1, :, 0, 0]
+        w -= 2./params.nu * Sk[0, 0, 0]
         w1 = mat.ADD0.matvec(u0_hat[0], w1)
         w += w1
         w += 2./params.nu/params.dt * mat.BDD0.matvec(u0_hat[0], w1)
@@ -520,9 +521,9 @@ def solve_linear(u_hat, g_hat, rhs,
         w += mat.BDD0.matvec(2./params.nu/params.dt*u0_hat[1], w1)
         u0_hat[1] = la.HelmholtzSolverU0(u0_hat[1], w)
 
-        u_hat[1, :, 0, 0] = u0_hat[0]
-        u_hat[2, :, 0, 0] = u0_hat[1]
-        u_hat[0, :, 0, 0] = 0           # This required for continuity
+        u_hat[0, 0, 0] = u0_hat[0]
+        u_hat[1, 0, 0] = u0_hat[1]
+        u_hat[2, 0, 0] = 0           # This required for continuity
 
     return u_hat, g_hat
 

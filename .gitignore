@@ -1,0 +1,26 @@
+# Generated data files
+*.xdmf
+*.h5
+
+*.py[c,o]
+*.html
+*.so
+*.o
+*.lprof
+*.prof
+*.swp
+*.avi
+*.gif
+
+.cache/
+.pytest_cache/
+__pycache__/
+sandbox/
+spectralDNS/optimization/*.c
+spectralDNS/optimization/*.cpp
+spectralDNS/shen/*.c
+spectralDNS/shen/*.cpp
+spectralDNS/shenGeneralBCs/*.*
+spectralDNS/optimization/cython_*.pyx
+spectralDNS/optimization/*_double.py
+spectralDNS/optimization/*_single.py

@@ -8,135 +8,46 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 from .KMM import *
 from .spectralinit import end_of_tstep
 
+KMM_context = get_context
+
 def get_context():
-    # Get points and weights for Chebyshev weighted integrals
-    ST = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
-    SB = Basis(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
-    CT = Basis(params.N[0], 'C', quad=params.Dquad)
-    ST0 = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad) # For 1D problem
-    K0 = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype='D')
-    K1 = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype='d')
-
-    #CT = ST.CT  # Chebyshev transform
-    kw0 = {'threads':params.threads,
-           'planner_effort':params.planner_effort["dct"]}
-    FST = TensorProductSpace(comm, (ST, K0, K1), collapse_fourier=False, **kw0)    # Dirichlet
-    FSB = TensorProductSpace(comm, (SB, K0, K1), collapse_fourier=False, **kw0)    # Biharmonic
-    FCT = TensorProductSpace(comm, (CT, K0, K1), collapse_fourier=False, **kw0)    # Regular Chebyshev
-    VFS = MixedTensorProductSpace([FSB, FST, FST])
-    VUG = MixedTensorProductSpace([FSB, FST])
-
-    # Padded
-    kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
-          'dealias_direct': params.dealias == '2/3-rule'}
-    if params.dealias == '3/2-rule':
-        # Requires new bases due to planning and transforms on different size arrays
-        STp = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
-        SBp = Basis(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
-        CTp = Basis(params.N[0], 'C', quad=params.Dquad)
-    else:
-        STp, SBp, CTp = ST, SB, CT
-
-    K0p = Basis(params.N[1], 'F', dtype='D', domain=(0, params.L[1]), **kw)
-    K1p = Basis(params.N[2], 'F', dtype='d', domain=(0, params.L[2]), **kw)
-    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), collapse_fourier=False, **kw0)
-    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), collapse_fourier=False, **kw0)
-    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), collapse_fourier=False, **kw0)
-    VFSp = MixedTensorProductSpace([FSBp, FSTp, FSTp])
-
-    Nu = params.N[0]-2   # Number of velocity modes in Shen basis
-    Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
-    u_slice = slice(0, Nu)
-    v_slice = slice(0, Nb)
-
-    float, complex, mpitype = datatypes("double")
-
-    # Mesh variables
-    X = FST.local_mesh(True)
-    x0, x1, x2 = FST.mesh()
-    K = FST.local_wavenumbers(scaled=True)
-
-    # Solution variables
-    U = Array(VFS)
-    U_hat = Function(VFS)
-    g = Function(FST)
-
-    # primary variable
-    u = (U_hat, g)
+    c = KMM_context()
+    del c.U0, c.U_hat0
 
     nu, dt, N = params.nu, params.dt, params.N
-
-    H_hat = Function(VFS)
-
-    dU = Function(VUG)
-    hv = zeros((2,)+FST.local_shape(), dtype=complex)
-    hg = zeros((2,)+FST.local_shape(), dtype=complex)
-    h1 = zeros((2, 2, N[0]), dtype=complex)
-
-    Source = Array(VFS)
-    Sk = Function(VFS)
-
-    K2 = K[1]*K[1]+K[2]*K[2]
-    K4 = K2**2
-    kx = K[0][:, 0, 0]
-
-    # Set Nyquist frequency to zero on K that is used for odd derivatives
-    Kx = FST.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
-    K_over_K2 = np.zeros((2,)+g.shape)
-    for i in range(2):
-        K_over_K2[i] = K[i+1] / np.where(K2 == 0, 1, K2)
-
-    work = work_arrays()
+    del c.H_hat0, c.H_hat1
+    c.hv = zeros((2,)+c.FST.local_shape(), dtype=complex)
+    c.hg = zeros((2,)+c.FST.local_shape(), dtype=complex)
+    c.h1 = zeros((2, 2, N[0]), dtype=complex)
 
     # RK parameters
-    a = (8./15., 5./12., 3./4.)
-    b = (0.0, -17./60., -5./12.)
+    c.a = a = (8./15., 5./12., 3./4.)
+    c.b = b = (0.0, -17./60., -5./12.)
 
-    alfa = K2[0] - 2.0/nu/dt
     # Collect all matrices
-    mat = config.AttributeDict(
-        dict(CDD=inner_product((ST, 0), (ST, 1)),
-             AC=[BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2),
-                                 -(K2 - nu*(a[rk]+b[rk])*dt/2.*K4), SB.quad) for rk in range(3)],
-             AB=[HelmholtzCoeff(N[0], 1.0, -(K2 - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)],
-             # Matrices for biharmonic equation
-             CBD=inner_product((SB, 0), (ST, 1)),
-             ABB=inner_product((SB, 0), (SB, 2)),
-             BBB=inner_product((SB, 0), (SB, 0)),
-             SBB=inner_product((SB, 0), (SB, 4)),
-             # Matrices for Helmholtz equation
-             ADD=inner_product((ST, 0), (ST, 2)),
-             BDD=inner_product((ST, 0), (ST, 0)),
-             BBD=inner_product((SB, 0), (ST, 0)),
-             CDB=inner_product((ST, 0), (SB, 1)),
-             ADD0=inner_product((ST0, 0), (ST0, 2)),
-             BDD0=inner_product((ST0, 0), (ST0, 0)),))
-    mat.ADD.axis = 0
-    mat.BDD.axis = 0
-    mat.SBB.axis = 0
+    c.mat.AC = [BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*c.K2),
+                                -(c.K2 - nu*(a[rk]+b[rk])*dt/2.*c.K4), c.SB.quad) for rk in range(3)]
+    c.mat.AB = [HelmholtzCoeff(N[0], 1.0, -(c.K2 - 2.0/nu/dt/(a[rk]+b[rk])), c.ST.quad) for rk in range(3)]
 
     # Collect all linear algebra solvers
     # RK 3 requires three solvers because of the three different coefficients
-    rk = 0
-    la = config.AttributeDict(
-        dict(HelmholtzSolverG=[Helmholtz(mat.ADD, mat.BDD, -np.ones((1, 1, 1)),
-                                         (K2[0]+2.0/nu/(a[rk]+b[rk])/dt)[np.newaxis, :, :])
+    c.la = config.AttributeDict(
+        dict(HelmholtzSolverG=[Helmholtz(c.mat.ADD, c.mat.BDD, -np.ones((1, 1, 1)),
+                                         (c.K2+2.0/nu/(a[rk]+b[rk])/dt))
                                for rk in range(3)],
-             BiharmonicSolverU=[Biharmonic(mat.SBB, mat.ABB, mat.BBB, -nu*(a[rk]+b[rk])*dt/2.*np.ones((1, 1, 1)),
-                                           (1.+nu*(a[rk]+b[rk])*dt*K2[0])[np.newaxis, :, :],
-                                           -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0])[np.newaxis, :, :])
+             BiharmonicSolverU=[Biharmonic(c.mat.SBB, c.mat.ABB, c.mat.BBB, -nu*(a[rk]+b[rk])*dt/2.*np.ones((1, 1, 1)),
+                                           (1.+nu*(a[rk]+b[rk])*dt*c.K2),
+                                           -(c.K2 + nu*(a[rk]+b[rk])*dt/2.*c.K4))
                                 for rk in range(3)],
-             HelmholtzSolverU0=[Helmholtz(mat.ADD0, mat.BDD0, np.array([-1]), np.array([2./nu/(a[rk]+b[rk])/dt])) for rk in range(3)],
-             TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0)))))
+             HelmholtzSolverU0=[Helmholtz(c.mat.ADD0, c.mat.BDD0, np.array([-1]), np.array([2./nu/(a[rk]+b[rk])/dt])) for rk in range(3)],
+             TDMASolverD=TDMA(inner_product((c.ST, 0), (c.ST, 0)))))
 
-    del rk
+    c.hdf5file = KMMRK3Writer({"U":c.U[0], "V":c.U[1], "W":c.U[2]},
+                              chkpoint={'current':{'U':c.U}, 'previous':{}},
+                              filename=params.solver+".h5",
+                              mesh={"x": c.x0, "y": c.x1, "z": c.x2})
 
-    hdf5file = KMMRK3Writer({"U":U[0], "V":U[1], "W":U[2]},
-                            chkpoint={'current':{'U':U}, 'previous':{}},
-                            filename=params.solver+".h5",
-                            mesh={"x": x0, "y": x1, "z": x2})
-
-    return config.AttributeDict(locals())
+    return c
 
 class KMMRK3Writer(HDF5Writer):
     def update_components(self, **context):
@@ -168,12 +79,18 @@ def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
 
     """Compute right hand side of Navier Stokes
 
-    args:
-        rhs         The right hand side to be returned
-        u_hat       The FST of the velocity at current time.
-        g_hat       The FST of the curl in wall normal direction
-        rk          The step in the Runge Kutta integrator
-        solver      The current solver module
+    Parameters
+    ----------
+        rhs : array
+            The right hand side to be returned
+        u_hat : array
+            The FST of the velocity at current time.
+        g_hat : array
+            The FST of the curl in wall normal direction
+        rk : int
+            The step in the Runge Kutta integrator
+        solver : module
+            The current solver module
 
     Remaining args are extracted from context
 

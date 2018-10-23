@@ -267,7 +267,8 @@ parser_MHD.add_argument('--eta', default=0.01, type=float, help='MHD parameter')
 parser_Bq = trippelsubparsers.add_parser('Bq', help='Navier Stokes solver with Boussinesq model')
 parser_Bq.add_argument('--Ri', default=0.1, type=float, help='Richardson number')
 parser_Bq.add_argument('--Pr', default=1.0, type=float, help='Prandtl number')
-parser_NS_shenfun = trippelsubparsers.add_parser('NS_shenfun', help='Regular Navier Stokes solver using shenfun backend for transforms')
+parser_NS_shenfun = trippelsubparsers.add_parser('NS_shenfun', help='Regular Navier Stokes solver using shenfun backend')
+parser_VV_shenfun = trippelsubparsers.add_parser('VV_shenfun', help='Velocity-vorticity Navier Stokes solver using shenfun backend')
 
 # Arguments for 2D periodic solvers
 doublyperiodic = argparse.ArgumentParser(parents=[parser])
@@ -332,7 +333,7 @@ channelsubparsers = channel.add_subparsers(dest='solver')
 KMM = channelsubparsers.add_parser('KMM', help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
 KMM.add_argument('--integrator', default='implicit', choices=('implicit',), help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
 
-KMMr = channelsubparsers.add_parser('KMMr', help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
+KMMr = channelsubparsers.add_parser('KMMr', help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization. Inhomogeneous space in z-direction.')
 KMMr.add_argument('--integrator', default='implicit', choices=('implicit',), help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
 
 KMMRK3 = channelsubparsers.add_parser('KMMRK3', help='Kim Moin Moser channel solver with third order semi-implicit Runge-Kutta discretization.')

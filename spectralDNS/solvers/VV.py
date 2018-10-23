@@ -18,44 +18,19 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 
 from .NS import *
 
+NS_context = get_context
+
 def get_context():
     """Set up context for Velocity-Vorticity (VV) solver"""
-
-    # FFT class performs the 3D parallel transforms
-    FFT = get_FFT(params)
-    float, complex, mpitype = datatypes(params.precision)
-
-    # Mesh variables
-    X = FFT.get_local_mesh()
-    K = FFT.get_local_wavenumbermesh(scaled=True)
-    K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
-
-    # Set Nyquist frequency to zero on K that is used for odd derivatives
-    Kx = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
-    K_over_K2 = zeros((3,) + FFT.complex_shape())
-    for i in range(3):
-        K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
-
-    # Solution variables
-    U = empty((3,) + FFT.real_shape(), dtype=float)
-    curl = empty((3,) + FFT.real_shape(), dtype=float)
-    W_hat = empty((3,) + FFT.complex_shape(), dtype=complex) # curl transformed
-    U_hat = empty((3,) + FFT.complex_shape(), dtype=complex) # velocity transformed
-
-    # Primary variable
-    u = W_hat
-
-    # RHS, source and work arrays
-    dU = empty((3,) + FFT.complex_shape(), dtype=complex)
-    Source = zeros((3,) + FFT.complex_shape(), dtype=complex) # Possible source term initialized to zero
-    work = work_arrays()
-
-    hdf5file = VVWriter({'U':U[0], 'V':U[1], 'W':U[2],
-                         'curlx':curl[0], 'curly':curl[1], 'curlz':curl[2]},
-                        chkpoint={'current':{'U':U, 'curl':curl}, 'previous':{}},
-                        filename=params.h5filename+'.h5')
-
-    return config.AttributeDict(locals())
+    c = NS_context()
+    del c.P, c.P_hat
+    c.W_hat = empty((3,) + c.FFT.complex_shape(), dtype=complex) # curl transformed
+    c.u = c.W_hat
+    c.hdf5file = VVWriter({'U':c.U[0], 'V':c.U[1], 'W':c.U[2],
+                           'curlx':c.curl[0], 'curly':c.curl[1], 'curlz':c.curl[2]},
+                          chkpoint={'current':{'U':c.U, 'curl':c.curl}, 'previous':{}},
+                          filename=params.h5filename+'.h5')
+    return c
 
 class VVWriter(HDF5Writer):
     """Subclass HDF5Writer for appropriate updating of real components"""

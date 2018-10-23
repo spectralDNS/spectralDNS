@@ -10,8 +10,7 @@ from scipy.linalg import eig
 #from numpy.linalg import eig
 #from numpy.linalg import inv
 import numpy as np
-from shenfun.chebyshev.bases import ShenBiharmonicBasis, \
-    ShenDirichletBasis
+from shenfun import Basis
 from shenfun.spectralbase import inner_product
 from shenfun.matrixbase import extract_diagonal_matrix
 
@@ -38,63 +37,50 @@ class OrrSommerfeld(object):
         self.SB, self.SD, self.CDB = (None,)*3
         self.x, self.w = None, None
 
-    def interp(self, y, eigvals, eigvectors, eigval=1, same_mesh=False, verbose=False):
+    def interp(self, y, eigvals, eigvectors, eigval=1, verbose=False):
         """Interpolate solution eigenvector and it's derivative onto y
 
-        args:
-            y            Interpolation points
-            eigvals      All computed eigenvalues
-            eigvectors   All computed eigenvectors
-        kwargs:
-            eigval       The chosen eigenvalue, ranked with descending imaginary
-                         part. The largest imaginary part is 1, the second
-                         largest is 2, etc.
-            same_mesh    Boolean. Whether or not to interpolate to the same
-                         quadrature points as used for computing the eigenvectors
-            verbose      Boolean. Print information or not
+        Parameters
+        ----------
+            y : array
+                Interpolation points
+            eigvals : array
+                All computed eigenvalues
+            eigvectors : array
+                All computed eigenvectors
+            eigval : int, optional
+                The chosen eigenvalue, ranked with descending imaginary
+                part. The largest imaginary part is 1, the second
+                largest is 2, etc.
+            verbose : bool, optional
+                Print information or not
         """
         N = self.N
         nx, eigval = self.get_eigval(eigval, eigvals, verbose)
         phi_hat = np.zeros(N, np.complex)
         phi_hat[:-4] = np.squeeze(eigvectors[:, nx])
-        if same_mesh:
-            phi = np.zeros_like(phi_hat)
-            dphidy = np.zeros_like(phi_hat)
-            if self.SB is None:
-                self.SB = ShenBiharmonicBasis(N, quad=self.quad, plan=True)
-                self.SD = ShenDirichletBasis(N, quad=self.quad, plan=True)
-                self.CDB = inner_product((self.SD, 0), (self.SB, 1))
 
-            phi = self.SB.ifst(phi_hat, phi)
-            dphidy_hat = self.CDB.matvec(phi_hat)
-            dphidy_hat = self.SD.apply_inverse_mass(dphidy_hat)
-            dphidy = self.SD.backward(dphidy_hat, dphidy)
-
-        else:
-            # Recompute interpolation matrices if necessary
-            if not len(self.P4) == len(y):
-                SB = ShenBiharmonicBasis(N, quad=self.quad)
-                V = SB.vandermonde(y)
-                self.P4 = SB.get_vandermonde_basis(V)
-                self.T4x = SB.get_vandermonde_basis_derivative(V, 1)
-            phi = np.dot(self.P4, phi_hat)
-            dphidy = np.dot(self.T4x, phi_hat)
+        if not len(self.P4) == len(y):
+            SB = Basis(N, 'C', bc='Biharmonic', quad=self.quad)
+            self.P4 = SB.evaluate_basis_all(x=y)
+            self.T4x = SB.evaluate_basis_derivative_all(x=y, k=1)
+        phi = np.dot(self.P4, phi_hat)
+        dphidy = np.dot(self.T4x, phi_hat)
 
         return eigval, phi, dphidy
 
     def assemble(self):
         N = self.N
-        SB = ShenBiharmonicBasis(N, quad=self.quad)
+        SB = Basis(N, 'C', bc='Biharmonic', quad=self.quad)
         SB.plan((N, N), 0, np.float, {})
 
         x, w = self.x, self.w = SB.points_and_weights(N)
-        V = SB.vandermonde(x)
 
         # Trial function
-        P4 = SB.get_vandermonde_basis(V)
+        P4 = SB.evaluate_basis_all(x=x)
 
         # Second derivatives
-        T2x = SB.get_vandermonde_basis_derivative(V, 2)
+        T2x = SB.evaluate_basis_derivative_all(x=x, k=2)
 
         # (u'', v)
         K = np.zeros((N, N))
@@ -140,12 +126,15 @@ class OrrSommerfeld(object):
     def get_eigval(nx, eigvals, verbose=False):
         """Get the chosen eigenvalue
 
-        Args:
-            nx       The chosen eigenvalue. nx=1 corresponds to the one with the
-                     largest imaginary part, nx=2 the second largest etc.
-            eigvals  Computed eigenvalues
-
-            verbose  Print the value of the chosen eigenvalue
+        Parameters
+        ----------
+            nx : int
+                The chosen eigenvalue. nx=1 corresponds to the one with the
+                largest imaginary part, nx=2 the second largest etc.
+            eigvals : array
+                Computed eigenvalues
+            verbose : bool, optional
+                Print the value of the chosen eigenvalue. Default is False.
 
         """
         indices = np.argsort(np.imag(eigvals))

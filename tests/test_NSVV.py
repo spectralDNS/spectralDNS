@@ -7,18 +7,30 @@ from TG import initialize, regression_test
 comm = MPI.COMM_WORLD
 
 if comm.Get_size() >= 4:
-    params = ('NS_uniform_slab', 'VV_uniform_slab',
-              'NS_nonuniform_slab', 'VV_nonuniform_slab',
-              'NS_uniform_pencil', 'VV_uniform_pencil',
-              'NS_nonuniform_pencil', 'VV_nonuniform_pencil')
+    params = ('NS/uniform/slab', 'VV/uniform/slab',
+              'NS/nonuniform/slab', 'VV/nonuniform/slab',
+              'NS/uniform/pencil', 'VV/uniform/pencil',
+              'NS/nonuniform/pencil', 'VV/nonuniform/pencil',
+              'NS_shenfun/uniform/slab',
+              'VV_shenfun/uniform/slab',
+              'NS_shenfun/nonuniform/slab',
+              'VV_shenfun/nonuniform/slab',
+              'NS_shenfun/uniform/pencil',
+              'VV_shenfun/uniform/pencil',
+              'NS_shenfun/nonuniform/pencil',
+              'VV_shenfun/nonuniform/pencil')
 else:
-    params = ('NS_uniform', 'VV_uniform',
-              'NS_nonuniform', 'VV_nonuniform')
+    params = ('NS/uniform', 'VV/uniform',
+              'NS/nonuniform', 'VV/nonuniform',
+              'NS_shenfun/uniform',
+              'VV_shenfun/uniform',
+              'NS_shenfun/nonuniform',
+              'VV_shenfun/nonuniform')
 
 @pytest.fixture(params=params)
 def sol(request):
     """Check for uniform and non-uniform cube"""
-    pars = request.param.split('_')
+    pars = request.param.split('/')
     solver, mesh = pars[:2]
     mpi = 'slab'
     if len(pars) == 3:
