@@ -5,7 +5,6 @@ import numpy as np
 import scipy.sparse.linalg as la
 from scipy.linalg import solve
 from spectralDNS.shen.shentransform import SlabShen_R2C
-from spectralDNS.shen.la import Helmholtz
 from spectralDNS.shen.Matrices import HelmholtzCoeff
 from spectralDNS.shen import LUsolve
 from shenfun.spectralbase import inner_product
@@ -172,121 +171,6 @@ def test_Mult_Div():
 
 #test_Mult_Div()
 
-@pytest.mark.parametrize('ST', Basis[1:3])
-@pytest.mark.parametrize('quad', quads)
-def test_Helmholtz(ST, quad):
-    M = 4*N
-    ST = ST(M, quad=quad)
-    kx = 12
-
-    fj = np.random.randn(M)
-    f_hat = np.zeros(M)
-    f_hat = ST.forward(fj, f_hat)
-    fj = ST.backward(f_hat, fj)
-    s = ST.slice()
-
-    A = inner_product((ST, 0), (ST, 2))
-    B = inner_product((ST, 0), (ST, 0))
-
-    f_hat = np.zeros(M)
-    f_hat = ST.scalar_product(fj, f_hat)
-    u_hat = np.zeros(M)
-    H = A + kx**2*B
-    u_hat[s] = solve(H.diags().toarray()[s, s], f_hat[s])
-    if ST.__class__.__name__ == "ShenNeumannBasis":
-        u_hat[0] = 0
-    u1 = np.zeros(M)
-    u1 = ST.backward(u_hat, u1)
-    c0 = np.zeros_like(u_hat)
-    c1 = np.zeros_like(u_hat)
-    c = A.matvec(u_hat, c0)+kx**2*B.matvec(u_hat, c1)
-    c2 = np.dot(A.diags().toarray()[s, s], u_hat[s]) + kx**2*np.dot(B.diags().toarray()[s, s], u_hat[s])
-    if ST.__class__.__name__ == "ShenNeumannBasis":
-        c2[0] = 0
-
-    assert np.allclose(c[s], f_hat[s])
-    assert np.allclose(c[s], c2)
-
-    H = Helmholtz(M, kx, ST)
-    u0_hat = np.zeros(M)
-    u0_hat = H(u0_hat, f_hat)
-    u0 = np.zeros(M)
-    u0 = ST.backward(u0_hat, u0)
-
-    from shenfun.chebyshev.la import Helmholtz as HH
-    A.scale = np.ones(1)
-    B.scale = np.array([kx**2])
-    Hs = HH(**{'ADDmat':A, 'BDDmat':B})
-    u2_hat = np.zeros_like(u1)
-    u2_hat = Hs(u2_hat, f_hat)
-    u2 = np.zeros_like(u2_hat)
-    u2 = ST.backward(u2_hat, u2)
-    assert np.linalg.norm(u2 - u1) < 1e-12
-
-    # Multidimensional
-    f_hat = (f_hat.repeat(16).reshape((M, 4, 4))+1j*f_hat.repeat(16).reshape((M, 4, 4)))
-    ST.plan((M, 4, 4), 0, np.complex, {})
-    kx = np.zeros((4, 4))+12
-
-    H = Helmholtz(M, kx, ST)
-    u0_hat = np.zeros((M, 4, 4), dtype=np.complex)
-    u0_hat = H(u0_hat, f_hat)
-    u0 = np.zeros((M, 4, 4), dtype=np.complex)
-    u0 = ST.backward(u0_hat, u0)
-
-    A.scale = np.ones((1, 1, 1))
-    B.scale = 12**2*np.ones((1, 4, 4))
-    A.axis = 0
-    B.axis = 0
-    #from IPython import embed; embed()
-
-    Hs = HH(**{'ADDmat':A, 'BDDmat':B})
-    u2_hat = np.zeros_like(u0_hat)
-    u2_hat = Hs(u2_hat, f_hat)
-    u2 = np.zeros_like(u2_hat)
-    u2 = ST.backward(u2_hat, u2)
-
-    assert np.linalg.norm(u2[:, 2, 2].real - u1)/(M*16) < 1e-12
-    assert np.linalg.norm(u2[:, 2, 2].imag - u1)/(M*16) < 1e-12
-
-#test_Helmholtz(ShenNeumannBasis, "GC")
-
-@pytest.mark.parametrize('quad', quads)
-def test_Helmholtz2(quad):
-    M = 2*N
-    SD = ShenDirichletBasis(M, quad=quad)
-    kx = 12
-    uj = np.random.randn(M)
-    u_hat = np.zeros(M)
-    u_hat = SD.forward(uj, u_hat)
-    uj = SD.backward(u_hat, uj)
-
-    #from IPython import embed; embed()
-    A = inner_product((SD, 0), (SD, 2))
-    B = inner_product((SD, 0), (SD, 0))
-
-    u1 = np.zeros(M)
-    u1 = SD.forward(uj, u1)
-    c0 = np.zeros_like(u1)
-    c1 = np.zeros_like(u1)
-    c = A.matvec(u1, c0)+kx**2*B.matvec(u1, c1)
-
-    b = np.zeros(M)
-    H = Helmholtz(M, kx, SD)
-    b = H.matvec(u1, b)
-    #LUsolve.Mult_Helmholtz_1D(M, SD.quad=="GL", 1, kx**2, u1, b)
-    assert np.allclose(c, b)
-
-    b = np.zeros((M, 4, 4), dtype=np.complex)
-    u1 = u1.repeat(16).reshape((M, 4, 4)) +1j*u1.repeat(16).reshape((M, 4, 4))
-    kx = np.zeros((4, 4))+kx
-    H = Helmholtz(M, kx, SD)
-    b = H.matvec(u1, b)
-    #LUsolve.Mult_Helmholtz_3D_complex(M, SD.quad=="GL", 1.0, kx**2, u1, b)
-    assert np.linalg.norm(b[:, 2, 2].real - c)/(M*16) < 1e-12
-    assert np.linalg.norm(b[:, 2, 2].imag - c)/(M*16) < 1e-12
-
-#test_Helmholtz2('GC')
 
 @pytest.mark.parametrize('quad', quads)
 def test_Mult_CTD(quad):
