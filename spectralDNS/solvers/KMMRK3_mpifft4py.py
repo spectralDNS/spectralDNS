@@ -8,110 +8,105 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 from .KMM_mpifft4py import *
 from .spectralinit import end_of_tstep
 
+KMM_context = get_context
+
 def get_context():
-    # Get points and weights for Chebyshev weighted integrals
-    ST = ShenDirichletBasis(params.N[0], quad=params.Dquad)
-    SB = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
-    CT = ST.CT
+    c = KMM_context()
+    del c.U0, c.U_hat0
 
-    ST_pad = ShenDirichletBasis(params.N[0], quad=params.Dquad)
-    SB_pad = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
-    CT_pad = ST.CT  # Chebyshev transform
+    ## Get points and weights for Chebyshev weighted integrals
+    #ST = ShenDirichletBasis(params.N[0], quad=params.Dquad)
+    #SB = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
+    #CT = ST.CT
 
-    Nu = params.N[0]-2   # Number of velocity modes in Shen basis
-    Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
-    u_slice = slice(0, Nu)
-    v_slice = slice(0, Nb)
+    #ST_pad = ShenDirichletBasis(params.N[0], quad=params.Dquad)
+    #SB_pad = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
+    #CT_pad = ST.CT  # Chebyshev transform
 
-    FST = SlabShen_R2C(params.N, params.L, comm, threads=params.threads,
-                       communication=params.communication,
-                       planner_effort=params.planner_effort,
-                       dealias_cheb=params.dealias_cheb)
+    #Nu = params.N[0]-2   # Number of velocity modes in Shen basis
+    #Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
+    #u_slice = slice(0, Nu)
+    #v_slice = slice(0, Nb)
 
-    float, complex, mpitype = datatypes("double")
+    #FST = SlabShen_R2C(params.N, params.L, comm, threads=params.threads,
+    #                   communication=params.communication,
+    #                   planner_effort=params.planner_effort,
+    #                   dealias_cheb=params.dealias_cheb)
 
-    ST.plan(FST.complex_shape(), 0, complex, {'threads':params.threads,
-                                              'planner_effort':params.planner_effort["dct"]})
-    SB.plan(FST.complex_shape(), 0, complex, {'threads':params.threads,
-                                              'planner_effort':params.planner_effort["dct"]})
+    #float, complex, mpitype = datatypes("double")
 
-    # Mesh variables
-    X = FST.get_local_mesh(ST)
-    x0, x1, x2 = FST.get_mesh_dims(ST)
-    K = FST.get_local_wavenumbermesh(scaled=True)
+    #ST.plan(FST.complex_shape(), 0, complex, {'threads':params.threads,
+    #                                          'planner_effort':params.planner_effort["dct"]})
+    #SB.plan(FST.complex_shape(), 0, complex, {'threads':params.threads,
+    #                                          'planner_effort':params.planner_effort["dct"]})
 
-    K2 = K[1]*K[1]+K[2]*K[2]
-    K4 = K2**2
+    ## Mesh variables
+    #X = FST.get_local_mesh(ST)
+    #x0, x1, x2 = FST.get_mesh_dims(ST)
+    #K = FST.get_local_wavenumbermesh(scaled=True)
 
-    # Set Nyquist frequency to zero on K that is used for odd derivatives in nonlinear terms
-    Kx = FST.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
-    K_over_K2 = zeros((2,) + FST.complex_shape())
-    for i in range(2):
-        K_over_K2[i] = K[i+1] / np.where(K2 == 0, 1, K2)
+    #K2 = K[1]*K[1]+K[2]*K[2]
+    #K4 = K2**2
 
-    # Solution variables
-    U = zeros((3,)+FST.real_shape(), dtype=float)
-    U_hat = zeros((3,)+FST.complex_shape(), dtype=complex)
-    g = zeros(FST.complex_shape(), dtype=complex)
+    ## Set Nyquist frequency to zero on K that is used for odd derivatives in nonlinear terms
+    #Kx = FST.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
+    #K_over_K2 = zeros((2,) + FST.complex_shape())
+    #for i in range(2):
+    #    K_over_K2[i] = K[i+1] / np.where(K2 == 0, 1, K2)
 
-    # primary variable
-    u = (U_hat, g)
+    ## Solution variables
+    #U = zeros((3,)+FST.real_shape(), dtype=float)
+    #U_hat = zeros((3,)+FST.complex_shape(), dtype=complex)
+    #g = zeros(FST.complex_shape(), dtype=complex)
+
+    ## primary variable
+    #u = (U_hat, g)
 
     nu, dt, N = params.nu, params.dt, params.N
 
-    H_hat = zeros((3,)+FST.complex_shape(), dtype=complex)
+    #H_hat = zeros((3,)+FST.complex_shape(), dtype=complex)
+    del c.H_hat0, c.H_hat1
 
-    dU = zeros((3,)+FST.complex_shape(), dtype=complex)
-    hv = zeros((2,)+FST.complex_shape(), dtype=complex)
-    hg = zeros((2,)+FST.complex_shape(), dtype=complex)
-    h1 = zeros((2, 2, N[0]), dtype=complex)
+    #dU = zeros((3,)+FST.complex_shape(), dtype=complex)
+    c.hv = zeros((2,)+c.FST.complex_shape(), dtype=complex)
+    c.hg = zeros((2,)+c.FST.complex_shape(), dtype=complex)
+    c.h1 = zeros((2, 2, N[0]), dtype=complex)
 
-    Source = zeros((3,)+FST.real_shape(), dtype=float)
-    Sk = zeros((3,)+FST.complex_shape(), dtype=complex)
+    #Source = zeros((3,)+FST.real_shape(), dtype=float)
+    #Sk = zeros((3,)+FST.complex_shape(), dtype=complex)
 
-    work = work_arrays()
+    #work = work_arrays()
 
     # RK parameters
-    a = (8./15., 5./12., 3./4.)
-    b = (0.0, -17./60., -5./12.)
+    a = c.a = (8./15., 5./12., 3./4.)
+    b = c.b = (0.0, -17./60., -5./12.)
+
+    alfa = c.K2 - 2.0/nu/dt
+    ST, SB = c.ST, c.SB
+    # Collect all matrices
+    c.mat.AC=[BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*c.K2),
+                                 -(c.K2 - nu*(a[rk]+b[rk])*dt/2.*c.K4), SB.quad) for rk in range(3)]
+    c.mat.AB=[HelmholtzCoeff(N[0], 1.0, -(c.K2 - 2.0/nu/dt/(a[rk]+b[rk])), c.ST.quad) for rk in range(3)]
 
     # Collect all linear algebra solvers
     # RK 3 requires three solvers because of the three different coefficients
-    rk = 0
-    la = config.AttributeDict(
-        dict(HelmholtzSolverG=[Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/(a[rk]+b[rk])/dt), ST)
+    c.la = config.AttributeDict(
+        dict(HelmholtzSolverG=[Helmholtz(c.mat.ADD, c.mat.BDD, -np.ones((1, 1, 1)),
+                                         (c.K2+2.0/nu/(a[rk]+b[rk])/dt))
                                for rk in range(3)],
-             BiharmonicSolverU=[Biharmonic(N[0], -nu*(a[rk]+b[rk])*dt/2., 1.+nu*(a[rk]+b[rk])*dt*K2[0],
-                                           -(K2[0] + nu*(a[rk]+b[rk])*dt/2.*K4[0]), quad=SB.quad,
-                                           solver="cython") for rk in range(3)],
-             HelmholtzSolverU0=[Helmholtz(N[0], np.sqrt(2./nu/(a[rk]+b[rk])/dt), ST) for rk in range(3)],
+             BiharmonicSolverU=[Biharmonic(c.mat.SBB, c.mat.ABB, c.mat.BBB, -nu*(a[rk]+b[rk])*dt/2.*np.ones((1, 1, 1)),
+                                           (1.+nu*(a[rk]+b[rk])*dt*c.K2),
+                                           -(c.K2 + nu*(a[rk]+b[rk])*dt/2.*c.K4))
+                                for rk in range(3)],
+             HelmholtzSolverU0=[Helmholtz(c.mat.ADD0, c.mat.BDD0, np.array([-1]), np.array([2./nu/(a[rk]+b[rk])/dt])) for rk in range(3)],
              TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0)))))
 
-    alfa = K2 - 2.0/nu/dt
-    # Collect all matrices
-    mat = config.AttributeDict(
-        dict(CDD=inner_product((ST, 0), (ST, 1)),
-             AC=[BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*K2),
-                                 -(K2 - nu*(a[rk]+b[rk])*dt/2.*K4), SB.quad) for rk in range(3)],
-             AB=[HelmholtzCoeff(N[0], 1.0, -(K2 - 2.0/nu/dt/(a[rk]+b[rk])), ST.quad) for rk in range(3)],
-             # Matrices for biharmonic equation
-             CBD=inner_product((SB, 0), (ST, 1)),
-             ABB=inner_product((SB, 0), (SB, 2)),
-             BBB=inner_product((SB, 0), (SB, 0)),
-             SBB=inner_product((SB, 0), (SB, 4)),
-             # Matrices for Helmholtz equation
-             ADD=inner_product((ST, 0), (ST, 2)),
-             BDD=inner_product((ST, 0), (ST, 0)),
-             BBD=inner_product((SB, 0), (ST, 0)),
-             CDB=inner_product((ST, 0), (SB, 1))))
-    del rk
+    c.hdf5file = KMMRK3Writer({"U":c.U[0], "V":c.U[1], "W":c.U[2]},
+                               chkpoint={'current':{'U':c.U}, 'previous':{}},
+                               filename=params.solver+".h5",
+                               mesh={"x": c.x0, "y": c.x1, "z": c.x2})
 
-    hdf5file = KMMRK3Writer({"U":U[0], "V":U[1], "W":U[2]},
-                            chkpoint={'current':{'U':U}, 'previous':{}},
-                            filename=params.solver+".h5",
-                            mesh={"x": x0, "y": x1, "z": x2})
-
-    return config.AttributeDict(locals())
+    return c
 
 class KMMRK3Writer(HDF5Writer):
     def update_components(self, **context):

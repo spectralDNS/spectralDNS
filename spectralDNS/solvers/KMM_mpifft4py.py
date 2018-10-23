@@ -5,14 +5,14 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 
 #pylint: disable=unused-variable,function-redefined,unused-argument
 
-from shenfun.chebyshev.bases import ShenDirichletBasis, ShenBiharmonicBasis
+from shenfun import Basis
 from shenfun.spectralbase import inner_product
 from shenfun.la import TDMA
+from shenfun.chebyshev.la import Helmholtz, Biharmonic
 
 from .spectralinit import *
 from ..shen.shentransform import SlabShen_R2C
 from ..shen.Matrices import BiharmonicCoeff, HelmholtzCoeff
-from ..shen.la import Helmholtz, Biharmonic
 from ..shen import LUsolve
 
 
@@ -20,8 +20,9 @@ def get_context():
     """Set up context for solver"""
 
     # Get points and weights for Chebyshev weighted integrals
-    ST = ShenDirichletBasis(params.N[0], quad=params.Dquad)
-    SB = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
+    ST = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
+    SB = Basis(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
+    ST0 = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad) # For 1D problem
     CT = ST.CT  # Chebyshev transform
 
     Nu = params.N[0]-2   # Number of velocity modes in Shen basis
@@ -79,16 +80,6 @@ def get_context():
 
     nu, dt, N = params.nu, params.dt, params.N
     kx = K[0][:, 0, 0]
-
-    # Collect all linear algebra solvers
-    la = config.AttributeDict(
-        dict(HelmholtzSolverG=Helmholtz(N[0], np.sqrt(K2[0]+2.0/nu/dt), ST),
-             BiharmonicSolverU=Biharmonic(N[0], -nu*dt/2., 1.+nu*dt*K2[0],
-                                          -(K2[0] + nu*dt/2.*K4[0]), quad=SB.quad,
-                                          solver="cython"),
-             HelmholtzSolverU0=Helmholtz(N[0], np.sqrt(2./nu/dt), ST),
-             TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0)))))
-
     alfa = K2 - 2.0/nu/dt
     # Collect all matrices
     mat = config.AttributeDict(
@@ -104,7 +95,22 @@ def get_context():
              ADD=inner_product((ST, 0), (ST, 2)),
              BDD=inner_product((ST, 0), (ST, 0)),
              BBD=inner_product((SB, 0), (ST, 0)),
-             CDB=inner_product((ST, 0), (SB, 1))))
+             CDB=inner_product((ST, 0), (SB, 1)),
+             ADD0=inner_product((ST0, 0), (ST0, 2)),
+             BDD0=inner_product((ST0, 0), (ST0, 0))))
+    mat.ADD.axis = 0
+    mat.BDD.axis = 0
+    mat.SBB.axis = 0
+
+    # Collect all linear algebra solvers
+    la = config.AttributeDict(
+        dict(HelmholtzSolverG=Helmholtz(mat.ADD, mat.BDD, -np.ones((1, 1, 1)),
+                                        (K2+2.0/nu/dt)),
+             BiharmonicSolverU=Biharmonic(mat.SBB, mat.ABB, mat.BBB, -nu*dt/2.*np.ones((1, 1, 1)),
+                                          (1.+nu*dt*K2),
+                                          (-(K2 + nu*dt/2.*K4))),
+             HelmholtzSolverU0=Helmholtz(mat.ADD0, mat.BDD0, np.array([-1.]), np.array([2./nu/dt])),
+             TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0)))))
 
     hdf5file = KMMWriter({"U":U[0], "V":U[1], "W":U[2]},
                          chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
