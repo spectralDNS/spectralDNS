@@ -251,7 +251,7 @@ def mult_K1j(K, a, f):
     f[0] = 1j*K[2]*a
     f[1] = -1j*K[1]*a
     return f
-#@profile
+
 def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, work):
     F_tmp = work[(u_hat, 0, False)]
     F_tmp2 = work[(u_hat, 2, False)]
@@ -259,7 +259,7 @@ def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, work):
     # Mult_CTD_3D_n is projection to T of d(u_hat)/dx (for components 1 and 2 of u_hat)
     # Corresponds to CTD.matvec(u_hat[1])/BTT.dd, CTD.matvec(u_hat[2])/BTT.dd
     #from IPython import embed; embed()
-    LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
+    LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2], 0)
     dvdx = Uc[1] = FCTp.backward(F_tmp[1], Uc[1])
     dwdx = Uc[2] = FCTp.backward(F_tmp[2], Uc[2])
     c[0] = FSTp.backward(g, c[0])

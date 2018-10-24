@@ -1,6 +1,6 @@
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
-__date__ = "2015-10-29"
-__copyright__ = "Copyright (C) 2015-2018 " + __author__
+__date__ = "2018-10-23"
+__copyright__ = "Copyright (C) 2018 " + __author__
 __license__ = "GNU Lesser GPL version 3 or any later version"
 
 #pylint: disable=unbalanced-tuple-unpacking,unused-variable,function-redefined,unused-argument
@@ -247,27 +247,17 @@ def Cross(c, a, b, FSTp, work):
     c[2] = FSTp.forward(Uc[2], c[2])
     return c
 
-#@optimizer
-#def mult_K1j(K, a, f):
-#    f[0] = 1j*K[0]*a
-#    f[1] = -1j*K[1]*a
-#    return f
-#@profile
 def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, mat, work):
     F_tmp = work[(u_hat, 0, False)]
     F_tmp2 = work[(u_hat, 2, False)]
     Uc = work[(c, 2, False)]
     # Mult_CTD_3D_n is projection to T of d(u_hat)/dz (for components 0 and 1 of u_hat)
     # Corresponds to CTD.matvec(u_hat[0])/BTT.dd, CTD.matvec(u_hat[1])/BTT.dd
-    F_tmp[0] = mat.CTD.matvec(u_hat[0], F_tmp[0], axis=2)
-    F_tmp[0] /= mat.BTT[0][np.newaxis, np.newaxis, :]
-    F_tmp[1] = mat.CTD.matvec(u_hat[1], F_tmp[1], axis=2)
-    F_tmp[1] /= mat.BTT[0][np.newaxis, np.newaxis, :]
+    LUsolve.Mult_CTD_3D_n(params.N[2], u_hat[0], u_hat[1], F_tmp[0], F_tmp[1], 2)
 
     dudz = Uc[0] = FCTp.backward(F_tmp[0], Uc[0])
     dvdz = Uc[1] = FCTp.backward(F_tmp[1], Uc[1])
     c[2] = FSTp.backward(g, c[2])
-    #F_tmp2[:2] = mult_K1j(K, u_hat[2], F_tmp2[:2])
     dwdy = F_tmp2[0] = 1j*K[1]*u_hat[2]
     dwdx = F_tmp2[1] = 1j*K[0]*u_hat[2]
 
