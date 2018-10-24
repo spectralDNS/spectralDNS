@@ -236,7 +236,7 @@ def test_Mult_CTD_3D(quad):
     wk0 = SD.forward(wk, wk0)
 
     #from IPython import embed; embed()
-    LUsolve.Mult_CTD_3D_n(N, vk0, wk0, bv, bw)
+    LUsolve.Mult_CTD_3D_n(N, vk0, wk0, bv, bw, 0)
 
     cv = np.zeros_like(vk0)
     cw = np.zeros_like(wk0)

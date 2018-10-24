@@ -172,9 +172,9 @@ def set_velocity(U_hat, U, VFS, **context):
     U_hat = VFS.forward(U, U_hat)
     return U_hat
 
-def get_curl(curl, U_hat, g, work, FST, SB, ST, Kx, **context):
+def get_curl(curl, U_hat, g, work, FCTp, FSTp, FSBp, Kx, **context):
     """Compute curl from context"""
-    curl = compute_curl(curl, U_hat, g, Kx, FST, SB, ST, work)
+    curl = compute_curl(curl, U_hat, g, Kx, FCTp, FSTp, FSBp, work)
     return curl
 
 def get_convection(H_hat, U_hat, g, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la, **context):
@@ -247,13 +247,14 @@ def Cross(c, a, b, FSTp, work):
     c[2] = FSTp.forward(Uc[2], c[2])
     return c
 
-def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, mat, work):
+def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, work):
     F_tmp = work[(u_hat, 0, False)]
     F_tmp2 = work[(u_hat, 2, False)]
     Uc = work[(c, 2, False)]
-    # Mult_CTD_3D_n is projection to T of d(u_hat)/dz (for components 0 and 1 of u_hat)
+    # Mult_CTD_3D is projection to T of d(u_hat)/dz (for components 0 and 1 of u_hat)
     # Corresponds to CTD.matvec(u_hat[0])/BTT.dd, CTD.matvec(u_hat[1])/BTT.dd
-    LUsolve.Mult_CTD_3D_n(params.N[2], u_hat[0], u_hat[1], F_tmp[0], F_tmp[1], 2)
+    #LUsolve.Mult_CTD_3D_n(params.N[2], u_hat[0], u_hat[1], F_tmp[0], F_tmp[1], 2)
+    LUsolve.Mult_CTD_3D_ptr(params.N[2], u_hat[0], u_hat[1], F_tmp[0], F_tmp[1], 2)
 
     dudz = Uc[0] = FCTp.backward(F_tmp[0], Uc[0])
     dvdz = Uc[1] = FCTp.backward(F_tmp[1], Uc[1])
@@ -399,7 +400,7 @@ def getConvection(convection):
             u_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 0)]
             curl_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 1)]
             u_dealias = VFSp.backward(u_hat, u_dealias)
-            curl_dealias = compute_curl(curl_dealias, u_hat, g_hat, K, FCTp, FSTp, FSBp, mat, work)
+            curl_dealias = compute_curl(curl_dealias, u_hat, g_hat, K, FCTp, FSTp, FSBp, work)
             rhs = Cross(rhs, u_dealias, curl_dealias, FSTp, work)
             return rhs
 
@@ -421,9 +422,10 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
     diff_g = AB.matvec(g, diff_g, axis=2)
 
     # Compute diffusion++ for u-equation
-    diff_u[:] = nu*dt/2.*SBB.matvec(u, u0, axis=2)
-    diff_u += (1. - nu*dt*K2)*ABB.matvec(u, u0, axis=2)
-    diff_u -= (K2 - nu*dt/2.*K4)*BBB.matvec(u, u0, axis=2)
+    diff_u = AC.matvec(u, diff_u, axis=2)
+    #diff_u[:] = nu*dt/2.*SBB.matvec(u, u0, axis=2)
+    #diff_u += (1. - nu*dt*K2)*ABB.matvec(u, u0, axis=2)
+    #diff_u -= (K2 - nu*dt/2.*K4)*BBB.matvec(u, u0, axis=2)
 
     rhs[0] += diff_u
     rhs[1] += diff_g

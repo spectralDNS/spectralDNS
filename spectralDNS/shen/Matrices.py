@@ -1,6 +1,7 @@
 from shenfun.chebyshev import bases
 from shenfun.spectralbase import inner_product
-from shenfun.optimization.Matvec import Helmholtz_matvec3D, Helmholtz_matvec, Biharmonic_matvec, Biharmonic_matvec3D
+from shenfun.optimization.Matvec import Helmholtz_matvec3D, Helmholtz_matvec, \
+    Biharmonic_matvec, Biharmonic_matvec3D_ptr
 
 class BiharmonicCoeff(object):
 
@@ -16,13 +17,12 @@ class BiharmonicCoeff(object):
         self.beta = beta
 
     def matvec(self, v, c, axis=0):
-        #c = zeros(v.shape, dtype=v.dtype)
         c.fill(0)
         if len(v.shape) > 1:
-            Biharmonic_matvec3D(v, c, self.a0, self.alfa, self.beta, self.S[0],
-                                self.S[2], self.S[4], self.A[-2], self.A[0],
-                                self.A[2], self.B[-4], self.B[-2], self.B[0],
-                                self.B[2], self.B[4], axis)
+            Biharmonic_matvec3D_ptr(v, c, self.a0, self.alfa, self.beta, self.S[0],
+                                    self.S[2], self.S[4], self.A[-2], self.A[0],
+                                    self.A[2], self.B[-4], self.B[-2], self.B[0],
+                                    self.B[2], self.B[4], axis)
         else:
             Biharmonic_matvec(v, c, self.a0, self.alfa, self.beta, self.S[0],
                               self.S[2], self.S[4], self.A[-2], self.A[0],

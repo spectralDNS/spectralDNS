@@ -14,68 +14,12 @@ def get_context():
     c = KMM_context()
     del c.U0, c.U_hat0
 
-    ## Get points and weights for Chebyshev weighted integrals
-    #ST = ShenDirichletBasis(params.N[0], quad=params.Dquad)
-    #SB = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
-    #CT = ST.CT
-
-    #ST_pad = ShenDirichletBasis(params.N[0], quad=params.Dquad)
-    #SB_pad = ShenBiharmonicBasis(params.N[0], quad=params.Bquad)
-    #CT_pad = ST.CT  # Chebyshev transform
-
-    #Nu = params.N[0]-2   # Number of velocity modes in Shen basis
-    #Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
-    #u_slice = slice(0, Nu)
-    #v_slice = slice(0, Nb)
-
-    #FST = SlabShen_R2C(params.N, params.L, comm, threads=params.threads,
-    #                   communication=params.communication,
-    #                   planner_effort=params.planner_effort,
-    #                   dealias_cheb=params.dealias_cheb)
-
-    #float, complex, mpitype = datatypes("double")
-
-    #ST.plan(FST.complex_shape(), 0, complex, {'threads':params.threads,
-    #                                          'planner_effort':params.planner_effort["dct"]})
-    #SB.plan(FST.complex_shape(), 0, complex, {'threads':params.threads,
-    #                                          'planner_effort':params.planner_effort["dct"]})
-
-    ## Mesh variables
-    #X = FST.get_local_mesh(ST)
-    #x0, x1, x2 = FST.get_mesh_dims(ST)
-    #K = FST.get_local_wavenumbermesh(scaled=True)
-
-    #K2 = K[1]*K[1]+K[2]*K[2]
-    #K4 = K2**2
-
-    ## Set Nyquist frequency to zero on K that is used for odd derivatives in nonlinear terms
-    #Kx = FST.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
-    #K_over_K2 = zeros((2,) + FST.complex_shape())
-    #for i in range(2):
-    #    K_over_K2[i] = K[i+1] / np.where(K2 == 0, 1, K2)
-
-    ## Solution variables
-    #U = zeros((3,)+FST.real_shape(), dtype=float)
-    #U_hat = zeros((3,)+FST.complex_shape(), dtype=complex)
-    #g = zeros(FST.complex_shape(), dtype=complex)
-
-    ## primary variable
-    #u = (U_hat, g)
-
     nu, dt, N = params.nu, params.dt, params.N
-
-    #H_hat = zeros((3,)+FST.complex_shape(), dtype=complex)
     del c.H_hat0, c.H_hat1
 
-    #dU = zeros((3,)+FST.complex_shape(), dtype=complex)
     c.hv = zeros((2,)+c.FST.complex_shape(), dtype=complex)
     c.hg = zeros((2,)+c.FST.complex_shape(), dtype=complex)
     c.h1 = zeros((2, 2, N[0]), dtype=complex)
-
-    #Source = zeros((3,)+FST.real_shape(), dtype=float)
-    #Sk = zeros((3,)+FST.complex_shape(), dtype=complex)
-
-    #work = work_arrays()
 
     # RK parameters
     a = c.a = (8./15., 5./12., 3./4.)
@@ -85,7 +29,7 @@ def get_context():
     ST, SB = c.ST, c.SB
     # Collect all matrices
     c.mat.AC=[BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*c.K2),
-                                 -(c.K2 - nu*(a[rk]+b[rk])*dt/2.*c.K4), SB.quad) for rk in range(3)]
+                              -(c.K2 - nu*(a[rk]+b[rk])*dt/2.*c.K4), SB.quad) for rk in range(3)]
     c.mat.AB=[HelmholtzCoeff(N[0], 1.0, -(c.K2 - 2.0/nu/dt/(a[rk]+b[rk])), c.ST.quad) for rk in range(3)]
 
     # Collect all linear algebra solvers
@@ -102,9 +46,9 @@ def get_context():
              TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0)))))
 
     c.hdf5file = KMMRK3Writer({"U":c.U[0], "V":c.U[1], "W":c.U[2]},
-                               chkpoint={'current':{'U':c.U}, 'previous':{}},
-                               filename=params.solver+".h5",
-                               mesh={"x": c.x0, "y": c.x1, "z": c.x2})
+                              chkpoint={'current':{'U':c.U}, 'previous':{}},
+                              filename=params.solver+".h5",
+                              mesh={"x": c.x0, "y": c.x1, "z": c.x2})
 
     return c
 

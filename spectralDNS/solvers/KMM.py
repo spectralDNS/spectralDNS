@@ -171,9 +171,9 @@ def set_velocity(U_hat, U, VFS, **context):
     U_hat = VFS.forward(U, U_hat)
     return U_hat
 
-def get_curl(curl, U_hat, g, work, FST, SB, ST, Kx, **context):
+def get_curl(curl, U_hat, g, Kx, FCTp, FSTp, FSBp, work, **context):
     """Compute curl from context"""
-    curl = compute_curl(curl, U_hat, g, Kx, FST, SB, ST, work)
+    curl = compute_curl(curl, U_hat, g, Kx, FCTp, FSTp, FSBp, work)
     return curl
 
 def get_convection(H_hat, U_hat, g, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la, **context):
@@ -259,7 +259,8 @@ def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, work):
     # Mult_CTD_3D_n is projection to T of d(u_hat)/dx (for components 1 and 2 of u_hat)
     # Corresponds to CTD.matvec(u_hat[1])/BTT.dd, CTD.matvec(u_hat[2])/BTT.dd
     #from IPython import embed; embed()
-    LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2], 0)
+    #LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2], 0)
+    LUsolve.Mult_CTD_3D_ptr(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2], 0)
     dvdx = Uc[1] = FCTp.backward(F_tmp[1], Uc[1])
     dwdx = Uc[2] = FCTp.backward(F_tmp[2], Uc[2])
     c[0] = FSTp.backward(g, c[0])
@@ -425,9 +426,10 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
     diff_g = AB.matvec(g, diff_g)
 
     # Compute diffusion++ for u-equation
-    diff_u[:] = nu*dt/2.*SBB.matvec(u, u0)
-    diff_u += (1. - nu*dt*K2)*ABB.matvec(u, u0)
-    diff_u -= (K2 - nu*dt/2.*K4)*BBB.matvec(u, u0)
+    diff_u = AC.matvec(u, diff_u)
+    #diff_u[:] = nu*dt/2.*SBB.matvec(u, u0)
+    #diff_u += (1. - nu*dt*K2)*ABB.matvec(u, u0)
+    #diff_u -= (K2 - nu*dt/2.*K4)*BBB.matvec(u, u0)
 
     rhs[0] += diff_u
     rhs[1] += diff_g
