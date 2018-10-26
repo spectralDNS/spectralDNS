@@ -5,7 +5,6 @@ Using Shen's biharmonic basis
 
 """
 import warnings
-import six
 from scipy.linalg import eig
 #from numpy.linalg import eig
 #from numpy.linalg import inv
@@ -16,6 +15,8 @@ from shenfun.matrixbase import extract_diagonal_matrix
 
 np.seterr(divide='ignore')
 
+#pylint: disable=no-member
+
 try:
     from matplotlib import pyplot as plt
 
@@ -24,14 +25,9 @@ except ImportError:
 
 
 class OrrSommerfeld(object):
-    def __init__(self, **kwargs):
-        self.par = {'alfa':1.,
-                    'Re':8000.,
-                    'N':80,
-                    'quad': 'GC'}
-        self.par.update(**kwargs)
-        for name, val in six.iteritems(self.par):
-            setattr(self, name, val)
+    def __init__(self, alfa=1., Re=8000., N=80, quad='GC', **kwargs):
+        kwargs.update(dict(alfa=alfa, Re=Re, N=N, quad=quad))
+        vars(self).update(kwargs)
         self.P4 = np.zeros(0)
         self.T4x = np.zeros(0)
         self.SB, self.SD, self.CDB = (None,)*3
@@ -74,7 +70,7 @@ class OrrSommerfeld(object):
         SB = Basis(N, 'C', bc='Biharmonic', quad=self.quad)
         SB.plan((N, N), 0, np.float, {})
 
-        x, w = self.x, self.w = SB.points_and_weights(N)
+        x, _ = self.x, self.w = SB.points_and_weights(N)
 
         # Trial function
         P4 = SB.evaluate_basis_all(x=x)
@@ -117,7 +113,7 @@ class OrrSommerfeld(object):
         """
         if verbose:
             print('Solving the Orr-Sommerfeld eigenvalue problem...')
-            print('Re = '+str(self.par['Re'])+' and alfa = '+str(self.par['alfa']))
+            print('Re = '+str(self.Re)+' and alfa = '+str(self.alfa))
         A, B = self.assemble()
         return eig(A[:-4, :-4], B[:-4, :-4])
         # return eig(np.dot(inv(B[:-4, :-4]), A[:-4, :-4]))
@@ -165,14 +161,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     #z = OrrSommerfeld(N=120, Re=5772.2219, alfa=1.02056)
     z = OrrSommerfeld(**vars(args))
-    eigvals, eigvectors = z.solve(args.verbose)
-    d = z.get_eigval(1, eigvals, args.verbose)
+    evals, evectors = z.solve(args.verbose)
+    d = z.get_eigval(1, evals, args.verbose)
     if args.Re == 8000.0 and args.alfa == 1.0 and args.N > 80:
         assert abs(d[1] - (0.24707506017508621+0.0026644103710965817j)) < 1e-12
 
     if args.plot:
         plt.figure()
-        ev = eigvals*z.alfa
-        plt.plot(ev.imag, ev.real, 'o')
+        evi = evals*z.alfa
+        plt.plot(evi.imag, evi.real, 'o')
         plt.axis([-10, 0.1, 0, 1])
         plt.show()

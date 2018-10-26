@@ -46,10 +46,10 @@ def get_context():
     c.mat.BBD = inner_product((c.SB, 0), (RB, 0))
     c.mat.ABD.axis = 0
     c.mat.BBD.axis = 0
-    c.la.HelmholtzSolverT=Helmholtz(ADD, BDD,
-                                    -np.ones((1, 1, 1)),
-                                    (c.K2[0]+2.0/kappa/dt)[np.newaxis, :, :])
-    c.TC=HelmholtzCoeff(config.params.N[0], 1.0, (2./kappa/dt-c.K2))
+    c.la.HelmholtzSolverT = Helmholtz(ADD, BDD,
+                                      -np.ones((1, 1, 1)),
+                                      (c.K2[0]+2.0/kappa/dt)[np.newaxis, :, :])
+    c.TC = HelmholtzCoeff(config.params.N[0], 1.0, (2./kappa/dt-c.K2))
 
     c.hdf5file = RBWriter({'U':c.U[0], 'V':c.U[1], 'W':c.U[2], 'phi':c.phi},
                           chkpoint={'current':{'U':c.U, 'phi':c.phi},

@@ -14,7 +14,7 @@ __date__ = "2015-01-02"
 __copyright__ = "Copyright (C) 2014-2018 " + __author__
 __license__ = "GNU Lesser GPL version 3 or any later version"
 
-#pylint: disable=unused-variable,unused-argument,function-redefined
+#pylint: disable=unused-argument,function-redefined
 
 from .NS import *
 
@@ -43,12 +43,13 @@ def compute_velocity(c, w_hat, work, FFT, K_over_K2, dealias=None):
     """Compute u from curl(u)
 
     Follows from
-      w = [curl(u)=] \nabla \times u
-      curl(w) = \nabla^2(u) (since div(u)=0)
-      FFT(curl(w)) = FFT(\nabla^2(u))
-      ik \times w_hat = k^2 u_hat
-      u_hat = (ik \times w_hat) / k^2
-      u = iFFT(u_hat)
+
+        w = [curl(u)=] \nabla \times u
+        curl(w) = \nabla^2(u) (since div(u)=0)
+        FFT(curl(w)) = FFT(\nabla^2(u))
+        ik \times w_hat = k^2 u_hat
+        u_hat = (ik \times w_hat) / k^2
+        u = iFFT(u_hat)
 
     """
     v_hat = work[(w_hat, 0)]
@@ -107,21 +108,33 @@ def add_linear(rhs, w_hat, nu, K2, Source):
 def ComputeRHS(rhs, w_hat, solver, work, FFT, K, Kx, K2, K_over_K2, Source, **context):
     """Return right hand side of Navier Stokes in velocity-vorticity form
 
-    args:
-        rhs         The right hand side to be returned
-        w_hat       The FFT of the curl at current time. May differ from
-                    context.W_hat since it is set by the integrator
-        solver      The solver module. Included for possible inheritance
-                    and flexibility of integrators.
+    Parameters
+    ----------
+        rhs : array
+            The right hand side to be returned
+        w_hat : array
+            The FFT of the curl at current time. May differ from
+            context.W_hat since it is set by the integrator
+        solver : module
+            The solver module. Included for possible inheritance
+            and flexibility of integrators.
 
-    Remaining args may be extracted from context:
-        work        Work arrays
-        FFT         Transform class from mpiFFT4py
-        K           Scaled wavenumber mesh
-        Kx          Scaled wavenumber mesh with zero Nyquist frequency
-        K2          K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
-        K_over_K2   K / K2
-        Source      Scalar source term
+    Other Parameters
+    ----------------
+        work : dict
+            Work arrays
+        FFT : class
+            Transform class from mpiFFT4py
+        K : list
+            Scaled wavenumber mesh
+        Kx : list
+            Scaled wavenumber mesh with zero Nyquist frequency
+        K2 : array
+            K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+        K_over_K2 : array
+            K / K2
+        Source : array
+            Scalar source term
 
     """
     rhs = solver.conv(rhs, w_hat, work, FFT, K, K_over_K2)

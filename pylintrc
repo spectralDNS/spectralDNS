@@ -19,4 +19,5 @@ disable=
     missing-docstring,
     redefined-builtin,
     arguments-differ,
-    unused-wildcard-import
+    unused-wildcard-import,
+    possibly-unused-variable

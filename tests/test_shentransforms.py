@@ -3,7 +3,6 @@ from mpi4py import MPI
 from sympy import Symbol, sin, pi, lambdify
 import numpy as np
 import scipy.sparse.linalg as la
-from scipy.linalg import solve
 from spectralDNS.shen.shentransform import SlabShen_R2C
 from spectralDNS.shen.Matrices import HelmholtzCoeff
 from spectralDNS.shen import LUsolve
@@ -254,7 +253,6 @@ def test_Mult_CTD_3D(quad):
 def test_Biharmonic(quad):
     M = 128
     SB = ShenBiharmonicBasis(M, quad=quad)
-    x = Symbol("x")
     u = sin(6*pi*x)**2
     a = 1.0
     b = 1.0
