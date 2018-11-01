@@ -1,70 +1,51 @@
 #!/usr/bin/env python
 import os
-import sys
-from setuptools import setup, Extension
-#from distutils.core import setup, Extension
+import re
 import subprocess
+from setuptools import setup, Extension
+from setuptools.command.build_ext import build_ext
 from numpy import get_include
-from Cython.Distutils import build_ext
-from Cython.Build import cythonize
-try:
-    from Cython.Compiler.Options import get_directive_defaults
-    directive_defaults = get_directive_defaults()
-    #directive_defaults['linetrace'] = True
-    #directive_defaults['binding'] = True
-except ImportError:
-    pass
-
-#define_macros=[('CYTHON_TRACE', '1')]
-define_macros=None
-
-# Version number
-major = 1
-minor = 1
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 cdir = os.path.join(cwd, "spectralDNS", "optimization")
 sdir = os.path.join(cwd, "spectralDNS", "shen")
 
-ext = None
-cmdclass = {}
+def has_flag(compiler, flagname):
+    """Return a boolean indicating whether a flag name is supported on
+    the specified compiler.
+    """
+    devnull = open(os.devnull, "w")
+    p = subprocess.Popen([compiler.compiler[0], '-E', '-'] + [flagname],
+                         stdin=subprocess.PIPE, stdout=devnull, stderr=devnull,
+                         shell=True)
+    p.communicate("")
+    return True if p.returncode == 0 else False
+
 class build_ext_subclass(build_ext):
     def build_extensions(self):
-        extra_compile_args = ['-w', '-Ofast']
-        devnull = open(os.devnull,"w")
-        p = subprocess.Popen([self.compiler.compiler[0], '-E', '-'] + extra_compile_args,
-                             stdin=subprocess.PIPE, stdout=devnull, stderr=devnull)
-        p.communicate("")
-        if p.returncode != 0:
-            extra_compile_args = ['-w', '-O3']
+        extra_compile_args = ['-g0']
+        for c in ['-w', '-Ofast', '-ffast-math', '-march=native']:
+            if has_flag(self.compiler, c):
+                extra_compile_args.append(c)
+
         for e in self.extensions:
             e.extra_compile_args += extra_compile_args
+            e.include_dirs.extend([get_include()])
         build_ext.build_extensions(self)
 
-args = ""
-if not "sdist" in sys.argv:
-    if "build_ext" in sys.argv:
-        args = "build_ext --inplace"
-    subprocess.call([sys.executable, os.path.join(cdir, "setup.py"),
-                    args], cwd=cdir)
-
+def get_extension():
     ext = []
     for s in ("LUsolve", ):
-        ext += cythonize(Extension("spectralDNS.shen.{0}".format(s),
-                                   sources=[os.path.join(sdir, '{0}.pyx'.format(s))],
-                                   language="c++", define_macros=define_macros))
+        ext.append(Extension("spectralDNS.shen.{0}".format(s),
+                             sources=[os.path.join(sdir, '{0}.pyx'.format(s))],
+                             language="c++"))
     for e in ext:
         e.extra_link_args.extend(["-std=c++11"])
-    for e in ext:
-        e.include_dirs.extend([get_include()])
-    ext0 = []
+
     for s in [files for files in os.listdir(cdir) if files.endswith('.pyx')]:
-        ext0 += cythonize(Extension("spectralDNS.optimization.{0}".format(s[:-4]),
-                                    sources=[os.path.join(cdir, '{0}'.format(s))],
-                                    language="c++", define_macros=define_macros))
-    for e in ext0:
-        e.include_dirs.extend([get_include()])
-    ext += ext0
+        ext.append(Extension("spectralDNS.optimization.{0}".format(s[:-4]),
+                             sources=[os.path.join(cdir, '{0}'.format(s))],
+                             language="c++"))
 
     try:
         from pythran import PythranExtension
@@ -73,45 +54,42 @@ if not "sdist" in sys.argv:
     except ImportError:
         print("Disabling Pythran support, package not available")
 
-    cmdclass = {'build_ext': build_ext_subclass}
+def version():
+    srcdir = os.path.join(cwd, 'shenfun')
+    with open(os.path.join(srcdir, '__init__.py')) as f:
+        m = re.search(r"__version__\s*=\s*'(.*)'", f.read())
+        return m.groups()[0]
 
-else:
-    # Remove generated files
-    for name in os.listdir(cdir):
-        if "single" in name or "double" in name:
-            os.remove(os.path.join(cdir, name))
-
-setup(name="spectralDNS",
-      version="%d.%d" % (major, minor),
-      description="spectralDNS -- Spectral Navier-Stokes (and similar) solvers framework",
-      long_description="",
-      author="Mikael Mortensen",
-      author_email="mikaem@math.uio.no",
-      url='https://github.com/spectralDNS/spectralDNS',
-      classifiers=[
-          'Development Status :: 5 - Production/Stable',
-          'Environment :: Console',
-          'Intended Audience :: Developers',
-          'Intended Audience :: Science/Research',
-          'Intended Audience :: Education',
-          'Programming Language :: Python',
-          'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)',
-          'Topic :: Scientific/Engineering :: Mathematics',
-          'Topic :: Software Development :: Libraries :: Python Modules',
-          ],
-      install_requires=[
-          'numpy',
-          'cython'
-          ],
-      packages=["spectralDNS",
-                  "spectralDNS.h5io",
-                  "spectralDNS.utilities",
-                  "spectralDNS.maths",
-                  "spectralDNS.shen",
-                  "spectralDNS.solvers",
-                  "spectralDNS.optimization",
-                  ],
-      package_dir={"spectralDNS": "spectralDNS"},
-      ext_modules=ext,
-      cmdclass=cmdclass
-    )
+if __name__ == '__main__':
+    setup(name="spectralDNS",
+          version=version(),
+          description="spectralDNS -- Spectral Navier-Stokes (and similar) solvers framework",
+          long_description="",
+          author="Mikael Mortensen",
+          author_email="mikaem@math.uio.no",
+          url='https://github.com/spectralDNS/spectralDNS',
+          classifiers=[
+              'Development Status :: 5 - Production/Stable',
+              'Environment :: Console',
+              'Intended Audience :: Developers',
+              'Intended Audience :: Science/Research',
+              'Intended Audience :: Education',
+              'Programming Language :: Python',
+              'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)',
+              'Topic :: Scientific/Engineering :: Mathematics',
+              'Topic :: Software Development :: Libraries :: Python Modules',
+              ],
+          install_requires=['numpy', 'cython'],
+          setup_requires=['numpy>=1.11', 'cython>=0.25', 'setuptools>=18.0'],
+          packages=["spectralDNS",
+                    "spectralDNS.h5io",
+                    "spectralDNS.utilities",
+                    "spectralDNS.maths",
+                    "spectralDNS.shen",
+                    "spectralDNS.solvers",
+                    "spectralDNS.optimization",
+                    ],
+          package_dir={"spectralDNS": "spectralDNS"},
+          ext_modules=get_extension(),
+          cmdclass={'build_ext': build_ext_subclass}
+         )
