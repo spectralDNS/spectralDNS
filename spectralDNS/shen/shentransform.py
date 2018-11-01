@@ -10,6 +10,7 @@ from ..optimization import optimizer
 
 work = work_arrays()
 
+__all__ = ('SlabShen_R2C', )
 
 class SlabShen_R2C(Slab_R2C):
 

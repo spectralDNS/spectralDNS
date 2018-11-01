@@ -3,6 +3,8 @@ from shenfun.spectralbase import inner_product
 from shenfun.optimization.Matvec import Helmholtz_matvec3D, Helmholtz_matvec, \
     Biharmonic_matvec, Biharmonic_matvec3D_ptr
 
+__all__ = ('BiharmonicCoeff', 'HelmholtzCoeff')
+
 class BiharmonicCoeff(object):
 
     def __init__(self, N, a0, alfa, beta, quad="GL"):
