@@ -54,6 +54,8 @@ def get_extension():
     except ImportError:
         print("Disabling Pythran support, package not available")
 
+    return ext
+
 def version():
     srcdir = os.path.join(cwd, 'spectralDNS')
     with open(os.path.join(srcdir, '__init__.py')) as f:
@@ -75,11 +77,13 @@ if __name__ == '__main__':
               'Intended Audience :: Science/Research',
               'Intended Audience :: Education',
               'Programming Language :: Python',
+              'Programming Language :: Python :: 2',
+              'Programming Language :: Python :: 3',
               'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)',
               'Topic :: Scientific/Engineering :: Mathematics',
               'Topic :: Software Development :: Libraries :: Python Modules',
               ],
-          install_requires=['numpy', 'cython'],
+          install_requires=['numpy', 'shenfun', 'mpi4py-fft', 'mpi4py'],
           setup_requires=['numpy>=1.11', 'cython>=0.25', 'setuptools>=18.0'],
           packages=["spectralDNS",
                     "spectralDNS.h5io",
