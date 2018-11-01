@@ -55,7 +55,7 @@ def get_extension():
         print("Disabling Pythran support, package not available")
 
 def version():
-    srcdir = os.path.join(cwd, 'shenfun')
+    srcdir = os.path.join(cwd, 'spectralDNS')
     with open(os.path.join(srcdir, '__init__.py')) as f:
         m = re.search(r"__version__\s*=\s*'(.*)'", f.read())
         return m.groups()[0]
