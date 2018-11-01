@@ -17,4 +17,5 @@ publish: tag pip
 clean:
 	git clean spectralDNS -fx
 	git clean tests -fx
+	git clean demo -fx
 	@rm -rf *.egg-info/ build/ dist/ .eggs/
