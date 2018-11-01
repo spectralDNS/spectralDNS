@@ -4,11 +4,11 @@ SpectralDNS
 High performance spectral Navier-Stokes (and similar) solvers implemented in
 Python.
 """
-__author__ = "Mikael Mortensen <mikaem@math.uio.no>"
-__date__ = "2015-04-09"
-__copyright__ = "Copyright (C) 2015-2018 " + __author__
-__license__ = "GNU Lesser GPL version 3 or any later version"
-__version__ = "1.1.0"
+__author__ = 'Mikael Mortensen <mikaem@math.uio.no>'
+__date__ = '2015-04-09'
+__copyright__ = 'Copyright (C) 2015-2018 ' + __author__
+__license__ = 'GNU Lesser GPL version 3 or any later version'
+__version__ = '1.1.0'
 
 import importlib
 import cProfile
