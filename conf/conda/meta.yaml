@@ -16,6 +16,7 @@ requirements:
     - cython
     - numpy
     - pyfftw
+    - mpi4py
     - pip
     - pytest-runner
 
