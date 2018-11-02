@@ -48,7 +48,7 @@ def get_context():
     for i in range(3):
         Kx[i] = Kx[i].astype(float)
 
-    K_over_K2 = np.zeros((3,)+VT.local_shape(), dtype=float)
+    K_over_K2 = np.zeros(VT.local_shape(), dtype=float)
     for i in range(3):
         K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
