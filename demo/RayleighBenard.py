@@ -86,10 +86,11 @@ class Stats(object):
         self.axis = axis
         N = config.params.N
         assert np.all(np.array(T.shape(False)[1:]) == np.array(N))
-        self.Umean = np.zeros((3, N[axis]))
-        self.phim = np.zeros(N[axis])
-        self.UU = np.zeros((6, N[axis]))
-        self.pp = np.zeros(N[axis])
+        M = self.T.local_shape(False)[self.axis+1]
+        self.Umean = np.zeros((3, M))
+        self.phim = np.zeros(M)
+        self.UU = np.zeros((6, M))
+        self.pp = np.zeros(M)
         self.num_samples = 0
         self.rank = comm.Get_rank()
         self.fname = filename
@@ -131,7 +132,7 @@ class Stats(object):
         sx = list(range(3))
         sx.pop(self.axis)
         N = config.params.N
-        s = self.T.local_slice(False)[self.axis]
+        s = self.T.local_slice(False)[self.axis+1]
         Nd = self.num_samples*np.prod(np.take(N, sx))
         self.comm.barrier()
         if tofile:
@@ -169,7 +170,7 @@ class Stats(object):
         N = config.params.N
         self.num_samples = self.f0.attrs["num_samples"]
         Nd = self.num_samples*np.prod(np.take(N, sx))
-        s = self.T.local_slice(False)[self.axis]
+        s = self.T.local_slice(False)[self.axis+1]
         for i, name in enumerate(("U", "V", "W")):
             self.Umean[i, :] = self.f0["Average/"+name][s]*Nd
         self.phim[:] = self.f0["Average/phi"][s]*Nd
