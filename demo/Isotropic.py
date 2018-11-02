@@ -13,6 +13,8 @@ of homogeneous turbulence with hyperviscosity", Physics of Fluids, 17, 1, 015106
 """
 from __future__ import print_function
 import warnings
+import sys
+import shenfun
 import numpy as np
 from numpy import pi, zeros, sum
 from spectralDNS import config, get_solver, solve
@@ -34,7 +36,7 @@ def initialize(solver, context):
     k = np.where(k == 0, 1, k)
     kk = c.K2.copy()
     kk = np.where(kk == 0, 1, kk)
-    k1, k2, k3 = c.K[0], c.K[1], c.K[2]
+    k1, k2, k3 = c.Kx[0], c.Kx[1], c.Kx[2]
     ksq = np.sqrt(k1**2+k2**2)
     ksq = np.where(ksq == 0, 1, ksq)
 
@@ -49,14 +51,13 @@ def initialize(solver, context):
     c.U_hat[1] = (beta*k2*k3 - alpha*k*k1)/(k*ksq)
     c.U_hat[2] = beta*ksq/k
 
-    if 'VV' in config.params.solver:
-        c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
-
     solver.get_velocity(**c)
     U_hat = solver.set_velocity(**c)
+
     K = c.K
     # project to zero divergence
     U_hat[:] -= (K[0]*U_hat[0]+K[1]*U_hat[1]+K[2]*U_hat[2])*c.K_over_K2
+
     if solver.rank == 0:
         c.U_hat[:, 0, 0, 0] = 0.0
 
@@ -208,11 +209,10 @@ def update(context):
 
     #c.dU[:] = alpha*c.mask*c.U_hat
     c.U_hat *= (alpha*c.mask + (1-c.mask))
-    #c.U_hat[:] -= (c.K[0]*c.U_hat[0]+c.K[1]*c.U_hat[1]+c.K[2]*c.U_hat[2])*c.K_over_K2
 
     energy_new = energy_fourier(solver.comm, c.U_hat)
 
-    assert np.sqrt((energy_new-c.target_energy)**2) < 1e-7
+    assert np.sqrt((energy_new-c.target_energy)**2) < 1e-7, np.sqrt((energy_new-c.target_energy)**2)
 
     if params.solver == 'VV':
         c.W_hat = solver.cross2(c.W_hat, c.K, c.U_hat)
@@ -282,6 +282,8 @@ def update(context):
         curl_hat = solver.cross2(curl_hat, K, c.U_hat)
         dissipation = energy_fourier(solver.comm, curl_hat)
         div_u = solver.get_divergence(**c)
+        #du = 1j*(c.K[0]*c.U_hat[0]+c.K[1]*c.U_hat[1]+c.K[2]*c.U_hat[2])
+        #from IPython import embed; embed(); sys.exit()
         div_u = L2_norm(solver.comm, div_u)
         #div_u2 = energy_fourier(solver.comm, 1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]))
 
