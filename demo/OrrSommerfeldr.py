@@ -1,10 +1,8 @@
 """Orr-Sommerfeld"""
-#import pyfftw  # Hack because of https://github.com/pyFFTW/pyFFTW/issues/40
 import warnings
 from numpy import real, pi, exp, zeros, imag, sqrt, log10
 from spectralDNS import config, get_solver, solve
 from spectralDNS.utilities import dx
-import shenfun
 #from spectralDNS.utilities import reset_profile
 from OrrSommerfeld_shen import OrrSommerfeld
 

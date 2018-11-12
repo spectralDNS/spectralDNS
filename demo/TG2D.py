@@ -9,11 +9,11 @@ except ImportError:
     warnings.warn("matplotlib not installed")
     plt = None
 
-def initialize(U, U_hat, X, FFT, **context):
+def initialize(sol, U, U_hat, X, **context):
     U[0] = sin(X[0])*cos(X[1])
     U[1] = -sin(X[1])*cos(X[0])
-    for i in range(2):
-        U_hat[i] = FFT.fft2(U[i], U_hat[i])
+    sol.set_velocity(U, U_hat, **context)
+    #U_hat = U.forward(U_hat)
     config.params.t = 0.0
     config.params.tstep = 0
 
@@ -47,7 +47,7 @@ def regression_test(context):
     ke = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
     if solver.rank == 0:
         print("Error {}".format(k-ke))
-        assert round(k - ke, params.ntol) == 0
+        assert round(float(k - ke), params.ntol) == 0
 
 if __name__ == '__main__':
     config.update(
@@ -59,5 +59,5 @@ if __name__ == '__main__':
     config.doublyperiodic.add_argument("--plot_result", type=int, default=10) # required to allow overloading through commandline
     sol = get_solver(update=update, regression_test=regression_test, mesh="doublyperiodic")
     context = sol.get_context()
-    initialize(**context)
+    initialize(sol, **context)
     solve(sol, context)

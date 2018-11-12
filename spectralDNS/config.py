@@ -230,25 +230,12 @@ triplyperiodic = argparse.ArgumentParser(parents=[parser])
 triplyperiodic.add_argument('--convection', default='Vortex',
                             choices=('Standard', 'Divergence', 'Skewed', 'Vortex'),
                             help='Choose method for computing the nonlinear convective term')
-triplyperiodic.add_argument('--communication', default='Alltoall',
-                            choices=('Alltoallw', 'Alltoall', 'Sendrecv_replace', 'AlltoallN'),
-                            help='Choose method for communication. Sendrecv_replace is only for slab without padding. AlltoallN is only for pencil decomposition.')
 triplyperiodic.add_argument('--L', default=[2*pi, 2*pi, 2*pi], metavar=("Lx", "Ly", "Lz"), nargs=3,
                             help='Physical mesh size')
-triplyperiodic.add_argument('--Pencil_alignment', default='Y', choices=('X', 'Y'),
-                            help='Alignment of the complex data for pencil decomposition')
-triplyperiodic.add_argument('--Pencil_P1', default=2, type=int,
-                            help='Pencil decomposition in first direction')
 triplyperiodic.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'),
                             help="Choose 3D decomposition between slab and pencil.")
 triplyperiodic.add_argument('--M', default=[6, 6, 6], metavar=("Mx", "My", "Mz"), nargs=3,
                             help='Mesh size is pow(2, M[i]) in direction i. Used if N is missing.')
-triplyperiodic.add_argument('--write_yz_slice', default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'),
-                            help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
-triplyperiodic.add_argument('--write_xz_slice', default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'),
-                            help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
-triplyperiodic.add_argument('--write_xy_slice', default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'),
-                            help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
 triplyperiodic.add_argument('--TOL', type=float, default=1e-6,
                             help='Tolerance for adaptive time integrator')
 triplyperiodic.add_argument('--integrator', default='RK4',
@@ -267,13 +254,13 @@ parser_MHD.add_argument('--eta', default=0.01, type=float, help='MHD parameter')
 parser_Bq = trippelsubparsers.add_parser('Bq', help='Navier Stokes solver with Boussinesq model')
 parser_Bq.add_argument('--Ri', default=0.1, type=float, help='Richardson number')
 parser_Bq.add_argument('--Pr', default=1.0, type=float, help='Prandtl number')
-parser_NS_shenfun = trippelsubparsers.add_parser('NS_shenfun', help='Regular Navier Stokes solver using shenfun backend')
-parser_VV_shenfun = trippelsubparsers.add_parser('VV_shenfun', help='Velocity-vorticity Navier Stokes solver using shenfun backend')
+parser_NS_mpifft4py = trippelsubparsers.add_parser('NS_mpifft4py', help='Regular Navier Stokes solver using deprecated mpifft4py backend')
+parser_VV_mpifft4py = trippelsubparsers.add_parser('VV_mpifft4py', help='Velocity-vorticity Navier Stokes solver using deprecated mpifft4py backend')
 
 # Arguments for 2D periodic solvers
 doublyperiodic = argparse.ArgumentParser(parents=[parser])
 doublyperiodic.add_argument('--integrator', default='RK4',
-                            choices=('RK4', 'ForwardEuler', 'AB2'),
+                            choices=('RK4', 'ForwardEuler', 'AB2', 'BS5_fixed', 'BS5_adaptive'),
                             help='Integrator for doubly periodic domain')
 doublyperiodic.add_argument('--L', default=[2*pi, 2*pi], nargs=2, metavar=('Lx', 'Ly'),
                             help='Physical mesh size')
@@ -283,6 +270,8 @@ doublyperiodic.add_argument('--convection', default='Vortex',
 doublyperiodic.add_argument('--decomposition', default='line',
                             choices=('line', ),
                             help="For 2D problems line is the only choice.")
+doublyperiodic.add_argument('--TOL', type=float, default=1e-6,
+                            help='Tolerance for adaptive time integrator')
 doublyperiodic.add_argument('--M', default=[6, 6], nargs=2, metavar=('Mx', 'My'),
                             help='Mesh size is pow(2, M[i]) in direction i. Used if N is missing.')
 
@@ -293,6 +282,8 @@ parser_Bq2D = doublesubparsers.add_parser('Bq2D', help='Regular 2D Navier Stokes
 parser_Bq2D.add_argument('--Ri', default=0.1, type=float, help='Richardson number')
 parser_Bq2D.add_argument('--Pr', default=1.0, type=float, help='Prandtl number')
 
+parser_NS2D_mpifft4py = doublesubparsers.add_parser('NS2D_mpifft4py', help='Regular Navier Stokes solver using deprecated mpifft4py backend')
+
 # Arguments for channel solvers with one inhomogeneous direction
 channel = argparse.ArgumentParser(parents=[parser])
 channel.add_argument('--convection', default='Vortex',
@@ -301,27 +292,10 @@ channel.add_argument('--convection', default='Vortex',
 channel.add_argument('--L', default=[2, 2*pi, 2*pi], nargs=3, metavar=('Lx', 'Ly', 'Lz'),
                      help='Physical mesh size')
 
-dealias_cheb_parser = channel.add_mutually_exclusive_group(required=False)
-
-dealias_cheb_parser.add_argument('--no-dealias_cheb', dest='dealias_cheb', action='store_false',
-                                 help='No dealiasing for inhomogeneous direction (default)')
-dealias_cheb_parser.add_argument('--dealias_cheb', dest='dealias_cheb', action='store_true',
-                                 help='Use dealiasing for inhomogeneous direction. If True, uses same rule as for periodic')
-channel.set_defaults(dealias_cheb=False)
 channel.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'),
                      help="Choose 3D decomposition between slab and pencil.")
-channel.add_argument('--communication', default='Alltoallw', choices=('Alltoallw', 'Alltoall'),
-                     help='Choose method for communication.')
-channel.add_argument('--Pencil_alignment', default='X', choices=('X',),
-                     help='Alignment of the complex data for pencil decomposition')
 channel.add_argument('--M', default=[6, 6, 6], nargs=3, metavar=('Mx', 'My', 'Mz'),
                      help='Mesh size is pow(2, M[i]) in direction i. Used if N is missing.')
-channel.add_argument('--write_yz_slice', default=[0, 1e8], nargs=2, type=int, metavar=('i', 'tstep'),
-                     help='Write 2D slice of yz plane with index i in x-direction every tstep. ')
-channel.add_argument('--write_xz_slice', default=[0, 1e8], nargs=2, type=int, metavar=('j', 'tstep'),
-                     help='Write 2D slice of xz plane with index j in y-direction every tstep. ')
-channel.add_argument('--write_xy_slice', default=[0, 1e8], nargs=2, type=int, metavar=('k', 'tstep'),
-                     help='Write 2D slice of xy plane with index k in z-direction every tstep. ')
 channel.add_argument('--Dquad', default='GC', choices=('GC', 'GL'),
                      help="Choose quadrature scheme for Dirichlet space. GC = Chebyshev-Gauss (x_k=cos((2k+1)/(2N+2)*pi)) and GL = Gauss-Lobatto (x_k=cos(k*pi/N))")
 channel.add_argument('--Bquad', default='GC', choices=('GC', 'GL'),
@@ -340,7 +314,7 @@ KMMRK3 = channelsubparsers.add_parser('KMMRK3', help='Kim Moin Moser channel sol
 KMMRK3.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',), help='RK3 integrator for channel solver')
 KMM_mpifft4py = channelsubparsers.add_parser('KMM_mpifft4py', help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
 KMM_mpifft4py.add_argument('--integrator', default='implicit', choices=('implicit',), help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
-KMMRK3_mpifft4py = channelsubparsers.add_parser('KMMRK3_mpifft4py', help='Kim Moin Moser channel solver with third order semi-implicit Runge-Kutta discretization.')
+KMMRK3_mpifft4py = channelsubparsers.add_parser('KMMRK3_mpifft4py', help='Deprecated Kim Moin Moser channel solver with third order semi-implicit Runge-Kutta discretization.')
 KMMRK3_mpifft4py.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',), help='RK3 integrator for channel solver')
 
 IPCS = channelsubparsers.add_parser('IPCS', help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')

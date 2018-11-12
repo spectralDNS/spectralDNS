@@ -13,10 +13,9 @@ of homogeneous turbulence with hyperviscosity", Physics of Fluids, 17, 1, 015106
 """
 from __future__ import print_function
 import warnings
-import sys
-import shenfun
 import numpy as np
 from numpy import pi, zeros, sum
+import shenfun
 from spectralDNS import config, get_solver, solve
 
 try:
@@ -98,9 +97,7 @@ def energy_fourier(comm, u_hat):
               + np.sum(np.abs(u_hat[..., 0])**2)
               + np.sum(np.abs(u_hat[..., -1])**2))
     result = comm.allreduce(result)
-    if 'shenfun' in config.params.solver:
-        return result*np.prod(L)
-    return result*np.prod(L)/np.prod(N)**2
+    return result*np.prod(L)
 
 def L2_norm(comm, u):
     r"""Compute the L2-norm of real array a
@@ -119,10 +116,7 @@ def spectrum(solver, context):
     uiui[..., 1:-1] = 2*np.sum((c.U_hat[..., 1:-1]*np.conj(c.U_hat[..., 1:-1])).real, axis=0)
     uiui[..., 0] = np.sum((c.U_hat[..., 0]*np.conj(c.U_hat[..., 0])).real, axis=0)
     uiui[..., -1] = np.sum((c.U_hat[..., -1]*np.conj(c.U_hat[..., -1])).real, axis=0)
-    if 'shenfun' in config.params.solver:
-        uiui *= (4./3.*np.pi)
-    else:
-        uiui *= (4./3.*np.pi/np.prod(config.params.N)**2)
+    uiui *= (4./3.*np.pi)
 
     # Create bins for Ek
     Nb = int(np.sqrt(sum((config.params.N/2)**2)/3))
@@ -221,7 +215,7 @@ def update(context):
             params.tstep % params.plot_step == 0 and params.plot_step > 0):
         solver.get_velocity(**c)
         solver.get_curl(**c)
-        if params.solver == 'NS':
+        if 'NS' in params.solver:
             solver.get_pressure(**c)
 
     K = c.K
@@ -244,9 +238,9 @@ def update(context):
 
     if params.tstep % params.compute_spectrum == 0:
         Ek, _, _, _, _ = spectrum(solver, context)
-        context.hdf5file.f = h5py.File(context.hdf5file.fname, driver='mpio', comm=solver.comm)
-        context.hdf5file.f['Turbulence/Ek'].create_dataset(str(params.tstep), data=Ek)
-        context.hdf5file.f.close()
+        f = h5py.File(context.spectrumname, driver='mpio', comm=solver.comm)
+        f['Turbulence/Ek'].create_dataset(str(params.tstep), data=Ek)
+        f.close()
 
     if params.tstep % params.compute_energy == 0:
         dx, L = params.dx, params.L
@@ -259,10 +253,7 @@ def update(context):
         duidxj = c.work[(((3, 3)+c.U[0].shape), c.float, 0)]
         for i in range(3):
             for j in range(3):
-                if 'shenfun' in config.params.solver:
-                    duidxj[i, j] = c.T.backward(1j*K[j]*c.U_hat[i], duidxj[i, j])
-                else:
-                    duidxj[i, j] = c.FFT.ifftn(1j*K[j]*c.U_hat[i], duidxj[i, j])
+                duidxj[i, j] = c.T.backward(1j*K[j]*c.U_hat[i], duidxj[i, j])
 
         ww2 = L2_norm(solver.comm, duidxj)*params.nu/np.prod(L)
         #ww2 = solver.comm.reduce(sum(duidxj*duidxj))
@@ -270,10 +261,7 @@ def update(context):
         ddU = c.work[(((3,)+c.U[0].shape), c.float, 0)]
         dU = solver.ComputeRHS(c.dU, c.U_hat, solver, **c)
         for i in range(3):
-            if 'shenfun' in config.params.solver:
-                ddU[i] = c.T.backward(dU[i], ddU[i])
-            else:
-                ddU[i] = c.FFT.ifftn(dU[i], ddU[i])
+            ddU[i] = c.T.backward(dU[i], ddU[i])
 
         ww3 = solver.comm.allreduce(sum(ddU*c.U))/np.prod(params.N)
 
@@ -353,14 +341,14 @@ if __name__ == "__main__":
     context = sol.get_context()
     initialize(sol, context)
     #init_from_file("NS_isotropic_6_6_6b.h5", sol, context)
+    context.hdf5file.filename = "NS_isotropic_{}_{}_{}".format(*config.params.N)
 
     Ek, bins, E0, E1, E2 = spectrum(sol, context)
-    context.hdf5file.fname = "NS_isotropic_{}_{}_{}b.h5".format(*config.params.N)
-    context.hdf5file.f = h5py.File(context.hdf5file.fname, driver='mpio', comm=sol.comm)
-    context.hdf5file._init_h5file(config.params, sol)
-    context.hdf5file.f.create_group("Turbulence")
-    context.hdf5file.f["Turbulence"].create_group("Ek")
+    context.spectrumname = context.hdf5file.filename+".h5"
+    f = h5py.File(context.spectrumname, mode='w', driver='mpio', comm=sol.comm)
+    f.create_group("Turbulence")
+    f["Turbulence"].create_group("Ek")
     bins = np.array(bins)
-    context.hdf5file.f["Turbulence"].create_dataset("bins", data=bins)
-    context.hdf5file.f.close()
+    f["Turbulence"].create_dataset("bins", data=bins)
+    f.close()
     solve(sol, context)

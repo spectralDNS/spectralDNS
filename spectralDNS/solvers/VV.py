@@ -5,16 +5,16 @@ Derived by taking the curl of the momentum equation and solving for the curl.
 The velocity that is required in the convective term is computed from the curl
 in the compute_velocity method.
 
-This solver inherits most features from the NS solver.
+This solver inherits most features from the NS_shenfun solver.
 Overloading just a few routines.
 
 """
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
-__date__ = "2015-01-02"
-__copyright__ = "Copyright (C) 2014-2018 " + __author__
+__date__ = "2018-10-23"
+__copyright__ = "Copyright (C) 2018 " + __author__
 __license__ = "GNU Lesser GPL version 3 or any later version"
 
-#pylint: disable=unused-argument,function-redefined
+#pylint: disable=unused-variable,unused-argument,function-redefined
 
 from .NS import *
 
@@ -24,56 +24,62 @@ def get_context():
     """Set up context for Velocity-Vorticity (VV) solver"""
     c = NS_context()
     del c.P, c.P_hat
-    c.W_hat = empty((3,) + c.FFT.complex_shape(), dtype=complex) # curl transformed
+
+    c.W_hat = Function(c.VT)
+
+    # Primary variable
     c.u = c.W_hat
-    c.hdf5file = VVWriter({'U':c.U[0], 'V':c.U[1], 'W':c.U[2],
-                           'curlx':c.curl[0], 'curly':c.curl[1], 'curlz':c.curl[2]},
-                          chkpoint={'current':{'U':c.U, 'curl':c.curl}, 'previous':{}},
-                          filename=params.h5filename+'.h5')
+    c.hdf5file = VVFile(config.params.solver,
+                        checkpoint={'space': c.VT,
+                                    'data': {'0': {'curl': [c.W_hat]}}},
+                        results={'space': c.VT,
+                                 'data': {'U': [c.U], 'curl': [c.curl]}})
+
     return c
 
-class VVWriter(HDF5Writer):
-    """Subclass HDF5Writer for appropriate updating of real components"""
-    def update_components(self, **context):
-        """Transform to real data when storing the solution"""
-        get_velocity(**context)
-        get_curl(**context)
+class VVFile(HDF5File):
+    """Subclass HDF5File for appropriate updating of real components
 
-def compute_velocity(c, w_hat, work, FFT, K_over_K2, dealias=None):
+    The method 'update_components' is used to transform all variables
+    that are to be stored. If more variables than U and P are
+    wanted, then subclass HDF5Writer in the application.
+    """
+    def update_components(self, **context):
+        """Transform to real data before storing the solution"""
+        U = get_velocity(**context)
+        curl = get_curl(**context)
+
+def compute_velocity(U, w_hat, work, VT, K_over_K2):
     """Compute u from curl(u)
 
     Follows from
-
-        w = [curl(u)=] \nabla \times u
-        curl(w) = \nabla^2(u) (since div(u)=0)
-        FFT(curl(w)) = FFT(\nabla^2(u))
-        ik \times w_hat = k^2 u_hat
-        u_hat = (ik \times w_hat) / k^2
-        u = iFFT(u_hat)
+      w = [curl(u)=] \nabla \times u
+      curl(w) = \nabla^2(u) (since div(u)=0)
+      FFT(curl(w)) = FFT(\nabla^2(u))
+      ik \times w_hat = k^2 u_hat
+      u_hat = (ik \times w_hat) / k^2
+      u = iFFT(u_hat)
 
     """
     v_hat = work[(w_hat, 0)]
     v_hat = cross2(v_hat, K_over_K2, w_hat)
-    c[0] = FFT.ifftn(v_hat[0], c[0], dealias)
-    c[1] = FFT.ifftn(v_hat[1], c[1], dealias)
-    c[2] = FFT.ifftn(v_hat[2], c[2], dealias)
-    return c
-
-def get_velocity(W_hat, U, work, FFT, K_over_K2, **context):
-    """Compute velocity from context"""
-    U = compute_velocity(U, W_hat, work, FFT, K_over_K2)
+    U = VT.backward(v_hat, U)
     return U
 
-def get_divergence(FFT, K, U_hat, W_hat, **context):
-    div_u = zeros(FFT.real_shape())
+def get_velocity(W_hat, U, work, VT, K_over_K2, **context):
+    """Compute velocity from context"""
+    U = compute_velocity(U, W_hat, work, VT, K_over_K2)
+    return U
+
+def get_divergence(T, K, U_hat, W_hat, **context):
+    div_u = Array(T)
     U_hat = cross2(U_hat, K, W_hat)
-    div_u = FFT.ifftn(1j*(K[0]*U_hat[0]+K[1]*U_hat[1]+K[2]*U_hat[2]), div_u)
+    div_u = T.backward(1j*(K[0]*U_hat[0]+K[1]*U_hat[1]+K[2]*U_hat[2]), div_u)
     return div_u
 
-def get_curl(curl, W_hat, FFT, **context):
+def get_curl(curl, W_hat, VT, **context):
     """Compute curl from context"""
-    for i in range(3):
-        curl[i] = FFT.ifftn(W_hat[i], curl[i])
+    curl = VT.backward(W_hat, curl)
     return curl
 
 def getConvection(convection):
@@ -83,15 +89,16 @@ def getConvection(convection):
 
     elif convection == "Vortex":
 
-        def Conv(rhs, w_hat, work, FFT, K, K_over_K2):
-            u_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 0)]
-            w_dealias = work[((3,)+FFT.work_shape(params.dealias), float, 1)]
+        def Conv(rhs, w_hat, work, Tp, VT, VTp, K, K_over_K2):
+            u_dealias = work[((3,)+Tp.backward.output_array.shape,
+                              Tp.backward.output_array.dtype, 0, False)]
+            w_dealias = work[((3,)+Tp.backward.output_array.shape,
+                              Tp.backward.output_array.dtype, 1, False)]
             v_hat = work[(rhs, 0)]
 
-            u_dealias = compute_velocity(u_dealias, w_hat, work, FFT, K_over_K2, params.dealias)
-            for i in range(3):
-                w_dealias[i] = FFT.ifftn(w_hat[i], w_dealias[i], params.dealias)
-            v_hat = Cross(v_hat, u_dealias, w_dealias, work, FFT, params.dealias) # v_hat = F_k(u_dealias x w_dealias)
+            u_dealias = compute_velocity(u_dealias, w_hat, work, VTp, K_over_K2)
+            w_dealias = VTp.backward(w_hat, w_dealias)
+            v_hat = Cross(v_hat, u_dealias, w_dealias, work, VT, VTp, params.dealias) # v_hat = F_k(u_dealias x w_dealias)
             rhs = cross2(rhs, K, v_hat)  # rhs = 1j*(K x v_hat)
             return rhs
 
@@ -105,7 +112,8 @@ def add_linear(rhs, w_hat, nu, K2, Source):
     rhs += Source
     return rhs
 
-def ComputeRHS(rhs, w_hat, solver, work, FFT, K, Kx, K2, K_over_K2, Source, **context):
+def ComputeRHS(rhs, w_hat, solver, work, Tp, VT, VTp, K, Kx, K2, K_over_K2,
+               Source, **context):
     """Return right hand side of Navier Stokes in velocity-vorticity form
 
     Parameters
@@ -123,11 +131,10 @@ def ComputeRHS(rhs, w_hat, solver, work, FFT, K, Kx, K2, K_over_K2, Source, **co
     ----------------
         work : dict
             Work arrays
-        FFT : class
-            Transform class from mpiFFT4py
-        K : list
+        Tp : TensorProductSpace
+        K : list of arrays
             Scaled wavenumber mesh
-        Kx : list
+        Kx : list of arrays
             Scaled wavenumber mesh with zero Nyquist frequency
         K2 : array
             K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
@@ -137,6 +144,6 @@ def ComputeRHS(rhs, w_hat, solver, work, FFT, K, Kx, K2, K_over_K2, Source, **co
             Scalar source term
 
     """
-    rhs = solver.conv(rhs, w_hat, work, FFT, K, K_over_K2)
+    rhs = solver.conv(rhs, w_hat, work, Tp, VT, VTp, K, K_over_K2)
     rhs = solver.add_linear(rhs, w_hat, params.nu, K2, Source)
     return rhs

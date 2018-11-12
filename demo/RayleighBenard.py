@@ -56,7 +56,7 @@ def update(context):
 
     if params.tstep % params.plot_result == 0 and solver.rank == 0 and params.plot_result > 0:
         plt.figure(1)
-        im1.set_UVC(U[1,:,:,0], U[0,:,:,0])
+        im1.set_UVC(U[1, :, :, 0], U[0, :, :, 0])
         im1.scale = np.linalg.norm(0.25*U[1])
 
         plt.pause(1e-6)
@@ -181,31 +181,33 @@ class Stats(object):
 
 def init_from_file(filename, solver, context):
     import h5py
-    f = h5py.File(filename, driver="mpio", comm=solver.comm)
-    assert "1" in f["3D/checkpoint/U"]
+    f = h5py.File(filename, 'r+', driver="mpio", comm=solver.comm)
+    assert "0" in f["U/Vector/3D"]
     U = context.U
+    U_hat = context.U_hat
     phi = context.phi
+    phi_hat = context.phi_hat
     N = U.shape[1]
-    s = slice(solver.rank*N, (solver.rank+1)*N, 1)
+    TV = context.U.function_space()
+    su = tuple(TV.local_slice(True))
+    T = context.phi.function_space()
+    sp = tuple(T.local_slice(True))
+    #s = slice(solver.rank*N, (solver.rank+1)*N, 1)
 
     # previous timestep
     if not 'RK3' in config.params.solver:
-        assert "0" in f["3D/checkpoint/U"]
-
-        U[:] = f["3D/checkpoint/U/0"][:, s]
-        U_hat = solver.set_velocity(**context)
+        assert "1" in f["U/Vector/3D"]
+        U_hat[:] = f["U/Vector/3D/1"][su]
 
         # Set g, which is used in computing convection
         context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
         context.U_hat0[:] = U_hat
         context.H_hat1[:] = solver.get_convection(**context)
-        context.phi0[:] = f["3D/checkpoint/phi/0"][s]
+        context.phi_hat0[:] = f["phi/3D/1"][sp]
 
     # current timestep
-    U[:] = f["3D/checkpoint/U/1"][:, s]
-    phi[:] = f["3D/checkpoint/phi/1"][s]
-    phi_hat = phi.forward(context.phi_hat)
-    U_hat = solver.set_velocity(**context)
+    U_hat[:] = f["U/Vector/3D/0"][su]
+    phi_hat[:] = f["phi/3D/0"][sp]
     context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
     f.close()
 
@@ -228,7 +230,7 @@ if __name__ == "__main__":
     config.params.kappa = 1./np.sqrt(config.params.Pr*config.params.Ra)
     context = solver.get_context()
     initialize(solver, context)
-    #init_from_file("KMM_RB_677.h5", solver, context)
-    context.hdf5file.fname = "KMM_RB_677b.h5"
+    #init_from_file("KMM_RB_677a_c.h5", solver, context)
+    context.hdf5file.filename = "KMM_RB_677b"
     solver.stats = Stats(context.VFS, filename="KMMRBstats")
     solve(solver, context)

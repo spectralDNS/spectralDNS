@@ -1,13 +1,10 @@
 """Orr-Sommerfeld"""
-#import pyfftw  # Hack because of https://github.com/pyFFTW/pyFFTW/issues/40
 import warnings
 from numpy import real, pi, exp, zeros, imag, sqrt, log10
 from spectralDNS import config, get_solver, solve
 from spectralDNS.utilities import dx
-import shenfun
 #from spectralDNS.utilities import reset_profile
 from OrrSommerfeld_shen import OrrSommerfeld
-#from OrrSommerfeld_eig import OrrSommerfeld
 
 try:
     import matplotlib.pyplot as plt
@@ -226,6 +223,7 @@ if __name__ == "__main__":
     #solver = get_solver(update=update, regression_test=regression_test, mesh="channel")
     solver = get_solver(update=update, mesh="channel")
 
+
     if config.params.eps_refinement_test:
         print("eps refinement-test")
         solver.update = lambda x: None
@@ -248,11 +246,10 @@ if __name__ == "__main__":
         solver.regression_test = spatial_refinement_test
         config.params.verbose = False
         for M in [4, 5, 6, 7, 8]:
-            config.params.M = [M, 3, 1]
+            config.params.M = [M, 3, 2]
             context = solver.get_context()
             initialize(solver, context)
             set_Source(**context)
-
             solve(solver, context)
 
     else:
@@ -260,6 +257,10 @@ if __name__ == "__main__":
             solver.update = lambda x: None
             solver.regression_test = refinement_test
         context = solver.get_context()
+        # Just store 2D slices for visualization
+        context.hdf5file.wdict = {'U': [(context.U[0], [slice(None), slice(None), 0])],
+                                  'V': [(context.U[1], [slice(None), slice(None), 0])]}
+        context.hdf5file.wfile.T = context.FST
         initialize(solver, context)
         set_Source(**context)
         solve(solver, context)

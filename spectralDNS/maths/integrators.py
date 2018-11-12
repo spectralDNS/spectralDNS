@@ -8,6 +8,8 @@ import numpy as np
 from mpi4py import MPI
 from ..optimization import optimizer, wraps
 
+comm = MPI.COMM_WORLD
+
 __all__ = ['getintegrator']
 
 def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
@@ -53,7 +55,6 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
     facmax = facmax_default
     fac = 0.8
     facmin = 0.01
-    FFT = context.FFT
 
     #We may need to repeat the time-step until a small enough value is used.
     while True:
@@ -88,16 +89,16 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
             est_to_bcast = None
             nsquared = np.zeros(u0.shape[0])
             for k in range(u0.shape[0]):
-                nsquared[k] = FFT.comm.reduce(np.sum(np.power(np.abs(err[k]/sc[k]), 2)))
-            if FFT.comm.rank == 0:
+                nsquared[k] = comm.reduce(np.sum(np.power(np.abs(err[k]/sc[k]), 2)))
+            if comm.Get_rank() == 0:
                 est_to_bcast = np.zeros(1)
                 est = np.max(np.sqrt(nsquared))
-                if hasattr(FFT, 'global_complex_shape'):
-                    est /= np.sqrt(np.array(FFT.global_complex_shape()).prod())
+                if hasattr(context, 'FFT'):
+                    est /= np.sqrt(np.array(context.FFT.global_complex_shape()).prod())
                 else:
-                    est /= np.sqrt(np.array(FFT.shape(forward_output=True)).prod())
+                    est /= np.sqrt(np.array(context.T.shape(True)).prod())
                 est_to_bcast[0] = est
-            est_to_bcast = FFT.comm.bcast(est_to_bcast, root=0)
+            est_to_bcast = comm.bcast(est_to_bcast, root=0)
             est = est_to_bcast[0]
 
         elif errnorm == "inf":
@@ -108,12 +109,12 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
             err = np.abs(err, out=err)
             asdf = np.max(err)
             x = np.zeros(asdf.shape)
-            FFT.comm.Allreduce(asdf, x, op=MPI.MAX)
+            comm.Allreduce(asdf, x, op=MPI.MAX)
             est = np.abs(np.max(x))
-            if hasattr(FFT, 'global_complex_shape'):
-                est /= np.sqrt(np.array(FFT.global_complex_shape()).prod())
+            if hasattr(context, 'FFT'):
+                est /= np.sqrt(np.array(context.FFT.global_complex_shape()).prod())
             else:
-                est /= np.sqrt(np.array(FFT.shape(forward_output=True)).prod())
+                est /= np.sqrt(np.array(context.T.shape(True)).prod())
         else:
             assert False, "Wrong error norm"
 

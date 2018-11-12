@@ -47,19 +47,19 @@ def get_context():
                                        (c.K2[0]+2.0/kappa/(c.a[rk]+c.b[rk])/dt)[np.newaxis, :, :]) for rk in range(3)]
     c.TC = [HelmholtzCoeff(config.params.N[0], 1.0, (2./kappa/dt/(c.a[rk]+c.b[rk])-c.K2), c.ST.quad) for rk in range(3)]
 
-    c.hdf5file = RBWriter({'U':c.U[0], 'V':c.U[1], 'W':c.U[2], 'phi':c.phi},
-                          chkpoint={'current':{'U':c.U, 'phi':c.phi},
-                                    'previous':{}},
-                          filename=config.params.solver+'.h5',
-                          mesh={'x':c.x0, 'y':c.x1, 'z':c.x2})
+    c.hdf5file = RBFile(config.params.solver,
+                        checkpoint={'space': c.VFS,
+                                    'data': {'0': {'U': [c.U_hat], 'phi': [c.phi_hat]}}},
+                        results={'space': c.VFS,
+                                 'data': {'U': [c.U], 'phi': [c.phi]}})
+
     return c
 
-class RBWriter(HDF5Writer):
-    def update_components(self, **context):
+class RBFile(HDF5File):
+    def update_components(self, U, U_hat, phi, phi_hat, **context):
         """Transform to real data when storing the solution"""
-        c = config.AttributeDict(context)
-        U = c.U_hat.backward(c.U)
-        phi = c.phi_hat.backward(c.phi)
+        U = U_hat.backward(U)
+        phi = phi_hat.backward(phi)
 
 def ComputeRHS(rhs, u_hat, g_hat, p_hat, rk, solver, context):
     rhs = KMMRK3_ComputeRHS(rhs, u_hat, g_hat, rk, solver, **context)

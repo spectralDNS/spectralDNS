@@ -13,7 +13,7 @@ def initialize(X, U, U_hat, FFT, **context):
     U[0, :, 3*N[1]//4:] = params.U1 - Um*exp(-1.0*(X[1][:, 3*N[1]//4:] - 1.5*pi)/params.delta)
 
     for i in range(2):
-        U_hat[i] = FFT.fft2(U[i], U_hat[i])
+        U_hat[i] = U[i].forward(U_hat[i])
 
 im, im2 = None, None
 count = 0

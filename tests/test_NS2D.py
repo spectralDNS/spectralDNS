@@ -24,17 +24,17 @@ def test_NS2D(args):
                         mesh='doublyperiodic',
                         parse_args=args)
     context = solver.get_context()
-    initialize(**context)
+    initialize(solver, **context)
     solve(solver, context)
 
     config.params.dealias = '3/2-rule'
-    initialize(**context)
+    initialize(solver, **context)
     solve(solver, context)
 
     config.params.dealias = '2/3-rule'
     config.params.optimization = 'cython'
     reload_module(solver)
-    initialize(**context)
+    initialize(solver, **context)
     solve(solver, context)
 
     config.params.write_result = 1
@@ -44,5 +44,5 @@ def test_NS2D(args):
     config.params.tstep = 0
     config.params.T = 0.04
     solver.regression_test = lambda c: None
-    initialize(**context)
+    initialize(solver, **context)
     solve(solver, context)

@@ -75,40 +75,6 @@ def initialize(solver, context):
         context.U_hat0[:] = context.U_hat[:]
         context.H_hat1[:] = solver.get_convection(**context)
 
-def init_from_file(filename, solver, context):
-    f = h5py.File(filename, driver="mpio", comm=solver.comm)
-    assert "1" in f["3D/checkpoint/U"]
-    U = context.U
-    N = U.shape[1]
-    s = slice(solver.rank*N, (solver.rank+1)*N, 1)
-
-    # previous timestep
-    if not 'RK3' in config.params.solver:
-        assert "0" in f["3D/checkpoint/U"]
-
-        U[:] = f["3D/checkpoint/U/0"][:, s]
-        U_hat = solver.set_velocity(**context)
-
-        # Set g, which is used in computing convection
-        if "KMM" in config.params.solver:
-            context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
-
-        context.U_hat0[:] = U_hat
-        context.H_hat1[:] = solver.get_convection(**context)
-
-    # current timestep
-    U[:] = f["3D/checkpoint/U/1"][:, s]
-    U_hat = solver.set_velocity(**context)
-
-    if config.params.solver in ("IPCS", "IPCSR"):
-        context.P[:] = f["3D/checkpoint/P/1"][s]
-        solver.set_pressure(**context)
-
-    elif "KMM" in config.params.solver:
-        context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
-
-    f.close()
-
 def set_Source(Source, Sk, ST, FST, **context):
     utau = config.params.nu * config.params.Re_tau
     Source[:] = 0
@@ -333,6 +299,31 @@ class Stats(object):
             self.UU[i, :] = self.f0["Reynolds Stress/"+name][s]*Nd
         self.f0.close()
 
+def init_from_file(filename, solver, context):
+    import h5py
+    f = h5py.File(filename, 'r+', driver="mpio", comm=solver.comm)
+    assert "0" in f["U/Vector/3D"]
+    U = context.U
+    U_hat = context.U_hat
+    N = U.shape[1]
+    TV = context.U.function_space()
+    su = tuple(TV.local_slice(True))
+
+    # previous timestep
+    if not 'RK3' in config.params.solver:
+        assert "1" in f["U/Vector/3D"]
+        U_hat[:] = f["U/Vector/3D/1"][su]
+
+        # Set g, which is used in computing convection
+        context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
+        context.U_hat0[:] = U_hat
+        context.H_hat1[:] = solver.get_convection(**context)
+
+    # current timestep
+    U_hat[:] = f["U/Vector/3D/0"][su]
+    context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
+    f.close()
+
 if __name__ == "__main__":
     config.update(
         {'nu': 1./590.,                  # Viscosity
@@ -340,7 +331,8 @@ if __name__ == "__main__":
          'dt': 0.0005,                  # Time step
          'T': 100.,                    # End time
          'L': [2, 2*np.pi, np.pi],
-         'M': [6, 6, 6]
+         'M': [6, 6, 6],
+         'dealias': '3/2-rule'
         }, "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=10)
@@ -350,9 +342,9 @@ if __name__ == "__main__":
     #solver = get_solver(update=update, mesh="channel")
     solver = get_solver(update=update, mesh="channel")
     context = solver.get_context()
-    initialize(solver, context)
-    #init_from_file("KMM665c.h5", solver, context)
+    #initialize(solver, context)
+    init_from_file("KMM666d.h5_c.h5", solver, context)
     set_Source(**context)
     solver.stats = Stats(context.U, solver.comm, filename="KMMstatsq")
-    context.hdf5file.fname = "KMM665d.h5"
+    context.hdf5file.filename = "KMM666e"
     solve(solver, context)

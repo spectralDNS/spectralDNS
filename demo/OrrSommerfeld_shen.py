@@ -23,7 +23,6 @@ try:
 except ImportError:
     warnings.warn("matplotlib not installed")
 
-
 class OrrSommerfeld(object):
     def __init__(self, alfa=1., Re=8000., N=80, quad='GC', **kwargs):
         kwargs.update(dict(alfa=alfa, Re=Re, N=N, quad=quad))

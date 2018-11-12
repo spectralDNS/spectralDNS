@@ -40,7 +40,7 @@ def get_context():
     VUG = MixedTensorProductSpace([FSB, FST])
 
     # Padded
-    kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
+    kw = {'padding_factor': 2.0 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
     if params.dealias == '3/2-rule':
         # Requires new bases due to planning and transforms on different size arrays
@@ -133,21 +133,19 @@ def get_context():
              HelmholtzSolverU0=Helmholtz(mat.ADD0, mat.BDD0, np.array([-1.]), np.array([2./nu/dt])),
              TDMASolverD=TDMA(inner_product((ST, 0), (ST, 0)))))
 
-    hdf5file = KMMWriter({"U":U[0], "V":U[1], "W":U[2]},
-                         chkpoint={'current':{'U':U}, 'previous':{'U':U0}},
-                         filename=params.solver+".h5",
-                         mesh={"x": x0, "y": x1, "z": x2})
+    hdf5file = KMMFile(config.params.solver,
+                       checkpoint={'space': VFS,
+                                   'data': {'0': {'U': [U_hat]},
+                                            '1': {'U': [U_hat0]}}},
+                       results={'space': VFS,
+                                'data': {'U': [U]}})
 
     return config.AttributeDict(locals())
 
-class KMMWriter(HDF5Writer):
-    def update_components(self, **context):
+class KMMFile(HDF5File):
+    def update_components(self, U_hat, U, **context):
         """Transform to real data when storing the solution"""
-        U = get_velocity(**context)    # updates U from U_hat
-        if params.tstep % params.checkpoint == 0:
-            # update U0 from U0_hat
-            c = config.AttributeDict(context)
-            U0 = get_velocity(c.U0, c.U_hat0, c.VFS)
+        U = U_hat.backward(U)
 
 assert params.precision == "double"
 
@@ -437,7 +435,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
 
 #@profile
 def ComputeRHS(rhs, u_hat, g_hat, solver,
-               H_hat, H_hat1, H_hat0, VFSp, FSTp, FSBp, FCTp, work, Kx, K2,
+               H_hat, H_hat1, H_hat0, VFSp, FSTp, FSBp, FCTp, work, Kx, K, K2,
                K4, hv, hg, mat, la, **context):
     """Compute right hand side of Navier Stokes
 

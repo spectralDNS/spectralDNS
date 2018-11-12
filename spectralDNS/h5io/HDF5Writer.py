@@ -130,18 +130,16 @@ class HDF5Writer(object):
 
         else:
             for key, val in six.iteritems(self.chkpoint['current']):
-                if len(s) == len(val.shape):
-                    self.f["3D/checkpoint/{}/1".format(key)][s] = val
-                else:
-                    ss = (slice(None),)+s
-                    self.f["3D/checkpoint/{}/1".format(key)][ss] = val
+                shape = params.N if len(val.shape) == self.dim else (val.shape[0],)+tuple(params.N)
+                d = self.f["{}/checkpoint/{}".format(dim, key)].require_dataset("1", shape=shape, dtype=val.dtype)
+                ss = s if len(s) == len(val.shape) else (slice(None),)+s
+                d[ss] = val
 
             for key, val in six.iteritems(self.chkpoint['previous']):
-                if len(s) == len(val.shape):
-                    self.f["3D/checkpoint/{}/0".format(key)][s] = val
-                else:
-                    ss = (slice(None),)+s
-                    self.f["3D/checkpoint/{}/0".format(key)][ss] = val
+                shape = params.N if len(val.shape) == self.dim else (val.shape[0],)+tuple(params.N)
+                d = self.f["{}/checkpoint/{}".format(dim, key)].require_dataset("0", shape=shape, dtype=val.dtype)
+                ss = s if len(s) == len(val.shape) else (slice(None),)+s
+                d[ss] = val
 
         # For channel solver with dynamic pressure
         if 'Sk' in kw:

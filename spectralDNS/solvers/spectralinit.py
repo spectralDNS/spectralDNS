@@ -14,7 +14,7 @@ from mpiFFT4py import Slab_R2C, Pencil_R2C, Line_R2C, empty, zeros, \
      work_arrays, datatypes
 from spectralDNS import config
 from spectralDNS.utilities import create_profile, MemoryUsage, Timer, reset_profile
-from spectralDNS.h5io import HDF5Writer
+from spectralDNS.h5io import HDF5Writer, HDF5File
 from spectralDNS.optimization import optimizer
 from spectralDNS.maths import cross1, cross2, project, getintegrator
 

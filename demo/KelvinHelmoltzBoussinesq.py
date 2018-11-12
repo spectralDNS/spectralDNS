@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from numpy import zeros, sum, pi, sin, tanh, float64
 from spectralDNS import config, get_solver, solve
 
-def initialize(X, U, Ur, Ur_hat, rho, FFT, float, **kwargs):
+def initialize(X, U, Ur, Ur_hat, rho, float, **kwargs):
 
     params = config.params
     N = params.N
@@ -14,8 +14,9 @@ def initialize(X, U, Ur, Ur_hat, rho, FFT, float, **kwargs):
     rho[:, N[1]//2:] = 2.0 -tanh((X[1][:, N[1]//2:]-1.5*pi)/params.delta)
     rho -= rho0
 
-    for i in range(3):
-        Ur_hat[i] = FFT.fft2(Ur[i], Ur_hat[i])
+    Ur_hat = Ur.forward(Ur_hat)
+    #for i in range(3):
+    #    Ur_hat[i] = FFT.fft2(Ur[i], Ur_hat[i])
 
 im, im2 = None, None
 def update(context):
@@ -55,18 +56,16 @@ def update(context):
         im2.set_data(curl[:, :].T)
         im2.autoscale()
         plt.pause(1e-6)
-        if solver.rank == 0:
-            print(params.tstep)
 
     if params.tstep % params.compute_energy == 0:
         U = solver.get_velocity(**context)
         kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
         if solver.rank == 0:
-            print(params.tstep, kk)
+            print(params.tstep, params.t, kk)
 
 if __name__ == "__main__":
     config.update(
-        {'nu': 1.0e-08,
+        {'nu': 1.0e-03,
          'dt': 0.001,
          'T': 1.0,
          'U1':-0.5,
@@ -80,6 +79,7 @@ if __name__ == "__main__":
          'k0': 2,
          'rho1': 1.0,
          'rho2': 3.0,
+         'integrator': 'BS5_adaptive'
         }, 'doublyperiodic'
     )
     config.doublyperiodic.add_argument("--plot_result", type=int, default=10)

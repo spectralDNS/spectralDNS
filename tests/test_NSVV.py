@@ -10,22 +10,10 @@ if comm.Get_size() >= 4:
     params = ('NS/uniform/slab', 'VV/uniform/slab',
               'NS/nonuniform/slab', 'VV/nonuniform/slab',
               'NS/uniform/pencil', 'VV/uniform/pencil',
-              'NS/nonuniform/pencil', 'VV/nonuniform/pencil',
-              'NS_shenfun/uniform/slab',
-              'VV_shenfun/uniform/slab',
-              'NS_shenfun/nonuniform/slab',
-              'VV_shenfun/nonuniform/slab',
-              'NS_shenfun/uniform/pencil',
-              'VV_shenfun/uniform/pencil',
-              'NS_shenfun/nonuniform/pencil',
-              'VV_shenfun/nonuniform/pencil')
+              'NS/nonuniform/pencil', 'VV/nonuniform/pencil')
 else:
     params = ('NS/uniform', 'VV/uniform',
-              'NS/nonuniform', 'VV/nonuniform',
-              'NS_shenfun/uniform',
-              'VV_shenfun/uniform',
-              'NS_shenfun/nonuniform',
-              'VV_shenfun/nonuniform')
+              'NS/nonuniform', 'VV/nonuniform')
 
 @pytest.fixture(params=params)
 def sol(request):

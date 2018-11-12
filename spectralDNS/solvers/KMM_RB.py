@@ -51,23 +51,20 @@ def get_context():
                                       (c.K2[0]+2.0/kappa/dt)[np.newaxis, :, :])
     c.TC = HelmholtzCoeff(config.params.N[0], 1.0, (2./kappa/dt-c.K2))
 
-    c.hdf5file = RBWriter({'U':c.U[0], 'V':c.U[1], 'W':c.U[2], 'phi':c.phi},
-                          chkpoint={'current':{'U':c.U, 'phi':c.phi},
-                                    'previous':{'U':c.U0, 'phi':c.phi0}},
-                          filename=config.params.solver+'.h5',
-                          mesh={'x':c.x0, 'y':c.x1, 'z':c.x2})
+    c.hdf5file = RBFile(config.params.solver,
+                        checkpoint={'space': c.VFS,
+                                    'data': {'0': {'U': [c.U_hat], 'phi': [c.phi_hat]},
+                                             '1': {'U': [c.U_hat0], 'phi': [c.phi_hat0]}}},
+                        results={'space': c.VFS,
+                                 'data': {'U': [c.U], 'phi': [c.phi]}})
+
     return c
 
-class RBWriter(HDF5Writer):
-    def update_components(self, **context):
+class RBFile(HDF5File):
+    def update_components(self, U, U_hat, phi, phi_hat, **context):
         """Transform to real data when storing the solution"""
-        c = config.AttributeDict(context)
-        U = c.U_hat.backward(c.U)
-        phi = c.phi_hat.backward(c.phi)
-        if config.params.tstep % config.params.checkpoint == 0:
-            # update U0 from U0_hat
-            U0 = c.U_hat0.backward(c.U0)
-            phi0 = c.phi_hat0.backward(c.phi0)
+        U = U_hat.backward(U)
+        phi = phi_hat.backward(phi)
 
 def end_of_tstep(context):
     context.phi_hat1[:] = context.phi_hat0

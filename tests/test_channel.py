@@ -3,7 +3,7 @@ from six.moves import reload_module
 from spectralDNS import config, get_solver, solve
 from OrrSommerfeld import initialize, regression_test, set_Source, pi
 
-@pytest.fixture(params=('KMMRK3', 'KMM', 'IPCS', 'IPCSR', 'KMMRK3_mpifft4py', 'KMM_mpifft4py'))
+@pytest.fixture(params=('KMMRK3', 'KMM', 'IPCS', 'IPCSR'))
 def sol(request):
     """Check for uniform and non-uniform cube"""
     return request.param
@@ -14,7 +14,7 @@ def test_channel(sol):
     config.update(
         {
             'Re': 8000.,
-            'nu': 1./8000.,             # Viscosity
+            'nu': 1./8000.,              # Viscosity
             'dt': 0.001,                 # Time step
             'T': 0.01,                   # End time
             'L': [2, 2*pi, 4*pi/3.],

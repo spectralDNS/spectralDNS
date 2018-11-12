@@ -5,49 +5,81 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 
 #pylint: disable=unused-variable,unused-argument,function-redefined
 
+from shenfun import Basis, TensorProductSpace, VectorTensorProductSpace, \
+    Array, Function
 from .spectralinit import *
 
 def get_context():
     """Set up context for classical (NS) solver"""
-
-    # FFT class performs the 3D parallel transforms
-    FFT = get_FFT(params)
     float, complex, mpitype = datatypes(params.precision)
+    collapse_fourier = False if params.dealias == '3/2-rule' else True
+    dim = len(params.N)
+    dtype = lambda d: float if d == dim-1 else complex
+    V = [Basis(params.N[i], 'F', domain=(0, params.L[i]),
+               dtype=dtype(i)) for i in range(dim)]
+
+    kw0 = {'threads': params.threads,
+           'planner_effort': params.planner_effort['fft']}
+    T = TensorProductSpace(comm, V, dtype=float,
+                           slab=(params.decomposition == 'slab'),
+                           collapse_fourier=collapse_fourier, **kw0)
+    VT = VectorTensorProductSpace(T)
+
+    kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
+          'dealias_direct': params.dealias == '2/3-rule'}
+
+    Vp = [Basis(params.N[i], 'F', domain=(0, params.L[i]),
+                dtype=dtype(i), **kw) for i in range(dim)]
+
+    Tp = TensorProductSpace(comm, Vp, dtype=float,
+                            slab=(params.decomposition == 'slab'),
+                            collapse_fourier=collapse_fourier, **kw0)
+    VTp = VectorTensorProductSpace(Tp)
 
     # Mesh variables
-    X = FFT.get_local_mesh()
-    K = FFT.get_local_wavenumbermesh(scaled=True)
-    K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+    X = T.local_mesh(True)
+    K = T.local_wavenumbers(scaled=True)
+    for i in range(dim):
+        X[i] = X[i].astype(float)
+        K[i] = K[i].astype(float)
+    K2 = np.zeros(T.local_shape(True), dtype=float)
+    for i in range(dim):
+        K2 += K[i]*K[i]
 
-    # Set Nyquist frequency to zero on K that is used for odd derivatives
-    Kx = FFT.get_local_wavenumbermesh(scaled=True, eliminate_highest_freq=True)
-    K_over_K2 = zeros((3,) + FFT.complex_shape(), dtype=float)
-    for i in range(3):
+    # Set Nyquist frequency to zero on K that is, from now on, used for odd derivatives
+    Kx = T.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
+    for i in range(dim):
+        Kx[i] = Kx[i].astype(float)
+
+    K_over_K2 = np.zeros(VT.local_shape(), dtype=float)
+    for i in range(dim):
         K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
     # Velocity and pressure
-    U = empty((3,) + FFT.real_shape(), dtype=float)
-    U_hat = empty((3,) + FFT.complex_shape(), dtype=complex)
-    P = empty(FFT.real_shape(), dtype=float)
-    P_hat = empty(FFT.complex_shape(), dtype=complex)
+    U = Array(VT)
+    U_hat = Function(VT)
+    P = Array(T)
+    P_hat = Function(T)
 
     # Primary variable
     u = U_hat
 
     # RHS array
-    dU = empty((3,) + FFT.complex_shape(), dtype=complex)
-    curl = empty((3,) + FFT.real_shape(), dtype=float)
-    Source = zeros((3,) + FFT.complex_shape(), dtype=complex) # Possible source term initialized to zero
+    dU = Function(VT)
+    curl = Array(VT)
+    Source = Function(VT) # Possible source term initialized to zero
     work = work_arrays()
 
-    hdf5file = NSWriter({"U":U[0], "V":U[1], "W":U[2], "P":P},
-                        chkpoint={"current":{"U":U, "P":P}, "previous":{}},
-                        filename=params.h5filename+".h5")
+    hdf5file = NSFile(config.params.solver,
+                      checkpoint={'space': VT,
+                                  'data': {'0': {'U': [U_hat]}}},
+                      results={'space': VT,
+                               'data': {'U': [U], 'P': [P]}})
 
     return config.AttributeDict(locals())
 
-class NSWriter(HDF5Writer):
-    """Subclass HDF5Writer for appropriate updating of real components
+class NSFile(HDF5File):
+    """Subclass HDF5File for appropriate updating of real components
 
     The method 'update_components' is used to transform all variables
     that are to be stored. If more variables than U and P are
@@ -55,46 +87,33 @@ class NSWriter(HDF5Writer):
     """
     def update_components(self, **context):
         """Transform to real data before storing the solution"""
-        get_velocity(**context)
-        get_pressure(**context)
+        U = get_velocity(**context)
+        P = get_pressure(**context)
 
-def get_curl(curl, U_hat, work, FFT, K, **context):
+def get_curl(curl, U_hat, work, VT, VTp, K, **context):
     """Compute curl from context"""
-    curl = compute_curl(curl, U_hat, work, FFT, K)
+    curl = compute_curl(curl, U_hat, work, VT, VTp, K)
     return curl
 
-def get_velocity(U, U_hat, FFT, **context):
+def get_velocity(U, U_hat, **context):
     """Compute velocity from context"""
-    for i in range(3):
-        U[i] = FFT.ifftn(U_hat[i], U[i])
+    U = U_hat.backward(U)
     return U
 
-def get_pressure(P, P_hat, FFT, **context):
+def get_pressure(P, P_hat, T, **context):
     """Compute pressure from context"""
-    P = FFT.ifftn(1j*P_hat, P)
+    P = T.backward(1j*P_hat, P)
+    return P
 
-def get_divergence(FFT, K, U_hat, **context):
-    div_u = zeros(FFT.real_shape())
-    div_u = FFT.ifftn(1j*(K[0]*U_hat[0]+K[1]*U_hat[1]+K[2]*U_hat[2]), div_u)
-    return div_u
-
-def set_velocity(U, U_hat, FFT, **context):
-    """Compute transformed velocity from context"""
-    for i in range(3):
-        U_hat[i] = FFT.fftn(U[i], U_hat[i])
+def set_velocity(U, U_hat, **context):
+    """Compute velocity from context"""
+    U_hat = U.forward(U_hat)
     return U_hat
 
-def forward_transform(a, a_hat, FFT):
-    """A common method for transforming forward """
-    for i in range(3):
-        a_hat[i] = FFT.fftn(a[i], a_hat[i])
-    return a_hat
-
-def backward_transform(a_hat, a, FFT):
-    """A common method for transforming backward"""
-    for i in range(3):
-        a[i] = FFT.ifftn(a_hat[i], a[i])
-    return a
+def get_divergence(T, K, U_hat, **context):
+    div_u = Array(T)
+    div_u = T.backward(1j*(K[0]*U_hat[0]+K[1]*U_hat[1]+K[2]*U_hat[2]), div_u)
+    return div_u
 
 def end_of_tstep(context):
     # Make sure that the last step hits T exactly.
@@ -108,47 +127,46 @@ def end_of_tstep(context):
 
     return False
 
-def compute_curl(c, a, work, FFT, K, dealias=None):
+def compute_curl(c, a, work, VT, VTp, K, dealias=None):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
     curl_hat = work[(a, 0, False)]
     curl_hat = cross2(curl_hat, K, a)
-
-    c[0] = FFT.ifftn(curl_hat[0], c[0], dealias)
-    c[1] = FFT.ifftn(curl_hat[1], c[1], dealias)
-    c[2] = FFT.ifftn(curl_hat[2], c[2], dealias)
+    V = VT if dealias is None else VTp
+    c = V.backward(curl_hat, c)
     return c
 
-def Cross(c, a, b, work, FFT, dealias=None):
+def Cross(c, a, b, work, VT, VTp, dealias=None):
     """c_k = F_k(a x b)"""
+    V = VT if dealias is None else VTp
     Uc = work[(a, 2, False)]
     Uc = cross1(Uc, a, b)
-    c[0] = FFT.fftn(Uc[0], c[0], dealias)
-    c[1] = FFT.fftn(Uc[1], c[1], dealias)
-    c[2] = FFT.fftn(Uc[2], c[2], dealias)
+    c = V.forward(Uc, c)
     return c
 
-def standard_convection(rhs, u_dealias, U_hat, work, FFT, K, dealias=None):
+def standard_convection(rhs, u_dealias, U_hat, work, T, Tp, K, dealias=None):
     """rhs_i = u_j du_i/dx_j"""
     gradUi = work[(u_dealias, 2, False)]
+    T = T if dealias is None else Tp
     for i in range(3):
         for j in range(3):
-            gradUi[j] = FFT.ifftn(1j*K[j]*U_hat[i], gradUi[j], dealias)
-        rhs[i] = FFT.fftn(np.sum(u_dealias*gradUi, 0), rhs[i], dealias)
+            gradUi[j] = T.backward(1j*K[j]*U_hat[i], gradUi[j])
+        rhs[i] = T.forward(np.sum(u_dealias*gradUi, 0), rhs[i])
     return rhs
 
-def divergence_convection(rhs, u_dealias, work, FFT, K, dealias=None, add=False):
+def divergence_convection(rhs, u_dealias, work, T, Tp, K, dealias=None, add=False):
     """rhs_i = div(u_i u_j)"""
     if not add:
         rhs.fill(0)
     UUi_hat = work[(rhs, 0, False)]
+    T = T if dealias is None else Tp
     for i in range(3):
-        UUi_hat[i] = FFT.fftn(u_dealias[0]*u_dealias[i], UUi_hat[i], dealias)
+        UUi_hat[i] = T.forward(u_dealias[0]*u_dealias[i], UUi_hat[i])
     rhs[0] += 1j*(K[0]*UUi_hat[0] + K[1]*UUi_hat[1] + K[2]*UUi_hat[2])
     rhs[1] += 1j*K[0]*UUi_hat[1]
     rhs[2] += 1j*K[0]*UUi_hat[2]
-    UUi_hat[0] = FFT.fftn(u_dealias[1]*u_dealias[1], UUi_hat[0], dealias)
-    UUi_hat[1] = FFT.fftn(u_dealias[1]*u_dealias[2], UUi_hat[1], dealias)
-    UUi_hat[2] = FFT.fftn(u_dealias[2]*u_dealias[2], UUi_hat[2], dealias)
+    UUi_hat[0] = T.forward(u_dealias[1]*u_dealias[1], UUi_hat[0])
+    UUi_hat[1] = T.forward(u_dealias[1]*u_dealias[2], UUi_hat[1])
+    UUi_hat[2] = T.forward(u_dealias[2]*u_dealias[2], UUi_hat[2])
     rhs[1] += (1j*K[1]*UUi_hat[0] + 1j*K[2]*UUi_hat[1])
     rhs[2] += (1j*K[1]*UUi_hat[1] + 1j*K[2]*UUi_hat[2])
     return rhs
@@ -157,51 +175,45 @@ def getConvection(convection):
 
     if convection == "Standard":
 
-        def Conv(rhs, u_hat, work, FFT, K):
-            u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                              FFT.float, 0, False)]
-            for i in range(3):
-                u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
-            rhs = standard_convection(rhs, u_dealias, u_hat, work, FFT, K, params.dealias)
+        def Conv(rhs, u_hat, work, T, Tp, VT, VTp, K):
+            u_dealias = work[((3,)+Tp.backward.output_array.shape,
+                              Tp.backward.output_array.dtype, 0, False)]
+            u_dealias = VTp.backward(u_hat, u_dealias)
+            rhs = standard_convection(rhs, u_dealias, u_hat, work, T, Tp, K, params.dealias)
             rhs[:] *= -1
             return rhs
 
     elif convection == "Divergence":
 
-        def Conv(rhs, u_hat, work, FFT, K):
-            u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                              FFT.float, 0, False)]
-            for i in range(3):
-                u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
-            rhs = divergence_convection(rhs, u_dealias, work, FFT, K, params.dealias, False)
+        def Conv(rhs, u_hat, work, T, Tp, VT, VTp, K):
+            u_dealias = work[((3,)+Tp.backward.output_array.shape,
+                              Tp.backward.output_array.dtype, 0, False)]
+            u_dealias = VTp.backward(u_hat, u_dealias)
+            rhs = divergence_convection(rhs, u_dealias, work, T, Tp, K, params.dealias, False)
             rhs[:] *= -1
             return rhs
 
     elif convection == "Skewed":
 
-        def Conv(rhs, u_hat, work, FFT, K):
-            u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                              FFT.float, 0, False)]
-            for i in range(3):
-                u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
-            rhs = standard_convection(rhs, u_dealias, u_hat, work, FFT, K, params.dealias)
-            rhs = divergence_convection(rhs, u_dealias, work, FFT, K, params.dealias, True)
+        def Conv(rhs, u_hat, work, T, Tp, VT, VTp, K):
+            u_dealias = work[((3,)+Tp.backward.output_array.shape,
+                              Tp.backward.output_array.dtype, 0, False)]
+            u_dealias = VTp.backward(u_hat, u_dealias)
+            rhs = standard_convection(rhs, u_dealias, u_hat, work, T, Tp, K, params.dealias)
+            rhs = divergence_convection(rhs, u_dealias, work, T, Tp, K, params.dealias, True)
             rhs *= -0.5
             return rhs
 
     elif convection == "Vortex":
 
-        def Conv(rhs, u_hat, work, FFT, K):
-            u_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                              FFT.float, 0, False)]
-            curl_dealias = work[((3,)+FFT.work_shape(params.dealias),
-                                 FFT.float, 1, False)]
-            for i in range(3):
-                u_dealias[i] = FFT.ifftn(u_hat[i], u_dealias[i], params.dealias)
-
-            curl_dealias = compute_curl(curl_dealias, u_hat, work, FFT, K, params.dealias)
-
-            rhs = Cross(rhs, u_dealias, curl_dealias, work, FFT, params.dealias)
+        def Conv(rhs, u_hat, work, T, Tp, VT, VTp, K):
+            u_dealias = work[(VTp.local_shape(False),
+                              VTp.backward.output_array.dtype, 0, False)]
+            curl_dealias = work[(VTp.local_shape(False),
+                                 VTp.backward.output_array.dtype, 1, False)]
+            u_dealias = VTp.backward(u_hat, u_dealias)
+            curl_dealias = compute_curl(curl_dealias, u_hat, work, VT, VTp, K, params.dealias)
+            rhs = Cross(rhs, u_dealias, curl_dealias, work, VT, VTp, params.dealias)
             return rhs
 
     Conv.convection = convection
@@ -210,6 +222,7 @@ def getConvection(convection):
 @optimizer
 def add_pressure_diffusion(rhs, u_hat, nu, K2, K, P_hat, K_over_K2):
     """Add contributions from pressure and diffusion to the rhs"""
+
     # Compute pressure (To get actual pressure multiply by 1j)
     P_hat = np.sum(rhs*K_over_K2, 0, out=P_hat)
 
@@ -222,26 +235,45 @@ def add_pressure_diffusion(rhs, u_hat, nu, K2, K, P_hat, K_over_K2):
 
     return rhs
 
-def ComputeRHS(rhs, u_hat, solver, work, FFT, P_hat, K, Kx, K2, K_over_K2, **context):
+def ComputeRHS(rhs, u_hat, solver, work, T, Tp, VT, VTp, P_hat, K, Kx, K2,
+               K_over_K2, Source, **context):
     """Compute right hand side of Navier Stokes
 
-    args:
-        rhs         The right hand side to be returned
-        u_hat       The FFT of the velocity at current time. May differ from
-                    context.U_hat since it is set by the integrator
-        solver      The solver module. Included for possible inheritance
-                    and flexibility of integrators.
+    Parameters
+    ----------
+        rhs : array
+            The right hand side to be returned
+        u_hat : array
+            The FFT of the velocity at current time. May differ from
+            context.U_hat since it is set by the integrator
+        solver : module
+            The solver module. Included for possible inheritance
+            and flexibility of integrators.
 
-    Remaining args extracted from context:
-        work        Work arrays
-        FFT         Transform class from mpiFFT4py
-        P_hat       Transformed pressure
-        K           Scaled wavenumber mesh
-        Kx          Scaled wavenumber mesh with eliminated Nyquist freq
-        K2          sum_i K[i]*K[i]
-        K_over_K2   K / K2
+    Other Parameters
+    ----------------
+        work : dict
+            Work arrays
+        T : TensorProductSpace
+        Tp : TensorProductSpace
+            for padded transforms
+        VT : VectorTensorProductSpace
+        VTp : VectorTensorProductSpace
+            for padded transforms
+        P_hat : array
+            Transformed pressure
+        K : list of arrays
+            Scaled wavenumber mesh
+        Kx : list of arrays
+            Scaled wavenumber mesh with Nyquist eliminated
+        K2 : array
+            sum_i K[i]*K[i]
+        K_over_K2 : array
+            K / K2
 
     """
-    rhs = solver.conv(rhs, u_hat, work, FFT, Kx)
-    rhs = solver.add_pressure_diffusion(rhs, u_hat, params.nu, K2, K, P_hat, K_over_K2)
+    rhs = solver.conv(rhs, u_hat, work, T, Tp, VT, VTp, Kx)
+    rhs = solver.add_pressure_diffusion(rhs, u_hat, params.nu, K2, K, P_hat,
+                                        K_over_K2)
+    rhs += Source
     return rhs

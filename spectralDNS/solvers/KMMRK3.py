@@ -42,17 +42,9 @@ def get_context():
              HelmholtzSolverU0=[Helmholtz(c.mat.ADD0, c.mat.BDD0, np.array([-1]), np.array([2./nu/(a[rk]+b[rk])/dt])) for rk in range(3)],
              TDMASolverD=TDMA(inner_product((c.ST, 0), (c.ST, 0)))))
 
-    c.hdf5file = KMMRK3Writer({"U":c.U[0], "V":c.U[1], "W":c.U[2]},
-                              chkpoint={'current':{'U':c.U}, 'previous':{}},
-                              filename=params.solver+".h5",
-                              mesh={"x": c.x0, "y": c.x1, "z": c.x2})
+    del c.hdf5file.checkpoint['data']['1'] # No need for previous time step
 
     return c
-
-class KMMRK3Writer(HDF5Writer):
-    def update_components(self, **context):
-        """Transform to real data when storing the solution"""
-        U = get_velocity(**context)    # updates U from U_hat
 
 @optimizer
 def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
