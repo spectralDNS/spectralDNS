@@ -93,10 +93,7 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
             if comm.Get_rank() == 0:
                 est_to_bcast = np.zeros(1)
                 est = np.max(np.sqrt(nsquared))
-                if hasattr(context, 'FFT'):
-                    est /= np.sqrt(np.array(context.FFT.global_complex_shape()).prod())
-                else:
-                    est /= np.sqrt(np.array(context.T.shape(True)).prod())
+                est /= np.sqrt(np.array(context.T.shape(True)).prod())
                 est_to_bcast[0] = est
             est_to_bcast = comm.bcast(est_to_bcast, root=0)
             est = est_to_bcast[0]
@@ -111,10 +108,7 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
             x = np.zeros(asdf.shape)
             comm.Allreduce(asdf, x, op=MPI.MAX)
             est = np.abs(np.max(x))
-            if hasattr(context, 'FFT'):
-                est /= np.sqrt(np.array(context.FFT.global_complex_shape()).prod())
-            else:
-                est /= np.sqrt(np.array(context.T.shape(True)).prod())
+            est /= np.sqrt(np.array(context.T.shape(True)).prod())
         else:
             assert False, "Wrong error norm"
 
@@ -147,7 +141,6 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
             #context.time_integrator["last_dt"] = dt_prev
             #context.time_integrator["last_est"] = est
         break
-
 
     #Update u0 and U
     u0[:] = u0_new
