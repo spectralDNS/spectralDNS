@@ -61,7 +61,7 @@ def compute_velocity(U, w_hat, work, VT, K_over_K2):
       u = iFFT(u_hat)
 
     """
-    v_hat = work[(w_hat, 0)]
+    v_hat = work[(w_hat, 1, True)]
     v_hat = cross2(v_hat, K_over_K2, w_hat)
     U = VT.backward(v_hat, U)
     return U
@@ -89,16 +89,13 @@ def getConvection(convection):
 
     elif convection == "Vortex":
 
-        def Conv(rhs, w_hat, work, Tp, VT, VTp, K, K_over_K2):
-            u_dealias = work[((3,)+Tp.backward.output_array.shape,
-                              Tp.backward.output_array.dtype, 0, False)]
-            w_dealias = work[((3,)+Tp.backward.output_array.shape,
-                              Tp.backward.output_array.dtype, 1, False)]
-            v_hat = work[(rhs, 0)]
+        def Conv(rhs, w_hat, work, Tp, VTp, K, K_over_K2, u_dealias):
+            w_dealias = work[(u_dealias, 0, True)]
+            v_hat = work[(rhs, 0, True)]
 
             u_dealias = compute_velocity(u_dealias, w_hat, work, VTp, K_over_K2)
             w_dealias = VTp.backward(w_hat, w_dealias)
-            v_hat = Cross(v_hat, u_dealias, w_dealias, work, VT, VTp, params.dealias) # v_hat = F_k(u_dealias x w_dealias)
+            v_hat = Cross(v_hat, u_dealias, w_dealias, work, VTp) # v_hat = F_k(u_dealias x w_dealias)
             rhs = cross2(rhs, K, v_hat)  # rhs = 1j*(K x v_hat)
             return rhs
 
@@ -113,7 +110,7 @@ def add_linear(rhs, w_hat, nu, K2, Source):
     return rhs
 
 def ComputeRHS(rhs, w_hat, solver, work, Tp, VT, VTp, K, Kx, K2, K_over_K2,
-               Source, **context):
+               Source, u_dealias, **context):
     """Return right hand side of Navier Stokes in velocity-vorticity form
 
     Parameters
@@ -144,6 +141,6 @@ def ComputeRHS(rhs, w_hat, solver, work, Tp, VT, VTp, K, Kx, K2, K_over_K2,
             Scalar source term
 
     """
-    rhs = solver.conv(rhs, w_hat, work, Tp, VT, VTp, K, K_over_K2)
+    rhs = solver.conv(rhs, w_hat, work, Tp, VTp, K, K_over_K2, u_dealias)
     rhs = solver.add_linear(rhs, w_hat, params.nu, K2, Source)
     return rhs

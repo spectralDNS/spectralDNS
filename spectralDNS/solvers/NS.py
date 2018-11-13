@@ -25,6 +25,7 @@ def get_context():
                            collapse_fourier=collapse_fourier, **kw0)
     VT = VectorTensorProductSpace(T)
 
+    # Different bases for nonlinear term, either 2/3-rule or 3/2-rule
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
 
@@ -60,6 +61,7 @@ def get_context():
     U_hat = Function(VT)
     P = Array(T)
     P_hat = Function(T)
+    u_dealias = Array(VTp)
 
     # Primary variable
     u = U_hat
@@ -90,9 +92,9 @@ class NSFile(HDF5File):
         U = get_velocity(**context)
         P = get_pressure(**context)
 
-def get_curl(curl, U_hat, work, VT, VTp, K, **context):
+def get_curl(curl, U_hat, work, VT, K, **context):
     """Compute curl from context"""
-    curl = compute_curl(curl, U_hat, work, VT, VTp, K)
+    curl = compute_curl(curl, U_hat, work, VT, K)
     return curl
 
 def get_velocity(U, U_hat, **context):
@@ -127,46 +129,42 @@ def end_of_tstep(context):
 
     return False
 
-def compute_curl(c, a, work, VT, VTp, K, dealias=None):
+def compute_curl(c, a, work, T, K):
     """c = curl(a) = F_inv(F(curl(a))) = F_inv(1j*K x a)"""
     curl_hat = work[(a, 0, False)]
     curl_hat = cross2(curl_hat, K, a)
-    V = VT if dealias is None else VTp
-    c = V.backward(curl_hat, c)
+    c = T.backward(curl_hat, c)
     return c
 
-def Cross(c, a, b, work, VT, VTp, dealias=None):
+def Cross(c, a, b, work, T):
     """c_k = F_k(a x b)"""
-    V = VT if dealias is None else VTp
-    Uc = work[(a, 2, False)]
-    Uc = cross1(Uc, a, b)
-    c = V.forward(Uc, c)
+    d = work[(a, 1, False)]
+    d = cross1(d, a, b)
+    c = T.forward(d, c)
     return c
 
-def standard_convection(rhs, u_dealias, U_hat, work, T, Tp, K, dealias=None):
+def standard_convection(rhs, u_dealias, U_hat, work, Tp, K):
     """rhs_i = u_j du_i/dx_j"""
-    gradUi = work[(u_dealias, 2, False)]
-    T = T if dealias is None else Tp
+    gradUi = work[(u_dealias, 1, False)]
     for i in range(3):
         for j in range(3):
-            gradUi[j] = T.backward(1j*K[j]*U_hat[i], gradUi[j])
-        rhs[i] = T.forward(np.sum(u_dealias*gradUi, 0), rhs[i])
+            gradUi[j] = Tp.backward(1j*K[j]*U_hat[i], gradUi[j])
+        rhs[i] = Tp.forward(np.sum(u_dealias*gradUi, 0), rhs[i])
     return rhs
 
-def divergence_convection(rhs, u_dealias, work, T, Tp, K, dealias=None, add=False):
+def divergence_convection(rhs, u_dealias, work, Tp, K, add=False):
     """rhs_i = div(u_i u_j)"""
     if not add:
         rhs.fill(0)
     UUi_hat = work[(rhs, 0, False)]
-    T = T if dealias is None else Tp
     for i in range(3):
-        UUi_hat[i] = T.forward(u_dealias[0]*u_dealias[i], UUi_hat[i])
+        UUi_hat[i] = Tp.forward(u_dealias[0]*u_dealias[i], UUi_hat[i])
     rhs[0] += 1j*(K[0]*UUi_hat[0] + K[1]*UUi_hat[1] + K[2]*UUi_hat[2])
     rhs[1] += 1j*K[0]*UUi_hat[1]
     rhs[2] += 1j*K[0]*UUi_hat[2]
-    UUi_hat[0] = T.forward(u_dealias[1]*u_dealias[1], UUi_hat[0])
-    UUi_hat[1] = T.forward(u_dealias[1]*u_dealias[2], UUi_hat[1])
-    UUi_hat[2] = T.forward(u_dealias[2]*u_dealias[2], UUi_hat[2])
+    UUi_hat[0] = Tp.forward(u_dealias[1]*u_dealias[1], UUi_hat[0])
+    UUi_hat[1] = Tp.forward(u_dealias[1]*u_dealias[2], UUi_hat[1])
+    UUi_hat[2] = Tp.forward(u_dealias[2]*u_dealias[2], UUi_hat[2])
     rhs[1] += (1j*K[1]*UUi_hat[0] + 1j*K[2]*UUi_hat[1])
     rhs[2] += (1j*K[1]*UUi_hat[1] + 1j*K[2]*UUi_hat[2])
     return rhs
@@ -175,45 +173,36 @@ def getConvection(convection):
 
     if convection == "Standard":
 
-        def Conv(rhs, u_hat, work, T, Tp, VT, VTp, K):
-            u_dealias = work[((3,)+Tp.backward.output_array.shape,
-                              Tp.backward.output_array.dtype, 0, False)]
+        def Conv(rhs, u_hat, work, Tp, VTp, K, u_dealias):
             u_dealias = VTp.backward(u_hat, u_dealias)
-            rhs = standard_convection(rhs, u_dealias, u_hat, work, T, Tp, K, params.dealias)
+            rhs = standard_convection(rhs, u_dealias, u_hat, work, Tp, K)
             rhs[:] *= -1
             return rhs
 
     elif convection == "Divergence":
 
-        def Conv(rhs, u_hat, work, T, Tp, VT, VTp, K):
-            u_dealias = work[((3,)+Tp.backward.output_array.shape,
-                              Tp.backward.output_array.dtype, 0, False)]
+        def Conv(rhs, u_hat, work, Tp, VTp, K, u_dealias):
             u_dealias = VTp.backward(u_hat, u_dealias)
-            rhs = divergence_convection(rhs, u_dealias, work, T, Tp, K, params.dealias, False)
+            rhs = divergence_convection(rhs, u_dealias, work, Tp, K, False)
             rhs[:] *= -1
             return rhs
 
     elif convection == "Skewed":
 
-        def Conv(rhs, u_hat, work, T, Tp, VT, VTp, K):
-            u_dealias = work[((3,)+Tp.backward.output_array.shape,
-                              Tp.backward.output_array.dtype, 0, False)]
+        def Conv(rhs, u_hat, work, Tp, VTp, K, u_dealias):
             u_dealias = VTp.backward(u_hat, u_dealias)
-            rhs = standard_convection(rhs, u_dealias, u_hat, work, T, Tp, K, params.dealias)
-            rhs = divergence_convection(rhs, u_dealias, work, T, Tp, K, params.dealias, True)
+            rhs = standard_convection(rhs, u_dealias, u_hat, work, Tp, K)
+            rhs = divergence_convection(rhs, u_dealias, work, Tp, K, True)
             rhs *= -0.5
             return rhs
 
     elif convection == "Vortex":
 
-        def Conv(rhs, u_hat, work, T, Tp, VT, VTp, K):
-            u_dealias = work[(VTp.local_shape(False),
-                              VTp.backward.output_array.dtype, 0, False)]
-            curl_dealias = work[(VTp.local_shape(False),
-                                 VTp.backward.output_array.dtype, 1, False)]
+        def Conv(rhs, u_hat, work, Tp, VTp, K, u_dealias):
+            curl_dealias = work[(u_dealias, 0, False)]
             u_dealias = VTp.backward(u_hat, u_dealias)
-            curl_dealias = compute_curl(curl_dealias, u_hat, work, VT, VTp, K, params.dealias)
-            rhs = Cross(rhs, u_dealias, curl_dealias, work, VT, VTp, params.dealias)
+            curl_dealias = compute_curl(curl_dealias, u_hat, work, VTp, K)
+            rhs = Cross(rhs, u_dealias, curl_dealias, work, VTp)
             return rhs
 
     Conv.convection = convection
@@ -235,7 +224,7 @@ def add_pressure_diffusion(rhs, u_hat, nu, K2, K, P_hat, K_over_K2):
 
     return rhs
 
-def ComputeRHS(rhs, u_hat, solver, work, T, Tp, VT, VTp, P_hat, K, Kx, K2,
+def ComputeRHS(rhs, u_hat, solver, work, Tp, VTp, P_hat, K, Kx, K2, u_dealias,
                K_over_K2, Source, **context):
     """Compute right hand side of Navier Stokes
 
@@ -254,10 +243,8 @@ def ComputeRHS(rhs, u_hat, solver, work, T, Tp, VT, VTp, P_hat, K, Kx, K2,
     ----------------
         work : dict
             Work arrays
-        T : TensorProductSpace
         Tp : TensorProductSpace
             for padded transforms
-        VT : VectorTensorProductSpace
         VTp : VectorTensorProductSpace
             for padded transforms
         P_hat : array
@@ -272,7 +259,7 @@ def ComputeRHS(rhs, u_hat, solver, work, T, Tp, VT, VTp, P_hat, K, Kx, K2,
             K / K2
 
     """
-    rhs = solver.conv(rhs, u_hat, work, T, Tp, VT, VTp, Kx)
+    rhs = solver.conv(rhs, u_hat, work, Tp, VTp, Kx, u_dealias)
     rhs = solver.add_pressure_diffusion(rhs, u_hat, params.nu, K2, K, P_hat,
                                         K_over_K2)
     rhs += Source

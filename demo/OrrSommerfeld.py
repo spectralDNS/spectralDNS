@@ -170,7 +170,7 @@ def compute_error(context):
         e1 = 0.5*dx(pert, c.FST)
 
     exact = exp(2*imag(OS.eigval)*params.t)
-    U0 = c.work[(c.U, 0)]
+    U0 = c.work[(c.U, 0, True)]
     initOS(OS, OS.eigvals, OS.eigvectors, U0, c.X, t=params.t)
     #pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
     pert = (U[0] - U0[0])**2
@@ -258,9 +258,8 @@ if __name__ == "__main__":
             solver.regression_test = refinement_test
         context = solver.get_context()
         # Just store 2D slices for visualization
-        context.hdf5file.wdict = {'U': [(context.U[0], [slice(None), slice(None), 0])],
-                                  'V': [(context.U[1], [slice(None), slice(None), 0])]}
-        context.hdf5file.wfile.T = context.FST
+        context.hdf5file.results['data'] = {'U': [(context.U[0], [slice(None), slice(None), 0])],
+                                            'V': [(context.U[1], [slice(None), slice(None), 0])]}
         initialize(solver, context)
         set_Source(**context)
         solve(solver, context)

@@ -29,7 +29,7 @@ def optimizer(func):
 
         # Check for generic implementation first, then solver specific
         name = func.__name__
-        if config.params.decomposition == 'line':
+        if len(config.params.N) == 2:
             fun = getattr(mod, name+"_2D", None)
 
         else:

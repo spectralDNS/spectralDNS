@@ -16,9 +16,9 @@ def get_context():
 
     nu, dt, N = params.nu, params.dt, params.N
     del c.H_hat0, c.H_hat1
-    c.hv = zeros((2,)+c.FST.local_shape(), dtype=complex)
-    c.hg = zeros((2,)+c.FST.local_shape(), dtype=complex)
-    c.h1 = zeros((2, 2, N[0]), dtype=complex)
+    c.hv = np.zeros((2,)+c.FST.local_shape(), dtype=complex)
+    c.hg = np.zeros((2,)+c.FST.local_shape(), dtype=complex)
+    c.h1 = np.zeros((2, 2, N[0]), dtype=complex)
 
     # RK parameters
     c.a = a = (8./15., 5./12., 3./4.)
@@ -48,7 +48,7 @@ def get_context():
 
 @optimizer
 def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
-    diff_u = work[(g, 0)]
+    diff_u = work[(g, 0, False)]
     diff_g = work[(g, 1, False)]
     w0 = work[(g, 2, False)]
 
@@ -67,7 +67,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
 
 def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
                H_hat, VFSp, FSTp, FSBp, FCTp, work, Kx, K2, K4, hv,
-               hg, a, b, la, mat, **context):
+               hg, a, b, la, mat, u_dealias, **context):
 
     """Compute right hand side of Navier Stokes
 
@@ -89,7 +89,7 @@ def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
     """
 
     # Nonlinear convection term at current u_hat
-    H_hat = solver.conv(H_hat, u_hat, g_hat, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la)
+    H_hat = solver.conv(H_hat, u_hat, g_hat, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la, u_dealias)
 
     w0 = work[(H_hat[0], 0, False)]
     w1 = work[(H_hat[0], 1, False)]
@@ -112,17 +112,18 @@ def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
     return rhs
 
 def solve_linear(u_hat, g_hat, rhs, rk,
-                 work, la, mat, H_hat, Sk, h1, a, b, K_over_K2, **context):
+                 work, la, mat, H_hat, Sk, h1, a, b, K_over_K2, u0_hat, h0_hat,
+                 w, w1, **context):
 
-    f_hat = work[(u_hat[0], 0)]
+    f_hat = work[(u_hat[0], 0, True)]
     w0 = work[(u_hat[0], 1, False)]
 
     u_hat[0] = la.BiharmonicSolverU[rk](u_hat[0], rhs[0])
     g_hat = la.HelmholtzSolverG[rk](g_hat, rhs[1])
 
     if rank == 0:
-        u0_hat = work[((2, params.N[0]), complex, 0)]
-        h0_hat = work[((2, params.N[0]), complex, 1)]
+        #u0_hat = work[((2, params.N[0]), complex, 0)]
+        #h0_hat = work[((2, params.N[0]), complex, 1)]
         u0_hat[0] = u_hat[1, :, 0, 0]
         u0_hat[1] = u_hat[2, :, 0, 0]
 
@@ -133,8 +134,8 @@ def solve_linear(u_hat, g_hat, rhs, rk,
 
     # Remains to fix wavenumber 0
     if rank == 0:
-        w = work[((params.N[0], ), complex, 0)]
-        w1 = work[((params.N[0], ), complex, 1, False)]
+        #w = work[((params.N[0], ), complex, 0)]
+        #w1 = work[((params.N[0], ), complex, 1, False)]
 
         h0_hat[0] = H_hat[1, :, 0, 0]
         h0_hat[1] = H_hat[2, :, 0, 0]

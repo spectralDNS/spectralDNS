@@ -30,10 +30,9 @@ def getConvection(convection):
 
     elif convection == "Vortex":
 
-        def Conv(rhs, u_hat, work, T, Tp, VT, VTp, K):
-            u_dealias = work[(VTp.local_shape(False), float, 0)]
-            curl_dealias = work[(Tp.local_shape(False), float, 0)]
-            curl_hat = work[(Tp.local_shape(True), complex, 0)]
+        def Conv(rhs, u_hat, work, Tp, VTp, K, u_dealias):
+            curl_dealias = work[(u_dealias[0], 0, False)]
+            curl_hat = work[(rhs[0], 0, False)]
 
             curl_hat = cross2(curl_hat, K, u_hat)
             curl_dealias = Tp.backward(curl_hat, curl_dealias)

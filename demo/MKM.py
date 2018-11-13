@@ -1,11 +1,9 @@
 """Turbulent channel"""
 import warnings
-from mpi4py import MPI
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 import matplotlib.cbook
-from mpiFFT4py import dct
 #from spectralDNS.utilities import reset_profile
 from spectralDNS import config, get_solver, solve
 from spectralDNS.utilities import dx

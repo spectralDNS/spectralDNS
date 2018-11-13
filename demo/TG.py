@@ -97,10 +97,7 @@ def update(context):
 
         ww = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))/prod(params.N)/2)
         kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))/prod(params.N)/2) # Compute energy with double precision
-        if 'mpifft4py' not in params.solver:
-            ww2 = energy_fourier(solver.comm, c.U_hat)/2
-        else:
-            ww2 = energy_fourier(solver.comm, c.U_hat)/prod(params.N)**2/2
+        ww2 = energy_fourier(solver.comm, c.U_hat)/prod(params.N)**2/2
 
         kold[0] = kk
         if solver.rank == 0:
@@ -135,8 +132,6 @@ if __name__ == "__main__":
          'planner_effort': {'fft': 'FFTW_ESTIMATE',
                             'rfftn': 'FFTW_ESTIMATE',
                             'irfftn': 'FFTW_ESTIMATE'},
-         #'decomposition': 'pencil',
-         #'P1': 2
         }, "triplyperiodic")
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=2)
     config.triplyperiodic.add_argument("--plot_step", type=int, default=2)
@@ -146,29 +141,16 @@ if __name__ == "__main__":
     context = sol.get_context()
 
     # Add curl to the stored results. For this we need to update the update_components
-    # method used by the HDF5Writer class to compute the real fields that are stored
-    if config.params.solver == 'NS_mpifft4py':
-        context.hdf5file.fname = "NS9.h5"
-        context.hdf5file.components["curlx"] = context.curl[0]
-        context.hdf5file.components["curly"] = context.curl[1]
-        context.hdf5file.components["curlz"] = context.curl[2]
-        def update_components(**c):
-            """Overload default because we want to store the curl as well"""
-            sol.get_velocity(**c)
-            sol.get_pressure(**c)
-            sol.get_curl(**c)
+    # method used by the HDF5File class to compute the real fields that are stored
+    context.hdf5file.filename = "NS9"
+    context.hdf5file.results['data'].update({'curl': [context.curl]})
+    def update_components(**c):
+        """Overload default because we want to store the curl as well"""
+        sol.get_velocity(**c)
+        sol.get_pressure(**c)
+        sol.get_curl(**c)
 
-        context.hdf5file.update_components = update_components
-    elif config.params.solver == 'NS':
-        context.hdf5file.filename = "NS9"
-        context.hdf5file.results['data'].update({'curl': [context.curl]})
-        def update_components(**c):
-            """Overload default because we want to store the curl as well"""
-            sol.get_velocity(**c)
-            sol.get_pressure(**c)
-            sol.get_curl(**c)
-
-        context.hdf5file.update_components = update_components
+    context.hdf5file.update_components = update_components
 
     initialize(sol, context)
     solve(sol, context)

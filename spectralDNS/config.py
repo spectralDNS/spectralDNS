@@ -19,34 +19,16 @@ Generic parameters for all solvers::
     write_result     (int)           Store results as HDF5 every (*) time step
     checkpoint       (int)           Save intermediate result every (*)
     dealias          (str)           ('3/2-rule', '2/3-rule', 'None')
+    decomposition    (str)           ('slab', 'pencil')
     ntol             (int)           Tolerance (number of accurate digits used in tests)
     threads          (int)           Number of threads used for FFTs
     h5filename       (str)           Filename for storing HDF5 results
     verbose          (bool)          Print some timings in the end
-
-Parameters for 3D solvers in triply periodic domain::
     convection       (str)           ('Standard', 'Divergence', 'Skewed', 'Vortex')
-    decomposition    (str)           ('slab', 'pencil')
-    communication    (str)           ('Alltoallw', 'Alltoall', 'Sendrecv_replace', 'AlltoallN')
-    pencil_alignment (str)           ('X', 'Y') Final alignment direction for spectral data
-    P1               (int)           Pencil decomposition in first direction
-    write_yz_slice   (int, int)      Store yz slice at x index (*0) every (*1) time step
-    write_xz_slice   (int, int)      Store xz slice at y index (*0) every (*1) time step
-    write_xy_slice   (int, int)      Store xy slice at z index (*0) every (*1) time step
+
+Parameters for 3D explicit solvers::
     integrator       (str)           ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
     TOL              (float)         Accuracy used in BS5_adaptive
-
-Parameters for 3D solvers in channel domain::
-    convection       (str)           ('Standard', 'Divergence', 'Skewed', 'Vortex')
-    dealias_cheb     (bool)          Whether or not to dealias in inhomogeneous direction
-    decomposition    (str)           ('slab',)
-    write_yz_slice   (int, int)      Store yz slice at x index (*0) every (*1) time step
-    write_xz_slice   (int, int)      Store xz slice at y index (*0) every (*1) time step
-    write_xy_slice   (int, int)      Store xy slice at z index (*0) every (*1) time step
-
-Parameters for 2D solvers in doubly periodic domain::
-    integrator       (str)           ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
-    decomposition    (str)           ('line')
 
 Solver specific parameters triply periodic domain::
     MHD::
@@ -56,13 +38,6 @@ Solver specific parameters doubly periodic domain::
     Bq2D::
         Ri           (float)         Model parameter (Richardson number)
         Pr           (float)         Model parameter (Prandtl number)
-        integrator   (str)           ('RK4', 'ForwardEuler', 'AB2', 'BS5_adaptive', 'BS5_fixed')
-
-Solver specifi parameters channel domain::
-    IPCS, IPCSR::
-        velocity_pressure_iters   (int)   Number of inner velocity pressure iterations
-        print_divergence_progress (bool)  Print the norm of the pressure correction on inner iterations
-        divergence_tol            (float) Tolerance on divergence error for pressure velocity coupling
 
 """
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
@@ -212,6 +187,8 @@ parser.add_argument('--tstep', default=0, type=int,
 parser.add_argument('--dealias', default='2/3-rule',
                     choices=('2/3-rule', '3/2-rule', 'None'),
                     help='Choose dealiasing method')
+parser.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'),
+                    help="Choose MPI decomposition between slab and pencil.")
 parser.add_argument('--ntol', default=7, type=int,
                     help='Tolerance - number of accurate digits')
 parser.add_argument('--threads', default=1, type=int,
@@ -232,8 +209,7 @@ triplyperiodic.add_argument('--convection', default='Vortex',
                             help='Choose method for computing the nonlinear convective term')
 triplyperiodic.add_argument('--L', default=[2*pi, 2*pi, 2*pi], metavar=("Lx", "Ly", "Lz"), nargs=3,
                             help='Physical mesh size')
-triplyperiodic.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'),
-                            help="Choose 3D decomposition between slab and pencil.")
+
 triplyperiodic.add_argument('--M', default=[6, 6, 6], metavar=("Mx", "My", "Mz"), nargs=3,
                             help='Mesh size is pow(2, M[i]) in direction i. Used if N is missing.')
 triplyperiodic.add_argument('--TOL', type=float, default=1e-6,
@@ -254,8 +230,6 @@ parser_MHD.add_argument('--eta', default=0.01, type=float, help='MHD parameter')
 parser_Bq = trippelsubparsers.add_parser('Bq', help='Navier Stokes solver with Boussinesq model')
 parser_Bq.add_argument('--Ri', default=0.1, type=float, help='Richardson number')
 parser_Bq.add_argument('--Pr', default=1.0, type=float, help='Prandtl number')
-parser_NS_mpifft4py = trippelsubparsers.add_parser('NS_mpifft4py', help='Regular Navier Stokes solver using deprecated mpifft4py backend')
-parser_VV_mpifft4py = trippelsubparsers.add_parser('VV_mpifft4py', help='Velocity-vorticity Navier Stokes solver using deprecated mpifft4py backend')
 
 # Arguments for 2D periodic solvers
 doublyperiodic = argparse.ArgumentParser(parents=[parser])
@@ -267,9 +241,6 @@ doublyperiodic.add_argument('--L', default=[2*pi, 2*pi], nargs=2, metavar=('Lx',
 doublyperiodic.add_argument('--convection', default='Vortex',
                             choices=('Vortex'),
                             help='Choose method for computing the nonlinear convective term')
-doublyperiodic.add_argument('--decomposition', default='line',
-                            choices=('line', ),
-                            help="For 2D problems line is the only choice.")
 doublyperiodic.add_argument('--TOL', type=float, default=1e-6,
                             help='Tolerance for adaptive time integrator')
 doublyperiodic.add_argument('--M', default=[6, 6], nargs=2, metavar=('Mx', 'My'),
@@ -282,8 +253,6 @@ parser_Bq2D = doublesubparsers.add_parser('Bq2D', help='Regular 2D Navier Stokes
 parser_Bq2D.add_argument('--Ri', default=0.1, type=float, help='Richardson number')
 parser_Bq2D.add_argument('--Pr', default=1.0, type=float, help='Prandtl number')
 
-parser_NS2D_mpifft4py = doublesubparsers.add_parser('NS2D_mpifft4py', help='Regular Navier Stokes solver using deprecated mpifft4py backend')
-
 # Arguments for channel solvers with one inhomogeneous direction
 channel = argparse.ArgumentParser(parents=[parser])
 channel.add_argument('--convection', default='Vortex',
@@ -291,9 +260,6 @@ channel.add_argument('--convection', default='Vortex',
                      help='Choose method for computing the nonlinear convective term')
 channel.add_argument('--L', default=[2, 2*pi, 2*pi], nargs=3, metavar=('Lx', 'Ly', 'Lz'),
                      help='Physical mesh size')
-
-channel.add_argument('--decomposition', default='slab', choices=('slab', 'pencil'),
-                     help="Choose 3D decomposition between slab and pencil.")
 channel.add_argument('--M', default=[6, 6, 6], nargs=3, metavar=('Mx', 'My', 'Mz'),
                      help='Mesh size is pow(2, M[i]) in direction i. Used if N is missing.')
 channel.add_argument('--Dquad', default='GC', choices=('GC', 'GL'),
@@ -312,42 +278,6 @@ KMMr.add_argument('--integrator', default='implicit', choices=('implicit',), hel
 
 KMMRK3 = channelsubparsers.add_parser('KMMRK3', help='Kim Moin Moser channel solver with third order semi-implicit Runge-Kutta discretization.')
 KMMRK3.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',), help='RK3 integrator for channel solver')
-KMM_mpifft4py = channelsubparsers.add_parser('KMM_mpifft4py', help='Kim Moin Moser channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
-KMM_mpifft4py.add_argument('--integrator', default='implicit', choices=('implicit',), help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
-KMMRK3_mpifft4py = channelsubparsers.add_parser('KMMRK3_mpifft4py', help='Deprecated Kim Moin Moser channel solver with third order semi-implicit Runge-Kutta discretization.')
-KMMRK3_mpifft4py.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',), help='RK3 integrator for channel solver')
-
-IPCS = channelsubparsers.add_parser('IPCS', help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
-IPCS.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations for IPCS')
-print_div_parser = IPCS.add_mutually_exclusive_group(required=False)
-print_div_parser.add_argument('--no-print_divergence_progress', dest='print_divergence_progress', action='store_false', help='Do not print the norm of the pressure correction on inner iterations for IPCS')
-print_div_parser.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true', help='Print the norm of the pressure correction on inner iterations for IPCS')
-IPCS.set_defaults(print_divergence_progress=False)
-IPCS.add_argument('--divergence_tol', default=1e-7, type=float, help='Tolerance on divergence error for pressure velocity coupling for IPCS')
-
-IPCS_mpifft4py = channelsubparsers.add_parser('IPCS_mpifft4py', help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
-IPCS_mpifft4py.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations for IPCS_mpifft4py')
-print_div_parser2 = IPCS_mpifft4py.add_mutually_exclusive_group(required=False)
-print_div_parser2.add_argument('--no-print_divergence_progress', dest='print_divergence_progress', action='store_false', help='Do not print the norm of the pressure correction on inner iterations for IPCS')
-print_div_parser2.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true', help='Print the norm of the pressure correction on inner iterations for IPCS')
-IPCS_mpifft4py.set_defaults(print_divergence_progress=False)
-IPCS_mpifft4py.add_argument('--divergence_tol', default=1e-7, type=float, help='Tolerance on divergence error for pressure velocity coupling for IPCS')
-
-IPCSR = channelsubparsers.add_parser('IPCSR', help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
-IPCSR.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations for IPCS')
-print_div_parser = IPCSR.add_mutually_exclusive_group(required=False)
-print_div_parser.add_argument('--no-print_divergence_progress', dest='print_divergence_progress', action='store_false', help='Do not print the norm of the pressure correction on inner iterations for IPCSR')
-print_div_parser.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true', help='Print the norm of the pressure correction on inner iterations for IPCSR')
-IPCSR.set_defaults(print_divergence_progress=False)
-IPCSR.add_argument('--divergence_tol', default=1e-7, type=float, help='Tolerance on divergence error for pressure velocity coupling for IPCS')
-
-IPCSR_mpifft4py = channelsubparsers.add_parser('IPCSR_mpifft4py', help='Incremental pressure correction with Crank-Nicolson and Adams-Bashforth discretization.')
-IPCSR_mpifft4py.add_argument('--velocity_pressure_iters', default=1, type=int, help='Number of inner velocity pressure iterations for IPCSR_mpifft4py')
-print_div_parser2 = IPCSR_mpifft4py.add_mutually_exclusive_group(required=False)
-print_div_parser2.add_argument('--no-print_divergence_progress', dest='print_divergence_progress', action='store_false', help='Do not print the norm of the pressure correction on inner iterations for IPCS')
-print_div_parser2.add_argument('--print_divergence_progress', dest='print_divergence_progress', action='store_true', help='Print the norm of the pressure correction on inner iterations for IPCS')
-IPCSR_mpifft4py.set_defaults(print_divergence_progress=False)
-IPCSR_mpifft4py.add_argument('--divergence_tol', default=1e-7, type=float, help='Tolerance on divergence error for pressure velocity coupling for IPCS')
 
 KMM_RB = channelsubparsers.add_parser('KMM_RB', help='Rayleigh-Benard channel solver using KMM')
 KMM_RB.add_argument('--integrator', default='implicit', choices=('implicit',), help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')

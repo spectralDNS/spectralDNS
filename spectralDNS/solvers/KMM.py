@@ -40,7 +40,7 @@ def get_context():
     VUG = MixedTensorProductSpace([FSB, FST])
 
     # Padded
-    kw = {'padding_factor': 2.0 if params.dealias == '3/2-rule' else 1,
+    kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
     if params.dealias == '3/2-rule':
         # Requires new bases due to planning and transforms on different size arrays
@@ -98,6 +98,11 @@ def get_context():
         K_over_K2[i] = K[i+1] / np.where(K2 == 0, 1, K2)
 
     work = work_arrays()
+    u_dealias = Array(VFSp)
+    u0_hat = np.zeros((2, params.N[0]), dtype=complex)
+    h0_hat = np.zeros((2, params.N[0]), dtype=complex)
+    w = np.zeros((params.N[0], ), dtype=complex)
+    w1 = np.zeros((params.N[0], ), dtype=complex)
 
     nu, dt, N = params.nu, params.dt, params.N
 
@@ -174,10 +179,10 @@ def get_curl(curl, U_hat, g, Kx, FCTp, FSTp, FSBp, work, **context):
     curl = compute_curl(curl, U_hat, g, Kx, FCTp, FSTp, FSBp, work)
     return curl
 
-def get_convection(H_hat, U_hat, g, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la, **context):
+def get_convection(H_hat, U_hat, g, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la, u_dealias, **context):
     """Compute convection from context"""
     conv_ = getConvection(params.convection)
-    H_hat = conv_(H_hat, U_hat, g, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la)
+    H_hat = conv_(H_hat, U_hat, g, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la, u_dealias)
     return H_hat
 
 def get_pressure(context, solver):
@@ -272,7 +277,7 @@ def compute_curl(c, u_hat, g, K, FCTp, FSTp, FSBp, work):
 
 def compute_derivatives(U, U_hat, FST, FCT, FSB, K, la, mat, work, **context):
     duidxj = np.zeros((3, 3)+U.shape[1:])
-    F_tmp = work[(U_hat, 0)]
+    F_tmp = work[(U_hat, 0, True)]
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
     F_tmp[0] = mat.CDB.matvec(U_hat[0], F_tmp[0])
@@ -293,9 +298,9 @@ def standardConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp, FSBp, FCTp, work,
                        mat, la):
     rhs[:] = 0
     U = u_dealias
-    Uc = work[(U, 1)]
-    Uc2 = work[(U, 2)]
-    F_tmp = work[(rhs, 0)]
+    Uc = work[(U, 1, True)]
+    Uc2 = work[(U, 2, True)]
+    F_tmp = work[(rhs, 0, True)]
 
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
@@ -330,8 +335,8 @@ def divergenceConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp, FSBp, FCTp, work,
     """c_i = div(u_i u_j)"""
     if not add:
         rhs.fill(0)
-    F_tmp = work[(rhs, 0)]
-    F_tmp2 = work[(rhs, 1)]
+    F_tmp = work[(rhs, 0, True)]
+    F_tmp2 = work[(rhs, 1, True)]
     U = u_dealias
 
     F_tmp[0] = FSTp.forward(U[0]*U[0], F_tmp[0])
@@ -367,8 +372,7 @@ def getConvection(convection):
 
     if convection == "Standard":
 
-        def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la):
-            u_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 0)]
+        def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la, u_dealias):
             u_dealias = VFSp.backward(u_hat, u_dealias)
             rhs = standardConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp,
                                      FSBp, FCTp, work, mat, la)
@@ -377,8 +381,7 @@ def getConvection(convection):
 
     elif convection == "Divergence":
 
-        def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la):
-            u_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 0)]
+        def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la, u_dealias):
             u_dealias = VFSp.backward(u_hat, u_dealias)
             rhs = divergenceConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp,
                                        FSBp, FCTp, work, mat, la, False)
@@ -387,8 +390,7 @@ def getConvection(convection):
 
     elif convection == "Skew":
 
-        def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la):
-            u_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 0)]
+        def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la, u_dealias):
             u_dealias = VFSp.backward(u_hat, u_dealias)
             rhs = standardConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp,
                                      FSBp, FCTp, work, mat, la)
@@ -398,9 +400,8 @@ def getConvection(convection):
             return rhs
 
     elif convection == "Vortex":
-        def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la):
-            u_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 0)]
-            curl_dealias = work[((3,)+VFSp.backward.output_array.shape, float, 1)]
+        def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la, u_dealias):
+            curl_dealias = work[(u_dealias, 1, False)]
             u_dealias = VFSp.backward(u_hat, u_dealias)
             curl_dealias = compute_curl(curl_dealias, u_hat, g_hat, K, FCTp, FSTp, FSBp, work)
             rhs = Cross(rhs, u_dealias, curl_dealias, FSTp, work)
@@ -416,8 +417,8 @@ def assembleAB(H_hat0, H_hat, H_hat1):
 
 @optimizer
 def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
-    diff_u = work[(g, 0)]
-    diff_g = work[(g, 1)]
+    diff_u = work[(g, 0, False)]
+    diff_g = work[(g, 1, False)]
     u0 = work[(g, 2, False)]
 
     # Compute diffusion for g-equation
@@ -436,7 +437,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
 #@profile
 def ComputeRHS(rhs, u_hat, g_hat, solver,
                H_hat, H_hat1, H_hat0, VFSp, FSTp, FSBp, FCTp, work, Kx, K, K2,
-               K4, hv, hg, mat, la, **context):
+               K4, hv, hg, mat, la, u_dealias, **context):
     """Compute right hand side of Navier Stokes
 
     Parameters
@@ -454,7 +455,7 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
 
     """
     # Nonlinear convection term at current u_hat
-    H_hat = solver.conv(H_hat, u_hat, g_hat, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la)
+    H_hat = solver.conv(H_hat, u_hat, g_hat, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la, u_dealias)
 
     # Assemble convection with Adams-Bashforth at time = n+1/2
     H_hat0 = solver.assembleAB(H_hat0, H_hat, H_hat1)
@@ -483,9 +484,10 @@ def compute_vw(u_hat, f_hat, g_hat, K_over_K2):
 
 #@profile
 def solve_linear(u_hat, g_hat, rhs,
-                 work, la, mat, K_over_K2, H_hat0, U_hat0, Sk, **context):
+                 work, la, mat, K_over_K2, H_hat0, U_hat0, Sk, u0_hat, h0_hat,
+                 w, w1, **context):
     """Solve final linear algebra systems"""
-    f_hat = work[(u_hat[0], 0)]
+    f_hat = work[(u_hat[0], 0, True)]
     w0 = work[(u_hat[0], 1, False)]
 
     u_hat[0] = la.BiharmonicSolverU(u_hat[0], rhs[0])
@@ -498,11 +500,6 @@ def solve_linear(u_hat, g_hat, rhs,
 
     # Remains to fix wavenumber 0
     if rank == 0:
-        u0_hat = work[((2, params.N[0]), complex, 0)]
-        h0_hat = work[((2, params.N[0]), complex, 1)]
-        w = work[((params.N[0], ), complex, 0, False)]
-        w1 = work[((params.N[0], ), complex, 1, False)]
-
         h0_hat[0] = H_hat0[1, :, 0, 0]
         h0_hat[1] = H_hat0[2, :, 0, 0]
         u0_hat[0] = U_hat0[1, :, 0, 0]

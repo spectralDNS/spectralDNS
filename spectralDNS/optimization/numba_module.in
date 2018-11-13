@@ -77,7 +77,7 @@ def ForwardEuler(U_hat, dU, dt, solver, context):
     dU = solver.ComputeRHS(dU, U_hat, solver, **context)
     loop5(dU, U_hat, dt)
     return U_hat, dt, dt
-    
+
 def AB2(U_hat, U_hat0, dU, dt, tstep, solver, context):
     dU = solver.ComputeRHS(dU, U_hat, solver, **context)
     if tstep == 0:
@@ -86,7 +86,7 @@ def AB2(U_hat, U_hat0, dU, dt, tstep, solver, context):
         loop6(dU, U_hat, U_hat0, dt)
     loop7(dU, U_hat0, dt)
     return U_hat, dt, dt
-    
+
 @jit(float[:, :, :, :](float[:, :, :, :], float[:, :, :, :], float[:, :, :, :]), nopython=True, fastmath=True)
 def cross1(c, a, b):
     """Regular c = a x b"""
@@ -163,11 +163,6 @@ def cross2(c, a, b):
     elif a.dtype == float.key:
         c = cross2b(c, a, b)
     return c
-
-def add_pressure_diffusion_NS_shenfun(du, u_hat, nu, ksq, kk, p_hat, k_over_k2):
-    du = add_pressure_diffusion_NS_(du, u_hat, nu, ksq, kk[0][:, 0, 0],
-                                    kk[1][0, :, 0], kk[2][0, 0, :], p_hat, k_over_k2)
-    return du
 
 def add_pressure_diffusion_NS(du, u_hat, nu, ksq, kk, p_hat, k_over_k2):
     du = add_pressure_diffusion_NS_(du, u_hat, nu, ksq, kk[0][:, 0, 0],

@@ -147,7 +147,7 @@ def compute_error(context):
     e1 = 0.5*dx(pert, c.FST, axis=2)
 
     exact = exp(2*imag(OS.eigval)*params.t)
-    U0 = c.work[(c.U, 0)]
+    U0 = c.work[(c.U, 0, True)]
     initOS(OS, OS.eigvals, OS.eigvectors, U0, c.X, t=params.t)
     #pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
     pert = (U[2] - U0[2])**2

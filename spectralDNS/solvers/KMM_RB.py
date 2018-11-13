@@ -77,9 +77,9 @@ def end_of_tstep(context):
 def ComputeRHS(rhs, u_hat, g_hat, p_hat, solver, context):
     rhs = KMM_ComputeRHS(rhs, u_hat, g_hat, solver, **context)
     c = context
-    w0 = c.work[(rhs[0], 0)]
-    w1 = c.work[(rhs[0], 1)]
-    diff_T = c.work[(rhs[0], 2)]
+    w0 = c.work[(rhs[0], 0, True)]
+    w1 = c.work[(rhs[0], 1, True)]
+    diff_T = c.work[(rhs[0], 2, True)]
     phi_ab = c.phi_ab
     phi_ab[:] = 1.5*c.phi_hat0 - 0.5*c.phi_hat1
     w0 = c.mat.ABD.matvec(phi_ab, w0)
@@ -104,8 +104,8 @@ def solve_linear(u_hat, g_hat, p_hat, rhs, context):
 def DivRBConvection(rhs, u_hat, g_hat, p_hat,
                     UCN, VFSp, U_hat0, phi_ab, phi0, mat, Kx, N_hat,
                     phi_hat0, phi_hat1, FRBp, FSBp, FSTp, work, **context):
-    uT_hat = work[(p_hat, 0)]
-    F_tmp = work[(u_hat, 0)]
+    uT_hat = work[(p_hat, 0, True)]
+    F_tmp = work[(u_hat, 0, True)]
 
     UCN = VFSp.backward(0.5*(u_hat + U_hat0), UCN)
     phi_ab[:] = 1.5*phi_hat0 - 0.5*phi_hat1
@@ -123,8 +123,8 @@ def DivRBConvection(rhs, u_hat, g_hat, p_hat,
 def DivABConvection(rhs, u_hat, g_hat, p_hat,
                     UCN, VFSp, U_hat0, phi_ab, phi0, mat, Kx, N_hat, N_hat0,
                     phi_hat0, phi_hat1, FRBp, FSBp, FSTp, work, **context):
-    uT_hat = work[(p_hat, 0)]
-    F_tmp = work[(u_hat, 0)]
+    uT_hat = work[(p_hat, 0, True)]
+    F_tmp = work[(u_hat, 0, True)]
 
     UCN = VFSp.backward(u_hat, UCN)
     phi0 = FRBp.backward(p_hat, phi0)
@@ -142,11 +142,11 @@ def StandardRBConvection(rhs, u_hat, g_hat, p_hat,
                          UCN, VFSp, U_hat0, mat, Kx, N_hat, N_hat0,
                          FCTp, FSTp, work, CTD, BTT, **context):
     # project to Chebyshev basis. Requires modification due to nonhomogen bc
-    dTdx_hat = work[(p_hat, 0)]
-    dTdxi = work[(UCN, 0)]
-    N_s = work[(p_hat, 1)]
-    N = work[(UCN[0], 0)]
-    diff_T = work[(p_hat, 2)]
+    dTdx_hat = work[(p_hat, 0, True)]
+    dTdxi = work[(UCN, 0, True)]
+    N_s = work[(p_hat, 1, True)]
+    N = work[(UCN[0], 0, True)]
+    diff_T = work[(p_hat, 2, True)]
     UCN = VFSp.backward(U_hat0, UCN)
     dTdx_hat = CTD.matvec(p_hat, dTdx_hat)
     dTdx_hat[0] += 0.5*BTT[0][0]*(p_hat[-2]-p_hat[-1])

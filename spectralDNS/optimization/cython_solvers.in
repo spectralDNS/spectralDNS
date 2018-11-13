@@ -41,10 +41,6 @@ def add_pressure_diffusion_NS(du, u_hat, nu, ksq, kk, p_hat, k_over_k2):
     du = add_pressure_diffusion_NS_(du, u_hat, nu, ksq, kk[0][:,0,0], kk[1][0,:,0], kk[2][0,0,:], p_hat, k_over_k2)
     return du
 
-def add_pressure_diffusion_NS_shenfun(du, u_hat, nu, ksq, kk, p_hat, k_over_k2):
-    du = add_pressure_diffusion_NS_(du, u_hat, nu, ksq, kk[0][:,0,0], kk[1][0,:,0], kk[2][0,0,:], p_hat, k_over_k2)
-    return du
-
 def add_pressure_diffusion_NS_(np.ndarray[complex_t, ndim=4] du,
                                 np.ndarray[complex_t, ndim=4] u_hat,
                                 real_t nu,
@@ -72,8 +68,8 @@ def add_pressure_diffusion_NS_(np.ndarray[complex_t, ndim=4] du,
                 #du[1,i,j,k] -= (p_hat[i,j,k]*k1+u_hat[1,i,j,k]*z)
                 #du[2,i,j,k] -= (p_hat[i,j,k]*k2+u_hat[2,i,j,k]*z)
 
-                p_hat[i,j,k].real = du0.real*k_over_k2[0,i,j,k]+du1.real*k_over_k2[1,i,j,k]+du2.real*k_over_k2[2,i,j,k]
-                p_hat[i,j,k].imag = du0.imag*k_over_k2[0,i,j,k]+du1.imag*k_over_k2[1,i,j,k]+du2.imag*k_over_k2[2,i,j,k]
+                p_hat[i,j,k].real = du[0,i,j,k].real*k_over_k2[0,i,j,k]+du[1,i,j,k].real*k_over_k2[1,i,j,k]+du[2,i,j,k].real*k_over_k2[2,i,j,k]
+                p_hat[i,j,k].imag = du[0,i,j,k].imag*k_over_k2[0,i,j,k]+du[1,i,j,k].imag*k_over_k2[1,i,j,k]+du[2,i,j,k].imag*k_over_k2[2,i,j,k]
                 du[0,i,j,k].real = du[0,i,j,k].real - (p_hat[i,j,k].real*k0+u_hat[0,i,j,k].real*z)
                 du[0,i,j,k].imag = du[0,i,j,k].imag - (p_hat[i,j,k].imag*k0+u_hat[0,i,j,k].imag*z)
                 du[1,i,j,k].real = du[1,i,j,k].real - (p_hat[i,j,k].real*k1+u_hat[1,i,j,k].real*z)

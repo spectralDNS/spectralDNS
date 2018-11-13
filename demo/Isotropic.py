@@ -15,7 +15,6 @@ from __future__ import print_function
 import warnings
 import numpy as np
 from numpy import pi, zeros, sum
-import shenfun
 from spectralDNS import config, get_solver, solve
 
 try:
@@ -80,18 +79,7 @@ def energy_fourier(comm, u_hat):
 
     See https://en.wikipedia.org/wiki/Parseval's_theorem
 
-    The different scaling of Shenfun and mpiFFT4py based
-    solvers is due to the definition used for the DFT. For
-    Shenfun
-
-        u(x) = \sum_k u_hat(k) exp(1j k x)
-
-    whereas for mpiFFT4py
-
-        u(x) = 1/N \sum_k u_hat(k) exp(1j k x)
-
     """
-    N = config.params.N
     L = config.params.L
     result = (2*np.sum(np.abs(u_hat[..., 1:-1])**2)
               + np.sum(np.abs(u_hat[..., 0])**2)
@@ -250,7 +238,7 @@ def update(context):
         #curl_hat = solver.cross2(curl_hat, K, c.U_hat)
         #ww = energy_fourier(solver.comm, params.N, curl_hat)/np.prod(params.N)/2
 
-        duidxj = c.work[(((3, 3)+c.U[0].shape), c.float, 0)]
+        duidxj = np.zeros(((3, 3)+c.U[0].shape), dtype=c.float)
         for i in range(3):
             for j in range(3):
                 duidxj[i, j] = c.T.backward(1j*K[j]*c.U_hat[i], duidxj[i, j])
@@ -258,7 +246,7 @@ def update(context):
         ww2 = L2_norm(solver.comm, duidxj)*params.nu/np.prod(L)
         #ww2 = solver.comm.reduce(sum(duidxj*duidxj))
 
-        ddU = c.work[(((3,)+c.U[0].shape), c.float, 0)]
+        ddU = np.zeros(((3,)+c.U[0].shape), dtype=c.float)
         dU = solver.ComputeRHS(c.dU, c.U_hat, solver, **c)
         for i in range(3):
             ddU[i] = c.T.backward(dU[i], ddU[i])
@@ -295,13 +283,11 @@ def update(context):
 
 def init_from_file(filename, solver, context):
     f = h5py.File(filename, driver="mpio", comm=solver.comm)
-    assert "1" in f["3D/checkpoint/U"]
-    U = context.U
-    s = context.T.local_slice(spectral=False)
+    assert "0" in f["U/Vector/3D"]
+    U_hat = context.U_hat
+    s = context.T.local_slice(True)
 
-    U[:] = f["3D/checkpoint/U/1"][:, s[0], s[1], s[2]]
-    U_hat = solver.set_velocity(**context)
-    U_hat[:] -= (context.K[0]*U_hat[0]+context.K[1]*U_hat[1]+context.K[2]*U_hat[2])*context.K_over_K2
+    U_hat[:] = f["U/Vector/3D/0"][:, s[0], s[1], s[2]]
     if solver.rank == 0:
         U_hat[:, 0, 0, 0] = 0.0
 
@@ -322,9 +308,6 @@ if __name__ == "__main__":
          'L': [2.*pi, 2.*pi, 2.*pi],
          'checkpoint': 100,
          'write_result': 1e8,
-         #'decomposition': 'pencil',
-         #'Pencil_alignment': 'Y',
-         #'P1': 2
         }, "triplyperiodic"
     )
     config.triplyperiodic.add_argument("--N", default=[60, 60, 60], nargs=3,
@@ -340,7 +323,7 @@ if __name__ == "__main__":
 
     context = sol.get_context()
     initialize(sol, context)
-    #init_from_file("NS_isotropic_6_6_6b.h5", sol, context)
+    init_from_file("NS_isotropic_60_60_60_c.h5", sol, context)
     context.hdf5file.filename = "NS_isotropic_{}_{}_{}".format(*config.params.N)
 
     Ek, bins, E0, E1, E2 = spectrum(sol, context)

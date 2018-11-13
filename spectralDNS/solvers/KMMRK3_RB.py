@@ -64,9 +64,9 @@ class RBFile(HDF5File):
 def ComputeRHS(rhs, u_hat, g_hat, p_hat, rk, solver, context):
     rhs = KMMRK3_ComputeRHS(rhs, u_hat, g_hat, rk, solver, **context)
     c = context
-    w0 = c.work[(rhs[0], 0)]
-    w1 = c.work[(rhs[0], 1)]
-    diff_T = c.work[(rhs[0], 2)]
+    w0 = c.work[(rhs[0], 0, False)]
+    w1 = c.work[(rhs[0], 1, False)]
+    diff_T = c.work[(rhs[0], 2, False)]
 
     w0 = c.mat.ABD.matvec(p_hat, w0)
     w0 -= c.K2*c.mat.BBD.matvec(p_hat, w1)
@@ -88,8 +88,8 @@ def solve_linear(u_hat, g_hat, p_hat, rhs, rk, context):
 
 def DivRBConvection(rhs, u_hat, g_hat, p_hat,
                     phi0, Ua, mat, Kx, VFSp, FRBp, FSBp, FSTp, work, **context):
-    uT_hat = work[(p_hat, 0)]
-    F_tmp = work[(u_hat, 0)]
+    uT_hat = work[(p_hat, 0, True)]
+    F_tmp = work[(u_hat, 0, True)]
 
     phi0 = FRBp.backward(p_hat, phi0)
     Ua = VFSp.backward(u_hat, Ua)
@@ -106,11 +106,11 @@ def StandardRBConvection(rhs, u_hat, g_hat, p_hat,
                          N_hat, phi0, Ua, mat, Kx, VFSp, FCTp, FSTp, CTD,
                          BTT, work, **context):
     # project to Chebyshev basis. Requires modification due to nonhomogen bc
-    dTdx_hat = work[(p_hat, 0)]
-    dTdxi = work[(Ua, 0)]
-    N_s = work[(p_hat, 1)]
-    N = work[(Ua[0], 0)]
-    diff_T = work[(p_hat, 2)]
+    dTdx_hat = work[(p_hat, 0, True)]
+    dTdxi = work[(Ua, 0, True)]
+    N_s = work[(p_hat, 1, True)]
+    N = work[(Ua[0], 0, True)]
+    diff_T = work[(p_hat, 2, True)]
     Ua = VFSp.backward(u_hat, Ua)
     dTdx_hat = CTD.matvec(p_hat, dTdx_hat)
     dTdx_hat[0] += 0.5*BTT[0][0]*(p_hat[-2]-p_hat[-1])

@@ -63,6 +63,7 @@ def get_context():
     P_hat = Function(T)
     curl = Array(T)
     W_hat = Function(T)
+    ur_dealias = Array(VMp)
 
     # Create views into large data structures
     rho = Ur[2]
@@ -113,10 +114,9 @@ def getConvection(convection):
 
     elif convection == "Vortex":
 
-        def Conv(rhs, ur_hat, work, T, Tp, VM, VMp, K):
-            ur_dealias = work[(VMp.local_shape(False), float, 0)]
-            curl_dealias = work[(Tp.local_shape(False), float, 0)]
-            F_tmp = work[(rhs, 0)]
+        def Conv(rhs, ur_hat, work, T, Tp, VM, VMp, K, ur_dealias):
+            curl_dealias = work[(ur_dealias[0], 0, False)]
+            F_tmp = work[(rhs, 0, True)]
 
             ur_dealias = VMp.backward(ur_hat, ur_dealias)
 
@@ -156,7 +156,7 @@ def add_pressure_diffusion(rhs, ur_hat, P_hat, K_over_K2, K, K2, nu, Ri, Pr):
     return rhs
 
 def ComputeRHS(rhs, ur_hat, solver, work, K, Kx, K2, K_over_K2, P_hat, T, Tp,
-               VM, VMp, **context):
+               VM, VMp, ur_dealias, **context):
     """Compute and return right hand side of 2D Navier Stokes equations
     on Boussinesq form
 
@@ -177,7 +177,7 @@ def ComputeRHS(rhs, ur_hat, solver, work, K, Kx, K2, K_over_K2, P_hat, T, Tp,
         P_hat       Transformed pressure
 
     """
-    rhs = solver.conv(rhs, ur_hat, work, T, Tp, VM, VMp, Kx)
+    rhs = solver.conv(rhs, ur_hat, work, T, Tp, VM, VMp, Kx, ur_dealias)
     rhs = solver.add_pressure_diffusion(rhs, ur_hat, P_hat, K_over_K2, K, K2,
                                         params.nu, params.Ri, params.Pr)
     return rhs

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import os
+import sys
 import re
 import subprocess
 from setuptools import setup, Extension
@@ -34,6 +35,7 @@ class build_ext_subclass(build_ext):
         build_ext.build_extensions(self)
 
 def get_extension():
+    subprocess.call([sys.executable, os.path.join(cdir, "setup.py"), ""], cwd=cdir)
     ext = []
     for s in ("LUsolve", ):
         ext.append(Extension("spectralDNS.shen.{0}".format(s),

@@ -64,6 +64,8 @@ def get_context():
     P_hat = Function(T)
     dU = Function(VM)
     Source = Array(VM)
+    ub_dealias = Array(VMp)
+    ZZ_hat = np.zeros((3, 3) + Tp.local_shape(True), dtype=complex) # Work array
 
     # Create views into large data structures
     U = UB[:3]
@@ -73,8 +75,6 @@ def get_context():
 
     # Primary variable
     u = UB_hat
-
-    work = work_arrays()
 
     hdf5file = MHDFile(config.params.solver,
                        checkpoint={'space': VM,
@@ -89,28 +89,27 @@ class MHDFile(HDF5File):
         """Transform to real data when storing the solution"""
         UB = UB_hat.backward(UB)
 
-def set_Elsasser(c, F_tmp, K):
-    c[:3] = -1j*(K[0]*(F_tmp[:, 0] + F_tmp[0, :])
-                 + K[1]*(F_tmp[:, 1] + F_tmp[1, :])
-                 + K[2]*(F_tmp[:, 2] + F_tmp[2, :]))/2.0
+def set_Elsasser(c, ZZ, K):
+    c[:3] = -1j*(K[0]*(ZZ[:, 0] + ZZ[0, :])
+                 + K[1]*(ZZ[:, 1] + ZZ[1, :])
+                 + K[2]*(ZZ[:, 2] + ZZ[2, :]))/2.0
 
-    c[3:] = 1j*(K[0]*(F_tmp[0, :] - F_tmp[:, 0])
-                + K[1]*(F_tmp[1, :] - F_tmp[:, 1])
-                + K[2]*(F_tmp[2, :] - F_tmp[:, 2]))/2.0
+    c[3:] = 1j*(K[0]*(ZZ[0, :] - ZZ[:, 0])
+                + K[1]*(ZZ[1, :] - ZZ[:, 1])
+                + K[2]*(ZZ[2, :] - ZZ[:, 2]))/2.0
     return c
 
-def divergenceConvection(c, z0, z1, work, T, Tp, K, dealias=None):
+def divergenceConvection(c, z0, z1, Tp, K, ZZ_hat):
     """Divergence convection using Elsasser variables
     z0=U+B
     z1=U-B
     """
-    T = T if dealias is None else Tp
-    F_tmp = work[((3, 3) + T.local_shape(True), complex, 0)]
+
     for i in range(3):
         for j in range(3):
-            F_tmp[i, j] = T.forward(z0[i]*z1[j], F_tmp[i, j])
+            ZZ_hat[i, j] = Tp.forward(z0[i]*z1[j], ZZ_hat[i, j])
 
-    c = set_Elsasser(c, F_tmp, K)
+    c = set_Elsasser(c, ZZ_hat, K)
     return c
 
 def getConvection(convection):
@@ -120,14 +119,14 @@ def getConvection(convection):
 
     elif convection == "Divergence":
 
-        def Conv(rhs, ub_hat, work, T, Tp, VM, VMp, K):
-            ub_dealias = work[((6,)+Tp.local_shape(False), float, 0)]
+        def Conv(rhs, ub_hat, Tp, VMp, K, ub_dealias, ZZ_hat):
+            #ub_dealias = work[((6,)+Tp.local_shape(False), float, 0)]
             ub_dealias = VMp.backward(ub_hat, ub_dealias)
             u_dealias = ub_dealias[:3]
             b_dealias = ub_dealias[3:]
             # Compute convective term and place in dU
             rhs = divergenceConvection(rhs, u_dealias+b_dealias, u_dealias-b_dealias,
-                                       work, T, Tp, K, params.dealias)
+                                       Tp, K, ZZ_hat)
             return rhs
 
     Conv.convection = convection
@@ -152,7 +151,7 @@ def add_pressure_diffusion(rhs, ub_hat, nu, eta, K2, K, P_hat, K_over_K2):
     rhs[3:] -= eta*K2*b_hat
     return rhs
 
-def ComputeRHS(rhs, ub_hat, solver, work, T, Tp, VM, VMp, K, Kx, K2, K_over_K2, P_hat, **context):
+def ComputeRHS(rhs, ub_hat, solver, Tp, VMp, K, Kx, K2, K_over_K2, P_hat, ub_dealias, ZZ_hat, **context):
     """Return right hand side of Navier Stokes
 
     args:
@@ -172,7 +171,7 @@ def ComputeRHS(rhs, ub_hat, solver, work, T, Tp, VM, VMp, K, Kx, K2, K_over_K2, 
         P_hat       Transfomred pressure
 
     """
-    rhs = solver.conv(rhs, ub_hat, work, T, Tp, VM, VMp, Kx)
+    rhs = solver.conv(rhs, ub_hat, Tp, VMp, Kx, ub_dealias, ZZ_hat)
     rhs = solver.add_pressure_diffusion(rhs, ub_hat, params.nu, params.eta, K2,
                                         K, P_hat, K_over_K2)
     return rhs
