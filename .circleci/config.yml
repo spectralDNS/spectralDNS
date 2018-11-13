@@ -37,13 +37,13 @@ jobs:
             cd /home/circleci/project
             conda build --python 2.7 ./conf/conda
             conda build --python 3.6 ./conf/conda
-        
+
       - run:
           name: Upload packages
           command: |
               source ~/miniconda/bin/activate root
               cd /home/circleci/project
+              export GIT_DESCRIBE_TAG=`git describe --tags | cut -d'-' -f 1`
               upload_or_check_non_existence ./conf/conda spectralDNS --channel main
               export CONDA_PY=36
               upload_or_check_non_existence ./conf/conda spectralDNS --channel main
-
