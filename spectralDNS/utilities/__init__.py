@@ -10,7 +10,7 @@ from time import time
 import types
 from mpi4py import MPI
 import numpy as np
-from mpiFFT4py import dct
+from mpi4py_fft.fftw import dctn, aligned, aligned_like
 from spectralDNS import config
 from .create_profile import create_profile, reset_profile
 from .memoryprofiler import MemoryUsage
@@ -86,15 +86,16 @@ def dx(u, FST, axis=0):
     uu = np.sum(u, axis=tuple(sx))
     sl = FST.local_slice(False)[axis]
     M = FST.shape()[axis]
-    c = np.zeros(M)
-    cc = np.zeros(M)
+    c = aligned(M, fill=0)
+    cc = aligned(M, fill=0)
     cc[sl] = uu
     FST.comm.Reduce(cc, c, op=MPI.SUM, root=0)
     quad = FST.bases[axis].quad
     if FST.comm.Get_rank() == 0:
         if quad == 'GL':
-            ak = np.zeros_like(c)
-            ak = dct(c, ak, 1, axis=0)
+            ak = aligned_like(c)
+            dct = dctn(aligned_like(c), axes=(0,), type=1)
+            ak = dct(c, ak)
             ak /= (M-1)
             w = np.arange(0, M, 1, dtype=float)
             w[2:] = 2./(1-w[2:]**2)
@@ -103,10 +104,11 @@ def dx(u, FST, axis=0):
             return sum(ak*w)*np.prod(np.take(config.params.L/config.params.N, sx))
 
         assert quad == 'GC'
-        d = np.zeros(M)
+        d = aligned(M, fill=0)
         k = 2*(1 + np.arange((M-1)//2))
         d[::2] = (2./M)/np.hstack((1., 1.-k*k))
-        w = np.zeros_like(d)
-        w = dct(d, w, type=3, axis=0)
+        w = aligned_like(d)
+        dct = dctn(w, axes=(0,), type=3)
+        w = dct(d, w)
         return np.sum(c*w)*np.prod(np.take(config.params.L/config.params.N, sx))
     return 0

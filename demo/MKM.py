@@ -78,10 +78,7 @@ def set_Source(Source, Sk, ST, FST, **context):
     Source[:] = 0
     Source[1, :] = -utau**2
     Sk[:] = 0
-    if hasattr(FST, 'complex_shape'):
-        Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
-    else:
-        Sk[1] = FST.scalar_product(Source[1], Sk[1])
+    Sk[1] = FST.scalar_product(Source[1], Sk[1])
 
 beta = np.zeros(1)
 def update(context):
@@ -96,12 +93,8 @@ def update(context):
 
     # Dynamically adjust flux
     if params.tstep % 1 == 0:
-        if hasattr(c.FST, 'complex_shape'):
-            U[1] = c.FST.backward(U_hat[1], U[1], c.ST)
-            beta[0] = c.FST.dx(U[1], c.ST.quad)
-        else:
-            U[1] = c.FST.backward(U_hat[1], U[1])
-            beta[0] = dx(U[1], c.FST)
+        U[1] = c.FST.backward(U_hat[1], U[1])
+        beta[0] = dx(U[1], c.FST)
 
         #solver.comm.Bcast(beta)
         q = (flux[0] - beta[0])  # array(params.L).prod()
@@ -190,18 +183,12 @@ def update(context):
         plt.pause(1e-6)
 
     if params.tstep % params.compute_energy == 0:
-        if hasattr(c.FST, 'complex_shape'):
-            e0 = c.FST.dx(U[0]*U[0], c.ST.quad)
-            e1 = c.FST.dx(U[1]*U[1], c.ST.quad)
-            e2 = c.FST.dx(U[2]*U[2], c.ST.quad)
-            q = c.FST.dx(U[1], c.ST.quad)
-        else:
-            e0 = dx(U[0]*U[0], c.FST)
-            e1 = dx(U[1]*U[1], c.FST)
-            e2 = dx(U[2]*U[2], c.FST)
-            q = dx(U[1], c.FST)
-            div_u = solver.get_divergence(**c)
-            e3 = dx(div_u**2, c.FST)
+        e0 = dx(U[0]*U[0], c.FST)
+        e1 = dx(U[1]*U[1], c.FST)
+        e2 = dx(U[2]*U[2], c.FST)
+        q = dx(U[1], c.FST)
+        div_u = solver.get_divergence(**c)
+        e3 = dx(div_u**2, c.FST)
         if solver.rank == 0:
             print("Time %2.5f Energy %2.8e %2.8e %2.8e Flux %2.6e Q %2.6e %2.6e %2.6e" %(config.params.t, e0, e1, e2, q, e0+e1+e2, e3, flux[0]/beta[0]-1))
 
@@ -298,7 +285,6 @@ class Stats(object):
         self.f0.close()
 
 def init_from_file(filename, solver, context):
-    import h5py
     f = h5py.File(filename, 'r+', driver="mpio", comm=solver.comm)
     assert "0" in f["U/Vector/3D"]
     U = context.U
@@ -340,8 +326,8 @@ if __name__ == "__main__":
     #solver = get_solver(update=update, mesh="channel")
     solver = get_solver(update=update, mesh="channel")
     context = solver.get_context()
-    #initialize(solver, context)
-    init_from_file("KMM666d.h5_c.h5", solver, context)
+    initialize(solver, context)
+    #init_from_file("KMM666d.h5_c.h5", solver, context)
     set_Source(**context)
     solver.stats = Stats(context.U, solver.comm, filename="KMMstatsq")
     context.hdf5file.filename = "KMM666e"

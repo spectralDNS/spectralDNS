@@ -3,7 +3,6 @@ from mpi4py import MPI
 from sympy import Symbol, sin, pi, lambdify
 import numpy as np
 import scipy.sparse.linalg as la
-from spectralDNS.shen.shentransform import SlabShen_R2C
 from spectralDNS.shen.Matrices import HelmholtzCoeff
 from spectralDNS.shen import LUsolve
 from shenfun.spectralbase import inner_product
@@ -18,98 +17,6 @@ x = Symbol("x")
 Basis = (Basis, ShenDirichletBasis, ShenNeumannBasis,
          ShenBiharmonicBasis)
 quads = ('GC', 'GL')
-
-
-@pytest.mark.parametrize('ST', Basis)
-@pytest.mark.parametrize('quad', quads)
-def test_FST(ST, quad):
-    ST1 = ST(N, quad=quad)
-    FST = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]), comm)
-    ST1.plan(FST.complex_shape(), 0, np.complex, {})
-
-    if FST.rank == 0:
-
-        FST_SELF = SlabShen_R2C(np.array([N, N, N]), np.array([2*pi, 2*pi, 2*pi]),
-                                MPI.COMM_SELF)
-        ST0 = ST(N, quad=quad)
-        A = np.random.random((N, N, N)).astype(FST.float)
-        B2 = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
-        ST0.plan(FST_SELF.complex_shape(), 0, np.complex, {})
-
-        B2 = FST_SELF.forward(A, B2, ST0)
-        A = FST_SELF.backward(B2, A, ST0)
-        B2 = FST_SELF.forward(A, B2, ST0)
-
-    else:
-        A = np.zeros((N, N, N), dtype=FST.float)
-        B2 = np.zeros((N, N, N//2+1), dtype=FST.complex)
-
-    _, rtol = (1e-10, 1e-8) if FST.float is np.float64 else (5e-7, 1e-4)
-    FST.comm.Bcast(A, root=0)
-    FST.comm.Bcast(B2, root=0)
-
-    a = np.zeros(FST.real_shape(), dtype=FST.float)
-    c = np.zeros(FST.complex_shape(), dtype=FST.complex)
-    a[:] = A[FST.real_local_slice()]
-    c = FST.forward(a, c, ST1)
-
-    assert np.all(abs((c - B2[FST.complex_local_slice()])/c.max()) < rtol)
-
-    a = FST.backward(c, a, ST1)
-
-    assert np.all(abs((a - A[FST.real_local_slice()])/a.max()) < rtol)
-
-#test_FST(ShenDirichletBasis, 'GC')
-
-@pytest.mark.parametrize('ST', Basis)
-@pytest.mark.parametrize('quad', quads)
-def test_FST_padded(ST, quad):
-    ST1 = ST(N, quad=quad)
-    M = np.array([N, 2*N, 4*N])
-    FST = SlabShen_R2C(M, np.array([2*pi, 2*pi, 2*pi]), comm,
-                       communication='Alltoall')
-    FST_SELF = SlabShen_R2C(M, np.array([2*pi, 2*pi, 2*pi]),
-                            MPI.COMM_SELF)
-    ST1.plan(FST.complex_shape(), 0, np.complex, {})
-
-    if FST.rank == 0:
-        ST0 = ST(N, quad=quad)
-        ST0.plan(FST_SELF.complex_shape(), 0, np.complex, {})
-        A = np.random.random(M).astype(FST.float)
-        A_hat = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
-
-        A_hat = FST_SELF.forward(A, A_hat, ST0)
-        A = FST_SELF.backward(A_hat, A, ST0)
-        A_hat = FST_SELF.forward(A, A_hat, ST0)
-
-        A_hat[:, -M[1]//2] = 0
-
-        A_pad = np.zeros(FST_SELF.real_shape_padded(), dtype=FST.float)
-        A_pad = FST_SELF.backward(A_hat, A_pad, ST0, dealias='3/2-rule')
-        A_hat = FST_SELF.forward(A_pad, A_hat, ST0, dealias='3/2-rule')
-
-    else:
-        A_pad = np.zeros(FST_SELF.real_shape_padded(), dtype=FST.float)
-        A_hat = np.zeros(FST_SELF.complex_shape(), dtype=FST.complex)
-
-    _, rtol = (1e-10, 1e-8) if FST.float is np.float64 else (5e-7, 1e-4)
-    FST.comm.Bcast(A_pad, root=0)
-    FST.comm.Bcast(A_hat, root=0)
-
-    a = np.zeros(FST.real_shape_padded(), dtype=FST.float)
-    c = np.zeros(FST.complex_shape(), dtype=FST.complex)
-    a[:] = A_pad[FST.real_local_slice(padsize=1.5)]
-    c = FST.forward(a, c, ST1, dealias='3/2-rule')
-
-    assert np.all(abs((c - A_hat[FST.complex_local_slice()])/c.max()) < rtol)
-
-    a = FST.backward(c, a, ST1, dealias='3/2-rule')
-
-    #print abs((a - A_pad[FST.real_local_slice(padsize=1.5)])/a.max())
-    assert np.all(abs((a - A_pad[FST.real_local_slice(padsize=1.5)])/a.max()) < rtol)
-
-
-#test_FST_padded(ShenBiharmonicBasis, 'GC')
 
 
 def test_Mult_Div():

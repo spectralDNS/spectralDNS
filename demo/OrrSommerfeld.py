@@ -164,20 +164,14 @@ def compute_error(context):
     solver = config.solver
     U = solver.get_velocity(**c)
     pert = (U[1] - (1-c.X[0]**2))**2 + U[0]**2
-    if hasattr(context.FST, 'dx'):
-        e1 = 0.5*c.FST.dx(pert, c.ST.quad)
-    else:
-        e1 = 0.5*dx(pert, c.FST)
+    e1 = 0.5*dx(pert, c.FST)
 
     exact = exp(2*imag(OS.eigval)*params.t)
     U0 = c.work[(c.U, 0, True)]
     initOS(OS, OS.eigvals, OS.eigvectors, U0, c.X, t=params.t)
     #pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
     pert = (U[0] - U0[0])**2
-    if hasattr(context.FST, 'dx'):
-        e2 = 0.5*c.FST.dx(pert, c.ST.quad)
-    else:
-        e2 = 0.5*dx(pert, c.FST)
+    e2 = 0.5*dx(pert, c.FST)
 
     return e1, e2, exact
 
