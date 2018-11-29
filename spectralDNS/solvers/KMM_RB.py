@@ -38,18 +38,12 @@ def get_context():
     BDD = inner_product((RB, 0), (RB, 0))
     c.CTD = inner_product((c.CT, 0), (RB, 1))
     c.BTT = inner_product((c.CT, 0), (c.CT, 0))
-    ADD.axis = 0
-    BDD.axis = 0
-    c.CTD.axis = 0
-    c.BTT.axis = 0
     c.mat.ABD = inner_product((c.SB, 0), (RB, 2))
     c.mat.BBD = inner_product((c.SB, 0), (RB, 0))
-    c.mat.ABD.axis = 0
-    c.mat.BBD.axis = 0
     c.la.HelmholtzSolverT = Helmholtz(ADD, BDD,
                                       -np.ones((1, 1, 1)),
                                       (c.K2[0]+2.0/kappa/dt)[np.newaxis, :, :])
-    c.TC = HelmholtzCoeff(config.params.N[0], 1.0, (2./kappa/dt-c.K2))
+    c.TC = HelmholtzCoeff(config.params.N[0], 1.0, (2./kappa/dt-c.K2), 0)
 
     c.hdf5file = RBFile(config.params.solver,
                         checkpoint={'space': c.VFS,

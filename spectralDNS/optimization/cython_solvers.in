@@ -126,10 +126,10 @@ def add_pressure_diffusion_NS2D(np.ndarray[complex_t, ndim=3] du,
             du[1,i,j] = du[1,i,j] - (p_hat[i,j]*k1+u_hat[1,i,j]*z)
     return du
 
-def compute_vw_KMM(np.ndarray[complex_t, ndim=4] u_hat,
-                   np.ndarray[complex_t, ndim=3] f_hat,
-                   np.ndarray[complex_t, ndim=3] g_hat,
-                   np.ndarray[real_t, ndim=4] k_over_k2):
+def compute_vw(np.ndarray[complex_t, ndim=4] u_hat,
+               np.ndarray[complex_t, ndim=3] f_hat,
+               np.ndarray[complex_t, ndim=3] g_hat,
+               np.ndarray[real_t, ndim=4] k_over_k2):
     cdef int i, j, k, l
 
     for i in range(u_hat.shape[1]):
@@ -137,4 +137,9 @@ def compute_vw_KMM(np.ndarray[complex_t, ndim=4] u_hat,
             for k in range(u_hat.shape[3]):
                 u_hat[1, i, j, k] = -1j*(k_over_k2[0, i, j, k]*f_hat[i, j, k] - k_over_k2[1, i, j, k]*g_hat[i, j, k])
                 u_hat[2, i, j, k] = -1j*(k_over_k2[1, i, j, k]*f_hat[i, j, k] + k_over_k2[0, i, j, k]*g_hat[i, j, k])
+                #u_hat[1, i, j, k].real = k_over_k2[0, i, j, k]*f_hat[i, j, k].imag - k_over_k2[1, i, j, k]*g_hat[i, j, k].imag
+                #u_hat[1, i, j, k].imag = -k_over_k2[0, i, j, k]*f_hat[i, j, k].real + k_over_k2[1, i, j, k]*g_hat[i, j, k].real
+                #u_hat[2, i, j, k].real = k_over_k2[1, i, j, k]*f_hat[i, j, k].imag + k_over_k2[0, i, j, k]*g_hat[i, j, k].imag
+                #u_hat[2, i, j, k].imag = -k_over_k2[1, i, j, k]*f_hat[i, j, k].real - k_over_k2[0, i, j, k]*g_hat[i, j, k].real
+
     return u_hat

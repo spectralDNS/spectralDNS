@@ -70,10 +70,13 @@ def update(context):
                 im1.autoscale()
             plt.pause(1e-6)
 
-    #if params.tstep == 1:
-    #    from spectralDNS.utilities import reset_profile
-    #    print("Reset profile")
-    #    reset_profile(profile)
+    if params.tstep == 1:
+        from spectralDNS.utilities import reset_profile
+        try:
+            reset_profile(profile)
+            print("Reset profile")
+        except:
+            pass
 
     if params.tstep % params.compute_energy == 0:
         #dx, L = params.dx, params.L

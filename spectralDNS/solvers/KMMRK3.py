@@ -26,8 +26,8 @@ def get_context():
 
     # Collect all matrices
     c.mat.AC = [BiharmonicCoeff(N[0], nu*(a[rk]+b[rk])*dt/2., (1. - nu*(a[rk]+b[rk])*dt*c.K2),
-                                -(c.K2 - nu*(a[rk]+b[rk])*dt/2.*c.K4), c.SB.quad) for rk in range(3)]
-    c.mat.AB = [HelmholtzCoeff(N[0], 1.0, -(c.K2 - 2.0/nu/dt/(a[rk]+b[rk])), c.ST.quad) for rk in range(3)]
+                                -(c.K2 - nu*(a[rk]+b[rk])*dt/2.*c.K4), 0, c.SB.quad) for rk in range(3)]
+    c.mat.AB = [HelmholtzCoeff(N[0], 1.0, -(c.K2 - 2.0/nu/dt/(a[rk]+b[rk])), 0, c.ST.quad) for rk in range(3)]
 
     # Collect all linear algebra solvers
     # RK 3 requires three solvers because of the three different coefficients

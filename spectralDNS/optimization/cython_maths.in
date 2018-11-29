@@ -160,5 +160,8 @@ def mult_K1j(list K,
                 kz = Kz[0,0,k]
                 f[0,i,j,k] = 1j*kz*a[i,j,k]
                 f[1,i,j,k] = -1j*ky*a[i,j,k]
+                #f[0,i,j,k].real = -kz*a[i,j,k].imag
+                #f[0,i,j,k].imag = kz*a[i,j,k].real
+                #f[1,i,j,k].real = ky*a[i,j,k].imag
+                #f[1,i,j,k].imag = -ky*a[i,j,k].real
     return f
-

@@ -97,6 +97,10 @@ def get_context():
     for i in range(2):
         K_over_K2[i] = K[i+1] / np.where(K2 == 0, 1, K2)
 
+    for i in range(3):
+        K[i] = K[i].astype(float)
+        Kx[i] = K[i].astype(float)
+
     work = work_arrays()
     u_dealias = Array(VFSp)
     u0_hat = np.zeros((2, params.N[0]), dtype=complex)
@@ -110,8 +114,8 @@ def get_context():
     # Collect all matrices
     mat = config.AttributeDict(
         dict(CDD=inner_product((ST, 0), (ST, 1)),
-             AB=HelmholtzCoeff(N[0], 1.0, -(K2 - 2.0/nu/dt), ST.quad),
-             AC=BiharmonicCoeff(N[0], nu*dt/2., (1. - nu*dt*K2), -(K2 - nu*dt/2.*K4), quad=SB.quad),
+             AB=HelmholtzCoeff(N[0], 1., -(K2 - 2.0/nu/dt), 0, ST.quad),
+             AC=BiharmonicCoeff(N[0], nu*dt/2., (1. - nu*dt*K2), -(K2 - nu*dt/2.*K4), 0, SB.quad),
              # Matrices for biharmonic equation
              CBD=inner_product((SB, 0), (ST, 1)),
              ABB=inner_product((SB, 0), (SB, 2)),
@@ -124,10 +128,6 @@ def get_context():
              CDB=inner_product((ST, 0), (SB, 1)),
              ADD0=inner_product((ST0, 0), (ST0, 2)),
              BDD0=inner_product((ST0, 0), (ST0, 0)),))
-
-    mat.ADD.axis = 0
-    mat.BDD.axis = 0
-    mat.SBB.axis = 0
 
     la = config.AttributeDict(
         dict(HelmholtzSolverG=Helmholtz(mat.ADD, mat.BDD, -np.ones((1, 1, 1)),
@@ -398,6 +398,7 @@ def getConvection(convection):
             return rhs
 
     elif convection == "Vortex":
+
         def Conv(rhs, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la, u_dealias):
             curl_dealias = work[(u_dealias, 1, False)]
             u_dealias = VFSp.backward(u_hat, u_dealias)
@@ -432,7 +433,6 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
     rhs[1] += diff_g
     return rhs
 
-#@profile
 def ComputeRHS(rhs, u_hat, g_hat, solver,
                H_hat, H_hat1, H_hat0, VFSp, FSTp, FSBp, FCTp, work, Kx, K, K2,
                K4, hv, hg, mat, la, u_dealias, **context):
@@ -480,19 +480,17 @@ def compute_vw(u_hat, f_hat, g_hat, K_over_K2):
     u_hat[2] = -1j*(K_over_K2[1]*f_hat + K_over_K2[0]*g_hat)
     return u_hat
 
-#@profile
 def solve_linear(u_hat, g_hat, rhs,
                  work, la, mat, K_over_K2, H_hat0, U_hat0, Sk, u0_hat, h0_hat,
                  w, w1, **context):
     """Solve final linear algebra systems"""
-    f_hat = work[(u_hat[0], 0, True)]
-    w0 = work[(u_hat[0], 1, False)]
+    f_hat = work[(u_hat[0], 0, False)]
 
     u_hat[0] = la.BiharmonicSolverU(u_hat[0], rhs[0])
     g_hat = la.HelmholtzSolverG(g_hat, rhs[1])
 
     # Compute v_hat and w_hat from u_hat and g_hat
-    f_hat -= mat.CDB.matvec(u_hat[0], w0)
+    f_hat = mat.CDB.matvec(-u_hat[0], f_hat)
     f_hat = la.TDMASolverD(f_hat)
     u_hat = compute_vw(u_hat, f_hat, g_hat, K_over_K2)
 

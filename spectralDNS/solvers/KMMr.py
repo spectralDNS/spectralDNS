@@ -111,8 +111,8 @@ def get_context():
         dict(CDD=inner_product((ST, 0), (ST, 1)),
              CTD=inner_product((CT, 0), (ST, 1)),
              BTT=inner_product((CT, 0), (CT, 0)),
-             AB=HelmholtzCoeff(N[2], 1.0, -(K2 - 2.0/nu/dt), ST.quad),
-             AC=BiharmonicCoeff(N[2], nu*dt/2., (1. - nu*dt*K2), -(K2 - nu*dt/2.*K4), quad=SB.quad),
+             AB=HelmholtzCoeff(N[2], 1.0, -(K2 - 2.0/nu/dt), 2, ST.quad),
+             AC=BiharmonicCoeff(N[2], nu*dt/2., (1. - nu*dt*K2), -(K2 - nu*dt/2.*K4), 2, SB.quad),
              # Matrices for biharmonic equation
              CBD=inner_product((SB, 0), (ST, 1)),
              ABB=inner_product((SB, 0), (SB, 2)),
@@ -125,10 +125,6 @@ def get_context():
              CDB=inner_product((ST, 0), (SB, 1)),
              ADD0=inner_product((ST0, 0), (ST0, 2)),
              BDD0=inner_product((ST0, 0), (ST0, 0))))
-
-    mat.ADD.axis = 2
-    mat.BDD.axis = 2
-    mat.SBB.axis = 2
 
     la = config.AttributeDict(
         dict(HelmholtzSolverG=Helmholtz(mat.ADD, mat.BDD, -np.ones((1, 1, 1)),
@@ -418,13 +414,13 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
     u0 = work[(g, 2, False)]
 
     # Compute diffusion for g-equation
-    diff_g = AB.matvec(g, diff_g, axis=2)
+    diff_g = AB.matvec(g, diff_g)
 
     # Compute diffusion++ for u-equation
-    diff_u = AC.matvec(u, diff_u, axis=2)
-    #diff_u[:] = nu*dt/2.*SBB.matvec(u, u0, axis=2)
-    #diff_u += (1. - nu*dt*K2)*ABB.matvec(u, u0, axis=2)
-    #diff_u -= (K2 - nu*dt/2.*K4)*BBB.matvec(u, u0, axis=2)
+    diff_u = AC.matvec(u, diff_u)
+    #diff_u[:] = nu*dt/2.*SBB.matvec(u, u0)
+    #diff_u += (1. - nu*dt*K2)*ABB.matvec(u, u0)
+    #diff_u -= (K2 - nu*dt/2.*K4)*BBB.matvec(u, u0)
 
     rhs[0] += diff_u
     rhs[1] += diff_g

@@ -54,19 +54,3 @@ for module in ("integrators", "maths", "solvers"):
 
 prec = {"single": ("float32", "complex64"),
         "double": ("float64", "complex128")}
-
-t0 = os.path.getmtime("numba_module.in")
-compile_new = False
-if not os.path.exists("numba_module.py"):
-    compile_new = True
-elif os.path.getmtime("numba_module.py") < t0:
-    compile_new = True
-if compile_new:
-    ff = open("numba_module.in").read()
-    fs = open("numba_single.py", "w")
-    fs.write(ff.format(*prec["single"]))
-    fs.close()
-
-    fd = open("numba_double.py", "w")
-    fd.write(ff.format(*prec["double"]))
-    fd.close()

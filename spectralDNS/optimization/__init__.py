@@ -26,7 +26,6 @@ def optimizer(func):
         mod = globals()["_".join((config.params.optimization,
                                   config.params.precision))]
 
-
         # Check for generic implementation first, then solver specific
         name = func.__name__
         if len(config.params.N) == 2:
@@ -62,8 +61,8 @@ except:
     pass
 
 try:
-    from . import numba_single, numba_double
-
+    from . import numba_module as numba_single
+    from . import numba_module as numba_double
 except:
     pass
 

@@ -17,8 +17,7 @@ def has_flag(compiler, flagname):
     """
     devnull = open(os.devnull, "w")
     p = subprocess.Popen([compiler.compiler[0], '-E', '-'] + [flagname],
-                         stdin=subprocess.PIPE, stdout=devnull, stderr=devnull,
-                         shell=True)
+                         stdin=subprocess.PIPE, stdout=devnull, stderr=devnull)
     p.communicate("")
     return True if p.returncode == 0 else False
 

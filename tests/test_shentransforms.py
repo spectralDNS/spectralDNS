@@ -3,7 +3,6 @@ from mpi4py import MPI
 from sympy import Symbol, sin, pi, lambdify
 import numpy as np
 import scipy.sparse.linalg as la
-from spectralDNS.shen.Matrices import HelmholtzCoeff
 from spectralDNS.shen import LUsolve
 from shenfun.spectralbase import inner_product
 from shenfun.chebyshev.bases import Basis, ShenDirichletBasis, \
@@ -115,78 +114,3 @@ def test_Mult_CTD_3D(quad):
     assert np.allclose(cw, bw)
 
 #test_Mult_CTD_3D("GL")
-
-@pytest.mark.parametrize('quad', quads)
-def test_Biharmonic(quad):
-    M = 128
-    SB = ShenBiharmonicBasis(M, quad=quad)
-    u = sin(6*pi*x)**2
-    a = 1.0
-    b = 1.0
-    f = -u.diff(x, 4) + a*u.diff(x, 2) + b*u
-
-    ul = lambdify(x, u, 'numpy')
-    fl = lambdify(x, f, 'numpy')
-    points, _ = SB.points_and_weights(M)
-    uj = ul(points)
-    fj = fl(points)
-
-    A = inner_product((SB, 0), (SB, 4))
-    B = inner_product((SB, 0), (SB, 0))
-    C = inner_product((SB, 0), (SB, 2))
-
-    AA = -A.diags() + C.diags() + B.diags()
-    f_hat = np.zeros(M)
-    f_hat = SB.scalar_product(fj, f_hat)
-    u_hat = np.zeros(M)
-    u_hat[:-4] = la.spsolve(AA, f_hat[:-4])
-    u1 = np.zeros(M)
-    u1 = SB.backward(u_hat, u1)
-    #from IPython import embed; embed()
-
-    assert np.allclose(u1, uj)
-
-#test_Biharmonic("GC")
-
-@pytest.mark.parametrize('quad', quads)
-def test_Helmholtz_matvec(quad):
-    M = 2*N
-    SD = ShenDirichletBasis(M, quad=quad)
-    kx = 11
-    uj = np.random.randn(M)
-    u_hat = np.zeros(M)
-    u_hat = SD.forward(uj, u_hat)
-    uj = SD.backward(u_hat, uj)
-
-    B = inner_product((SD, 0), (SD, 0))
-    A = inner_product((SD, 0), (SD, 2))
-
-    AB = HelmholtzCoeff(M, 1, kx**2, SD.quad)
-
-    u1 = np.zeros(M)
-    u1 = SD.forward(uj, u1)
-    c0 = np.zeros_like(u1)
-    c1 = np.zeros_like(u1)
-    c = A.matvec(u1, c0)+kx**2*B.matvec(u1, c1)
-
-    b = np.zeros(M)
-    #LUsolve.Mult_Helmholtz_1D(M, SD.quad=="GL", 1, kx**2, u1, b)
-    b = AB.matvec(u1, b)
-    #from IPython import embed; embed()
-    assert np.allclose(c, b)
-
-    b = np.zeros((M, 4, 4), dtype=np.complex)
-    u1 = u1.repeat(16).reshape((M, 4, 4)) +1j*u1.repeat(16).reshape((M, 4, 4))
-    kx = np.zeros((1, 4, 4))+kx
-    #LUsolve.Mult_Helmholtz_3D_complex(M, SD.quad=="GL", 1.0, kx**2, u1, b)
-    AB = HelmholtzCoeff(M, 1, kx**2, SD.quad)
-    b = AB.matvec(u1, b)
-
-    assert np.linalg.norm(b[:, 2, 2].real - c)/(M*16) < 1e-12
-    assert np.linalg.norm(b[:, 2, 2].imag - c)/(M*16) < 1e-12
-
-#test_Helmholtz_matvec("GL")
-#test_ADDmat(ShenNeumannBasis("GL"))
-#test_Helmholtz2(ShenDirichletBasis("GL"))
-#test_Mult_CTD(ShenDirichletBasis("GL"))
-#test_CDDmat(ShenDirichletBasis("GL"))
