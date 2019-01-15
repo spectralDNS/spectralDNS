@@ -104,7 +104,7 @@ class HDF5File(object):
     def check_if_kill():
         """Check if user has put a file named killspectraldns in running folder."""
         found = 0
-        if 'killspectraldns' in os.listdir():
+        if 'killspectraldns' in os.listdir(os.getcwd()):
             found = 1
         collective = comm.allreduce(found)
         if collective > 0:
