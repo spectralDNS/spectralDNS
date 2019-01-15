@@ -1,5 +1,6 @@
 """Rayleigh Benard flow in channel"""
 import warnings
+import sys
 from mpi4py import MPI
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,7 +27,7 @@ def initialize(solver, context):
         context.phi_hat1[:] = phi_hat
 
 im1, im2 = None, None
-
+beta = np.zeros(1)
 def update(context):
     global im1, im3
 
@@ -73,6 +74,11 @@ def update(context):
         e3 = dx(phi*phi, c.FRB)
         div_u = solver.get_divergence(**c)
         e4 = dx(div_u*div_u, c.FST)
+        beta[0] = e0+e1+e2+e3+e4
+        comm.Bcast(beta)
+        if abs(beta[0]) > 1e8 or np.isnan(beta[0]):
+            print('Diverging! Stopping...', params.tstep, beta[0])
+            sys.exit(1)
         if solver.rank == 0:
             print("Time %2.5f Energy %2.6e %2.6e %2.6e %2.6e div %2.6e" %(config.params.t, e0, e1, e2, e3, e4))
 
@@ -219,10 +225,9 @@ if __name__ == "__main__":
          'M': [6, 7, 7]
         }, "channel"
     )
-
     config.channel.add_argument("--compute_energy", type=int, default=10)
     config.channel.add_argument("--plot_result", type=int, default=100)
-    config.channel.add_argument("--Ra", type=float, default=20000.0)
+    config.channel.add_argument("--Ra", type=float, default=10000.0)
     config.channel.add_argument("--Pr", type=float, default=0.7)
     config.channel.add_argument("--sample_stats", type=int, default=10)
     solver = get_solver(update=update, mesh="channel")
@@ -230,7 +235,17 @@ if __name__ == "__main__":
     config.params.kappa = 1./np.sqrt(config.params.Pr*config.params.Ra)
     context = solver.get_context()
     initialize(solver, context)
-    #init_from_file("KMM_RB_677a_c.h5", solver, context)
-    context.hdf5file.filename = "KMM_RB_677b"
-    solver.stats = Stats(context.VFS, filename="KMMRBstats")
+    #init_from_file("KMMRK3_RB_677a_c.h5", solver, context)
+    #config.params.tstep = 20
+    #config.params.t = 0.2
+    context.hdf5file.filename = "KMMRK3_RB_666"
+
+    # Just store slices
+    context.hdf5file.results['space'] = context.FST
+    context.hdf5file.results['data'] = {'U0': [(context.U[0], [slice(None), slice(None), 0]), (context.U[0], [slice(None), 0, slice(None)])],
+                                        'U1': [(context.U[1], [slice(None), slice(None), 0]), (context.U[1], [slice(None), 0, slice(None)])],
+                                        'U2': [(context.U[2], [slice(None), slice(None), 0]), (context.U[2], [slice(None), 0, slice(None)])],
+                                        'phi': [(context.phi, [slice(None), slice(None), 0]), (context.phi, [slice(None), 0, slice(None)])]
+                                       }
+    solver.stats = Stats(context.VFS, filename="KMMRK3_RB_stats")
     solve(solver, context)
