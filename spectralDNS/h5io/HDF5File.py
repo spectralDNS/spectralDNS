@@ -59,9 +59,9 @@ class HDF5File(object):
 
     def update(self, params, **kw):
         if self.cfile is None:
-            self.cfile = H5File(self.filename+'_c.h5', self.checkpoint['space'], mode='a')
+            self.cfile = H5File(self.filename+'_c.h5', self.checkpoint['space'], mode=params.filemode)
         if self.wfile is None:
-            self.wfile = H5File(self.filename+'_w.h5', self.results['space'], mode='a')
+            self.wfile = H5File(self.filename+'_w.h5', self.results['space'], mode=params.filemode)
 
         if params.tstep % params.write_result == 0:
             self.update_components(**kw)

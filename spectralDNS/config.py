@@ -184,6 +184,9 @@ parser.add_argument('--t', default=0.0, type=float,
                     help='Time')
 parser.add_argument('--tstep', default=0, type=int,
                     help='Time step')
+parser.add_argument('--filemode', default='w',
+                    choices=('w', 'r', 'a'),
+                    help='Choose mode for opening HDF5 files')
 parser.add_argument('--dealias', default='2/3-rule',
                     choices=('2/3-rule', '3/2-rule', 'None'),
                     help='Choose dealiasing method')
