@@ -189,16 +189,12 @@ def init_from_file(filename, solver, context):
     import h5py
     f = h5py.File(filename, 'r+', driver="mpio", comm=solver.comm)
     assert "0" in f["U/Vector/3D"]
-    U = context.U
     U_hat = context.U_hat
-    phi = context.phi
     phi_hat = context.phi_hat
-    N = U.shape[1]
     TV = context.U.function_space()
-    su = tuple(TV.local_slice(True))
+    su = TV.local_slice(True)
     T = context.phi.function_space()
-    sp = tuple(T.local_slice(True))
-    #s = slice(solver.rank*N, (solver.rank+1)*N, 1)
+    sp = T.local_slice(True)
 
     # previous timestep
     if not 'RK3' in config.params.solver:
@@ -216,6 +212,7 @@ def init_from_file(filename, solver, context):
     phi_hat[:] = f["phi/3D/0"][sp]
     context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
     f.close()
+    context.hdf5file.filename = filename
 
 if __name__ == "__main__":
     config.update(
@@ -235,10 +232,10 @@ if __name__ == "__main__":
     config.params.kappa = 1./np.sqrt(config.params.Pr*config.params.Ra)
     context = solver.get_context()
     #initialize(solver, context)
-    init_from_file("KMMRK3_RB_677f_c.h5", solver, context)
+    init_from_file("KMMRK3_RB_677g_c.h5", solver, context)
     config.params.tstep = 20
     config.params.t = 0.2
-    context.hdf5file.filename = "KMMRK3_RB_677f"
+    #context.hdf5file.filename = "KMMRK3_RB_677g"
 
     # Just store slices
     context.hdf5file.results['space'] = context.FST

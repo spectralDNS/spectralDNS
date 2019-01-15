@@ -1,9 +1,13 @@
+import os
+import sys
+from mpi4py import MPI
 from shenfun import HDF5File as H5File
 
 __all__ = ['HDF5File']
 
 #pylint: disable=dangerous-default-value,unused-argument
 
+comm = MPI.COMM_WORLD
 
 class HDF5File(object):
     """Class for storing and retrieving spectralDNS data
@@ -67,9 +71,12 @@ class HDF5File(object):
             self.update_components(**kw)
             self.wfile.write(params.tstep, self.results['data'], as_scalar=True, forward_output=False)
 
-        if params.tstep % params.checkpoint == 0:
+        kill = self.check_if_kill()
+        if params.tstep % params.checkpoint == 0 or kill:
             for key, val in self.checkpoint['data'].items():
                 self.cfile.write(int(key), val, forward_output=True)
+            if kill:
+                sys.exit(1)
 
     def update_components(self, **kw):
         pass
@@ -83,3 +90,18 @@ class HDF5File(object):
             self.cfile.close()
         if self.wfile.f:
             self.wfile.close()
+
+    @staticmethod
+    def check_if_kill():
+        """Check if user has put a file named killspectraldns in running folder."""
+        found = 0
+        if 'killspectraldns' in os.listdir():
+            found = 1
+        collective = comm.allreduce(found)
+        if collective > 0:
+            if comm.Get_rank() == 0:
+                os.remove('killspectraldns')
+                print('killspectraldns Found! Stopping simulations cleanly by checkpointing...')
+            return True
+        else:
+            return False
