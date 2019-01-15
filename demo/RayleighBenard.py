@@ -238,14 +238,18 @@ if __name__ == "__main__":
     #init_from_file("KMMRK3_RB_677a_c.h5", solver, context)
     #config.params.tstep = 20
     #config.params.t = 0.2
-    context.hdf5file.filename = "KMMRK3_RB_666"
+    context.hdf5file.filename = "KMMRK3_RB_677"
 
     # Just store slices
     context.hdf5file.results['space'] = context.FST
-    context.hdf5file.results['data'] = {'U0': [(context.U[0], [slice(None), slice(None), 0]), (context.U[0], [slice(None), 0, slice(None)])],
-                                        'U1': [(context.U[1], [slice(None), slice(None), 0]), (context.U[1], [slice(None), 0, slice(None)])],
-                                        'U2': [(context.U[2], [slice(None), slice(None), 0]), (context.U[2], [slice(None), 0, slice(None)])],
-                                        'phi': [(context.phi, [slice(None), slice(None), 0]), (context.phi, [slice(None), 0, slice(None)])]
+    context.hdf5file.results['data'] = {'U0': [(context.U[0], [slice(None), slice(None), 0]),
+                                               (context.U[0], [slice(None), 0, slice(None)])],
+                                        'U1': [(context.U[1], [slice(None), slice(None), 0]),
+                                               (context.U[1], [slice(None), 0, slice(None)])],
+                                        'U2': [(context.U[2], [slice(None), slice(None), 0]),
+                                               (context.U[2], [slice(None), 0, slice(None)])],
+                                        'phi': [(context.phi, [slice(None), slice(None), 0]),
+                                                (context.phi, [slice(None), 0, slice(None)])]
                                        }
     solver.stats = Stats(context.VFS, filename="KMMRK3_RB_stats")
     solve(solver, context)
