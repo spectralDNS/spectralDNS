@@ -211,8 +211,12 @@ def init_from_file(filename, solver, context):
     U_hat[:] = f["U/Vector/3D/0"][su]
     phi_hat[:] = f["phi/3D/0"][sp]
     context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
-    f.close()
     context.hdf5file.filename = filename
+    if 'tstep' in f.attrs:
+        config.params.tstep = f.attrs['tstep']
+    if 't' in f.attrs:
+        config.params.tstep = f.attrs['t']
+    f.close()
 
 if __name__ == "__main__":
     config.update(
