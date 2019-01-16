@@ -11,7 +11,7 @@ build:
 requirements:
 
   build:
-    - toolchain  # [osx]
+    #- toolchain  # [osx]
     - python
     - cython
     - numpy
