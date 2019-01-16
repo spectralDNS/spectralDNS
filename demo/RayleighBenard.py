@@ -235,11 +235,9 @@ if __name__ == "__main__":
     config.params.nu = np.sqrt(config.params.Pr/config.params.Ra)
     config.params.kappa = 1./np.sqrt(config.params.Pr*config.params.Ra)
     context = solver.get_context()
-    #initialize(solver, context)
-    init_from_file("KMMRK3_RB_677g_c.h5", solver, context)
-    config.params.tstep = 20
-    config.params.t = 0.2
-    #context.hdf5file.filename = "KMMRK3_RB_677g"
+    initialize(solver, context)
+    #init_from_file("KMMRK3_RB_677g_c.h5", solver, context)
+    context.hdf5file.filename = "KMMRK3_RB_677a"
 
     # Just store slices
     context.hdf5file.results['space'] = context.FST

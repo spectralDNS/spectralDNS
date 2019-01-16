@@ -1,6 +1,6 @@
 from __future__ import print_function
 import warnings
-from numpy import pi, zeros, sum, float64, sin, cos, prod, asscalar
+from numpy import pi, zeros, sum, float64, sin, cos, prod
 from spectralDNS import config, get_solver, solve
 
 try:
@@ -122,8 +122,8 @@ def regression_test(context):
     k = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))/prod(params.N)/2) # Compute energy with double precision
     config.solver.MemoryUsage('End')
     if solver.rank == 0:
-        assert round(asscalar(w) - 0.375249930801, params.ntol) == 0, w
-        assert round(asscalar(k) - 0.124953117517, params.ntol) == 0, k
+        assert round(w.item() - 0.375249930801, params.ntol) == 0, w
+        assert round(k.item() - 0.124953117517, params.ntol) == 0, k
 
 if __name__ == "__main__":
     config.update(
