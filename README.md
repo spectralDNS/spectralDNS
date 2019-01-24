@@ -110,6 +110,13 @@ Results also from the old Shaheen BlueGene/P:
     Evolution of vorticity. Two-dimensional simulation of Kelvin Helmholtz shear instability using a 2D solver (solvers/NS2D.py)
 </p>
 
+<p align="center">
+    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/movies/RB_200k.png" width="800" height="266" alt="Rayleigh Bénard flow"/>
+</p>
+<p align="center">
+    Turbulent Rayleigh-Bénard flow computed with the KMMRK3_RB solver (solvers/KMMRK3_RB.py) using 512x512x256 points in real physical space.
+</p>
+
 Authors
 -------
 spectralDNS is developed by
