@@ -114,7 +114,7 @@ Results also from the old Shaheen BlueGene/P:
     <img src="https://cdn.jsdelivr.net/gh/spectralDNS/spectralutilities@master/movies/RB_200k_small.png" width="506" height="316" alt="Rayleigh Bénard flow"/>
 </p>
 <p align="center">
-    Turbulent Rayleigh-Bénard flow computed with the KMMRK3_RB solver (solvers/KMMRK3_RB.py) using 512x512x256 points in real physical space.
+    Turbulent Rayleigh-Bénard flow computed with the KMMRK3_RB solver (solvers/KMMRK3_RB.py) using 512x512x256 points in real physical space. Shown is the concentration of a scalar with boundary condition 0 and 1 for the top and bottom, respectively. Note that the shown top lid is located just inside the wall, at z=0.991 (z domain is in [-1, 1]).
 </p>
 
 Authors
