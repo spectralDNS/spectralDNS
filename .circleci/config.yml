@@ -1,6 +1,6 @@
 version: 2
 jobs:
-  build:
+  build_python_27:
     machine: true
     steps:
       - checkout
@@ -11,19 +11,7 @@ jobs:
       - run:
           name: install miniconda
           command: |
-            if [[ ! -d /home/circleci/miniconda ]]; then
-                wget https://repo.continuum.io/miniconda/Miniconda3-4.5.1-Linux-x86_64.sh -O miniconda.sh &&
-                bash miniconda.sh -b -f -p /home/circleci/miniconda;
-            else
-                echo "Using cached miniconda";
-            fi
-            source ~/miniconda/bin/activate root
-            conda config --set always_yes yes
-            conda config --add channels conda-forge
-            conda config --add channels spectralDNS
-            conda clean --lock
-            conda install --yes --quiet conda-forge-ci-setup=1
-            source run_conda_forge_build_setup
+            ./.circleci/install_conda.sh
 
       - save_cache:
           key: v2-miniconda-{{ .Branch }}
@@ -31,19 +19,81 @@ jobs:
             - /home/circleci/miniconda
 
       - run:
-          name: Build and test
+          name: Build and test python 2.7
           command: |
             source ~/miniconda/bin/activate root
             cd /home/circleci/project
             conda build --python 2.7 ./conf/conda
+
+      - run:
+          name: Upload package
+          command: |
+            source ~/miniconda/bin/activate root
+            cd /home/circleci/project
+            export CONDA_PY=27
+            upload_or_check_non_existence ./conf/conda spectralDNS --channel main
+
+  build_python_36:
+    machine: true
+    steps:
+      - checkout
+
+      - restore_cache:
+          key: v2-miniconda-{{ .Branch }}
+
+      - run:
+          name: install miniconda
+          command: |
+            ./.circleci/install_conda.sh
+
+      - run:
+          name: Build and test python 3.6
+          command: |
+            source ~/miniconda/bin/activate root
+            cd /home/circleci/project
             conda build --python 3.6 ./conf/conda
 
       - run:
-          name: Upload packages
+          name: Upload package
+          command: |
+            source ~/miniconda/bin/activate root
+            cd /home/circleci/project
+            export CONDA_PY=36
+            upload_or_check_non_existence ./conf/conda spectralDNS --channel main
+
+  build_python_37:
+    machine: true
+    steps:
+      - checkout
+
+      - restore_cache:
+          key: v2-miniconda-{{ .Branch }}
+
+      - run:
+          name: install miniconda
+          command: |
+            ./.circleci/install_conda.sh
+
+      - run:
+          name: Build and test python 3.7
+          command: |
+            source ~/miniconda/bin/activate root
+            cd /home/circleci/project
+            conda build --python 3.7 ./conf/conda
+
+      - run:
+          name: Upload package
           command: |
               source ~/miniconda/bin/activate root
               cd /home/circleci/project
-              export GIT_DESCRIBE_TAG=`git describe --tags | cut -d'-' -f 1`
+              export CONDA_PY=37
+              #export GIT_DESCRIBE_TAG=`git describe --tags | cut -d'-' -f 1`
               upload_or_check_non_existence ./conf/conda spectralDNS --channel main
-              export CONDA_PY=36
-              upload_or_check_non_existence ./conf/conda spectralDNS --channel main
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - build_python_27
+      - build_python_36
+      - build_python_37

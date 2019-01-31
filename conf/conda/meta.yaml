@@ -6,35 +6,46 @@ source:
   git_url: ../../
 
 build:
-  number: 34
+  number: 35
 
 requirements:
 
   build:
-    #- toolchain  # [osx]
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}
+
+  host:
     - python
     - cython
-    - numpy
+    - numpy 1.16.*
+    - setuptools
     - nomkl
     - fftw
     - pyfftw
     - mpi4py
+    - mpi4py-fft
+    - {{ mpi }}
     - scipy
-    - pip
     - pytest-runner
+    - pythran
+    - pip
 
   run:
     - python
-    - numpy
+    - {{ pin_compatible('numpy') }}
     - nomkl
     - cython
     - fftw
-    - hdf5-parallel
-    - h5py-parallel
+    - {{ mpi }}
+    - hdf5 * mpi_{{ mpi }}_*
+    - h5py * mpi_{{ mpi }}_*
+    - mpi4py-fft
     - mpi4py
     - scipy
     - sympy
     - pyfftw
+    - pythran
+    - pip
 
 test:
   source_files:
@@ -42,8 +53,7 @@ test:
 
   imports:
     - spectralDNS
-    - nodepy
-    - mpi4py_fft
+    - shenfun
 
   requires:
     - pytest

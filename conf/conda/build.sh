@@ -7,7 +7,5 @@ then
 fi
 
 pip install --no-deps --no-binary :all: -r "${RECIPE_DIR}/component-requirements.txt"
-#pip install pythran || echo "no pythran support"
 
-$PYTHON setup.py build_ext --inplace
-$PYTHON setup.py install --prefix=$PREFIX
+$PYTHON -m pip install . --no-deps --ignore-installed --no-cache-dir -vvv
