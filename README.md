@@ -6,7 +6,7 @@ spectralDNS
 [![CircleCI](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master.svg?style=svg)](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master)
 
 <p align="center">
-    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/movies/isotropic300_12.gif" width="600" height="400" alt="Isotropic turbulence"/>
+    <img src="https://cdn.jsdelivr.net/gh/spectralDNS/spectralutilities@master/movies/isotropic300_12.gif" width="600" height="400" alt="Isotropic turbulence"/>
 </p>
 <p align="center">
     Isotropic turbulence with Re_lambda=128 computed using the NS solver and a mesh of size 300**3 is physical space.
@@ -75,39 +75,46 @@ Scaling
 The most recent simulations of the pencil version of the NS solver are showing excellent scaling up to 65k cores at KAUST and Shaheen II!
 
 <p align="center">
-    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/figures/strong_scaling_pencil_col.png" width="600" height="400" alt="Strong scaling of Cython optimized NS solver on Shaheen II"/>
+    <img src="https://cdn.jsdelivr.net/gh/spectralDNS/spectralutilities@master/figures/strong_scaling_pencil_col.png" width="600" height="400" alt="Strong scaling of Cython optimized NS solver on Shaheen II"/>
 </p>
 The difference between the red triangles and the blue squares are simply the number of mpi processes sent to each node on Shaheen II. The default version (blue squares) are filling up all nodes with 32 processes on each, whereas the red triangles have only four processes for each node. The green dots have been sampled using the default settings.
 
 Results also from the old Shaheen BlueGene/P:
 
 <p align="center">
-    <img src="https://github.com/spectralDNS/spectralutilities/blob/master/figures/weak_scaling_shaheen_numpy_noopt.png" width="600" height="400" alt="Weak scaling of pure numpy/mpi4py solver on Shaheen BlueGene/P"/>
+    <img src="https://cdn.jsdelivr.net/gh/spectralDNS/spectralutilities@master/figures/weak_scaling_shaheen_numpy_noopt.png" width="600" height="400" alt="Weak scaling of pure numpy/mpi4py solver on Shaheen BlueGene/P"/>
 </p>
 <p align="center">
     Weak scaling of pure numpy/mpi4py solver on Shaheen BlueGene/P. The C++ solver uses slab decomposition and MPI communication is performed by the FFTW library.
 </p>
 
 <p align="center">
-    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/figures/strong_scaling_shaheen_512.png" width="600" height="400" alt="Strong scaling of optimized Python/Cython solver on Shaheen BlueGene/P"/>
+    <img src="https://cdn.jsdelivr.net/gh/spectralDNS/spectralutilities@master/figures/strong_scaling_shaheen_512.png" width="600" height="400" alt="Strong scaling of optimized Python/Cython solver on Shaheen BlueGene/P"/>
 </p>
 <p align="center">
     Strong scaling of optimized Python/Cython solver on Shaheen BlueGene/P. The C++ solver uses slab decomposition and MPI communication is performed by the FFTW library.
 </p>
 
 <p align="center">
-    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/movies/Re2000_5.gif" width="800" height="266" alt="Channel flow"/>
+    <img src="https://cdn.jsdelivr.net/gh/spectralDNS/spectralutilities@master/movies/Re2000_5.gif" width="800" height="266" alt="Channel flow"/>
 </p>
 <p align="center">
     Turbulent channel flow at Re_tau = 2000. Simulations are performed using 512 cores on Shaheen II with the KMM channel flow solver (solvers/KMM.py) using 512x1024x1024 points in real physical space.
 </p>
 
 <p align="center">
-    <img src="https://rawgit.com/spectralDNS/spectralutilities/master/movies/KHmovie_3.gif" width="600" height="400" alt="Kelvin Helmholtz instability"/>
+    <img src="https://cdn.jsdelivr.net/gh/spectralDNS/spectralutilities@master/movies/KHmovie_3.gif" width="600" height="400" alt="Kelvin Helmholtz instability"/>
 </p>
 
 <p align="center">
     Evolution of vorticity. Two-dimensional simulation of Kelvin Helmholtz shear instability using a 2D solver (solvers/NS2D.py)
+</p>
+
+<p align="center">
+    <img src="https://cdn.jsdelivr.net/gh/spectralDNS/spectralutilities@master/movies/RB_200k_small.png" width="506" height="316" alt="Rayleigh Bénard flow"/>
+</p>
+<p align="center">
+    Turbulent Rayleigh-Bénard flow computed with the KMMRK3_RB solver (solvers/KMMRK3_RB.py) using 512x512x256 points in real physical space. Shown is the concentration of a scalar with boundary condition 0 and 1 for the top and bottom, respectively. Note that the shown top lid is located just inside the wall, at z=0.991 (z domain is in [-1, 1]).
 </p>
 
 Authors
@@ -119,7 +126,7 @@ spectralDNS is developed by
 
 Licence
 -------
-spectralDNS is licensed under the GNU GPL, version 3 or (at your option) any later version. spectralDNS is Copyright (2014-2018) by the authors.
+spectralDNS is licensed under the GNU GPL, version 3 or (at your option) any later version. spectralDNS is Copyright (2014-2019) by the authors.
 
 Contact
 -------
