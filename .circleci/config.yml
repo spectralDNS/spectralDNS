@@ -6,7 +6,7 @@ jobs:
       - checkout
 
       - restore_cache:
-          key: v3-miniconda-{{ .Branch }}
+          key: vx-miniconda-{{ .Branch }}
 
       - run:
           name: install miniconda
@@ -39,7 +39,7 @@ jobs:
       - checkout
 
       - restore_cache:
-          key: v3-miniconda-{{ .Branch }}
+          key: vx-miniconda-{{ .Branch }}
 
       - run:
           name: install miniconda
@@ -67,7 +67,7 @@ jobs:
       - checkout
 
       - restore_cache:
-          key: v3-miniconda-{{ .Branch }}
+          key: vx-miniconda-{{ .Branch }}
 
       - run:
           name: install miniconda
