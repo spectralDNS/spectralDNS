@@ -35,7 +35,7 @@ or in-place using
 
 However, spectralDNS depends on two other modules in the [spectralDNS](https://github.com/spectralDNS) organization: [shenfun](https://github.com/spectralDNS/shenfun) and [mpi4py-fft](https://github.com/spectralDNS/mpi4py-fft). And besides that, it requires [*h5py*](http://www.h5py.org) built with parallel HDF5, for visualizing the results, and [*cython*](http://cython.org) or [*numba*](http://numba.pydata.org) are used to optimize a few routines. These dependencies are all available on [*conda forge*](https://conda-forge.org) and a proper environment would be
 
-    conda create --name spectralDNS -c conda-forge shenfun mpi4py-fft cython numba
+    conda create --name spectralDNS -c conda-forge shenfun mpi4py-fft cython numba h5py=*=mpi*
     conda activate spectralDNS
 
 To install using Anaconda, you may compile it yourselves using (from the main directory after cloning)
