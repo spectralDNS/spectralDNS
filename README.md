@@ -33,23 +33,24 @@ or in-place using
 
     python setup.py build_ext --inplace
 
-However, spectralDNS depends on two other modules in the [spectralDNS](https://github.com/spectralDNS) organization: [shenfun](https://github.com/spectralDNS/shenfun) and [mpi4py-fft](https://github.com/spectralDNS/mpi4py-fft). And besides that, it requires [*h5py*](http://www.h5py.org) built with parallel HDF5, for visualizing the results, and [*cython*](http://cython.org) is used to optimize a few routines. The regular "python setup.py ..." will not install these dependencies for you, and, as such, it is strongly adviced to install spectralDNS using Anaconda, as shown below.
+However, spectralDNS depends on two other modules in the [spectralDNS](https://github.com/spectralDNS) organization: [shenfun](https://github.com/spectralDNS/shenfun) and [mpi4py-fft](https://github.com/spectralDNS/mpi4py-fft). And besides that, it requires [*h5py*](http://www.h5py.org) built with parallel HDF5, for visualizing the results, and [*cython*](http://cython.org) or [*numba*](http://numba.pydata.org) are used to optimize a few routines. These dependencies are all available on [*conda forge*](https://conda-forge.org) and a proper environment would be
+
+    conda create --name spectralDNS shenfun mpi4py-fft cython numba
+    conda activate spectralDNS
 
 To install using Anaconda, you may compile it yourselves using (from the main directory after cloning)
 
     conda build -c conda-forge -c spectralDNS conf/conda
     conda install spectralDNS --use-local
 
-which will also build and install shenfun and mpi4py-fft.
-You may also use precompiled binaries in the [*spectralDNS*](https://anaconda.org/spectralDNS) channel on Anaconda cloud. Use for exampel
+which will also build and install the required dependencies.
 
-    conda create --name spectralDNS -c conda-forge -c spectralDNS spectralDNS
-    source activate spectralDNS
+If you do not use conda, then the dependencies must be installed through other channels. Both shenfun and mpi4py-fft can be installed using [*pypi*](https://pypi.org)
 
-which installs both spectralDNS and all required dependencies, most of which are pulled in from the conda-forge channel. There are binaries compiled for both OSX and linux, for either Python version 2.7 or 3.6. To specify the Python version as 3.6 instead of default (used above) you can for exampel do
+    pip install shenfun
+    pip install mpi4py-fft
 
-    conda create --name spectralDNS_py3 -c conda-forge -c spectralDNS python=3 spectralDNS
-    source activate spectralDNS_py3
+But note that these require MPI for Python and serial FFTW libraries. See [further installation instructions](https://shenfun.readthedocs.io/en/latest/installation.html).
 
 Usage
 -----
