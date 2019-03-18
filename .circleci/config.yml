@@ -25,13 +25,13 @@ jobs:
             cd /home/circleci/project
             conda build --python 2.7 ./conf/conda
 
-      #- run:
-      #    name: Upload package
-      #    command: |
-      #      source ~/miniconda/bin/activate root
-      #      cd /home/circleci/project
-      #      export CONDA_PY=27
-      #      upload_or_check_non_existence ./conf/conda spectralDNS --channel main
+      - run:
+          name: Upload package
+          command: |
+            source ~/miniconda/bin/activate root
+            cd /home/circleci/project
+            export CONDA_PY=27
+            upload_or_check_non_existence ./conf/conda spectralDNS --channel main
 
   build_python_36:
     machine: true
@@ -53,13 +53,13 @@ jobs:
             cd /home/circleci/project
             conda build --python 3.6 ./conf/conda
 
-      #- run:
-      #    name: Upload package
-      #    command: |
-      #      source ~/miniconda/bin/activate root
-      #      cd /home/circleci/project
-      #      export CONDA_PY=36
-      #      upload_or_check_non_existence ./conf/conda spectralDNS --channel main
+      - run:
+          name: Upload package
+          command: |
+            source ~/miniconda/bin/activate root
+            cd /home/circleci/project
+            export CONDA_PY=36
+            upload_or_check_non_existence ./conf/conda spectralDNS --channel main
 
   build_python_37:
     machine: true
@@ -81,14 +81,14 @@ jobs:
             cd /home/circleci/project
             conda build --python 3.7 ./conf/conda
 
-      #- run:
-      #    name: Upload package
-      #    command: |
-      #        source ~/miniconda/bin/activate root
-      #        cd /home/circleci/project
-      #        export CONDA_PY=37
-      #        #export GIT_DESCRIBE_TAG=`git describe --tags | cut -d'-' -f 1`
-      #        upload_or_check_non_existence ./conf/conda spectralDNS --channel main
+      - run:
+          name: Upload package
+          command: |
+              source ~/miniconda/bin/activate root
+              cd /home/circleci/project
+              export CONDA_PY=37
+              #export GIT_DESCRIBE_TAG=`git describe --tags | cut -d'-' -f 1`
+              upload_or_check_non_existence ./conf/conda spectralDNS --channel main
 
 workflows:
   version: 2
