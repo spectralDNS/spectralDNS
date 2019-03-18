@@ -1,7 +1,7 @@
 import os
 import sys
 from mpi4py import MPI
-from shenfun import HDF5File as H5File
+from shenfun import ShenfunFile
 
 __all__ = ['HDF5File']
 
@@ -63,22 +63,26 @@ class HDF5File(object):
 
     def update(self, params, **kw):
         if self.cfile is None:
-            self.cfile = H5File(self.filename+'_c.h5', self.checkpoint['space'], mode=params.filemode)
+            self.cfile = ShenfunFile(self.filename+'_c',
+                                     self.checkpoint['space'],
+                                     mode=params.filemode)
             self.cfile.open()
             self.cfile.f.attrs.create('tstep', 0)
             self.cfile.f.attrs.create('t', 0.0)
             self.cfile.close()
         if self.wfile is None:
-            self.wfile = H5File(self.filename+'_w.h5', self.results['space'], mode=params.filemode)
+            self.wfile = ShenfunFile(self.filename+'_w',
+                                     self.results['space'],
+                                     mode=params.filemode)
 
         if params.tstep % params.write_result == 0:
             self.update_components(**kw)
-            self.wfile.write(params.tstep, self.results['data'], as_scalar=True, forward_output=False)
+            self.wfile.write(params.tstep, self.results['data'], as_scalar=True)
 
         kill = self.check_if_kill()
         if params.tstep % params.checkpoint == 0 or kill:
             for key, val in self.checkpoint['data'].items():
-                self.cfile.write(int(key), val, forward_output=True)
+                self.cfile.write(int(key), val)
                 self.cfile.open()
                 self.cfile.f.attrs['tstep'] = params.tstep
                 self.cfile.f.attrs['t'] = params.t

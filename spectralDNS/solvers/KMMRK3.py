@@ -16,8 +16,8 @@ def get_context():
 
     nu, dt, N = params.nu, params.dt, params.N
     del c.H_hat0, c.H_hat1
-    c.hv = np.zeros((2,)+c.FST.local_shape(), dtype=complex)
-    c.hg = np.zeros((2,)+c.FST.local_shape(), dtype=complex)
+    c.hv = np.zeros((2,)+c.FST.local_shape(True), dtype=complex)
+    c.hg = np.zeros((2,)+c.FST.local_shape(True), dtype=complex)
     c.h1 = np.zeros((2, 2, N[0]), dtype=complex)
 
     # RK parameters

@@ -99,7 +99,7 @@ def get_context():
 
     for i in range(3):
         K[i] = K[i].astype(float)
-        Kx[i] = K[i].astype(float)
+        Kx[i] = Kx[i].astype(float)
 
     work = work_arrays()
     u_dealias = Array(VFSp)

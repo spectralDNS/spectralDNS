@@ -11,8 +11,9 @@ from spectralDNS.utilities import dx
 warnings.filterwarnings("ignore", category=matplotlib.cbook.mplDeprecation)
 
 # Use constant flux and adjust pressure gradient dynamically
-#flux = np.array([1645.46])
-flux = np.array([736.43])
+#flux = np.array([1645.46]) # Re_tau=2000
+#flux = np.array([736.43]) # Re_tau=590
+flux = np.array([618.97]) # Re_tau=180
 
 def initOS(OS, U, X, t=0.):
     for i in range(U.shape[1]):
@@ -310,8 +311,8 @@ def init_from_file(filename, solver, context):
 
 if __name__ == "__main__":
     config.update(
-        {'nu': 1./590.,                  # Viscosity
-         'Re_tau': 590.,
+        {'nu': 1./180.,                  # Viscosity
+         'Re_tau': 180.,
          'dt': 0.0005,                  # Time step
          'T': 100.,                    # End time
          'L': [2, 2*np.pi, np.pi],

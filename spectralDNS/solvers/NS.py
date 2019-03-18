@@ -56,7 +56,7 @@ def get_context():
     for i in range(dim):
         K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
-    # Velocity and pressure
+    # Velocity and pressure. Use ndarray view for efficiency
     U = Array(VT)
     U_hat = Function(VT)
     P = Array(T)
@@ -97,9 +97,9 @@ def get_curl(curl, U_hat, work, VT, K, **context):
     curl = compute_curl(curl, U_hat, work, VT, K)
     return curl
 
-def get_velocity(U, U_hat, **context):
+def get_velocity(U, U_hat, VT, **context):
     """Compute velocity from context"""
-    U = U_hat.backward(U)
+    U = VT.backward(U_hat, U)
     return U
 
 def get_pressure(P, P_hat, T, **context):
@@ -107,9 +107,9 @@ def get_pressure(P, P_hat, T, **context):
     P = T.backward(1j*P_hat, P)
     return P
 
-def set_velocity(U, U_hat, **context):
+def set_velocity(U, U_hat, VT, **context):
     """Compute velocity from context"""
-    U_hat = U.forward(U_hat)
+    U_hat = VT.forward(U, U_hat)
     return U_hat
 
 def get_divergence(T, K, U_hat, **context):
