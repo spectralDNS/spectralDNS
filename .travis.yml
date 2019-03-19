@@ -31,12 +31,16 @@ install:
       conda config --add channels conda-forge
       conda config --add channels spectralDNS
       #conda install --yes --quiet conda-forge-build-setup
-      conda install --yes --quiet conda-forge::conda-forge-ci-setup=2
-      source run_conda_forge_build_setup
+      #conda install --yes --quiet conda-forge::conda-forge-ci-setup=2
+      #source run_conda_forge_build_setup
 
 script:
-    - conda build conf/conda
+    - conda build --no-test conf/conda
 
 after_success:
     - export GIT_DESCRIBE_TAG=`git describe --tags | cut -d'-' -f 1`
-    - upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
+    - conda install anaconda-client
+    - echo $PREFIX
+    - echo $PREFIX/spectralDNS-$PKG_BUILD_STRING.tar.bz2
+    - anaconda -t $COND_UPLOAD_TOKEN upload -u spectralDNS -l nightly $PREFIX/spectralDNS-$PKG_BUILD_STRING.tar.bz2 --force
+    #- upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
