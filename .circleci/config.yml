@@ -25,13 +25,15 @@ jobs:
             cd /home/circleci/project
             conda build --python 2.7 ./conf/conda
 
-      #- run:
-      #    name: Upload package
-      #    command: |
-      #      source ~/miniconda/bin/activate root
-      #      cd /home/circleci/project
-      #      export CONDA_PY=27
-      #      upload_or_check_non_existence ./conf/conda spectralDNS --channel main
+      - run:
+          name: Upload package
+          command: |
+            source ~/miniconda/bin/activate root
+            cd /home/circleci/project
+            export CONDA_PY=27
+            conda install anaconda-client
+            anaconda -t $BINSTAR_TOKEN upload -u spectraldns -l nightly $PREFIX/spectraldns-$PKG_BUILD_STRING.tar.bz2 --force
+            #upload_or_check_non_existence ./conf/conda spectralDNS --channel main
 
   build_python_36:
     machine: true
