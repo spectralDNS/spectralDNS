@@ -32,7 +32,7 @@ jobs:
             cd /home/circleci/project
             export CONDA_PY=27
             conda install anaconda-client
-            anaconda -t $BINSTAR_TOKEN upload -u spectraldns -l nightly /home/circleci/miniconda/conda-bld/linux-64/spectraldns-*.tar.bz2 || exit 1
+            anaconda -t $BINSTAR_TOKEN upload --skip -u spectraldns -l nightly /home/circleci/miniconda/conda-bld/linux-64/spectraldns-*.tar.bz2
 
   build_python_36:
     machine: true
@@ -61,7 +61,7 @@ jobs:
             cd /home/circleci/project
             export CONDA_PY=36
             conda install anaconda-client
-            anaconda -t $BINSTAR_TOKEN upload -u spectraldns -l nightly /home/circleci/miniconda/conda-bld/linux-64/spectraldns-*.tar.bz2 || exit 1
+            anaconda -t $BINSTAR_TOKEN upload --skip -u spectraldns -l nightly /home/circleci/miniconda/conda-bld/linux-64/spectraldns-*.tar.bz2
 
   build_python_37:
     machine: true
@@ -90,7 +90,7 @@ jobs:
             cd /home/circleci/project
             export CONDA_PY=37
             conda install anaconda-client
-            anaconda -t $BINSTAR_TOKEN upload -u spectraldns -l nightly /home/circleci/miniconda/conda-bld/linux-64/spectraldns-*.tar.bz2 || exit 1
+            anaconda -t $BINSTAR_TOKEN upload --skip -u spectraldns -l nightly /home/circleci/miniconda/conda-bld/linux-64/spectraldns-*.tar.bz2
 
 workflows:
   version: 2

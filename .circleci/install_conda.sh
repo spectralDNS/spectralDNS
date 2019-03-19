@@ -12,5 +12,3 @@ conda update -q conda
 conda config --add channels conda-forge
 conda config --add channels spectralDNS
 conda install -n root conda-build
-#conda install --yes --quiet conda-forge-ci-setup=2
-#source run_conda_forge_build_setup

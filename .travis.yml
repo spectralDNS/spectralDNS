@@ -37,4 +37,4 @@ script:
 after_success:
     - export GIT_DESCRIBE_TAG=`git describe --tags | cut -d'-' -f 1`
     - conda install anaconda-client
-    - anaconda -t $BINSTAR_TOKEN upload -u spectraldns -l nightly /Users/travis/miniconda3/conda-bld/osx-64/spectraldns-*.tar.bz2 || exit 1
+    - anaconda -t $BINSTAR_TOKEN upload --skip -u spectraldns -l nightly /Users/travis/miniconda3/conda-bld/osx-64/spectraldns-*.tar.bz2
