@@ -6,7 +6,7 @@ source:
   git_url: ../../
 
 build:
-  number: 35
+  number: 36
 
 requirements:
 
@@ -20,29 +20,22 @@ requirements:
     - numpy
     - setuptools
     - nomkl
-    - fftw
-    - mpi4py
-    - mpi4py-fft
     - {{ mpi }}
     - pytest-runner
-    - pythran
     - pip
 
   run:
     - python
     - {{ pin_compatible('numpy') }}
     - nomkl
-    - fftw
     - {{ mpi }}
     - hdf5 * mpi_{{ mpi }}_*
     - h5py * mpi_{{ mpi }}_*
-    - shenfun
-    - mpi4py-fft
+    - shenfun >=2.0.1
+    - mpi4py-fft >=2.0.1
     - mpi4py
     - scipy
     - sympy
-    - pythran
-    - pip
 
 test:
   source_files:
