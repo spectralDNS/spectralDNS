@@ -1,8 +1,6 @@
 mpi:
   - 'mpich'
   #- 'openmpi'
-numpy:
-  - '1.16.*'
 
 # Need 10.9 to build locally. Not for CIs
 #CONDA_BUILD_SYSROOT:

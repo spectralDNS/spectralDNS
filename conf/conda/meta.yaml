@@ -17,15 +17,13 @@ requirements:
   host:
     - python
     - cython
-    - numpy 1.16.*
+    - numpy
     - setuptools
     - nomkl
     - fftw
-    - pyfftw
     - mpi4py
     - mpi4py-fft
     - {{ mpi }}
-    - scipy
     - pytest-runner
     - pythran
     - pip
@@ -34,16 +32,15 @@ requirements:
     - python
     - {{ pin_compatible('numpy') }}
     - nomkl
-    - cython
     - fftw
     - {{ mpi }}
     - hdf5 * mpi_{{ mpi }}_*
     - h5py * mpi_{{ mpi }}_*
+    - shenfun
     - mpi4py-fft
     - mpi4py
     - scipy
     - sympy
-    - pyfftw
     - pythran
     - pip
 
