@@ -6,7 +6,7 @@ jobs:
       - checkout
 
       - restore_cache:
-          key: vx-miniconda-{{ .Branch }}
+          key: v3-miniconda-{{ .Branch }}
 
       - run:
           name: install miniconda
@@ -32,8 +32,7 @@ jobs:
             cd /home/circleci/project
             export CONDA_PY=27
             conda install anaconda-client
-            anaconda -t $BINSTAR_TOKEN upload -u spectraldns -l nightly /home/circleci/miniconda/conda-bld/linux-64/spectraldns-*.tar.bz2 --force
-            #upload_or_check_non_existence ./conf/conda spectralDNS --channel main
+            anaconda -t $BINSTAR_TOKEN upload -u spectraldns -l nightly /home/circleci/miniconda/conda-bld/linux-64/spectraldns-*.tar.bz2 || exit 1
 
   build_python_36:
     machine: true
@@ -41,7 +40,7 @@ jobs:
       - checkout
 
       - restore_cache:
-          key: vx-miniconda-{{ .Branch }}
+          key: v3-miniconda-{{ .Branch }}
 
       - run:
           name: install miniconda
@@ -55,13 +54,14 @@ jobs:
             cd /home/circleci/project
             conda build --python 3.6 ./conf/conda
 
-      #- run:
-      #    name: Upload package
-      #    command: |
-      #      source ~/miniconda/bin/activate root
-      #      cd /home/circleci/project
-      #      export CONDA_PY=36
-      #      upload_or_check_non_existence ./conf/conda spectralDNS --channel main
+      - run:
+          name: Upload package
+          command: |
+            source ~/miniconda/bin/activate root
+            cd /home/circleci/project
+            export CONDA_PY=36
+            conda install anaconda-client
+            anaconda -t $BINSTAR_TOKEN upload -u spectraldns -l nightly /home/circleci/miniconda/conda-bld/linux-64/spectraldns-*.tar.bz2 || exit 1
 
   build_python_37:
     machine: true
@@ -69,7 +69,7 @@ jobs:
       - checkout
 
       - restore_cache:
-          key: vx-miniconda-{{ .Branch }}
+          key: v3-miniconda-{{ .Branch }}
 
       - run:
           name: install miniconda
@@ -83,14 +83,14 @@ jobs:
             cd /home/circleci/project
             conda build --python 3.7 ./conf/conda
 
-      #- run:
-      #    name: Upload package
-      #    command: |
-      #        source ~/miniconda/bin/activate root
-      #        cd /home/circleci/project
-      #        export CONDA_PY=37
-      #        #export GIT_DESCRIBE_TAG=`git describe --tags | cut -d'-' -f 1`
-      #        upload_or_check_non_existence ./conf/conda spectralDNS --channel main
+      - run:
+          name: Upload package
+          command: |
+            source ~/miniconda/bin/activate root
+            cd /home/circleci/project
+            export CONDA_PY=37
+            conda install anaconda-client
+            anaconda -t $BINSTAR_TOKEN upload -u spectraldns -l nightly /home/circleci/miniconda/conda-bld/linux-64/spectraldns-*.tar.bz2 || exit 1
 
 workflows:
   version: 2
