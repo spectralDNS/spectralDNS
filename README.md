@@ -33,14 +33,18 @@ or in-place using
 
     python setup.py build_ext --inplace
 
-However, spectralDNS depends on two other modules in the [spectralDNS](https://github.com/spectralDNS) organization: [shenfun](https://github.com/spectralDNS/shenfun) and [mpi4py-fft](https://github.com/spectralDNS/mpi4py-fft). And besides that, it requires [*h5py*](http://www.h5py.org) built with parallel HDF5, for visualizing the results, and [*cython*](http://cython.org) or [*numba*](http://numba.pydata.org) are used to optimize a few routines. These dependencies are all available on [*conda forge*](https://conda-forge.org) and a proper environment would be
+However, spectralDNS depends on two other modules in the [spectralDNS](https://github.com/spectralDNS) organization: [shenfun](https://github.com/spectralDNS/shenfun) and [mpi4py-fft](https://github.com/spectralDNS/mpi4py-fft). And besides that, it requires [*h5py*](http://www.h5py.org) built with parallel HDF5, for visualizing the results, and [*cython*](http://cython.org), [*numba*](http://numba.pydata.org) or [*pythran*](https://github.com/serge-sans-paille/pythran) are used to optimize a few routines. These dependencies are all available on [*conda forge*](https://conda-forge.org) and a proper environment would be
 
-    conda create --name spectralDNS -c conda-forge shenfun mpi4py-fft cython numba h5py=*=mpi*
+    conda create --name spectralDNS -c conda-forge shenfun mpi4py-fft cython numba pythran mpich pip h5py=*=mpi*
     conda activate spectralDNS
 
-To install using Anaconda, you may compile it yourselves using (from the main directory after cloning)
+Furthermore, you may want to use [*matplotlib*](https://matplotlib.org) for plotting and [*nodepy*](https://github.com/ketch/nodepy) is used for some of the integrators. The latter should be installed using [*pypi*](https://pypi.org)
 
-    conda build -c conda-forge -c spectralDNS conf/conda
+    pip install nodepy
+
+Another possibility is to compile spectralDNS yourselves using [*conda build*](https://docs.conda.io/projects/conda-build/en/latest/). From the main directory after forking or cloning do, e.g.,
+
+    conda build -c conda-forge conf/conda
     conda install spectralDNS --use-local
 
 which will also build and install the required dependencies.
