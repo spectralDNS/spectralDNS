@@ -15,6 +15,7 @@ from __future__ import print_function
 import warnings
 import numpy as np
 from numpy import pi, zeros, sum
+from shenfun import Function
 from spectralDNS import config, get_solver, solve
 
 try:
@@ -81,9 +82,17 @@ def energy_fourier(comm, u_hat):
 
     """
     L = config.params.L
-    result = (2*np.sum(np.abs(u_hat[..., 1:-1])**2)
-              + np.sum(np.abs(u_hat[..., 0])**2)
-              + np.sum(np.abs(u_hat[..., -1])**2))
+    result = 2*np.sum(np.abs(u_hat[..., 1:-1])**2)
+    T = u_hat[0].function_space()
+    ls = T.local_slice(True)
+    if ls[-1].start == 0:
+        result += np.sum(np.abs(u_hat[..., 0])**2)
+    else:
+        result += 2*np.sum(np.abs(u_hat[..., 0])**2)
+    if ls[-1].stop == config.params.N[-1]//2+1:
+        result += np.sum(np.abs(u_hat[..., -1])**2)
+    else:
+        result += 2*np.sum(np.abs(u_hat[..., -1])**2)
     result = comm.allreduce(result)
     return result*np.prod(L)
 
@@ -169,7 +178,7 @@ def update(context):
     c = context
     params = config.params
     solver = config.solver
-    curl_hat = c.work[(c.U_hat, 2, True)]
+    curl_hat = Function(c.VT, buffer=c.work[(c.U_hat, 2, True)])
 
     if solver.rank == 0:
         c.U_hat[:, 0, 0, 0] = 0
@@ -259,7 +268,6 @@ def update(context):
         dissipation = energy_fourier(solver.comm, curl_hat)
         div_u = solver.get_divergence(**c)
         #du = 1j*(c.K[0]*c.U_hat[0]+c.K[1]*c.U_hat[1]+c.K[2]*c.U_hat[2])
-        #from IPython import embed; embed(); sys.exit()
         div_u = L2_norm(solver.comm, div_u)
         #div_u2 = energy_fourier(solver.comm, 1j*(K[0]*c.U_hat[0]+K[1]*c.U_hat[1]+K[2]*c.U_hat[2]))
 
@@ -270,10 +278,11 @@ def update(context):
 
         kold[0] = energy_new
         vol = 1./np.prod(params.L)
+        e0, e1 = energy_fourier(solver.comm, c.U_hat), L2_norm(solver.comm, c.U)
         if solver.rank == 0:
             k.append(energy_new)
             w.append(dissipation)
-            print(params.t, alpha, kk, eps, ww2, ww3, (energy_new-energy_old)/2/params.dt*vol, div_u, Re_lam, Re_lam2)
+            print(params.t, e0, e1, alpha, kk, eps, ww2, ww3, (energy_new-energy_old)/2/params.dt*vol, div_u, Re_lam, Re_lam2)
 
     #if params.tstep % params.compute_energy == 1:
         #if 'NS' in params.solver:

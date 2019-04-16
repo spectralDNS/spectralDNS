@@ -44,7 +44,7 @@ def get_context():
     for i in range(dim):
         X[i] = X[i].astype(float)
         K[i] = K[i].astype(float)
-    K2 = np.zeros(T.local_shape(True), dtype=float)
+    K2 = np.zeros(T.shape(True), dtype=float)
     for i in range(dim):
         K2 += K[i]*K[i]
 
@@ -53,7 +53,7 @@ def get_context():
     for i in range(dim):
         Kx[i] = Kx[i].astype(float)
 
-    K_over_K2 = np.zeros(VT.local_shape(), dtype=float)
+    K_over_K2 = np.zeros(VT.shape(True), dtype=float)
     for i in range(dim):
         K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
@@ -65,7 +65,7 @@ def get_context():
     dU = Function(VM)
     Source = Array(VM)
     ub_dealias = Array(VMp)
-    ZZ_hat = np.zeros((3, 3) + Tp.local_shape(True), dtype=complex) # Work array
+    ZZ_hat = np.zeros((3, 3) + Tp.shape(True), dtype=complex) # Work array
 
     # Create views into large data structures
     U = UB[:3]
@@ -120,7 +120,7 @@ def getConvection(convection):
     elif convection == "Divergence":
 
         def Conv(rhs, ub_hat, Tp, VMp, K, ub_dealias, ZZ_hat):
-            #ub_dealias = work[((6,)+Tp.local_shape(False), float, 0)]
+            #ub_dealias = work[((6,)+Tp.shape(False), float, 0)]
             ub_dealias = VMp.backward(ub_hat, ub_dealias)
             u_dealias = ub_dealias[:3]
             b_dealias = ub_dealias[3:]
