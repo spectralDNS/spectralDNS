@@ -29,7 +29,7 @@ install:
       source /Users/travis/miniconda3/bin/activate root
       conda config --set show_channel_urls true --set always_yes yes
       conda config --add channels conda-forge
-      conda install conda-build
+      travis_wait conda install conda-build
 
 script:
     - conda build conf/conda
