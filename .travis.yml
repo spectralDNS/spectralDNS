@@ -3,7 +3,7 @@
 language: generic
 
 os: osx
-osx_image: xcode8.3
+osx_image: xcode9.4
 
 env:
   matrix:
@@ -32,7 +32,7 @@ install:
       conda install conda-build
 
 script:
-    - travis_wait conda build conf/conda
+    - conda build conf/conda
 
 after_success:
     - export GIT_DESCRIBE_TAG=`git describe --tags | cut -d'-' -f 1`
