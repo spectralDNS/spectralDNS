@@ -1,6 +1,6 @@
 """Orr-Sommerfeld"""
 import warnings
-from numpy import real, pi, exp, zeros, imag, sqrt, log10
+from numpy import real, pi, exp, zeros, imag, sqrt, log10, sum
 from spectralDNS import config, get_solver, solve
 from spectralDNS.utilities import dx
 #from spectralDNS.utilities import reset_profile
@@ -58,50 +58,46 @@ def initialize(solver, context):
 
     # Compute convection from data in context (i.e., context.U_hat and context.g)
     # This is the convection at t=0
-    if hasattr(context.FST, 'dx'):
-        e0 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.ST.quad)
-    else:
-        e0 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
-    #print(e0)
+    e0 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
     acc[0] = 0.0
 
-    if not 'KMMRK3' in params.solver:
+    if not 'RK3' in params.solver:
         # Initialize at t = dt
         context.H_hat1[:] = solver.get_convection(**context)
+        context.U_hat0[:] = U_hat
+        context.U0[:] = U
         initOS(OS, eigvals, eigvectors, U, X, t=params.dt)
         U_hat = solver.set_velocity(**context)
         U = solver.get_velocity(**context)
-        context.U_hat0[:] = U_hat
         params.t = params.dt
         params.tstep = 1
-        if hasattr(context.FST, 'dx'):
-            e1 = 0.5*FST.dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.ST.quad)
-        else:
-            e1 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
+        e1 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
 
         if solver.rank == 0:
-            acc[0] += abs(e1/e0 - exp(2*imag(OS.eigval)*params.t))
+            acc[0] += abs(e1/e0 - exp(2*imag(OS.eigval)*params.t))*params.dt
 
     else:
         params.t = 0
         params.tstep = 0
 
-    if not "KMM" in params.solver:
+    if not ("KMM" in params.solver or "Coupled" in params.solver):
         P_hat = solver.compute_pressure(**context)
-        P = FST.backward(P_hat, context.P, context.SN)
+        P = P_hat.backward(context.P)
+        if params.convection == 'Vortex':
+            context.P += 0.5*sum(U**2, axis=0)
+            context.P_hat = context.P.forward(context.P_hat)
 
     else:
-        context.g[:] = 0
+        try:
+            context.g[:] = 0
+        except AttributeError:
+            pass
 
 def set_Source(Source, Sk, FST, ST, N, **kw):
     Source[:] = 0
     Source[1] = -2./config.params.Re
     Sk[:] = 0
-    if hasattr(FST, 'complex_shape'):
-        Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
-
-    else:
-        Sk[1] = FST.scalar_product(Source[1], Sk[1])
+    Sk[1] = FST.scalar_product(Source[1], Sk[1])
     Sk[1, -2:, 0, 0] = 0
 
 im1, im2, im3, im4 = (None, )*4
@@ -149,13 +145,11 @@ def update(context):
     if params.tstep % params.compute_energy == 0:
         e1, e2, exact = compute_error(c)
         div_u = solver.get_divergence(**c)
-        if hasattr(c.FST, 'dx'):
-            e3 = 0.5*c.FST.dx(div_u**2, c.ST.quad)
-        else:
-            e3 = dx(div_u**2, c.FST)
+        e3 = dx(div_u**2, c.FST)
         if solver.rank == 0 and not config.params.spatial_refinement_test:
-            acc[0] += abs(e1/e0-exact)
-            print("Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2), e3))
+            acc[0] += abs(e1/e0-exact)*params.dt
+            #acc[0] += sqrt(e2)
+            print("Time %2.5f Norms %2.16e %2.16e %2.16e %2.16e %2.16e" %(params.t, e1/e0, exact, e1/e0-exact, sqrt(e2), sqrt(e3)))
 
 def compute_error(context):
     global OS, e0, acc
@@ -169,8 +163,8 @@ def compute_error(context):
     exact = exp(2*imag(OS.eigval)*params.t)
     U0 = c.work[(c.U, 0, True)]
     initOS(OS, OS.eigvals, OS.eigvectors, U0, c.X, t=params.t)
-    #pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
-    pert = (U[0] - U0[0])**2
+    pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
+    #pert = (U[1] - U0[1])**2
     e2 = 0.5*dx(pert, c.FST)
 
     return e1, e2, exact
@@ -184,6 +178,7 @@ def refinement_test(context):
     _, e2, _ = compute_error(context)
     if config.solver.rank == 0:
         print("Computed error = %2.8e %2.8e %2.8e" %(sqrt(e2)/config.params.eps, config.params.dt, config.params.eps))
+        #print("Computed error = %2.8e %2.8e %2.8e" %(acc[0], config.params.dt, config.params.eps))
 
 def eps_refinement_test(context):
     e1, e2, exact = compute_error(context)
@@ -205,7 +200,8 @@ if __name__ == "__main__":
          'M': [7, 5, 2],
          'Dquad': 'GC',
          'Bquad': 'GC',
-         'dealias': None
+         'dealias': None,
+         'mask_nyquist': True
         }, "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)
@@ -248,7 +244,11 @@ if __name__ == "__main__":
 
     else:
         if config.params.refinement_test:
-            solver.update = lambda x: None
+            #solver.update = lambda x: None
+            def update_(con):
+                e1, _, exact = compute_error(con)
+                acc[0] += abs(e1/e0-exact)*config.params.dt
+            solver.update = update_
             solver.regression_test = refinement_test
         context = solver.get_context()
         # Just store 2D slices for visualization

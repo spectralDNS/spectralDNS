@@ -203,6 +203,9 @@ parser.add_argument('--h5filename', default='results', type=str,
 parser.add_argument('--verbose', dest='verbose', action='store_true', help='Print timings in the end')
 parser.add_argument('--no-verbose', dest='verbose', action='store_false', help='Do not print timings in the end')
 parser.set_defaults(verbose=True)
+parser.add_argument('--mask_nyquist', dest='mask_nyquist', action='store_true', help='Eliminate Nyquist frequency')
+parser.add_argument('--no-mask_nyquist', dest='mask_nyquist', action='store_false', help='Do not eliminate Nyquist frequency')
+parser.set_defaults(mask_nyquist=False)
 
 # Arguments for 3D isotropic solvers
 triplyperiodic = argparse.ArgumentParser(parents=[parser])
@@ -288,6 +291,17 @@ KMM_RB.add_argument('--integrator', default='implicit', choices=('implicit',), h
 KMMRK3_RB = channelsubparsers.add_parser('KMMRK3_RB', help='Rayleigh-Benard channel solver using KMMRK3.')
 KMMRK3_RB.add_argument('--integrator', default='implicitRK3', choices=('implicitRK3',), help='RK3 integrator for channel solver')
 
+#IPCS = channelsubparsers.add_parser('IPCS', help='Incremental pressure correction channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
+#IPCS.add_argument('--integrator', default='implicit', choices=('implicit',), help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
+
+#IPCSR = channelsubparsers.add_parser('IPCSR', help='Incremental pressure correction channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
+#IPCSR.add_argument('--integrator', default='implicit', choices=('implicit',), help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
+
+Coupled = channelsubparsers.add_parser('Coupled', help='Coupled channel solver with Crank-Nicolson and Adams-Bashforth discretization.')
+Coupled.add_argument('--integrator', default='implicit', choices=('implicit',), help='Regular Crank-Nicolson/Adams-Bashforth integrator for channel solver')
+
+CoupledRK3 = channelsubparsers.add_parser('CoupledRK3', help='Coupled channel solver with RK3.')
+CoupledRK3.add_argument('--integrator', default='implicit', choices=('implicit',), help='Coupled RK3 integrator for channel solver')
 
 def update(new, mesh="triplyperiodic"):
     """Update spectralDNS parameters"""

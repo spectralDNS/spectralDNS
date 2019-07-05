@@ -39,6 +39,8 @@ def get_context():
     VFST = MixedTensorProductSpace([FST, FST, FST])
     VUG = MixedTensorProductSpace([FST, FSB])
 
+    mask = FST.mask_nyquist() if params.mask_nyquist else None
+
     # Padded
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
@@ -55,11 +57,6 @@ def get_context():
     FSBp = TensorProductSpace(comm, (K0p, K1p, SBp), axes=(2, 0, 1), **kw0)
     FCTp = TensorProductSpace(comm, (K0p, K1p, CTp), axes=(2, 0, 1), **kw0)
     VFSp = MixedTensorProductSpace([FSTp, FSTp, FSBp])
-
-    Nu = params.N[2]-2   # Number of velocity modes in Shen basis
-    Nb = params.N[2]-4   # Number of velocity modes in Shen biharmonic basis
-    u_slice = slice(0, Nu)
-    v_slice = slice(0, Nb)
 
     float, complex, mpitype = datatypes("double")
 
@@ -97,6 +94,11 @@ def get_context():
     for i in range(2):
         K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
+    for i in range(3):
+        K[i] = K[i].astype(float)
+        Kx[i] = Kx[i].astype(float)
+
+    Kx2 = Kx[1]*Kx[1]+Kx[2]*Kx[2]
     work = work_arrays()
     u_dealias = Array(VFSp)
     u0_hat = np.zeros((2, params.N[2]), dtype=complex)
@@ -428,7 +430,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
 
 #@profile
 def ComputeRHS(rhs, u_hat, g_hat, solver,
-               H_hat, H_hat1, H_hat0, VFSp, FSTp, FSBp, FCTp, work, Kx, K2,
+               H_hat, H_hat1, H_hat0, VFSp, FSTp, FSBp, FCTp, work, Kx, K2, Kx2,
                K4, hv, hg, mat, la, u_dealias, **context):
     """Compute right hand side of Navier Stokes
 
@@ -463,7 +465,6 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
 
     return rhs
 
-@optimizer
 def compute_vw(u_hat, f_hat, g_hat, K_over_K2):
     u_hat[0] = -1j*(K_over_K2[0]*f_hat - K_over_K2[1]*g_hat)
     u_hat[1] = -1j*(K_over_K2[1]*f_hat + K_over_K2[0]*g_hat)
@@ -515,6 +516,10 @@ def integrate(u_hat, g_hat, rhs, dt, solver, context):
     rhs[:] = 0
     rhs = solver.ComputeRHS(rhs, u_hat, g_hat, solver, **context)
     u_hat, g_hat = solver.solve_linear(u_hat, g_hat, rhs, **context)
+    if context.mask is not None:
+        for i in range(3):
+            u_hat[i] *= context.mask
+        g_hat *= context.mask
     return (u_hat, g_hat), dt, dt
 
 def getintegrator(rhs, u0, solver, context):

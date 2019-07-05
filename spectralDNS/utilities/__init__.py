@@ -92,23 +92,29 @@ def dx(u, FST, axis=0):
     FST.comm.Reduce(cc, c, op=MPI.SUM, root=0)
     quad = FST.bases[axis].quad
     if FST.comm.Get_rank() == 0:
-        if quad == 'GL':
-            ak = aligned_like(c)
-            dct = dctn(aligned_like(c), axes=(0,), type=1)
-            ak = dct(c, ak)
-            ak /= (M-1)
-            w = np.arange(0, M, 1, dtype=float)
-            w[2:] = 2./(1-w[2:]**2)
-            w[0] = 1
-            w[1::2] = 0
-            return sum(ak*w)*np.prod(np.take(config.params.L/config.params.N, sx))
+        if FST.bases[axis].family() == 'chebyshev':
+            if quad == 'GL':
+                ak = aligned_like(c)
+                dct = dctn(aligned_like(c), axes=(0,), type=1)
+                ak = dct(c, ak)
+                ak /= (M-1)
+                w = np.arange(0, M, 1, dtype=float)
+                w[2:] = 2./(1-w[2:]**2)
+                w[0] = 1
+                w[1::2] = 0
+                return sum(ak*w)*np.prod(np.take(config.params.L/config.params.N, sx))
 
-        assert quad == 'GC'
-        d = aligned(M, fill=0)
-        k = 2*(1 + np.arange((M-1)//2))
-        d[::2] = (2./M)/np.hstack((1., 1.-k*k))
-        w = aligned_like(d)
-        dct = dctn(w, axes=(0,), type=3)
-        w = dct(d, w)
-        return np.sum(c*w)*np.prod(np.take(config.params.L/config.params.N, sx))
+            assert quad == 'GC'
+            d = aligned(M, fill=0)
+            k = 2*(1 + np.arange((M-1)//2))
+            d[::2] = (2./M)/np.hstack((1., 1.-k*k))
+            w = aligned_like(d)
+            dct = dctn(w, axes=(0,), type=3)
+            w = dct(d, w)
+            return np.sum(c*w)*np.prod(np.take(config.params.L/config.params.N, sx))
+        else:
+
+            w = FST.bases[axis].points_and_weights()[1]
+            return np.sum(c*w)*np.prod(np.take(config.params.L/config.params.N, sx))
+
     return 0

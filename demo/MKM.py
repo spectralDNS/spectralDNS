@@ -7,6 +7,7 @@ import matplotlib.cbook
 #from spectralDNS.utilities import reset_profile
 from spectralDNS import config, get_solver, solve
 from spectralDNS.utilities import dx
+from shenfun import TrialFunction, TestFunction, inner, div, grad, project, Function
 
 warnings.filterwarnings("ignore", category=matplotlib.cbook.mplDeprecation)
 
@@ -31,30 +32,30 @@ def initialize(solver, context):
     # Initialize with pertubation ala perturbU (https://github.com/wyldckat/perturbU) for openfoam
     U = context.U
     X = context.X
+    U_hat = context.U_hat
     params = config.params
     Y = np.where(X[0] < 0, 1+X[0], 1-X[0])
     utau = params.nu*params.Re_tau
-    #Um = 46.9091*utau
-    Um = 56.*utau
+    Um = 46.9091*utau # For Re_tau=180
+    #Um = 56.*utau
     Xplus = Y*params.Re_tau
     Yplus = X[1]*params.Re_tau
     Zplus = X[2]*params.Re_tau
     duplus = Um*0.2/utau  #Um*0.25/utau
-    alfaplus = params.L[1]/500.
-    betaplus = params.L[2]/200.
+    alfaplus = params.L[1]/200.  # May have to adjust these two for different Re
+    betaplus = params.L[2]/100.  #
     sigma = 0.00055 # 0.00055
     epsilon = Um/200.   #Um/200.
     U[:] = 0
     U[1] = Um*(Y-0.5*Y**2)
-    dev = 1+0.0001*np.random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
+    dev = 1+0.0000001*np.random.randn(Y.shape[0], Y.shape[1], Y.shape[2])
     #dev = np.fromfile('dev.dat').reshape((64, 64, 64))
-    dd = utau*duplus/2.0*Xplus/40.*np.exp(-sigma*Xplus**2+0.5)*np.cos(betaplus*Zplus)*dev
+    dd = utau*duplus/2.0*Xplus/40.*np.exp(-sigma*Xplus**2+0.5)*np.cos(betaplus*Zplus)*dev[:, slice(0, 1), :]
     U[1] += dd
-    U[2] += epsilon*np.sin(alfaplus*Yplus)*Xplus*np.exp(-sigma*Xplus**2)*dev
-
-    U_hat = solver.set_velocity(**context)
-    U = solver.get_velocity(**context)
-    U_hat = solver.set_velocity(**context)
+    U[2] += epsilon*np.sin(alfaplus*Yplus)*Xplus*np.exp(-sigma*Xplus**2)*dev[:, :, slice(0, 1)]
+    U_hat = U.forward(U_hat)
+    U = U_hat.backward(U)
+    U_hat = U.forward(U_hat)
 
     if "KMM" in params.solver:
         context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
@@ -63,12 +64,28 @@ def initialize(solver, context):
     #flux[0] = context.FST.dx(U[1], context.ST.quad)
     #solver.comm.Bcast(flux)
 
+    # project to zero divergence
+    div_u = solver.get_divergence(**context)
+    print('div0 ', dx(div_u**2, context.FST))
+    u = TrialFunction(context.FST)
+    v = TestFunction(context.FST)
+    A = inner(v, div(grad(u)))
+    b = inner(v, div(U_hat))
+    from shenfun.chebyshev.la import Helmholtz
+    sol = Helmholtz(*A)
+    phi = Function(context.FST)
+    phi = sol(phi, b)
+    U_hat -= project(grad(phi), context.VFS)
+    U = U_hat.backward(U)
+    div_u = solver.get_divergence(**context)
+    print('div1 ', dx(div_u**2, context.FST))
+
     if solver.rank == 0:
         print("Flux {}".format(flux[0]))
 
     if not 'KMM' in params.solver:
         P_hat = solver.compute_pressure(**context)
-        P = context.FST.backward(P_hat, context.P, context.SN)
+        P = P_hat.backward(context.P)
 
     if not 'RK3' in params.solver:
         context.U_hat0[:] = context.U_hat[:]
@@ -98,41 +115,10 @@ def update(context):
         beta[0] = dx(U[1], c.FST)
 
         #solver.comm.Bcast(beta)
-        q = (flux[0] - beta[0])  # array(params.L).prod()
-        #U_tmp = c.work[(U[0], 0)]
-        #F_tmp = c.work[(U_hat[0], 0)]
-        #U_tmp[:] = beta[0]
-        #F_tmp = c.FST.forward(U_tmp, F_tmp, c.ST)
-        #U_hat[1] += q/beta[0]*U_hat[1]
+        q = (flux[0] - beta[0])
         if solver.rank == 0:
-            #d0 = zeros(U_hat.shape[1], dtype=U_hat.dtype)
-            #d1 = zeros(U_hat.shape[1], dtype=U_hat.dtype)
-            #d0 = c.mat.ADD.matvec(U_hat[1,:,0,0], d0)
-            #d1 = c.mat.BDD.matvec(U_hat[1,:,0,0], d1)
-            #c.Sk[1,0,0,0] -= (flux[0]/beta[0]-1)/params.dt*(-params.nu*params.dt/2.*d0[0] + d1[0])*0.025
-            c.Sk[1, 0, 0, 0] -= (flux[0]/beta[0]-1)*0.1
-
-        #c.Source[1] -= q/array(params.L).prod()
-        #c.Sk[1] = c.FST.scalar_product(c.Source[1], c.Sk[1], c.ST)
-
-    #if params.tstep % 1 == 0:
-        #U[1] = c.FST.backward(U_hat[1], U[1], c.ST)
-        #beta[0] = c.FST.dx(U[1], c.ST.quad)
-        ##beta[0] = (flux[0] - beta[0])/(array(params.L).prod())
-        #solver.comm.Bcast(beta)
-        #q = flux[0]/beta[0]-1
-        ##U[1] += beta[0]*U[1]
-        ##U_hat[1] = c.FST.forward(U[1], U_hat[1], c.ST)
-        #U_hat[1] += q*U_hat[1]
-        #c.Source[1] -= beta[0]*q/(array(params.L).prod())/params.dt/2
-        #c.Sk[1] = c.FST.scalar_product(c.Source[1], c.Sk[1], c.ST)
-
-    #utau = config.params.Re_tau * config.params.nu
-    #Source[:] = 0
-    #Source[1] = -utau**2
-    #Source[:] += 0.05*random.randn(*U.shape)
-    #for i in range(3):
-        #Sk[i] = FST.scalar_product(Source[i], Sk[i], ST)
+            #c.Sk[1, 0, 0, 0] -= (flux[0]/beta[0]-1)*0.05
+            c.U_hat[1, 0, 0, 0] += q/(np.array(params.L).prod()*4./3.)
 
     if (params.tstep % params.compute_energy == 0 or
             params.tstep % params.plot_result == 0 and params.plot_result > 0 or
@@ -140,11 +126,8 @@ def update(context):
         U = solver.get_velocity(**c)
 
     if params.tstep % params.print_energy0 == 0 and solver.rank == 0:
-        print((c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 2)))
-        print((c.U_hat[0].real*c.U_hat[0].real).mean(axis=(0, 1)))
-        #print(params.tstep, (c.U_hat[0]*c.U_hat[0]).mean()/4096**2, (c.U[0]*c.U[0]).mean())
-        #print(params.tstep, (c.U_hat[1]*c.U_hat[1]).mean()/4096**2, (c.U[1]*c.U[1]).mean())
-        #print(params.tstep, (c.U_hat[2]*c.U_hat[2]).mean()/4096**2, (c.U[2]*c.U[2]).mean())
+        print(abs(c.U_hat[0]).mean(axis=(0, 2)))
+        print(abs(c.U_hat[0]).mean(axis=(0, 1)))
 
     if params.tstep == 1 and solver.rank == 0 and params.plot_result > 0:
         # Initialize figures
@@ -287,7 +270,7 @@ class Stats(object):
 
 def init_from_file(filename, solver, context):
     f = h5py.File(filename, 'r+', driver="mpio", comm=solver.comm)
-    assert "0" in f["U/Vector/3D"]
+    assert "0" in f["U/3D"]
     U = context.U
     U_hat = context.U_hat
     N = U.shape[1]
@@ -296,17 +279,18 @@ def init_from_file(filename, solver, context):
 
     # previous timestep
     if not 'RK3' in config.params.solver:
-        assert "1" in f["U/Vector/3D"]
-        U_hat[:] = f["U/Vector/3D/1"][su]
+        assert "1" in f["U/3D"]
+        U_hat[:] = f["U/3D/1"][su]
 
         # Set g, which is used in computing convection
-        context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
+        #context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
         context.U_hat0[:] = U_hat
         context.H_hat1[:] = solver.get_convection(**context)
 
     # current timestep
-    U_hat[:] = f["U/Vector/3D/0"][su]
-    context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
+    U_hat[:] = f["U/3D/0"][su]
+    if hasattr(context, 'g'):
+        context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
     f.close()
 
 if __name__ == "__main__":
@@ -316,20 +300,22 @@ if __name__ == "__main__":
          'dt': 0.0005,                  # Time step
          'T': 100.,                    # End time
          'L': [2, 2*np.pi, np.pi],
-         'M': [6, 6, 6],
-         'dealias': '3/2-rule'
+         'M': [6, 6, 5],
+         'dealias': '3/2-rule',
+         'checkpoint': 1000,
+         'mask_nyquist': True
         }, "channel"
     )
-    config.channel.add_argument("--compute_energy", type=int, default=10)
+    config.channel.add_argument("--compute_energy", type=int, default=100)
     config.channel.add_argument("--plot_result", type=int, default=100)
-    config.channel.add_argument("--sample_stats", type=int, default=1000)
-    config.channel.add_argument("--print_energy0", type=int, default=10)
+    config.channel.add_argument("--sample_stats", type=int, default=500)
+    config.channel.add_argument("--print_energy0", type=int, default=1000)
     #solver = get_solver(update=update, mesh="channel")
     solver = get_solver(update=update, mesh="channel")
     context = solver.get_context()
-    initialize(solver, context)
-    #init_from_file("KMM666d.h5_c.h5", solver, context)
+    #initialize(solver, context)
+    init_from_file("IPCSR666e_c.h5", solver, context)
     set_Source(**context)
-    solver.stats = Stats(context.U, solver.comm, filename="KMMstatsq")
-    context.hdf5file.filename = "KMM666e"
+    solver.stats = Stats(context.U, solver.comm, filename="IPCSR666stats6")
+    context.hdf5file.filename = "IPCSR666f"
     solve(solver, context)

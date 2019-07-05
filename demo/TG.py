@@ -100,13 +100,15 @@ def update(context):
 
         ww = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))/prod(params.N)/2)
         kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))/prod(params.N)/2) # Compute energy with double precision
-        ww2 = energy_fourier(solver.comm, c.U_hat)/prod(params.N)**2/2
+        ww2 = energy_fourier(solver.comm, c.U_hat)/2
+        divu = solver.get_divergence(**context)
+        divu = solver.comm.reduce(sum(divu.astype(float64)*divu.astype(float64))/prod(params.N)/2)
 
         kold[0] = kk
         if solver.rank == 0:
             k.append(kk)
             w.append(ww)
-            print("%2.2f %2.8f %2.8f %2.8f" %(params.t, float(kk), float(ww), float(ww2)))
+            print("%2.2f %2.8f %2.8e %2.8e" %(params.t, float(kk), float(ww2-kk), float(divu)))
     #if params.tstep % params.compute_energy == 1:
         #if 'NS' in params.solver:
             #kk2 = comm.reduce(sum(U.astype(float64)*U.astype(float64))/prod(params.N)/2)
@@ -132,6 +134,7 @@ if __name__ == "__main__":
          'T': 0.1,                   # End time
          'L': [2*pi, 2.*pi, 2*pi],
          'M': [5, 5, 5],
+         'mask_nyquist': True,
          'planner_effort': {'fft': 'FFTW_ESTIMATE',
                             'rfftn': 'FFTW_ESTIMATE',
                             'irfftn': 'FFTW_ESTIMATE'},

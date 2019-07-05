@@ -37,6 +37,8 @@ def get_context():
                             collapse_fourier=collapse_fourier, **kw0)
     VTp = VectorTensorProductSpace(Tp)
 
+    mask = T.mask_nyquist() if params.mask_nyquist else None
+
     # Mesh variables
     X = T.local_mesh(True)
     K = T.local_wavenumbers(scaled=True)
@@ -263,4 +265,6 @@ def ComputeRHS(rhs, u_hat, solver, work, Tp, VTp, P_hat, K, Kx, K2, u_dealias,
     rhs = solver.add_pressure_diffusion(rhs, u_hat, params.nu, K2, K, P_hat,
                                         K_over_K2)
     rhs += Source
+    if context['mask'] is not None:
+        rhs *= context['mask']
     return rhs

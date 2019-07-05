@@ -66,7 +66,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
     return rhs
 
 def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
-               H_hat, VFSp, FSTp, FSBp, FCTp, work, Kx, K2, K4, hv,
+               H_hat, VFSp, FSTp, FSBp, FCTp, work, Kx, K, K2, K4, hv,
                hg, a, b, la, mat, u_dealias, **context):
 
     """Compute right hand side of Navier Stokes
@@ -96,9 +96,9 @@ def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
     hv[1] = -K2*mat.BBD.matvec(H_hat[0], w0)
     #hv[:] = FST.scalar_product(H[0], hv, SB)
     #hv *= -K2
-    hv[1] -= 1j*Kx[1]*mat.CBD.matvec(H_hat[1], w0)
-    hv[1] -= 1j*Kx[2]*mat.CBD.matvec(H_hat[2], w0)
-    hg[1] = 1j*Kx[1]*mat.BDD.matvec(H_hat[2], w0) - 1j*Kx[2]*mat.BDD.matvec(H_hat[1], w1)
+    hv[1] -= 1j*K[1]*mat.CBD.matvec(H_hat[1], w0)
+    hv[1] -= 1j*K[2]*mat.CBD.matvec(H_hat[2], w0)
+    hg[1] = 1j*K[1]*mat.BDD.matvec(H_hat[2], w0) - 1j*K[2]*mat.BDD.matvec(H_hat[1], w1)
 
     rhs[0] = (hv[1]*a[rk] + hv[0]*b[rk])*params.dt
     rhs[1] = (hg[1]*a[rk] + hg[0]*b[rk])*2./params.nu/(a[rk]+b[rk])
@@ -168,5 +168,10 @@ def integrate(u_hat, g_hat, rhs, dt, solver, context):
     for rk in range(3):
         rhs = solver.ComputeRHS(rhs, u_hat, g_hat, rk, solver, **context)
         u_hat, g_hat = solver.solve_linear(u_hat, g_hat, rhs, rk, **context)
+
+    if context.mask is not None:
+        for i in range(3):
+            u_hat[i] *= context.mask
+        g_hat *= context.mask
 
     return (u_hat, g_hat), dt, dt

@@ -14,11 +14,7 @@ def set_Source(Source, Sk, FST, ST, **context):
     Source[:] = 0
     Source[1, :] = -2./config.params.Re
     Sk[:] = 0
-    if hasattr(FST, 'complex_shape'):
-        Sk[1] = FST.scalar_product(Source[1], Sk[1], ST)
-
-    else:
-        Sk[1] = FST.scalar_product(Source[1], Sk[1])
+    Sk[1] = FST.scalar_product(Source[1], Sk[1])
 
 def exact(x, Re, t, num_terms=400):
     beta = 2./Re

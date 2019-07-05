@@ -121,7 +121,7 @@ def update(context):
 
         if params.tstep % params.plot_step == 0 and solver.rank == 0 and params.plot_step > 0:
             im1.ax.clear()
-            im1.ax.contourf(c.X[0][:, 0, :], c.X[2][:, 0, :], U[0, :, 0, :], 100)
+            im1.ax.contourf(c.X[0][:, 0, :], c.X[2][:, 0, :], U[2, :, 0, :], 100)
             im1.autoscale()
             im2.ax.clear()
             im2.ax.contourf(c.X[0][:, 0, :], c.X[2][:, 0, :], U[0, :, 0, :]-(1-c.X[2][:, 0, :]**2), 100)
@@ -144,13 +144,14 @@ def compute_error(context):
     solver = config.solver
     U = solver.get_velocity(**c)
     pert = (U[0] - (1-c.X[2]**2))**2 + U[2]**2
+
     e1 = 0.5*dx(pert, c.FST, axis=2)
 
     exact = exp(2*imag(OS.eigval)*params.t)
-    U0 = c.work[(c.U, 0, True)]
+    U0 = c.work[(U, 0, True)]
     initOS(OS, OS.eigvals, OS.eigvectors, U0, c.X, t=params.t)
-    #pert = (U[0] - U0[0])**2 + (U[1]-U0[1])**2
-    pert = (U[2] - U0[2])**2
+    pert = (U[0] - U0[0])**2 + (U[2]-U0[2])**2
+    #pert = (U[2] - U0[2])**2
     e2 = 0.5*dx(pert, c.FST, axis=2)
 
     return e1, e2, exact
@@ -185,6 +186,7 @@ if __name__ == "__main__":
          'M': [5, 2, 7],
          'Dquad': 'GC',
          'Bquad': 'GC',
+         'mask_nyquist': True,
          'dealias': None
         }, "channel"
     )

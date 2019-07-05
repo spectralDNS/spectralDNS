@@ -8,12 +8,14 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 from shenfun.spectralbase import inner_product
 from shenfun.la import TDMA
 from shenfun import TensorProductSpace, Array, TestFunction, TrialFunction, \
-    MixedTensorProductSpace, div, grad, Dx, inner, Function, Basis
+    MixedTensorProductSpace, div, grad, Dx, inner, Function, Basis, \
+    VectorTensorProductSpace
 from shenfun.chebyshev.la import Helmholtz, Biharmonic
 
 from .spectralinit import *
 from ..shen.Matrices import BiharmonicCoeff, HelmholtzCoeff
 from ..shen import LUsolve
+from shenfun import project, div
 
 def get_context():
     """Set up context for solver"""
@@ -38,6 +40,9 @@ def get_context():
     VFS = MixedTensorProductSpace([FSB, FST, FST])
     VFST = MixedTensorProductSpace([FST, FST, FST])
     VUG = MixedTensorProductSpace([FSB, FST])
+    VCT = VectorTensorProductSpace(FCT)
+
+    mask = FST.mask_nyquist() if params.mask_nyquist else None
 
     # Padded
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
@@ -55,11 +60,6 @@ def get_context():
     FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **kw0)
     FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **kw0)
     VFSp = MixedTensorProductSpace([FSBp, FSTp, FSTp])
-
-    Nu = params.N[0]-2   # Number of velocity modes in Shen basis
-    Nb = params.N[0]-4   # Number of velocity modes in Shen biharmonic basis
-    u_slice = slice(0, Nu)
-    v_slice = slice(0, Nb)
 
     float, complex, mpitype = datatypes("double")
 
@@ -82,8 +82,8 @@ def get_context():
     H_hat0 = Function(VFST)
     H_hat1 = Function(VFST)
 
-    dU = Function(VUG)
-    hv = Function(FST)
+    dU = Function(VFS)
+    hv = Function(FSB)
     hg = Function(FST)
     Source = Array(VFS)
     Sk = Function(VFS)
@@ -189,43 +189,44 @@ def get_pressure(context, solver):
     FCT = context.FCT
     FST = context.FST
 
-    U = solver.get_velocity(**context)
-    U0 = context.VFS.backward(context.U_hat0, context.U0)
+    U_hat = context.U_hat
+    U_hat0 = context.U_hat0
+    Um = Function(context.FST)
+    Um[:] = 0.5*(U_hat[0] + U_hat0[0])
+    U = U_hat.backward(context.U)
+    U0 = U_hat0.backward(context.U0)
     dt = solver.params.dt
 
-    H_hat = solver.get_convection(**context)
-    Hx = Array(FST)
-    Hx = FST.backward(H_hat[0], Hx)
+    Hx = Function(context.FST)
+    Hx[:] = solver.get_convection(**context)[0]
 
     v = TestFunction(FCT)
     p = TrialFunction(FCT)
-    U = U.as_function()
-    U0 = U0.as_function()
-
-    rhs_hat = inner((0.5*context.nu)*div(grad(U[0]+U0[0])), v)
-    Hx -= 1./dt*(U[0]-U0[0])
+    rhs_hat = inner(context.nu*div(grad(Um)), v)
+    Hx -= 1./dt*(U_hat[0]-U_hat0[0])
     rhs_hat += inner(Hx, v)
 
-    CT = inner(Dx(p, 0), v)
+    CT = inner(Dx(p, 0, 1), v)
 
     # Should implement fast solver. Just a backwards substitution
-    A = CT.diags().toarray()*CT.scale[0]
-    A[-1, 0] = 1
-    a_i = np.linalg.inv(A)
+    # Apply integral constraint
+    A = CT.mats[0]
+    N = A.shape[0]
+    A[-(N-1)] = 1
 
     p_hat = Function(context.FCT)
-
-    for j in range(p_hat.shape[1]):
-        for k in range(p_hat.shape[2]):
-            p_hat[:, j, k] = np.dot(a_i, rhs_hat[:, j, k])
+    p_hat = CT.solve(rhs_hat, p_hat)
 
     p = Array(FCT)
     p = FCT.backward(p_hat, p)
 
-    uu = np.sum((0.5*(U+U0))**2, 0)
-    uu *= 0.5
+    uu = 0.
+    if params.convection == 'Vortex':
+        uu = np.sum((0.5*(U+U0))**2, 0)
+        uu *= 0.5
 
-    return p-uu+3./16.
+
+    return p-uu
 
 def get_divergence(U, U_hat, FST, K, Kx, work, la, mat, **context):
     Uc_hat = work[(U_hat[0], 0, True)]
@@ -302,13 +303,16 @@ def standardConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp, FSBp, FCTp, work,
 
     # dudx = 0 from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx
-    F_tmp[0] = mat.CDB.matvec(u_hat[0], F_tmp[0])
-    F_tmp[0] = la.TDMASolverD(F_tmp[0])
-    dudx = Uc[0] = FSTp.backward(F_tmp[0], Uc[0])
+    #F_tmp[0] = mat.CDB.matvec(u_hat[0], F_tmp[0])
+    #F_tmp[0] = la.TDMASolverD(F_tmp[0])
+    #dudx = Uc[0] = FSTp.backward(F_tmp[0], Uc[0])
+    #LUsolve.Mult_CTD_3D(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
+    #dvdx = Uc[1] = FCTp.backward(F_tmp[1], Uc[1])
+    #dwdx = Uc[2] = FCTp.backward(F_tmp[2], Uc[2])
 
-    LUsolve.Mult_CTD_3D_n(params.N[0], u_hat[1], u_hat[2], F_tmp[1], F_tmp[2])
-    dvdx = Uc[1] = FCTp.backward(F_tmp[1], Uc[1])
-    dwdx = Uc[2] = FCTp.backward(F_tmp[2], Uc[2])
+    dudx = project(Dx(u_hat[0], 0, 1), FSTp).backward()
+    dvdx = project(Dx(u_hat[1], 0, 1), FCTp).backward()
+    dwdx = project(Dx(u_hat[2], 0, 1), FCTp).backward()
 
     dudy = Uc2[0] = FSBp.backward(1j*K[1]*u_hat[0], Uc2[0])
     dudz = Uc2[1] = FSBp.backward(1j*K[2]*u_hat[0], Uc2[1])
@@ -333,23 +337,16 @@ def divergenceConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp, FSBp, FCTp, work,
     """c_i = div(u_i u_j)"""
     if not add:
         rhs.fill(0)
-    F_tmp = work[(rhs, 0, True)]
-    F_tmp2 = work[(rhs, 1, True)]
+    F_tmp = Function(VFSp, buffer=work[(rhs, 0, True)])
+    F_tmp2 = Function(VFSp, buffer=work[(rhs, 1, True)])
     U = u_dealias
 
     F_tmp[0] = FSTp.forward(U[0]*U[0], F_tmp[0])
     F_tmp[1] = FSTp.forward(U[0]*U[1], F_tmp[1])
     F_tmp[2] = FSTp.forward(U[0]*U[2], F_tmp[2])
 
-    F_tmp2[0] = mat.CDD.matvec(F_tmp[0], F_tmp2[0])
-    F_tmp2[1] = mat.CDD.matvec(F_tmp[1], F_tmp2[1])
-    F_tmp2[2] = mat.CDD.matvec(F_tmp[2], F_tmp2[2])
-    F_tmp2[0] = la.TDMASolverD(F_tmp2[0])
-    F_tmp2[1] = la.TDMASolverD(F_tmp2[1])
-    F_tmp2[2] = la.TDMASolverD(F_tmp2[2])
-    rhs[0] += F_tmp2[0]
-    rhs[1] += F_tmp2[1]
-    rhs[2] += F_tmp2[2]
+    F_tmp2 = project(Dx(F_tmp, 0, 1), VFSp, output_array=F_tmp2)
+    rhs += F_tmp2
 
     F_tmp2[0] = FSTp.forward(U[0]*U[1], F_tmp2[0])
     F_tmp2[1] = FSTp.forward(U[0]*U[2], F_tmp2[1])
@@ -462,9 +459,9 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
     w0 = work[(hv, 0, False)]
     w1 = work[(hv, 1, False)]
     hv[:] = -K2*mat.BBD.matvec(H_hat0[0], w0)
-    hv -= 1j*Kx[1]*mat.CBD.matvec(H_hat0[1], w0)
-    hv -= 1j*Kx[2]*mat.CBD.matvec(H_hat0[2], w0)
-    hg[:] = 1j*Kx[1]*mat.BDD.matvec(H_hat0[2], w0) - 1j*Kx[2]*mat.BDD.matvec(H_hat0[1], w1)
+    hv -= 1j*K[1]*mat.CBD.matvec(H_hat0[1], w0)
+    hv -= 1j*K[2]*mat.CBD.matvec(H_hat0[2], w0)
+    hg[:] = 1j*K[1]*mat.BDD.matvec(H_hat0[2], w0) - 1j*K[2]*mat.BDD.matvec(H_hat0[1], w1)
 
     rhs[0] = hv*params.dt
     rhs[1] = hg*2./params.nu
@@ -524,6 +521,10 @@ def integrate(u_hat, g_hat, rhs, dt, solver, context):
     rhs[:] = 0
     rhs = solver.ComputeRHS(rhs, u_hat, g_hat, solver, **context)
     u_hat, g_hat = solver.solve_linear(u_hat, g_hat, rhs, **context)
+    if context.mask is not None:
+        for i in range(3):
+            u_hat[i] *= context.mask
+        g_hat *= context.mask
     return (u_hat, g_hat), dt, dt
 
 def getintegrator(rhs, u0, solver, context):
