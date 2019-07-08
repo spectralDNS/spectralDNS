@@ -157,13 +157,9 @@ def integrate(u_hat, g_hat, p_hat, rhs, dt, solver, context):
     """Regular implicit solver for KMM_RB channel solver"""
     rhs[:] = 0
     rhs = solver.ComputeRHS(rhs, u_hat, g_hat, p_hat, solver, context)
-    u_hat, g_hat, p_hat = solver.solve_linear(u_hat, g_hat, p_hat, rhs, context)
     if context.mask is not None:
-        for i in range(3):
-            u_hat[i] *= context.mask
-        g_hat *= context.mask
-        p_hat *= context.mask
-
+        rhs *= context.mask
+    u_hat, g_hat, p_hat = solver.solve_linear(u_hat, g_hat, p_hat, rhs, context)
     return (u_hat, g_hat, p_hat), dt, dt
 
 def getintegrator(rhs, u0, solver, context):

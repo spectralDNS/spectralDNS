@@ -317,6 +317,7 @@ if __name__ == "__main__":
          'L': [2.*pi, 2.*pi, 2.*pi],
          'checkpoint': 100,
          'write_result': 1e8,
+         'mask_nyquist': True,
         }, "triplyperiodic"
     )
     config.triplyperiodic.add_argument("--N", default=[60, 60, 60], nargs=3,

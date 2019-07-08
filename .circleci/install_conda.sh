@@ -11,4 +11,4 @@ conda config --set always_yes yes
 conda update -q conda
 conda config --add channels conda-forge
 conda config --add channels spectralDNS
-conda install -n root conda-build
+conda install -n root conda-build=3.17

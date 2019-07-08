@@ -167,11 +167,7 @@ def integrate(u_hat, g_hat, rhs, dt, solver, context):
     """Three stage Runge Kutta integrator for KMM channel solver"""
     for rk in range(3):
         rhs = solver.ComputeRHS(rhs, u_hat, g_hat, rk, solver, **context)
+        if context.mask is not None:
+            rhs *= context.mask
         u_hat, g_hat = solver.solve_linear(u_hat, g_hat, rhs, rk, **context)
-
-    if context.mask is not None:
-        for i in range(3):
-            u_hat[i] *= context.mask
-        g_hat *= context.mask
-
     return (u_hat, g_hat), dt, dt

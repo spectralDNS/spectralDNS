@@ -26,6 +26,8 @@ def get_context():
     VT = VectorTensorProductSpace(T)
     VM = MixedTensorProductSpace([T]*2*dim)
 
+    mask = T.mask_nyquist() if params.mask_nyquist else None
+
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
 
@@ -174,4 +176,6 @@ def ComputeRHS(rhs, ub_hat, solver, Tp, VMp, K, Kx, K2, K_over_K2, P_hat, ub_dea
     rhs = solver.conv(rhs, ub_hat, Tp, VMp, Kx, ub_dealias, ZZ_hat)
     rhs = solver.add_pressure_diffusion(rhs, ub_hat, params.nu, params.eta, K2,
                                         K, P_hat, K_over_K2)
+    if context['mask'] is not None:
+        rhs *= context['mask']
     return rhs

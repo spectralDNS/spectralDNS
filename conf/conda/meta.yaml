@@ -31,8 +31,8 @@ requirements:
     - {{ mpi }}
     - hdf5 * mpi_{{ mpi }}_*
     - h5py * mpi_{{ mpi }}_*
-    - shenfun >=2.0.1
-    - mpi4py-fft >=2.0.1
+    - shenfun >=2.0.7
+    - mpi4py-fft >=2.0.3
     - mpi4py
     - scipy
     - sympy

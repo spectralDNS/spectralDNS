@@ -122,13 +122,9 @@ def integrate(u_hat, g_hat, p_hat, rhs, dt, solver, context):
     rhs[:] = 0
     for rk in range(3):
         rhs = solver.ComputeRHS(rhs, u_hat, g_hat, p_hat, rk, solver, context)
+        if context.mask is not None:
+            rhs *= context.mask
         u_hat, g_hat, p_hat = solver.solve_linear(u_hat, g_hat, p_hat, rhs, rk, context)
-
-    if context.mask is not None:
-        for i in range(3):
-            u_hat[i] *= context.mask
-        g_hat *= context.mask
-        p_hat *= context.mask
 
     return (u_hat, g_hat, p_hat), dt, dt
 

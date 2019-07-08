@@ -313,9 +313,9 @@ if __name__ == "__main__":
     #solver = get_solver(update=update, mesh="channel")
     solver = get_solver(update=update, mesh="channel")
     context = solver.get_context()
-    #initialize(solver, context)
-    init_from_file("IPCSR666e_c.h5", solver, context)
+    initialize(solver, context)
+    #init_from_file("IPCSR666e_c.h5", solver, context)
     set_Source(**context)
-    solver.stats = Stats(context.U, solver.comm, filename="IPCSR666stats6")
-    context.hdf5file.filename = "IPCSR666f"
+    solver.stats = Stats(context.U, solver.comm, filename="KMM665statsa")
+    context.hdf5file.filename = "KMM665a"
     solve(solver, context)

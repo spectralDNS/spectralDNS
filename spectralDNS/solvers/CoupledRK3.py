@@ -355,12 +355,9 @@ def integrate(up_hat, rhs, dt, solver, context):
     rhs[:] = 0
     for rk in range(3):
         rhs = solver.ComputeRHS(rhs, u_hat, rk, solver, **context)
+        if context.mask is not None:
+            rhs *= context.mask
         up_hat = context.M[rk].solve(rhs, u=up_hat, constraints=context.constraints)
-
-    if context.mask is not None:
-        for i in range(3):
-            u_hat[i] *= context.mask
-        p_hat *= context.mask
 
     return up_hat, dt, dt
 

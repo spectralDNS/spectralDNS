@@ -25,6 +25,8 @@ def get_context():
     VT = VectorTensorProductSpace(T)
     VM = MixedTensorProductSpace([T]*(dim+1))
 
+    mask = T.mask_nyquist() if params.mask_nyquist else None
+
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
 
@@ -52,7 +54,7 @@ def get_context():
     for i in range(dim):
         Kx[i] = Kx[i].astype(float)
 
-    K_over_K2 = np.zeros(VT.shape(), dtype=float)
+    K_over_K2 = np.zeros(VT.shape(True), dtype=float)
     for i in range(dim):
         K_over_K2[i] = K[i] / np.where(K2 == 0, 1, K2)
 
@@ -101,11 +103,11 @@ def get_rho(Ur, Ur_hat, **context):
     Ur[2] = Ur_hat[2].backward(Ur[2])
     return Ur[2]
 
-def get_velocity(U, U_hat, **context):
+def get_velocity(Ur, Ur_hat, **context):
     """Compute and return velocity from context"""
-    U[0] = U_hat[0].backward(U[0])
-    U[1] = U_hat[1].backward(U[1])
-    return U
+    Ur[0] = Ur_hat[0].backward(Ur[0])
+    Ur[1] = Ur_hat[1].backward(Ur[1])
+    return Ur[:2]
 
 def getConvection(convection):
     """Return function used to compute nonlinear term"""
@@ -180,4 +182,6 @@ def ComputeRHS(rhs, ur_hat, solver, work, K, Kx, K2, K_over_K2, P_hat, T, Tp,
     rhs = solver.conv(rhs, ur_hat, work, T, Tp, VM, VMp, Kx, ur_dealias)
     rhs = solver.add_pressure_diffusion(rhs, ur_hat, P_hat, K_over_K2, K, K2,
                                         params.nu, params.Ri, params.Pr)
+    if context['mask'] is not None:
+        rhs *= context['mask']
     return rhs

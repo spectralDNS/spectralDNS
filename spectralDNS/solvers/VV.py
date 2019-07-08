@@ -143,4 +143,6 @@ def ComputeRHS(rhs, w_hat, solver, work, Tp, VT, VTp, K, Kx, K2, K_over_K2,
     """
     rhs = solver.conv(rhs, w_hat, work, Tp, VTp, K, K_over_K2, u_dealias)
     rhs = solver.add_linear(rhs, w_hat, params.nu, K2, Source)
+    if context['mask'] is not None:
+        rhs *= context['mask']
     return rhs

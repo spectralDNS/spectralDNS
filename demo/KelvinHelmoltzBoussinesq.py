@@ -79,6 +79,7 @@ if __name__ == "__main__":
          'k0': 2,
          'rho1': 1.0,
          'rho2': 3.0,
+         'mask_nyquist': True,
          'integrator': 'BS5_adaptive'
         }, 'doublyperiodic'
     )

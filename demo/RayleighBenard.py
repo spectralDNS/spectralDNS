@@ -91,8 +91,9 @@ class Stats(object):
         self.T = T
         self.axis = axis
         N = config.params.N
+        print(np.array(T.shape(False)[1:]), np.array(N))
         assert np.all(np.array(T.shape(False)[1:]) == np.array(N))
-        M = self.T.local_shape(False)[self.axis+1]
+        M = self.T.shape(False)[self.axis+1]
         self.Umean = np.zeros((3, M))
         self.phim = np.zeros(M)
         self.UU = np.zeros((6, M))
@@ -223,7 +224,8 @@ if __name__ == "__main__":
         {'dt': 0.01,               # Time step
          'T': 1000.,                  # End time
          'L': [2, 2*np.pi, 2*np.pi],
-         'M': [6, 7, 7]
+         'M': [6, 7, 7],
+         'mask_nyquist': True
         }, "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=10)
@@ -237,7 +239,7 @@ if __name__ == "__main__":
     context = solver.get_context()
     initialize(solver, context)
     #init_from_file("KMMRK3_RB_677g_c.h5", solver, context)
-    context.hdf5file.filename = "KMMRK3_RB_677a"
+    context.hdf5file.filename = "KMM_RB_677a"
 
     # Just store slices
     context.hdf5file.results['space'] = context.FST
@@ -250,5 +252,5 @@ if __name__ == "__main__":
                                         'phi': [(context.phi, [slice(None), slice(None), 0]),
                                                 (context.phi, [slice(None), 0, slice(None)])]
                                        }
-    solver.stats = Stats(context.VFS, filename="KMMRK3_RB_stats")
+    solver.stats = Stats(context.VFS, filename="KMM_RB_stats")
     solve(solver, context)
