@@ -67,7 +67,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
 
 def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
                H_hat, VFSp, FSTp, FSBp, FCTp, work, Kx, K, K2, K4, hv,
-               hg, a, b, la, mat, u_dealias, **context):
+               hg, a, b, la, mat, u_dealias, mask, **context):
 
     """Compute right hand side of Navier Stokes
 
@@ -90,6 +90,9 @@ def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
 
     # Nonlinear convection term at current u_hat
     H_hat = solver.conv(H_hat, u_hat, g_hat, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la, u_dealias)
+
+    if mask is not None:
+        H_hat *= mask
 
     w0 = work[(H_hat[0], 0, False)]
     w1 = work[(H_hat[0], 1, False)]
@@ -167,7 +170,5 @@ def integrate(u_hat, g_hat, rhs, dt, solver, context):
     """Three stage Runge Kutta integrator for KMM channel solver"""
     for rk in range(3):
         rhs = solver.ComputeRHS(rhs, u_hat, g_hat, rk, solver, **context)
-        if context.mask is not None:
-            rhs *= context.mask
         u_hat, g_hat = solver.solve_linear(u_hat, g_hat, rhs, rk, **context)
     return (u_hat, g_hat), dt, dt

@@ -91,6 +91,11 @@ class MHDFile(HDF5File):
         """Transform to real data when storing the solution"""
         UB = UB_hat.backward(UB)
 
+def get_divergence(T, Kx, U_hat, **context):
+    div_u = Array(T)
+    div_u = T.backward(1j*(Kx[0]*U_hat[0]+Kx[1]*U_hat[1]+Kx[2]*U_hat[2]), div_u)
+    return div_u
+
 def set_Elsasser(c, ZZ, K):
     c[:3] = -1j*(K[0]*(ZZ[:, 0] + ZZ[0, :])
                  + K[1]*(ZZ[:, 1] + ZZ[1, :])
@@ -153,7 +158,8 @@ def add_pressure_diffusion(rhs, ub_hat, nu, eta, K2, K, P_hat, K_over_K2):
     rhs[3:] -= eta*K2*b_hat
     return rhs
 
-def ComputeRHS(rhs, ub_hat, solver, Tp, VMp, K, Kx, K2, K_over_K2, P_hat, ub_dealias, ZZ_hat, **context):
+def ComputeRHS(rhs, ub_hat, solver, Tp, VMp, K, Kx, K2, K_over_K2, P_hat,
+               ub_dealias, ZZ_hat, mask, **context):
     """Return right hand side of Navier Stokes
 
     args:
@@ -174,8 +180,8 @@ def ComputeRHS(rhs, ub_hat, solver, Tp, VMp, K, Kx, K2, K_over_K2, P_hat, ub_dea
 
     """
     rhs = solver.conv(rhs, ub_hat, Tp, VMp, Kx, ub_dealias, ZZ_hat)
+    if mask is not None:
+        rhs *= mask
     rhs = solver.add_pressure_diffusion(rhs, ub_hat, params.nu, params.eta, K2,
                                         K, P_hat, K_over_K2)
-    if context['mask'] is not None:
-        rhs *= context['mask']
     return rhs

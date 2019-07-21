@@ -299,7 +299,7 @@ def assembleAB(H_hat0, H_hat, H_hat1):
 
 def ComputeRHS(rhs, u_hat, solver,
                H_hat, H_hat1, H_hat0, VFSp, FSTp, FCTp, VCp, work, Kx, K, K2,
-               u_dealias, curl_dealias, curl_hat, mat, la, vt, Sk, **context):
+               u_dealias, curl_dealias, curl_hat, mat, la, vt, Sk, mask, **context):
     """Compute right hand side of Navier Stokes
 
     Parameters
@@ -320,6 +320,9 @@ def ComputeRHS(rhs, u_hat, solver,
     # Assemble convection with Adams-Bashforth at time = n+1/2
     H_hat0 = solver.assembleAB(H_hat0, H_hat, H_hat1)
 
+    if mask is not None:
+        H_hat0 *= mask
+
     # Assemble rhs
     rhs_u, rhs_p = rhs
     rhs_u[0] = mat.AB.matvec(u_hat[0], rhs_u[0])
@@ -339,8 +342,6 @@ def integrate(up_hat, rhs, dt, solver, context):
     u_hat, p_hat = up_hat
     rhs[:] = 0
     rhs = solver.ComputeRHS(rhs, u_hat, solver, **context)
-    if context.mask is not None:
-        rhs *= context.mask
     up_hat = context.M.solve(rhs, u=up_hat, constraints=context.constraints)
     if rank == 0:
         u_hat[0, :, 0, 0] = 0

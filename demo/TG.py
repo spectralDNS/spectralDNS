@@ -1,7 +1,8 @@
 from __future__ import print_function
 import warnings
-from numpy import pi, zeros, sum, float64, sin, cos, prod
+from numpy import pi, zeros, sum, float64, sin, cos, prod, where
 from spectralDNS import config, get_solver, solve
+#from shenfun.fourier import energy_fourier
 
 try:
     import matplotlib.pyplot as plt
@@ -34,8 +35,12 @@ def initialize2(solver, context):
     solver.set_velocity(**context)
     solver.cross2(context.W_hat, context.K, context.U_hat)
 
-def energy_fourier(comm, a):
-    result = 2*sum(abs(a[..., 1:-1])**2) + sum(abs(a[..., 0])**2) + sum(abs(a[..., -1])**2)
+def energy_fourier(a, T):
+    comm = T.comm
+    if config.params.N[2] % 2 == 0:
+        result = 2*sum(abs(a[..., 1:-1])**2) + sum(abs(a[..., 0])**2) + sum(abs(a[..., -1])**2)
+    else:
+        result = 2*sum(abs(a[..., 1:])**2) + sum(abs(a[..., 0])**2)
     result = comm.allreduce(result)
     return result
 
@@ -100,7 +105,9 @@ def update(context):
 
         ww = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))/prod(params.N)/2)
         kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))/prod(params.N)/2) # Compute energy with double precision
-        ww2 = energy_fourier(solver.comm, c.U_hat)/2
+        if not 'NS' in params.solver:
+            c.U_hat = c.U.forward(c.U_hat)
+        ww2 = energy_fourier(c.U_hat, c.T)/2
         divu = solver.get_divergence(**context)
         divu = solver.comm.reduce(sum(divu.astype(float64)*divu.astype(float64))/prod(params.N)/2)
 
@@ -134,13 +141,14 @@ if __name__ == "__main__":
          'T': 0.1,                   # End time
          'L': [2*pi, 2.*pi, 2*pi],
          'M': [5, 5, 5],
-         'mask_nyquist': True,
          'planner_effort': {'fft': 'FFTW_ESTIMATE',
                             'rfftn': 'FFTW_ESTIMATE',
                             'irfftn': 'FFTW_ESTIMATE'},
         }, "triplyperiodic")
     config.triplyperiodic.add_argument("--compute_energy", type=int, default=2)
     config.triplyperiodic.add_argument("--plot_step", type=int, default=2)
+    config.triplyperiodic.add_argument("--N", default=[32, 32, 32], nargs=3,
+                                       help="Mesh size. Trumps M.")
     sol = get_solver(update=update, regression_test=regression_test,
                      mesh="triplyperiodic")
 

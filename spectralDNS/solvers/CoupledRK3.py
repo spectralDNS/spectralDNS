@@ -300,7 +300,7 @@ def getConvection(convection):
 
 def ComputeRHS(rhs, u_hat, rk, solver,
                H_hat, VFSp, FSTp, FCTp, VCp, work, Kx, K, K2,
-               u_dealias, curl_dealias, curl_hat, mat, la, vt, Sk, hv, a, b, **context):
+               u_dealias, curl_dealias, curl_hat, mat, la, vt, Sk, hv, a, b, mask, **context):
     """Compute right hand side of Navier Stokes
 
     Parameters
@@ -319,6 +319,9 @@ def ComputeRHS(rhs, u_hat, rk, solver,
 
     # Nonlinear convection term at current u_hat
     H_hat = solver.conv(H_hat, u_hat, Kx, VFSp, VCp, FSTp, FCTp, work, u_dealias, curl_dealias, curl_hat, mat, la)
+
+    if mask is not None:
+        H_hat *= mask
 
     # Assemble rhs
     rhs[:] = 0
@@ -355,8 +358,6 @@ def integrate(up_hat, rhs, dt, solver, context):
     rhs[:] = 0
     for rk in range(3):
         rhs = solver.ComputeRHS(rhs, u_hat, rk, solver, **context)
-        if context.mask is not None:
-            rhs *= context.mask
         up_hat = context.M[rk].solve(rhs, u=up_hat, constraints=context.constraints)
 
     return up_hat, dt, dt

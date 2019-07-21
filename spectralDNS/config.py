@@ -205,7 +205,7 @@ parser.add_argument('--no-verbose', dest='verbose', action='store_false', help='
 parser.set_defaults(verbose=True)
 parser.add_argument('--mask_nyquist', dest='mask_nyquist', action='store_true', help='Eliminate Nyquist frequency')
 parser.add_argument('--no-mask_nyquist', dest='mask_nyquist', action='store_false', help='Do not eliminate Nyquist frequency')
-parser.set_defaults(mask_nyquist=False)
+parser.set_defaults(mask_nyquist=True)
 
 # Arguments for 3D isotropic solvers
 triplyperiodic = argparse.ArgumentParser(parents=[parser])

@@ -114,8 +114,9 @@ def set_velocity(U, U_hat, VT, **context):
     U_hat = VT.forward(U, U_hat)
     return U_hat
 
-def get_divergence(T, K, U_hat, **context):
+def get_divergence(T, Kx, U_hat, **context):
     div_u = Array(T)
+    K = Kx
     div_u = T.backward(1j*(K[0]*U_hat[0]+K[1]*U_hat[1]+K[2]*U_hat[2]), div_u)
     return div_u
 
@@ -227,7 +228,7 @@ def add_pressure_diffusion(rhs, u_hat, nu, K2, K, P_hat, K_over_K2):
     return rhs
 
 def ComputeRHS(rhs, u_hat, solver, work, Tp, VTp, P_hat, K, Kx, K2, u_dealias,
-               K_over_K2, Source, **context):
+               K_over_K2, Source, mask, **context):
     """Compute right hand side of Navier Stokes
 
     Parameters
@@ -262,9 +263,12 @@ def ComputeRHS(rhs, u_hat, solver, work, Tp, VTp, P_hat, K, Kx, K2, u_dealias,
 
     """
     rhs = solver.conv(rhs, u_hat, work, Tp, VTp, Kx, u_dealias)
+    if mask is not None:
+        rhs *= mask
+
     rhs = solver.add_pressure_diffusion(rhs, u_hat, params.nu, K2, K, P_hat,
                                         K_over_K2)
+
     rhs += Source
-    if context['mask'] is not None:
-        rhs *= context['mask']
+
     return rhs

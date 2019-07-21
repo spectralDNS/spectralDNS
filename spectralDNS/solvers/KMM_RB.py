@@ -84,6 +84,8 @@ def ComputeRHS(rhs, u_hat, g_hat, p_hat, solver, context):
     rhs[2] = DivRBConvection(rhs[2], u_hat, g_hat, p_hat, **context)
     #rhs[2] = DivABConvection(rhs[2], u_hat, g_hat, p_hat, **context)
     #rhs[2] = StandardRBConvection(rhs[2], u_hat, g_hat, p_hat, **context)
+    if context.mask is not None:
+        rhs[2] *= context.mask
 
     rhs[2] *= -2./params.kappa
     diff_T = c.TC.matvec(c.phi_hat0, diff_T)
@@ -157,8 +159,6 @@ def integrate(u_hat, g_hat, p_hat, rhs, dt, solver, context):
     """Regular implicit solver for KMM_RB channel solver"""
     rhs[:] = 0
     rhs = solver.ComputeRHS(rhs, u_hat, g_hat, p_hat, solver, context)
-    if context.mask is not None:
-        rhs *= context.mask
     u_hat, g_hat, p_hat = solver.solve_linear(u_hat, g_hat, p_hat, rhs, context)
     return (u_hat, g_hat, p_hat), dt, dt
 

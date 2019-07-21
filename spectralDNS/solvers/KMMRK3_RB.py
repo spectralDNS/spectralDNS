@@ -69,6 +69,8 @@ def ComputeRHS(rhs, u_hat, g_hat, p_hat, rk, solver, context):
     rhs[0] += config.params.dt*(c.a[rk]+c.b[rk])*w0
     c.N_hat = DivRBConvection(c.N_hat, u_hat, g_hat, p_hat, **context)
     #c.N_hat = StandardRBConvection(c.N_hat, u_hat, g_hat, p_hat, **context)
+    if context.mask is not None:
+        c.N_hat *= context.mask
     rhs[2] = -2./params.kappa/(c.a[rk]+c.b[rk])*(c.N_hat*c.a[rk] + c.N_hat0*c.b[rk])
     c.N_hat0[:] = c.N_hat
     diff_T = c.TC[rk].matvec(p_hat, diff_T)
@@ -122,8 +124,6 @@ def integrate(u_hat, g_hat, p_hat, rhs, dt, solver, context):
     rhs[:] = 0
     for rk in range(3):
         rhs = solver.ComputeRHS(rhs, u_hat, g_hat, p_hat, rk, solver, context)
-        if context.mask is not None:
-            rhs *= context.mask
         u_hat, g_hat, p_hat = solver.solve_linear(u_hat, g_hat, p_hat, rhs, rk, context)
 
     return (u_hat, g_hat, p_hat), dt, dt

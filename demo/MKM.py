@@ -303,7 +303,6 @@ if __name__ == "__main__":
          'M': [6, 6, 5],
          'dealias': '3/2-rule',
          'checkpoint': 1000,
-         'mask_nyquist': True
         }, "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=100)

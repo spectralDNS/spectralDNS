@@ -431,7 +431,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4):
 #@profile
 def ComputeRHS(rhs, u_hat, g_hat, solver,
                H_hat, H_hat1, H_hat0, VFSp, FSTp, FSBp, FCTp, work, Kx, K2, Kx2,
-               K4, hv, hg, mat, la, u_dealias, **context):
+               K4, hv, hg, mat, la, u_dealias, mask, **context):
     """Compute right hand side of Navier Stokes
 
     args:
@@ -448,6 +448,9 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
 
     # Assemble convection with Adams-Bashforth at time = n+1/2
     H_hat0 = solver.assembleAB(H_hat0, H_hat, H_hat1)
+
+    if mask is not None:
+        H_hat0 *= mask
 
     # Assemble hv, hg and remaining rhs
     w0 = work[(hv, 0, False)]
@@ -515,8 +518,6 @@ def integrate(u_hat, g_hat, rhs, dt, solver, context):
     """Regular implicit solver for KMM channel solver"""
     rhs[:] = 0
     rhs = solver.ComputeRHS(rhs, u_hat, g_hat, solver, **context)
-    if context.mask is not None:
-        rhs *= context.mask
     u_hat, g_hat = solver.solve_linear(u_hat, g_hat, rhs, **context)
     return (u_hat, g_hat), dt, dt
 

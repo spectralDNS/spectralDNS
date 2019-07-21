@@ -158,7 +158,7 @@ def add_pressure_diffusion(rhs, ur_hat, P_hat, K_over_K2, K, K2, nu, Ri, Pr):
     return rhs
 
 def ComputeRHS(rhs, ur_hat, solver, work, K, Kx, K2, K_over_K2, P_hat, T, Tp,
-               VM, VMp, ur_dealias, **context):
+               VM, VMp, ur_dealias, mask, **context):
     """Compute and return right hand side of 2D Navier Stokes equations
     on Boussinesq form
 
@@ -180,8 +180,9 @@ def ComputeRHS(rhs, ur_hat, solver, work, K, Kx, K2, K_over_K2, P_hat, T, Tp,
 
     """
     rhs = solver.conv(rhs, ur_hat, work, T, Tp, VM, VMp, Kx, ur_dealias)
+    if mask is not None:
+        rhs *= mask
     rhs = solver.add_pressure_diffusion(rhs, ur_hat, P_hat, K_over_K2, K, K2,
                                         params.nu, params.Ri, params.Pr)
-    if context['mask'] is not None:
-        rhs *= context['mask']
+
     return rhs

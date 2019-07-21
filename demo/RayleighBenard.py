@@ -91,7 +91,6 @@ class Stats(object):
         self.T = T
         self.axis = axis
         N = config.params.N
-        print(np.array(T.shape(False)[1:]), np.array(N))
         assert np.all(np.array(T.shape(False)[1:]) == np.array(N))
         M = self.T.shape(False)[self.axis+1]
         self.Umean = np.zeros((3, M))
@@ -225,7 +224,6 @@ if __name__ == "__main__":
          'T': 1000.,                  # End time
          'L': [2, 2*np.pi, 2*np.pi],
          'M': [6, 7, 7],
-         'mask_nyquist': True
         }, "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=10)
