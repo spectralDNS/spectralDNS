@@ -1,8 +1,8 @@
 from __future__ import print_function
 import warnings
-from numpy import pi, zeros, sum, float64, sin, cos, prod, where
+from numpy import pi, zeros, sum, float64, sin, cos, prod
 from spectralDNS import config, get_solver, solve
-#from shenfun.fourier import energy_fourier
+from shenfun.fourier import energy_fourier
 
 try:
     import matplotlib.pyplot as plt
@@ -34,15 +34,6 @@ def initialize2(solver, context):
     U[2] = 0
     solver.set_velocity(**context)
     solver.cross2(context.W_hat, context.K, context.U_hat)
-
-def energy_fourier(a, T):
-    comm = T.comm
-    if config.params.N[2] % 2 == 0:
-        result = 2*sum(abs(a[..., 1:-1])**2) + sum(abs(a[..., 0])**2) + sum(abs(a[..., -1])**2)
-    else:
-        result = 2*sum(abs(a[..., 1:])**2) + sum(abs(a[..., 0])**2)
-    result = comm.allreduce(result)
-    return result
 
 k = []
 w = []

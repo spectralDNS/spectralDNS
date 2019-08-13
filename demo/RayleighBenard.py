@@ -19,6 +19,7 @@ def initialize(solver, context):
     # Perturb temperature
     phi[:] = 0.5*(1-X[0])+0.01*np.random.randn(*phi.shape)*(1-X[0])*(1+X[0])
     phi_hat = phi.forward(context.phi_hat)
+    phi_hat.mask_nyquist()
     phi = phi_hat.backward(phi)
     phi_hat = phi.forward(phi_hat)
 
@@ -188,7 +189,7 @@ class Stats(object):
 def init_from_file(filename, solver, context):
     import h5py
     f = h5py.File(filename, 'r+', driver="mpio", comm=solver.comm)
-    assert "0" in f["U/Vector/3D"]
+    assert "0" in f["U/3D"]
     U_hat = context.U_hat
     phi_hat = context.phi_hat
     TV = context.U.function_space()
@@ -198,8 +199,8 @@ def init_from_file(filename, solver, context):
 
     # previous timestep
     if not 'RK3' in config.params.solver:
-        assert "1" in f["U/Vector/3D"]
-        U_hat[:] = f["U/Vector/3D/1"][su]
+        assert "1" in f["U/3D"]
+        U_hat[:] = f["U/3D/1"][su]
 
         # Set g, which is used in computing convection
         context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
@@ -208,7 +209,7 @@ def init_from_file(filename, solver, context):
         context.phi_hat0[:] = f["phi/3D/1"][sp]
 
     # current timestep
-    U_hat[:] = f["U/Vector/3D/0"][su]
+    U_hat[:] = f["U/3D/0"][su]
     phi_hat[:] = f["phi/3D/0"][sp]
     context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
     context.hdf5file.filename = filename

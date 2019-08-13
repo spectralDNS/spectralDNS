@@ -70,7 +70,7 @@ def ComputeRHS(rhs, u_hat, g_hat, p_hat, rk, solver, context):
     c.N_hat = DivRBConvection(c.N_hat, u_hat, g_hat, p_hat, **context)
     #c.N_hat = StandardRBConvection(c.N_hat, u_hat, g_hat, p_hat, **context)
     if context.mask is not None:
-        c.N_hat *= context.mask
+        c.N_hat.mask_nyquist(context.mask)
     rhs[2] = -2./params.kappa/(c.a[rk]+c.b[rk])*(c.N_hat*c.a[rk] + c.N_hat0*c.b[rk])
     c.N_hat0[:] = c.N_hat
     diff_T = c.TC[rk].matvec(p_hat, diff_T)
@@ -83,7 +83,7 @@ def solve_linear(u_hat, g_hat, p_hat, rhs, rk, context):
     return u_hat, g_hat, p_hat
 
 def DivRBConvection(rhs, u_hat, g_hat, p_hat,
-                    phi0, Ua, mat, Kx, VFSp, FRBp, FSBp, FSTp, work, **context):
+                    phi0, Ua, mat, K, VFSp, FRBp, FSBp, FSTp, work, **context):
     uT_hat = work[(p_hat, 0, True)]
     F_tmp = work[(u_hat, 0, True)]
 
@@ -92,14 +92,14 @@ def DivRBConvection(rhs, u_hat, g_hat, p_hat,
     uT_hat = FSBp.forward(phi0*Ua[0], uT_hat)
     F_tmp[0] = mat.CDB.matvec(uT_hat, F_tmp[0])
     uT_hat = FSTp.forward(phi0*Ua[1], uT_hat)
-    F_tmp[1] = mat.BDD.matvec(1j*Kx[1]*uT_hat, F_tmp[1])
+    F_tmp[1] = mat.BDD.matvec(1j*K[1]*uT_hat, F_tmp[1])
     uT_hat = FSTp.forward(phi0*Ua[2], uT_hat)
-    F_tmp[2] = mat.BDD.matvec(1j*Kx[2]*uT_hat, F_tmp[2])
+    F_tmp[2] = mat.BDD.matvec(1j*K[2]*uT_hat, F_tmp[2])
     rhs[:] = np.sum(F_tmp, axis=0)
     return rhs
 
 def StandardRBConvection(rhs, u_hat, g_hat, p_hat,
-                         N_hat, phi0, Ua, mat, Kx, VFSp, FCTp, FSTp, CTD,
+                         N_hat, phi0, Ua, mat, K, VFSp, FCTp, FSTp, CTD,
                          BTT, work, **context):
     # project to Chebyshev basis. Requires modification due to nonhomogen bc
     dTdx_hat = work[(p_hat, 0, True)]
@@ -112,8 +112,8 @@ def StandardRBConvection(rhs, u_hat, g_hat, p_hat,
     dTdx_hat[0] += 0.5*BTT[0][0]*(p_hat[-2]-p_hat[-1])
     dTdx_hat = BTT.solve(dTdx_hat)
     dTdxi[0] = FCTp.backward(dTdx_hat, dTdxi[0])
-    dTdxi[1] = FSTp.backward(1j*Kx[1]*p_hat, dTdxi[1])
-    dTdxi[2] = FSTp.backward(1j*Kx[2]*p_hat, dTdxi[2])
+    dTdxi[1] = FSTp.backward(1j*K[1]*p_hat, dTdxi[1])
+    dTdxi[2] = FSTp.backward(1j*K[2]*p_hat, dTdxi[2])
     N[:] = Ua[0]*dTdxi[0] + Ua[1]*dTdxi[1] + Ua[2]*dTdxi[2]
     N_hat = FSTp.forward(N, N_hat)
     rhs = mat.BDD.matvec(N_hat, rhs)

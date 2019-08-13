@@ -186,7 +186,6 @@ if __name__ == "__main__":
          'M': [5, 2, 7],
          'Dquad': 'GC',
          'Bquad': 'GC',
-         'mask_nyquist': True,
          'dealias': None
         }, "channel"
     )

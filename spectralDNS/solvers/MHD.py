@@ -26,7 +26,7 @@ def get_context():
     VT = VectorTensorProductSpace(T)
     VM = MixedTensorProductSpace([T]*2*dim)
 
-    mask = T.mask_nyquist() if params.mask_nyquist else None
+    mask = T.get_mask_nyquist() if params.mask_nyquist else None
 
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
@@ -49,11 +49,6 @@ def get_context():
     K2 = np.zeros(T.shape(True), dtype=float)
     for i in range(dim):
         K2 += K[i]*K[i]
-
-    # Set Nyquist frequency to zero on K that is, from now on, used for odd derivatives
-    Kx = T.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
-    for i in range(dim):
-        Kx[i] = Kx[i].astype(float)
 
     K_over_K2 = np.zeros(VT.shape(True), dtype=float)
     for i in range(dim):
@@ -91,9 +86,9 @@ class MHDFile(HDF5File):
         """Transform to real data when storing the solution"""
         UB = UB_hat.backward(UB)
 
-def get_divergence(T, Kx, U_hat, **context):
+def get_divergence(T, K, U_hat, **context):
     div_u = Array(T)
-    div_u = T.backward(1j*(Kx[0]*U_hat[0]+Kx[1]*U_hat[1]+Kx[2]*U_hat[2]), div_u)
+    div_u = T.backward(1j*(K[0]*U_hat[0]+K[1]*U_hat[1]+K[2]*U_hat[2]), div_u)
     return div_u
 
 def set_Elsasser(c, ZZ, K):
@@ -158,7 +153,7 @@ def add_pressure_diffusion(rhs, ub_hat, nu, eta, K2, K, P_hat, K_over_K2):
     rhs[3:] -= eta*K2*b_hat
     return rhs
 
-def ComputeRHS(rhs, ub_hat, solver, Tp, VMp, K, Kx, K2, K_over_K2, P_hat,
+def ComputeRHS(rhs, ub_hat, solver, Tp, VMp, K, K2, K_over_K2, P_hat,
                ub_dealias, ZZ_hat, mask, **context):
     """Return right hand side of Navier Stokes
 
@@ -173,15 +168,14 @@ def ComputeRHS(rhs, ub_hat, solver, Tp, VMp, K, Kx, K2, K_over_K2, P_hat,
     Remaining args may be extracted from context:
         work        Work arrays
         K           Scaled wavenumber mesh
-        Kx          Scaled wavenumber mesh with Nyquist eliminated
         K2          sum_i K[i]*K[i]
         K_over_K2   K / K2
-        P_hat       Transfomred pressure
+        P_hat       Transformed pressure
 
     """
-    rhs = solver.conv(rhs, ub_hat, Tp, VMp, Kx, ub_dealias, ZZ_hat)
+    rhs = solver.conv(rhs, ub_hat, Tp, VMp, K, ub_dealias, ZZ_hat)
     if mask is not None:
-        rhs *= mask
+        rhs.mask_nyquist(mask)
     rhs = solver.add_pressure_diffusion(rhs, ub_hat, params.nu, params.eta, K2,
                                         K, P_hat, K_over_K2)
     return rhs

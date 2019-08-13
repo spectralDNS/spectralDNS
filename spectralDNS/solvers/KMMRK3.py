@@ -66,7 +66,7 @@ def add_linear(rhs, u, g, work, AB, AC, SBB, ABB, BBB, nu, dt, K2, K4, a, b):
     return rhs
 
 def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
-               H_hat, VFSp, FSTp, FSBp, FCTp, work, Kx, K, K2, K4, hv,
+               H_hat, VFSp, FSTp, FSBp, FCTp, work, K, K2, K4, hv,
                hg, a, b, la, mat, u_dealias, mask, **context):
 
     """Compute right hand side of Navier Stokes
@@ -89,10 +89,10 @@ def ComputeRHS(rhs, u_hat, g_hat, rk, solver,
     """
 
     # Nonlinear convection term at current u_hat
-    H_hat = solver.conv(H_hat, u_hat, g_hat, Kx, VFSp, FSTp, FSBp, FCTp, work, mat, la, u_dealias)
+    H_hat = solver.conv(H_hat, u_hat, g_hat, K, VFSp, FSTp, FSBp, FCTp, work, mat, la, u_dealias)
 
     if mask is not None:
-        H_hat *= mask
+        H_hat.mask_nyquist(mask)
 
     w0 = work[(H_hat[0], 0, False)]
     w1 = work[(H_hat[0], 1, False)]

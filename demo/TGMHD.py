@@ -1,4 +1,4 @@
-from numpy import pi, sin, cos, float64, sum, prod
+from numpy import pi, sin, cos, float64, sum
 from spectralDNS import config, get_solver, solve
 
 def initialize(UB_hat, UB, U, B, X, **context):

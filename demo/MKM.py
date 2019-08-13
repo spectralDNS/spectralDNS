@@ -54,31 +54,19 @@ def initialize(solver, context):
     U[1] += dd
     U[2] += epsilon*np.sin(alfaplus*Yplus)*Xplus*np.exp(-sigma*Xplus**2)*dev[:, :, slice(0, 1)]
     U_hat = U.forward(U_hat)
+    if context.mask is not None:
+        U_hat.mask_nyquist(context.mask)
     U = U_hat.backward(U)
     U_hat = U.forward(U_hat)
 
     if "KMM" in params.solver:
         context.g[:] = 1j*context.K[1]*U_hat[2] - 1j*context.K[2]*U_hat[1]
 
+
     # Set the flux
     #flux[0] = context.FST.dx(U[1], context.ST.quad)
     #solver.comm.Bcast(flux)
 
-    # project to zero divergence
-    div_u = solver.get_divergence(**context)
-    print('div0 ', dx(div_u**2, context.FST))
-    u = TrialFunction(context.FST)
-    v = TestFunction(context.FST)
-    A = inner(v, div(grad(u)))
-    b = inner(v, div(U_hat))
-    from shenfun.chebyshev.la import Helmholtz
-    sol = Helmholtz(*A)
-    phi = Function(context.FST)
-    phi = sol(phi, b)
-    U_hat -= project(grad(phi), context.VFS)
-    U = U_hat.backward(U)
-    div_u = solver.get_divergence(**context)
-    print('div1 ', dx(div_u**2, context.FST))
 
     if solver.rank == 0:
         print("Flux {}".format(flux[0]))
@@ -302,19 +290,19 @@ if __name__ == "__main__":
          'L': [2, 2*np.pi, np.pi],
          'M': [6, 6, 5],
          'dealias': '3/2-rule',
-         'checkpoint': 1000,
+         'checkpoint': 2000,
         }, "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=100)
-    config.channel.add_argument("--plot_result", type=int, default=100)
-    config.channel.add_argument("--sample_stats", type=int, default=500)
+    config.channel.add_argument("--plot_result", type=int, default=200)
+    config.channel.add_argument("--sample_stats", type=int, default=200)
     config.channel.add_argument("--print_energy0", type=int, default=1000)
     #solver = get_solver(update=update, mesh="channel")
     solver = get_solver(update=update, mesh="channel")
     context = solver.get_context()
-    initialize(solver, context)
-    #init_from_file("IPCSR666e_c.h5", solver, context)
+    #initialize(solver, context)
+    init_from_file("KMM776d_c.h5", solver, context)
     set_Source(**context)
-    solver.stats = Stats(context.U, solver.comm, filename="KMM665statsa")
-    context.hdf5file.filename = "KMM665a"
+    solver.stats = Stats(context.U, solver.comm, fromstats="KMM776statsc")
+    context.hdf5file.filename = "KMM776e"
     solve(solver, context)

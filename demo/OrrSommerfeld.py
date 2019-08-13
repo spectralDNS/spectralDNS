@@ -201,7 +201,6 @@ if __name__ == "__main__":
          'Dquad': 'GC',
          'Bquad': 'GC',
          'dealias': None,
-         'mask_nyquist': True
         }, "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=1)

@@ -25,7 +25,7 @@ def get_context():
     VT = VectorTensorProductSpace(T)
     VM = MixedTensorProductSpace([T]*(dim+1))
 
-    mask = T.mask_nyquist() if params.mask_nyquist else None
+    mask = T.get_mask_nyquist() if params.mask_nyquist else None
 
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
@@ -48,11 +48,6 @@ def get_context():
     K2 = np.zeros(T.shape(True), dtype=float)
     for i in range(dim):
         K2 += K[i]*K[i]
-
-    # Set Nyquist frequency to zero on K that is, from now on, used for odd derivatives
-    Kx = T.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
-    for i in range(dim):
-        Kx[i] = Kx[i].astype(float)
 
     K_over_K2 = np.zeros(VT.shape(True), dtype=float)
     for i in range(dim):
@@ -157,7 +152,7 @@ def add_pressure_diffusion(rhs, ur_hat, P_hat, K_over_K2, K, K2, nu, Ri, Pr):
     rhs[2] -= nu*K2*rho_hat/Pr
     return rhs
 
-def ComputeRHS(rhs, ur_hat, solver, work, K, Kx, K2, K_over_K2, P_hat, T, Tp,
+def ComputeRHS(rhs, ur_hat, solver, work, K, K2, K_over_K2, P_hat, T, Tp,
                VM, VMp, ur_dealias, mask, **context):
     """Compute and return right hand side of 2D Navier Stokes equations
     on Boussinesq form
@@ -173,15 +168,14 @@ def ComputeRHS(rhs, ur_hat, solver, work, K, Kx, K2, K_over_K2, P_hat, T, Tp,
     Remaining args may be extracted from context:
         work        Work arrays
         K           Scaled wavenumber mesh
-        Kx          Scaled wavenumber mesh with Nyquist eliminated
         K2          K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
         K_over_K2   K / K2
         P_hat       Transformed pressure
 
     """
-    rhs = solver.conv(rhs, ur_hat, work, T, Tp, VM, VMp, Kx, ur_dealias)
+    rhs = solver.conv(rhs, ur_hat, work, T, Tp, VM, VMp, K, ur_dealias)
     if mask is not None:
-        rhs *= mask
+        rhs.mask_nyquist(mask)
     rhs = solver.add_pressure_diffusion(rhs, ur_hat, P_hat, K_over_K2, K, K2,
                                         params.nu, params.Ri, params.Pr)
 

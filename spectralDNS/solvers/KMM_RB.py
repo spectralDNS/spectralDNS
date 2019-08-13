@@ -85,7 +85,7 @@ def ComputeRHS(rhs, u_hat, g_hat, p_hat, solver, context):
     #rhs[2] = DivABConvection(rhs[2], u_hat, g_hat, p_hat, **context)
     #rhs[2] = StandardRBConvection(rhs[2], u_hat, g_hat, p_hat, **context)
     if context.mask is not None:
-        rhs[2] *= context.mask
+        rhs[2].mask_nyquist(context.mask)
 
     rhs[2] *= -2./params.kappa
     diff_T = c.TC.matvec(c.phi_hat0, diff_T)
@@ -98,7 +98,7 @@ def solve_linear(u_hat, g_hat, p_hat, rhs, context):
     return u_hat, g_hat, p_hat
 
 def DivRBConvection(rhs, u_hat, g_hat, p_hat,
-                    UCN, VFSp, U_hat0, phi_ab, phi0, mat, Kx, N_hat,
+                    UCN, VFSp, U_hat0, phi_ab, phi0, mat, K, N_hat,
                     phi_hat0, phi_hat1, FRBp, FSBp, FSTp, work, **context):
     uT_hat = work[(p_hat, 0, True)]
     F_tmp = work[(u_hat, 0, True)]
@@ -109,15 +109,15 @@ def DivRBConvection(rhs, u_hat, g_hat, p_hat,
     uT_hat = FSBp.forward(phi0*UCN[0], uT_hat)
     F_tmp[0] = mat.CDB.matvec(uT_hat, F_tmp[0])
     uT_hat = FSTp.forward(phi0*UCN[1], uT_hat)
-    F_tmp[1] = mat.BDD.matvec(1j*Kx[1]*uT_hat, F_tmp[1])
+    F_tmp[1] = mat.BDD.matvec(1j*K[1]*uT_hat, F_tmp[1])
     uT_hat = FSTp.forward(phi0*UCN[2], uT_hat)
-    F_tmp[2] = mat.BDD.matvec(1j*Kx[2]*uT_hat, F_tmp[2])
+    F_tmp[2] = mat.BDD.matvec(1j*K[2]*uT_hat, F_tmp[2])
     N_hat[:] = np.sum(F_tmp, axis=0)
     rhs[:] = N_hat
     return rhs
 
 def DivABConvection(rhs, u_hat, g_hat, p_hat,
-                    UCN, VFSp, U_hat0, phi_ab, phi0, mat, Kx, N_hat, N_hat0,
+                    UCN, VFSp, U_hat0, phi_ab, phi0, mat, K, N_hat, N_hat0,
                     phi_hat0, phi_hat1, FRBp, FSBp, FSTp, work, **context):
     uT_hat = work[(p_hat, 0, True)]
     F_tmp = work[(u_hat, 0, True)]
@@ -127,15 +127,15 @@ def DivABConvection(rhs, u_hat, g_hat, p_hat,
     uT_hat = FSBp.forward(phi0*UCN[0], uT_hat)
     F_tmp[0] = mat.CDB.matvec(uT_hat, F_tmp[0])
     uT_hat = FSTp.forward(phi0*UCN[1], uT_hat)
-    F_tmp[1] = mat.BDD.matvec(1j*Kx[1]*uT_hat, F_tmp[1])
+    F_tmp[1] = mat.BDD.matvec(1j*K[1]*uT_hat, F_tmp[1])
     uT_hat = FSTp.forward(phi0*UCN[2], uT_hat)
-    F_tmp[2] = mat.BDD.matvec(1j*Kx[2]*uT_hat, F_tmp[2])
+    F_tmp[2] = mat.BDD.matvec(1j*K[2]*uT_hat, F_tmp[2])
     N_hat[:] = np.sum(F_tmp, axis=0)
     rhs[:] = 1.5*N_hat - 0.5*N_hat0
     return rhs
 
 def StandardRBConvection(rhs, u_hat, g_hat, p_hat,
-                         UCN, VFSp, U_hat0, mat, Kx, N_hat, N_hat0,
+                         UCN, VFSp, U_hat0, mat, K, N_hat, N_hat0,
                          FCTp, FSTp, work, CTD, BTT, **context):
     # project to Chebyshev basis. Requires modification due to nonhomogen bc
     dTdx_hat = work[(p_hat, 0, True)]
@@ -148,8 +148,8 @@ def StandardRBConvection(rhs, u_hat, g_hat, p_hat,
     dTdx_hat[0] += 0.5*BTT[0][0]*(p_hat[-2]-p_hat[-1])
     dTdx_hat = BTT.solve(dTdx_hat)
     dTdxi[0] = FCTp.backward(dTdx_hat, dTdxi[0])
-    dTdxi[1] = FSTp.backward(1j*Kx[1]*p_hat, dTdxi[1])
-    dTdxi[2] = FSTp.backward(1j*Kx[2]*p_hat, dTdxi[2])
+    dTdxi[1] = FSTp.backward(1j*K[1]*p_hat, dTdxi[1])
+    dTdxi[2] = FSTp.backward(1j*K[2]*p_hat, dTdxi[2])
     N[:] = UCN[0]*dTdxi[0] + UCN[1]*dTdxi[1] + UCN[2]*dTdxi[2]
     N_hat = FSTp.forward(N, N_hat)
     rhs = mat.BDD.matvec(1.5*N_hat-0.5*N_hat0, rhs)

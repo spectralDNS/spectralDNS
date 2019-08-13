@@ -39,7 +39,7 @@ def get_context():
     VFST = MixedTensorProductSpace([FST, FST, FST])
     VUG = MixedTensorProductSpace([FST, FSB])
 
-    mask = FST.mask_nyquist() if params.mask_nyquist else None
+    mask = FST.get_mask_nyquist() if params.mask_nyquist else None
 
     # Padded
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
@@ -450,7 +450,7 @@ def ComputeRHS(rhs, u_hat, g_hat, solver,
     H_hat0 = solver.assembleAB(H_hat0, H_hat, H_hat1)
 
     if mask is not None:
-        H_hat0 *= mask
+        H_hat0.mask_nyquist(mask)
 
     # Assemble hv, hg and remaining rhs
     w0 = work[(hv, 0, False)]

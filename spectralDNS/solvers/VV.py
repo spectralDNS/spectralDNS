@@ -71,10 +71,10 @@ def get_velocity(W_hat, U, work, VT, K_over_K2, **context):
     U = compute_velocity(U, W_hat, work, VT, K_over_K2)
     return U
 
-def get_divergence(T, Kx, U_hat, W_hat, **context):
+def get_divergence(T, K, U_hat, W_hat, **context):
     div_u = Array(T)
-    U_hat = cross2(U_hat, Kx, W_hat)
-    div_u = T.backward(1j*(Kx[0]*U_hat[0]+Kx[1]*U_hat[1]+Kx[2]*U_hat[2]), div_u)
+    U_hat = cross2(U_hat, K, W_hat)
+    div_u = T.backward(1j*(K[0]*U_hat[0]+K[1]*U_hat[1]+K[2]*U_hat[2]), div_u)
     return div_u
 
 def get_curl(curl, W_hat, VT, **context):
@@ -109,7 +109,7 @@ def add_linear(rhs, w_hat, nu, K2, Source):
     rhs += Source
     return rhs
 
-def ComputeRHS(rhs, w_hat, solver, work, Tp, VT, VTp, K, Kx, K2, K_over_K2,
+def ComputeRHS(rhs, w_hat, solver, work, Tp, VT, VTp, K, K2, K_over_K2,
                Source, u_dealias, mask, **context):
     """Return right hand side of Navier Stokes in velocity-vorticity form
 
@@ -131,8 +131,6 @@ def ComputeRHS(rhs, w_hat, solver, work, Tp, VT, VTp, K, Kx, K2, K_over_K2,
         Tp : TensorProductSpace
         K : list of arrays
             Scaled wavenumber mesh
-        Kx : list of arrays
-            Scaled wavenumber mesh with zero Nyquist frequency
         K2 : array
             K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
         K_over_K2 : array
@@ -141,8 +139,8 @@ def ComputeRHS(rhs, w_hat, solver, work, Tp, VT, VTp, K, Kx, K2, K_over_K2,
             Scalar source term
 
     """
-    rhs = solver.conv(rhs, w_hat, work, Tp, VTp, Kx, K_over_K2, u_dealias)
+    rhs = solver.conv(rhs, w_hat, work, Tp, VTp, K, K_over_K2, u_dealias)
     if mask is not None:
-        rhs *= mask
+        rhs.mask_nyquist(mask)
     rhs = solver.add_linear(rhs, w_hat, params.nu, K2, Source)
     return rhs

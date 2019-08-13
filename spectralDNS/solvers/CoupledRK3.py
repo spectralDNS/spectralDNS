@@ -42,7 +42,7 @@ def get_context():
     VCT = VectorTensorProductSpace(FCT)
     VQ = MixedTensorProductSpace([VFS, FCP])
 
-    mask = FST.mask_nyquist() if params.mask_nyquist else None
+    mask = FST.get_mask_nyquist() if params.mask_nyquist else None
 
     # Padded
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
@@ -95,12 +95,8 @@ def get_context():
 
     K2 = K[1]*K[1]+K[2]*K[2]
 
-    # Set Nyquist frequency to zero on K that is used for odd derivatives in nonlinear terms
-    Kx = FST.local_wavenumbers(scaled=True, eliminate_highest_freq=True)
-
     for i in range(3):
         K[i] = K[i].astype(float)
-        Kx[i] = Kx[i].astype(float)
 
     work = work_arrays()
     u_dealias = Array(VFSp)
@@ -168,14 +164,16 @@ def set_velocity(U_hat, U, **context):
     U_hat = U.forward(U_hat)
     return U_hat
 
-def get_convection(H_hat, U_hat, Kx, VFSp, VCp, FSTp, FCTp, work, u_dealias, curl_dealias, curl_hat, mat, la, **context):
+def get_convection(H_hat, U_hat, K, VFSp, VCp, FSTp, FCTp, work, u_dealias, curl_dealias, curl_hat, mat, la, **context):
     """Compute convection from context"""
     conv_ = getConvection(params.convection)
-    H_hat = conv_(H_hat, U_hat, Kx, VFSp, VCp, FSTp, FCTp, work, u_dealias, curl_dealias, curl_hat, mat, la)
+    H_hat = conv_(H_hat, U_hat, K, VFSp, VCp, FSTp, FCTp, work, u_dealias, curl_dealias, curl_hat, mat, la)
     return H_hat
 
-def get_divergence(U_hat, FST, **context):
+def get_divergence(U_hat, FST, mask, **context):
     div_hat = project(div(U_hat), FST)
+    if mask is not None:
+        div_hat.mask_nyquist(mask)
     div_ = Array(FST)
     div_ = div_hat.backward(div_)
     return div_
@@ -299,8 +297,9 @@ def getConvection(convection):
     return Conv
 
 def ComputeRHS(rhs, u_hat, rk, solver,
-               H_hat, VFSp, FSTp, FCTp, VCp, work, Kx, K, K2,
-               u_dealias, curl_dealias, curl_hat, mat, la, vt, Sk, hv, a, b, mask, **context):
+               H_hat, VFSp, FSTp, FCTp, VCp, work, K, K2,
+               u_dealias, curl_dealias, curl_hat, mat, la, vt, Sk, hv, a, b,
+               mask, **context):
     """Compute right hand side of Navier Stokes
 
     Parameters
@@ -318,10 +317,10 @@ def ComputeRHS(rhs, u_hat, rk, solver,
     w0 = work[(u_hat[0], 0, False)]
 
     # Nonlinear convection term at current u_hat
-    H_hat = solver.conv(H_hat, u_hat, Kx, VFSp, VCp, FSTp, FCTp, work, u_dealias, curl_dealias, curl_hat, mat, la)
+    H_hat = solver.conv(H_hat, u_hat, K, VFSp, VCp, FSTp, FCTp, work, u_dealias, curl_dealias, curl_hat, mat, la)
 
     if mask is not None:
-        H_hat *= mask
+        H_hat.mask_nyquist(mask)
 
     # Assemble rhs
     rhs[:] = 0
