@@ -15,7 +15,7 @@ KMMRK3_solve_linear = solve_linear
 def get_context():
     c = KMMRK3_context()
 
-    c.RB = RB = Basis(config.params.N[0], 'C', bc=(0, 1))
+    c.RB = RB = Basis(config.params.N[0], 'C', bc=(1, 0))
     c.FRB = FRB = TensorProductSpace(comm, (RB, c.K0, c.K1), **c.kw0)
     c.FRBp = FRBp = TensorProductSpace(comm, (RB, c.K0p, c.K1p), **c.kw0)
 
@@ -62,8 +62,8 @@ def ComputeRHS(rhs, u_hat, g_hat, p_hat, rk, solver, context):
     w1 = c.work[(rhs[0], 1, False)]
     diff_T = c.work[(rhs[0], 2, False)]
 
-    w0 = c.mat.ABD.matvec(p_hat, w0)
-    w0 -= c.K2*c.mat.BBD.matvec(p_hat, w1)
+    #w0 = c.mat.ABD.matvec(p_hat, w0)
+    w0 = -c.K2*c.mat.BBD.matvec(p_hat, w1)
     w0[0] -= 0.5*c.BTT[0][0]*(p_hat[-2]+p_hat[-1])*c.K2[0]
     w0[1] -= 0.5*c.BTT[0][1]*(p_hat[-2]-p_hat[-1])*c.K2[0]
     rhs[0] += config.params.dt*(c.a[rk]+c.b[rk])*w0

@@ -1,8 +1,9 @@
 """
 2D test case with three vortices
 """
-from numpy import zeros, exp, pi, loadtxt, allclose
+from numpy import zeros, exp, pi, loadtxt, allclose, where
 import matplotlib.pyplot as plt
+from shenfun import Array
 from spectralDNS import config, get_solver, solve
 
 def initialize(U, X, U_hat, K_over_K2, T, **context):
@@ -51,13 +52,19 @@ if __name__ == '__main__':
     solver = get_solver(update=update, regression_test=regression_test, mesh='doublyperiodic')
     assert config.params.solver == 'NS2D'
     context = solver.get_context()
-    context.hdf5file.results['data'].update({'curl': [context.curl]})
+    context.stream = Array(context.T)
+    context.hdf5file.results['data'].update({'curl': [context.curl],
+                                             'stream': [context.stream]})
     def update_components(**context):
         """Overload default because we want to store the curl as well"""
         solver.get_velocity(**context)
         solver.get_pressure(**context)
         solver.get_curl(**context)
+        K2 = context['K2']
+        context['stream'] = context['T'].backward(-context['W_hat']/where(K2 == 0, 1, K2), context['stream'])
 
     context.hdf5file.update_components = update_components
     initialize(**context)
+    context.hdf5file.filename = "NS2D_stream"
     solve(solver, context)
+

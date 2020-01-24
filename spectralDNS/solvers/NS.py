@@ -101,7 +101,7 @@ def get_velocity(U, U_hat, VT, **context):
 
 def get_pressure(P, P_hat, T, **context):
     """Compute pressure from context"""
-    P = T.backward(1j*P_hat, P)
+    P = T.backward(-1j*P_hat, P)
     return P
 
 def set_velocity(U, U_hat, VT, **context):
