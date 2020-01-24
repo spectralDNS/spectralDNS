@@ -188,13 +188,13 @@ def get_pressure(context, solver):
 
     U_hat = context.U_hat
     U_hat0 = context.U_hat0
-    Um = Function(context.FST)
+    Um = Function(FST)
     Um[:] = 0.5*(U_hat[0] + U_hat0[0])
     U = U_hat.backward(context.U)
     U0 = U_hat0.backward(context.U0)
     dt = solver.params.dt
 
-    Hx = Function(context.FST)
+    Hx = Function(FST)
     Hx[:] = solver.get_convection(**context)[0]
 
     v = TestFunction(FCT)
@@ -211,7 +211,7 @@ def get_pressure(context, solver):
     N = A.shape[0]
     A[-(N-1)] = 1
 
-    p_hat = Function(context.FCT)
+    p_hat = Function(FCT)
     p_hat = CT.solve(rhs_hat, p_hat)
 
     p = Array(FCT)
@@ -221,7 +221,6 @@ def get_pressure(context, solver):
     if params.convection == 'Vortex':
         uu = np.sum((0.5*(U+U0))**2, 0)
         uu *= 0.5
-
 
     return p-uu
 

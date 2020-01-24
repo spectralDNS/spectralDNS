@@ -86,8 +86,8 @@ class NSFile(HDF5File):
     """
     def update_components(self, **context):
         """Transform to real data before storing the solution"""
-        U = get_velocity(**context)
-        P = get_pressure(**context)
+        get_velocity(**context)
+        get_pressure(**context)
 
 def get_curl(curl, U_hat, work, VT, K, **context):
     """Compute curl from context"""

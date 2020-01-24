@@ -51,7 +51,7 @@ def initialize(solver, context):
     #print(e0)
     acc[0] = 0.0
 
-    if not 'KMMRK3' in params.solver:
+    if 'KMMRK3' not in params.solver:
         # Initialize at t = dt
         context.H_hat1[:] = solver.get_convection(**context)
         initOS(OS, eigvals, eigvectors, U, X, t=params.dt)
@@ -71,7 +71,7 @@ def initialize(solver, context):
 
     if not "KMM" in params.solver:
         P_hat = solver.compute_pressure(**context)
-        P = FST.backward(P_hat, context.P, context.SN)
+        FST.backward(P_hat, context.P, context.SN)
 
     else:
         context.g[:] = 0

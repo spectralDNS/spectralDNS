@@ -6,8 +6,6 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 #pylint: disable=unbalanced-tuple-unpacking,unused-variable,function-redefined,unused-argument
 
 from shenfun.spectralbase import inner_product
-from shenfun.la import TDMA
-from scipy.sparse.linalg import splu
 
 from .spectralinit import *
 from shenfun import TensorProductSpace, Array, TestFunction, TrialFunction, \
@@ -198,7 +196,6 @@ def standardConvection(rhs, u_dealias, u_hat, K, VFSp, FSTp, FCTp, work,
     U = u_dealias
     Uc = work[(U, 1, True)]
     Uc2 = work[(U, 2, True)]
-    F_tmp = work[(rhs, 0, True)]
 
     # dudx = 0 on walls from continuity equation. Use Shen Dirichlet basis
     # Use regular Chebyshev basis for dvdx and dwdx

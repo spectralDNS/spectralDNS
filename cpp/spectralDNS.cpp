@@ -63,7 +63,6 @@ int main( int argc, char *argv[] )
   vector<precision> CU(2*alloc_local);
   vector<precision> CV(2*alloc_local);
   vector<precision> CW(2*alloc_local);
-  vector<precision> P(2*alloc_local);
   vector<int> dealias(2*alloc_local);
   vector<precision> kk(2*alloc_local);
   vector<complex<precision> > U_hat(alloc_local);
@@ -126,7 +125,7 @@ int main( int argc, char *argv[] )
       for (int k=0; k<Nf; k++)
       {
         const int z = (i*N+j)*Nf+k;
-        dealias[z] = (abs(kx[i+local_1_start])<kmax)*(abs(kx[j])<kmax)*(abs(kx[k])<kmax) == true ? 1 : 0;
+        dealias[z] = (abs(kx[i+local_1_start])<kmax)*(abs(kx[j])<kmax)*(abs(kx[k])<kmax);
       }
 
   for (int i=0; i<local_n1; i++)

@@ -117,9 +117,9 @@ def adaptiveRK(A, b, bhat, err_order, fY_hat, u0_new, sc, err, fsal, offset,
         if not predictivecontroller:
             factor = min(facmax, max(facmin, fac*pow((1/est), exponent)))
         else:
-            if not "last_dt" in vars(params):
+            if "last_dt" not in vars(params):
                 params.last_dt = dt
-            if not "last_est" in vars(params):
+            if "last_est" not in vars(params):
                 params.last_est = est
 
             last_dt = params.last_dt

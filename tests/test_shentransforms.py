@@ -1,8 +1,7 @@
 import pytest
 from mpi4py import MPI
-from sympy import Symbol, sin, pi, lambdify
+from sympy import Symbol
 import numpy as np
-import scipy.sparse.linalg as la
 from spectralDNS.shen import LUsolve
 from shenfun.spectralbase import inner_product
 from shenfun.chebyshev.bases import Basis, ShenDirichletBasis, \

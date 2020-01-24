@@ -58,10 +58,10 @@ def initialize(solver, context):
 
     # Compute convection from data in context (i.e., context.U_hat and context.g)
     # This is the convection at t=0
-    e0 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
+    e0 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, FST)
     acc[0] = 0.0
 
-    if not 'RK3' in params.solver:
+    if 'RK3' not in params.solver:
         # Initialize at t = dt
         context.H_hat1[:] = solver.get_convection(**context)
         context.U_hat0[:] = U_hat
@@ -71,7 +71,7 @@ def initialize(solver, context):
         U = solver.get_velocity(**context)
         params.t = params.dt
         params.tstep = 1
-        e1 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, context.FST)
+        e1 = 0.5*dx(U[0]**2+(U[1]-(1-X[0]**2))**2, FST)
 
         if solver.rank == 0:
             acc[0] += abs(e1/e0 - exp(2*imag(OS.eigval)*params.t))*params.dt
@@ -84,8 +84,8 @@ def initialize(solver, context):
         P_hat = solver.compute_pressure(**context)
         P = P_hat.backward(context.P)
         if params.convection == 'Vortex':
-            context.P += 0.5*sum(U**2, axis=0)
-            context.P_hat = context.P.forward(context.P_hat)
+            P += 0.5*sum(U**2, axis=0)
+            P_hat = context.P.forward(P_hat)
 
     else:
         try:
@@ -114,7 +114,7 @@ def update(context):
         U = solver.get_velocity(**context)
 
     global im1, im2, im3, OS, e0, acc
-    if not plt is None:
+    if plt is not None:
         if im1 is None and solver.rank == 0 and params.plot_step > 0:
             plt.figure()
             im1 = plt.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], c.U[0, :, :, 0], 100)

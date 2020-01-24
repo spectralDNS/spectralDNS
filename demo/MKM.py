@@ -7,7 +7,6 @@ import matplotlib.cbook
 #from spectralDNS.utilities import reset_profile
 from spectralDNS import config, get_solver, solve
 from spectralDNS.utilities import dx
-from shenfun import TrialFunction, TestFunction, inner, div, grad, project, Function
 
 warnings.filterwarnings("ignore", category=matplotlib.cbook.mplDeprecation)
 
@@ -71,11 +70,11 @@ def initialize(solver, context):
     if solver.rank == 0:
         print("Flux {}".format(flux[0]))
 
-    if not 'KMM' in params.solver:
+    if 'KMM' not in params.solver:
         P_hat = solver.compute_pressure(**context)
-        P = P_hat.backward(context.P)
+        P_hat.backward(context.P)
 
-    if not 'RK3' in params.solver:
+    if 'RK3' not in params.solver:
         context.U_hat0[:] = context.U_hat[:]
         context.H_hat1[:] = solver.get_convection(**context)
 
@@ -259,14 +258,12 @@ class Stats(object):
 def init_from_file(filename, solver, context):
     f = h5py.File(filename, 'r+', driver="mpio", comm=solver.comm)
     assert "0" in f["U/3D"]
-    U = context.U
     U_hat = context.U_hat
-    N = U.shape[1]
     TV = context.U.function_space()
     su = tuple(TV.local_slice(True))
 
     # previous timestep
-    if not 'RK3' in config.params.solver:
+    if 'RK3' not in config.params.solver:
         assert "1" in f["U/3D"]
         U_hat[:] = f["U/3D/1"][su]
 

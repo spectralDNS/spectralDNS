@@ -46,8 +46,8 @@ class VVFile(HDF5File):
     """
     def update_components(self, **context):
         """Transform to real data before storing the solution"""
-        U = get_velocity(**context)
-        curl = get_curl(**context)
+        get_velocity(**context)
+        get_curl(**context)
 
 def compute_velocity(U, w_hat, work, VT, K_over_K2):
     """Compute u from curl(u)

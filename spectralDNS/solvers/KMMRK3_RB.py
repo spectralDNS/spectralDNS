@@ -106,7 +106,6 @@ def StandardRBConvection(rhs, u_hat, g_hat, p_hat,
     dTdxi = work[(Ua, 0, True)]
     N_s = work[(p_hat, 1, True)]
     N = work[(Ua[0], 0, True)]
-    diff_T = work[(p_hat, 2, True)]
     Ua = VFSp.backward(u_hat, Ua)
     dTdx_hat = CTD.matvec(p_hat, dTdx_hat)
     dTdx_hat[0] += 0.5*BTT[0][0]*(p_hat[-2]-p_hat[-1])

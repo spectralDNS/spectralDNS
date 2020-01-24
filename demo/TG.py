@@ -96,7 +96,7 @@ def update(context):
 
         ww = solver.comm.reduce(sum(curl.astype(float64)*curl.astype(float64))/prod(params.N)/2)
         kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))/prod(params.N)/2) # Compute energy with double precision
-        if not 'NS' in params.solver:
+        if 'NS' not in params.solver:
             c.U_hat = c.U.forward(c.U_hat)
         ww2 = energy_fourier(c.U_hat, c.T)/2
         divu = solver.get_divergence(**context)

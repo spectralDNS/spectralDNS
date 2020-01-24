@@ -82,7 +82,6 @@ def L2_norm(comm, u):
 
     """
     N = config.params.N
-    L = config.params.L
     result = comm.allreduce(np.sum(u**2))
     return result/np.prod(N)
 
@@ -120,7 +119,7 @@ def spectrum(solver, context):
 
     ## Rij
     #for i in range(3):
-        #c.U[i] = c.FFT.ifftn(c.U_hat[i], c.U[i])
+    #    c.U[i] = c.FFT.ifftn(c.U_hat[i], c.U[i])
     #X = c.FFT.get_local_mesh()
     #R = np.sqrt(X[0]**2 + X[1]**2 + X[2]**2)
     ## Sample
@@ -136,14 +135,14 @@ def spectrum(solver, context):
     #rz = np.digitize(R, rbins, right=True)
     #RR = np.zeros(Nr)
     #for i in range(Nr):
-        #ii = np.where(rz == i)
-        #RR[i] = np.sum(Rii[0][ii] + Rii[1][ii] + Rii[2][ii]) / len(ii[0])
+    #    ii = np.where(rz == i)
+    #    RR[i] = np.sum(Rii[0][ii] + Rii[1][ii] + Rii[2][ii]) / len(ii[0])
 
     #Rxx = np.zeros((3, config.params.N[0]))
     #for i in range(config.params.N[0]):
-        #Rxx[0, i] = (c.U[0] * np.roll(c.U[0], -i, axis=0)).mean()
-        #Rxx[1, i] = (c.U[0] * np.roll(c.U[0], -i, axis=1)).mean()
-        #Rxx[2, i] = (c.U[0] * np.roll(c.U[0], -i, axis=2)).mean()
+    #    Rxx[0, i] = (c.U[0] * np.roll(c.U[0], -i, axis=0)).mean()
+    #    Rxx[1, i] = (c.U[0] * np.roll(c.U[0], -i, axis=1)).mean()
+    #    Rxx[2, i] = (c.U[0] * np.roll(c.U[0], -i, axis=2)).mean()
 
     return Ek, bins, E0, E1, E2
 
