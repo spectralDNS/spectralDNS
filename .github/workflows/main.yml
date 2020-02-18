@@ -26,6 +26,6 @@ jobs:
     - run: pwd
     - run: |
         export GIT_DESCRIBE_TAG=1.0.0
-        conda config --set channel_priority strict
-        conda install conda-build
+        conda create --name buildenv conda-build numpy=1.14.*
+        source activate buildenv
         conda build conf/conda
