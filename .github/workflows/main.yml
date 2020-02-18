@@ -22,6 +22,7 @@ jobs:
           conda-channels: anaconda, conda-forge
     - run: conda --version
     - run: which python
+    - run: pwd
     - run: |
         conda install conda-build=3.17
-        conda build ../../conf/conda
+        conda build conf/conda
