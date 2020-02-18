@@ -14,6 +14,7 @@ jobs:
     
     steps:
     - uses: actions/checkout@v2
+    #- run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
     - name: setup-conda
       uses: s-weigand/setup-conda@v1.0.2
       with:
@@ -25,4 +26,5 @@ jobs:
     - run: pwd
     - run: |
         export GIT_DESCRIBE_TAG=1.0.0
+        conda install conda-build
         conda build conf/conda
