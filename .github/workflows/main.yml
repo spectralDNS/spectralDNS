@@ -25,5 +25,4 @@ jobs:
     - run: pwd
     - run: |
         export GIT_DESCRIBE_TAG=1.0.0
-        conda install conda-build=3.17
         conda build conf/conda
