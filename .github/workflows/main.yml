@@ -26,5 +26,6 @@ jobs:
     - run: pwd
     - run: |
         export GIT_DESCRIBE_TAG=1.0.0
+        conda config --set channel_priority strict
         conda install conda-build
         conda build conf/conda
