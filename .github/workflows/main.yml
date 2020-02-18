@@ -23,6 +23,7 @@ jobs:
     - run: conda --version
     - run: which python
     - run: pwd
+    - run: export GIT_DESCRIBE_TAG=`git describe --tags | cut -d'-' -f 1`
     - run: |
         conda install conda-build=3.17
         conda build conf/conda
