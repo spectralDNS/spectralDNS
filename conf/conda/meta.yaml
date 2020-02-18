@@ -17,7 +17,7 @@ requirements:
   host:
     - python
     - cython
-    - numpy
+    - numpy >=1.14.*
     - setuptools
     #- nomkl
     - {{ mpi }}
