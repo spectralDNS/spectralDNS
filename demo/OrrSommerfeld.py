@@ -15,19 +15,6 @@ except ImportError:
     warnings.warn("matplotlib not installed")
     plt = None
 
-#params.eps = 1e-9
-#def initOS(OS, U, X, t=0.):
-    #for i in range(U.shape[1]):
-        #x = X[0, i, 0, 0]
-        #OS.interp(x, 1)
-        #for j in range(U.shape[2]):
-            #y = X[1, i, j, 0]
-            #v = (1-x**2) + config.params.eps*dot(OS.f, real(OS.dphidy*exp(1j*(y-OS.eigval*t))))
-            #u = -config.params.eps*dot(OS.f, real(1j*OS.phi*exp(1j*(y-OS.eigval*t))))
-            #U[0, i, j, :] = u
-            #U[1, i, j, :] = v
-    #U[2] = 0
-
 def initOS(OS, eigvals, eigvectors, U, X, t=0.):
     x = X[0][:, 0, 0]
     eigval, phi, dphidy = OS.interp(x, eigvals, eigvectors, eigval=1, verbose=False)

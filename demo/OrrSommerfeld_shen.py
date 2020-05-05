@@ -9,7 +9,8 @@ from scipy.linalg import eig
 #from numpy.linalg import eig
 #from numpy.linalg import inv
 import numpy as np
-from shenfun import Basis
+import sympy as sp
+from shenfun import Basis, Function, Dx
 from shenfun.spectralbase import inner_product
 from shenfun.matrixbase import extract_diagonal_matrix
 
@@ -27,9 +28,6 @@ class OrrSommerfeld(object):
     def __init__(self, alfa=1., Re=8000., N=80, quad='GC', **kwargs):
         kwargs.update(dict(alfa=alfa, Re=Re, N=N, quad=quad))
         vars(self).update(kwargs)
-        self.P4 = np.zeros(0)
-        self.T4x = np.zeros(0)
-        self.SB, self.SD, self.CDB = (None,)*3
         self.x, self.w = None, None
 
     def interp(self, y, eigvals, eigvectors, eigval=1, verbose=False):
@@ -50,18 +48,13 @@ class OrrSommerfeld(object):
             verbose : bool, optional
                 Print information or not
         """
-        N = self.N
         nx, eigval = self.get_eigval(eigval, eigvals, verbose)
-        phi_hat = np.zeros(N, np.complex)
+        SB = Basis(self.N, 'C', bc='Biharmonic', quad=self.quad)
+        SB.plan(self.N, 0, np.complex, {})
+        phi_hat = Function(SB)
         phi_hat[:-4] = np.squeeze(eigvectors[:, nx])
-
-        if not len(self.P4) == len(y):
-            SB = Basis(N, 'C', bc='Biharmonic', quad=self.quad)
-            self.P4 = SB.evaluate_basis_all(x=y)
-            self.T4x = SB.evaluate_basis_derivative_all(x=y, k=1)
-        phi = np.dot(self.P4, phi_hat)
-        dphidy = np.dot(self.T4x, phi_hat)
-
+        phi = phi_hat.eval(y)
+        dphidy = Dx(phi_hat, 0, 1).eval(y)
         return eigval, phi, dphidy
 
     def assemble(self):
@@ -69,43 +62,27 @@ class OrrSommerfeld(object):
         SB = Basis(N, 'C', bc='Biharmonic', quad=self.quad)
         SB.plan((N, N), 0, np.float, {})
 
-        x, _ = self.x, self.w = SB.points_and_weights(N)
-
-        # Trial function
-        P4 = SB.evaluate_basis_all(x=x)
-
-        # Second derivatives
-        T2x = SB.evaluate_basis_derivative_all(x=x, k=2)
-
         # (u'', v)
-        K = np.zeros((N, N))
-        K[:-4, :-4] = inner_product((SB, 0), (SB, 2)).diags().toarray()
+        K = inner_product((SB, 0), (SB, 2))
 
         # ((1-x**2)u, v)
-        xx = np.broadcast_to((1-x**2)[:, np.newaxis], (N, N))
-        #K1 = np.dot(w*P4.T, xx*P4)  # Alternative: K1 = np.dot(w*P4.T, ((1-x**2)*P4.T).T)
-        K1 = np.zeros((N, N))
-        K1 = SB.scalar_product(xx*P4, K1)
-        K1 = extract_diagonal_matrix(K1).diags().toarray() # For improved roundoff
+        x = sp.symbols('x', real=True)
+        K1 = inner_product((SB, 0), (SB, 0), measure=(1-x**2))
 
         # ((1-x**2)u'', v)
-        K2 = np.zeros((N, N))
-        K2 = SB.scalar_product(xx*T2x, K2)
-        K2 = extract_diagonal_matrix(K2).diags().toarray() # For improved roundoff
+        K2 = inner_product((SB, 0), (SB, 2), measure=(1-x**2))
 
         # (u'''', v)
-        Q = np.zeros((self.N, self.N))
-        Q[:-4, :-4] = inner_product((SB, 0), (SB, 4)).diags().toarray()
+        Q = inner_product((SB, 0), (SB, 4))
 
         # (u, v)
-        M = np.zeros((self.N, self.N))
-        M[:-4, :-4] = inner_product((SB, 0), (SB, 0)).diags().toarray()
+        M = inner_product((SB, 0), (SB, 0))
 
         Re = self.Re
         a = self.alfa
         B = -Re*a*1j*(K-a**2*M)
         A = Q-2*a**2*K+a**4*M - 2*a*Re*1j*M - 1j*a*Re*(K2-a**2*K1)
-        return A, B
+        return A.diags().toarray(), B.diags().toarray()
 
     def solve(self, verbose=False):
         """Solve the Orr-Sommerfeld eigenvalue problem
@@ -114,8 +91,8 @@ class OrrSommerfeld(object):
             print('Solving the Orr-Sommerfeld eigenvalue problem...')
             print('Re = '+str(self.Re)+' and alfa = '+str(self.alfa))
         A, B = self.assemble()
-        return eig(A[:-4, :-4], B[:-4, :-4])
-        # return eig(np.dot(inv(B[:-4, :-4]), A[:-4, :-4]))
+        return eig(A, B)
+        # return eig(np.dot(inv(B), A))
 
     @staticmethod
     def get_eigval(nx, eigvals, verbose=False):
@@ -162,6 +139,7 @@ if __name__ == '__main__':
     z = OrrSommerfeld(**vars(args))
     evals, evectors = z.solve(args.verbose)
     d = z.get_eigval(1, evals, args.verbose)
+
     if args.Re == 8000.0 and args.alfa == 1.0 and args.N > 80:
         assert abs(d[1] - (0.24707506017508621+0.0026644103710965817j)) < 1e-12
 
