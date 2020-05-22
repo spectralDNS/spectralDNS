@@ -23,6 +23,12 @@ def get_curl(curl, W_hat, U_hat, work, T, K, **context):
     curl = W_hat.backward(curl)
     return curl
 
+def get_divergence(T, K, U_hat, mask, **context):
+    div_u = Array(T)
+    div_u_hat = 1j*(K[0]*U_hat[0]+K[1]*U_hat[1])
+    div_u = T.backward(div_u_hat, div_u)
+    return div_u
+
 def getConvection(convection):
     """Return function used to compute nonlinear term"""
     if convection in ("Standard", "Divergence", "Skewed"):

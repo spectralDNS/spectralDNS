@@ -307,7 +307,7 @@ if __name__ == "__main__":
 
     context = sol.get_context()
     initialize(sol, context)
-    init_from_file("NS_isotropic_60_60_60_c.h5", sol, context)
+    #init_from_file("NS_isotropic_60_60_60_c.h5", sol, context)
     context.hdf5file.filename = "NS_isotropic_{}_{}_{}".format(*config.params.N)
 
     Ek, bins, E0, E1, E2 = spectrum(sol, context)
@@ -319,3 +319,6 @@ if __name__ == "__main__":
     f["Turbulence"].create_dataset("bins", data=bins)
     f.close()
     solve(sol, context)
+    from mpi4py_fft import generate_xdmf
+    if sol.rank == 0:
+        generate_xdmf(context.hdf5file.filename+"_w.h5")

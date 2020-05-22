@@ -49,8 +49,7 @@ class OrrSommerfeld(object):
                 Print information or not
         """
         nx, eigval = self.get_eigval(eigval, eigvals, verbose)
-        SB = Basis(self.N, 'C', bc='Biharmonic', quad=self.quad)
-        SB.plan(self.N, 0, np.complex, {})
+        SB = Basis(self.N, 'C', bc='Biharmonic', quad=self.quad, dtype='D')
         phi_hat = Function(SB)
         phi_hat[:-4] = np.squeeze(eigvectors[:, nx])
         phi = phi_hat.eval(y)

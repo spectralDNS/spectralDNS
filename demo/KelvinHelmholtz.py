@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
-from numpy import zeros, pi, sum, exp, sin, float64
+from numpy import zeros, pi, sum, exp, sin, float64, prod
 from spectralDNS import config, get_solver, solve
 
-def initialize(X, U, U_hat, FFT, **context):
+def initialize(X, U, U_hat, mask, T, K, K_over_K2, **context):
     params = config.params
     Um = 0.5*(params.U1 - params.U2)
     N = params.N
@@ -14,6 +14,22 @@ def initialize(X, U, U_hat, FFT, **context):
 
     for i in range(2):
         U_hat[i] = U[i].forward(U_hat[i])
+
+    U_hat[:] -= (K[0]*U_hat[0]+K[1]*U_hat[1])*K_over_K2
+    if solver.rank == 0:
+        U_hat[:, 0, 0] = 0.0
+
+    T.mask_nyquist(U_hat, mask)
+
+def L2_norm(u, comm):
+    r"""Compute the L2-norm of real array a
+
+    Computing \int abs(u)**2 dx
+
+    """
+    N = config.params.N
+    result = comm.allreduce(sum(u**2))
+    return result/prod(N)
 
 im, im2 = None, None
 count = 0
@@ -28,9 +44,11 @@ def update(context):
 
     if params.tstep % params.compute_energy == 0:
         U = solver.get_velocity(**context)
+        div_u = solver.get_divergence(**context)
+        du = L2_norm(div_u, solver.comm)
         kk = solver.comm.reduce(sum(U.astype(float64)*U.astype(float64))*dx[0]*dx[1]/L[0]/L[1]/2)
         if solver.rank == 0:
-            print(params.tstep, kk)
+            print(params.tstep, kk, du)
 
     if params.tstep == 1 and params.plot_result > 0:
         fig, ax = plt.subplots(1, 1)

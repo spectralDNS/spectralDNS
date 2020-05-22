@@ -6,7 +6,7 @@ source:
   git_url: ../../
 
 build:
-  number: 36
+  number: 37
 
 requirements:
 
@@ -19,7 +19,6 @@ requirements:
     - cython
     - numpy >=1.14.*
     - setuptools
-    #- nomkl
     - {{ mpi }}
     - pytest-runner
     - pip
@@ -27,7 +26,6 @@ requirements:
   run:
     - python
     - {{ pin_compatible('numpy') }}
-    #- nomkl
     - {{ mpi }}
     - hdf5 * mpi_{{ mpi }}_*
     - h5py * mpi_{{ mpi }}_*
@@ -36,6 +34,7 @@ requirements:
     - mpi4py
     - scipy
     - sympy
+    - nodepy
 
 test:
   source_files:
