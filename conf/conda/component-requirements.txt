@@ -1,1 +1,2 @@
-git+https://github.com/ketch/nodepy.git@master
+nodepy==0.8
+# git+https://github.com/ketch/nodepy.git@master
