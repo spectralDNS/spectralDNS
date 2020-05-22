@@ -4,6 +4,7 @@ spectralDNS
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/9f6923d0baeb4deb842d819a6b598f99)](https://app.codacy.com/app/mikaem/spectralDNS?utm_source=github.com&utm_medium=referral&utm_content=spectralDNS/spectralDNS&utm_campaign=badger)
 [![Build Status](https://travis-ci.org/spectralDNS/spectralDNS.svg?branch=master)](https://travis-ci.org/spectralDNS/spectralDNS)
 [![CircleCI](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master.svg?style=svg)](https://circleci.com/gh/spectralDNS/spectralDNS/tree/master)
+![CI](https://github.com/spectralDNS/spectralDNS/workflows/CI/badge.svg)
 
 <p align="center">
     <img src="https://cdn.jsdelivr.net/gh/spectralDNS/spectralutilities@master/movies/isotropic300_12.gif" width="600" height="400" alt="Isotropic turbulence"/>
@@ -74,6 +75,13 @@ There are many different arguments to each solver. They are all described in con
     mpirun -np 4 python TG.py --M 6 6 6 --precision single --dealias '3/2-rule' NS
 
 before the required solver argument. Alternatively, use config.update as shown in demo/TG.py.
+
+To visualize the generated data you can do 
+
+    from mpi4py_fft import generate_xdmf
+    generate_xdmf('name of h5-file')
+
+and then open the generated xdmf-file in Paraview. Note that `generate_xdmf` must be run on only one single processor.
 
 Scaling
 ------
