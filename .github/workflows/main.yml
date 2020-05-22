@@ -11,7 +11,7 @@ jobs:
         os: [ubuntu-latest, macOS-latest]
         python-version: [3.7, 3.8]
     name: Python ${{ matrix.python-version }} example
-    
+
     steps:
     - uses: actions/checkout@v2
     #- run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
@@ -25,7 +25,7 @@ jobs:
     - run: which python
     - run: pwd
     - run: |
-        export GIT_DESCRIBE_TAG=1.0.0
+        export GIT_DESCRIBE_TAG=1.2.2
         conda create --name buildenv conda-build
         source activate buildenv
         conda build conf/conda
