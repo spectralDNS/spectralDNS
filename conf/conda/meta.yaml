@@ -34,7 +34,7 @@ requirements:
     - mpi4py
     - scipy
     - sympy
-    - nodepy
+    - matplotlib
 
 test:
   source_files:
