@@ -7,9 +7,9 @@ osx_image: xcode9.4
 
 env:
   matrix:
-    - CONDA_PY=27
     - CONDA_PY=36
     - CONDA_PY=37
+    - CONDA_PY=38
 
   global:
     - secure: "ToqJHt8Lz8lj4erX3YW5B8FnbnJWyAC5x85zjkqwMFDfavnF3+CPnUsrI6JgyWYBz1CMOlWM0Jiwtk1mdmOLjq4DbQ/MvMUDrxjOdQJ+SDbCbvRNmYgXtR9M3f3OtvY/E1Um2c2jl6m0x8i5kDY4JeO1sVsn5+ELAee4kRWFEezd82IsCDLDXeqCzVE+vdD3P3TjFPUjunOKOxOvlUwh4+CUTNtp8kN4r+qdOG0aX/e3sAWjMDnKDMbiLlKQgmK1IFNuNZ+ahD7aKxeh0vvtL4xoJnpT4D9TRwEzTMrS9M9kCnU+Ghx530tTT9VxkGByohekY+tk5Wwmng0Ggyqg2kToz4lKyk3puTN5wp+4y0Wt+NAEFZLB6YXwam9e/eXdIhQ/u+tf324h8Apunja6EjjAujZSPPnU4qDt39zk8t0x0pzXIUabQViIuRUwWAunR9s+NhdFrbl5sDfdVZ5X/kLRYZR8ntH8J7es3l1FhHNxaw+67o8TDtameoTthl0QFsCEUo51j/l+GlYvRKhhUa0l29qXiU+rA840yvn+FPnUWQFjIneOtq9fZKattV5HdM6ts9jS+FzIlq2rIVfiHrKo6GEZMQ2r8RqltzwL+zC2rMofKFAVnKgFBj5lRqgcp8zM3wfzaPfYzT3slEJHNF+PxN580GNjRbXKvm7J49A="

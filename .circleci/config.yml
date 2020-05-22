@@ -1,39 +1,5 @@
 version: 2
 jobs:
-  build_python_27:
-    machine: true
-    steps:
-      - checkout
-
-      - restore_cache:
-          key: v3-miniconda-{{ .Branch }}
-
-      - run:
-          name: install miniconda
-          command: |
-            ./.circleci/install_conda.sh
-
-      - save_cache:
-          key: v3-miniconda-{{ .Branch }}
-          paths:
-            - /home/circleci/miniconda
-
-      - run:
-          name: Build and test python 2.7
-          command: |
-            source ~/miniconda/bin/activate root
-            cd /home/circleci/project
-            conda build --python 2.7 ./conf/conda
-
-      - run:
-          name: Upload package
-          command: |
-            source ~/miniconda/bin/activate root
-            cd /home/circleci/project
-            export CONDA_PY=27
-            conda install anaconda-client
-            anaconda -t $BINSTAR_TOKEN upload --skip -u spectraldns -l nightly /home/circleci/miniconda/conda-bld/linux-64/spectraldns-*.tar.bz2
-
   build_python_36:
     machine: true
     steps:
@@ -91,11 +57,39 @@ jobs:
             export CONDA_PY=37
             conda install anaconda-client
             anaconda -t $BINSTAR_TOKEN upload --skip -u spectraldns -l nightly /home/circleci/miniconda/conda-bld/linux-64/spectraldns-*.tar.bz2
+  build_python_38:
+    machine: true
+    steps:
+      - checkout
+
+      - restore_cache:
+          key: v3-miniconda-{{ .Branch }}
+
+      - run:
+          name: install miniconda
+          command: |
+            ./.circleci/install_conda.sh
+
+      - run:
+          name: Build and test python 3.8
+          command: |
+            source ~/miniconda/bin/activate root
+            cd /home/circleci/project
+            conda build --python 3.8 ./conf/conda
+
+      - run:
+          name: Upload package
+          command: |
+            source ~/miniconda/bin/activate root
+            cd /home/circleci/project
+            export CONDA_PY=38
+            conda install anaconda-client
+            anaconda -t $BINSTAR_TOKEN upload --skip -u spectraldns -l nightly /home/circleci/miniconda/conda-bld/linux-64/spectraldns-*.tar.bz2
 
 workflows:
   version: 2
   build_and_test:
     jobs:
-      - build_python_27
       - build_python_36
       - build_python_37
+      - build_python_38
