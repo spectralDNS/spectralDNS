@@ -76,6 +76,13 @@ There are many different arguments to each solver. They are all described in con
 
 before the required solver argument. Alternatively, use config.update as shown in demo/TG.py.
 
+To visualize the generated data you can do 
+
+    from mpi4py_fft import generate_xdmf
+    generate_xdmf('name of h5-file')
+
+and then open the generated xdmf-file in Paraview. Note that `generate_xdmf` must be run on only one single processor.
+
 Scaling
 ------
 The most recent simulations of the pencil version of the NS solver are showing excellent scaling up to 65k cores at KAUST and Shaheen II!
