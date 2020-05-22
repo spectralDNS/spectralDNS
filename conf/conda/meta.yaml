@@ -34,6 +34,8 @@ requirements:
     - mpi4py
     - scipy
     - sympy
+    - pip:
+      - nodepy ==0.8
 
 test:
   source_files:
