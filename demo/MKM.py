@@ -297,9 +297,9 @@ if __name__ == "__main__":
     #solver = get_solver(update=update, mesh="channel")
     solver = get_solver(update=update, mesh="channel")
     context = solver.get_context()
-    #initialize(solver, context)
-    init_from_file("KMM776d_c.h5", solver, context)
+    initialize(solver, context)
+    #init_from_file("KMM776d_c.h5", solver, context)
     set_Source(**context)
-    solver.stats = Stats(context.U, solver.comm, fromstats="KMM776statsc")
-    context.hdf5file.filename = "KMM776e"
+    solver.stats = Stats(context.U, solver.comm)
+    context.hdf5file.filename = "KMM776f"
     solve(solver, context)

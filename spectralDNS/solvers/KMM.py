@@ -37,8 +37,8 @@ def get_context():
     FST = TensorProductSpace(comm, (ST, K0, K1), **kw0)    # Dirichlet
     FSB = TensorProductSpace(comm, (SB, K0, K1), **kw0)    # Biharmonic
     FCT = TensorProductSpace(comm, (CT, K0, K1), **kw0)    # Regular Chebyshev
-    VFS = MixedTensorProductSpace([FSB, FST, FST])
-    VFST = MixedTensorProductSpace([FST, FST, FST])
+    VFS = VectorTensorProductSpace([FSB, FST, FST])
+    VFST = VectorTensorProductSpace([FST, FST, FST])
     VUG = MixedTensorProductSpace([FSB, FST])
     VCT = VectorTensorProductSpace(FCT)
 
@@ -59,7 +59,7 @@ def get_context():
     FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **kw0)
     FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **kw0)
     FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **kw0)
-    VFSp = MixedTensorProductSpace([FSBp, FSTp, FSTp])
+    VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
 
     float, complex, mpitype = datatypes("double")
 

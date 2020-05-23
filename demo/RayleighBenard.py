@@ -88,16 +88,13 @@ def update(context):
 
 class Stats(object):
 
-    def __init__(self, T, axis=0, fromstats="", filename=""):
-        self.T = T
-        self.axis = axis
-        N = config.params.N
-        assert np.all(np.array(T.shape(False)[1:]) == np.array(N))
-        M = self.T.shape(False)[self.axis+1]
-        self.Umean = np.zeros((3, M))
-        self.phim = np.zeros(M)
-        self.UU = np.zeros((6, M))
-        self.pp = np.zeros(M)
+    def __init__(self, U, comm, fromstats="", filename=""):
+        self.shape = U.shape[1:]
+        self.Umean = np.zeros(U.shape[:2])
+        self.Pmean = np.zeros(U.shape[1])
+        self.phim = np.zeros(U.shape[1])
+        self.pp = np.zeros(U.shape[1])
+        self.UU = np.zeros((6, U.shape[1]))
         self.num_samples = 0
         self.rank = comm.Get_rank()
         self.fname = filename
@@ -112,35 +109,29 @@ class Stats(object):
         self.f0.create_group("Average")
         self.f0.create_group("Reynolds Stress")
         for i in ("U", "V", "W", "phi"):
-            self.f0["Average"].create_dataset(i, shape=(config.params.N[self.axis],), dtype=float)
+            self.f0["Average"].create_dataset(i, shape=(2**config.params.M[0],), dtype=float)
 
         for i in ("UU", "VV", "WW", "UV", "UW", "VW", "pp"):
-            self.f0["Reynolds Stress"].create_dataset(i, shape=(config.params.N[self.axis],), dtype=float)
+            self.f0["Reynolds Stress"].create_dataset(i, shape=(2**config.params.M[0], ), dtype=float)
 
     def __call__(self, U, phi):
-        sx = list(range(3))
-        sx.pop(self.axis)
-        sx = np.array(sx)
         self.num_samples += 1
-        self.Umean += np.sum(U, axis=tuple(sx+1))
-        sx = tuple(sx)
-        self.phim += np.sum(phi, axis=sx)
-        self.UU[0] += np.sum(U[0]*U[0], axis=sx)
-        self.UU[1] += np.sum(U[1]*U[1], axis=sx)
-        self.UU[2] += np.sum(U[2]*U[2], axis=sx)
-        self.UU[3] += np.sum(U[0]*U[1], axis=sx)
-        self.UU[4] += np.sum(U[0]*U[2], axis=sx)
-        self.UU[5] += np.sum(U[1]*U[2], axis=sx)
-        self.pp += np.sum(phi*phi, axis=sx)
+        self.Umean += np.sum(U, axis=(2, 3))
+        self.phim += np.sum(phi, axis=(1, 2))
+        self.UU[0] += np.sum(U[0]*U[0], axis=(1, 2))
+        self.UU[1] += np.sum(U[1]*U[1], axis=(1, 2))
+        self.UU[2] += np.sum(U[2]*U[2], axis=(1, 2))
+        self.UU[3] += np.sum(U[0]*U[1], axis=(1, 2))
+        self.UU[4] += np.sum(U[0]*U[2], axis=(1, 2))
+        self.UU[5] += np.sum(U[1]*U[2], axis=(1, 2))
+        self.pp += np.sum(phi*phi, axis=(1, 2))
         self.get_stats()
 
     def get_stats(self, tofile=True):
         import h5py
-        sx = list(range(3))
-        sx.pop(self.axis)
-        N = config.params.N
-        s = self.T.local_slice(False)[self.axis+1]
-        Nd = self.num_samples*np.prod(np.take(N, sx))
+        N = self.shape[0]
+        s = slice(self.rank*N, (self.rank+1)*N, 1)
+        Nd = self.num_samples*self.shape[1]*self.shape[2]
         self.comm.barrier()
         if tofile:
             if self.f0 is None:
@@ -170,14 +161,13 @@ class Stats(object):
 
     def fromfile(self, filename="stats"):
         import h5py
-        sx = list(range(3))
-        sx.pop(self.axis)
         self.fname = filename
         self.f0 = h5py.File(filename+".h5", "a", driver="mpio", comm=comm)
-        N = config.params.N
+        N = self.shape[0]
         self.num_samples = self.f0.attrs["num_samples"]
-        Nd = self.num_samples*np.prod(np.take(N, sx))
-        s = self.T.local_slice(False)[self.axis+1]
+        Nd = self.num_samples*self.shape[1]*self.shape[2]
+        #s = self.T.local_slice(False)[self.axis+1]
+        s = slice(self.rank*N, (self.rank+1)*N, 1)
         for i, name in enumerate(("U", "V", "W")):
             self.Umean[i, :] = self.f0["Average/"+name][s]*Nd
         self.phim[:] = self.f0["Average/phi"][s]*Nd
@@ -251,5 +241,5 @@ if __name__ == "__main__":
                                         'phi': [(context.phi, [slice(None), slice(None), 0]),
                                                 (context.phi, [slice(None), 0, slice(None)])]
                                        }
-    solver.stats = Stats(context.VFS, filename="KMM_RB_stats")
+    solver.stats = Stats(context.U, solver.comm, filename="KMM_RB_stats")
     solve(solver, context)
