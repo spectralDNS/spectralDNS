@@ -215,6 +215,7 @@ if __name__ == "__main__":
          'T': 1000.,                  # End time
          'L': [2, 2*np.pi, 2*np.pi],
          'M': [6, 7, 7],
+         'write_result': 100,
         }, "channel"
     )
     config.channel.add_argument("--compute_energy", type=int, default=10)
@@ -243,3 +244,6 @@ if __name__ == "__main__":
                                        }
     solver.stats = Stats(context.U, solver.comm, filename="KMM_RB_stats")
     solve(solver, context)
+    if solver.rank == 0:
+        from mpi4py_fft import generate_xdmf
+        generate_xdmf('KMM_RB_677a_w.h5')
