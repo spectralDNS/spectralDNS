@@ -14,9 +14,9 @@ dt = 0.01
 comm = MPI.COMM_WORLD
 N = (2**6, 2**6, 2**6)
 
-K0 = Basis(N[0], 'F', dtype='D')
-K1 = Basis(N[1], 'F', dtype='D')
-K2 = Basis(N[2], 'F', dtype='d')
+K0 = FunctionSpace(N[0], 'F', dtype='D')
+K1 = FunctionSpace(N[1], 'F', dtype='D')
+K2 = FunctionSpace(N[2], 'F', dtype='d')
 T = TensorProductSpace(comm, (K0, K1, K2), **{'planner_effort': 'FFTW_MEASURE'})
 TV = VectorTensorProductSpace(T)
 

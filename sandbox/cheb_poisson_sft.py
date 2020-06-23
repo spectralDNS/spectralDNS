@@ -30,7 +30,7 @@ f = u.diff(x, 2)
 solver = "bs"
 N = 21
 
-ST = ShenDirichletBasis(quad="GC")
+ST = ShenDirichletFunctionSpace(quad="GC")
 points, weights = ST.points_and_weights(N, ST.quad)
 
 # Gauss-Chebyshev quadrature to compute rhs

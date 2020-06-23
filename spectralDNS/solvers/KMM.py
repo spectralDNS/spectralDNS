@@ -8,7 +8,7 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 from shenfun.spectralbase import inner_product
 from shenfun.la import TDMA
 from shenfun import TensorProductSpace, Array, TestFunction, TrialFunction, \
-    MixedTensorProductSpace, div, grad, Dx, inner, Function, Basis, \
+    MixedTensorProductSpace, div, grad, Dx, inner, Function, FunctionSpace, \
     VectorTensorProductSpace
 from shenfun.chebyshev.la import Helmholtz, Biharmonic
 
@@ -23,12 +23,12 @@ def get_context():
     # Get points and weights for Chebyshev weighted integrals
     assert params.Dquad == params.Bquad
     collapse_fourier = False if params.dealias == '3/2-rule' else True
-    ST = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
-    SB = Basis(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
-    CT = Basis(params.N[0], 'C', quad=params.Dquad)
-    ST0 = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad) # For 1D problem
-    K0 = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype='D')
-    K1 = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype='d')
+    ST = FunctionSpace(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
+    SB = FunctionSpace(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
+    CT = FunctionSpace(params.N[0], 'C', quad=params.Dquad)
+    ST0 = FunctionSpace(params.N[0], 'C', bc=(0, 0), quad=params.Dquad) # For 1D problem
+    K0 = FunctionSpace(params.N[1], 'F', domain=(0, params.L[1]), dtype='D')
+    K1 = FunctionSpace(params.N[2], 'F', domain=(0, params.L[2]), dtype='d')
 
     kw0 = {'threads': params.threads,
            'planner_effort': params.planner_effort["dct"],
@@ -49,13 +49,13 @@ def get_context():
           'dealias_direct': params.dealias == '2/3-rule'}
     if params.dealias == '3/2-rule':
         # Requires new bases due to planning and transforms on different size arrays
-        STp = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
-        SBp = Basis(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
-        CTp = Basis(params.N[0], 'C', quad=params.Dquad)
+        STp = FunctionSpace(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
+        SBp = FunctionSpace(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
+        CTp = FunctionSpace(params.N[0], 'C', quad=params.Dquad)
     else:
         STp, SBp, CTp = ST, SB, CT
-    K0p = Basis(params.N[1], 'F', dtype='D', domain=(0, params.L[1]), **kw)
-    K1p = Basis(params.N[2], 'F', dtype='d', domain=(0, params.L[2]), **kw)
+    K0p = FunctionSpace(params.N[1], 'F', dtype='D', domain=(0, params.L[1]), **kw)
+    K1p = FunctionSpace(params.N[2], 'F', dtype='d', domain=(0, params.L[2]), **kw)
     FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **kw0)
     FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **kw0)
     FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **kw0)

@@ -10,7 +10,7 @@ class BiharmonicCoeff(object):
     def __init__(self, N, a0, alfa, beta, axis, quad="GL"):
         self.quad = quad
         self.shape = (N-4, N-4)
-        SB = bases.ShenBiharmonicBasis(N, quad)
+        SB = bases.ShenBiharmonic(N, quad)
         self.S = inner_product((SB, 0), (SB, 4))
         self.B = inner_product((SB, 0), (SB, 0))
         self.A = inner_product((SB, 0), (SB, 2))
@@ -34,7 +34,7 @@ class HelmholtzCoeff(object):
         """
         self.quad = quad
         self.shape = (N-2, N-2)
-        SD = bases.ShenDirichletBasis(N, quad)
+        SD = bases.ShenDirichlet(N, quad)
         self.B = inner_product((SD, 0), (SD, 0))
         self.A = inner_product((SD, 0), (SD, 2))
         self.axis = axis

@@ -60,8 +60,8 @@ f = -u.diff(x, 2) + kx**2*u
 solver = "lu"
 N = 10
 
-ST = ShenNeumannBasis("GC")
-SD = ShenDirichletBasis("GL")
+ST = ShenNeumannFunctionSpace("GC")
+SD = ShenDirichletFunctionSpace("GL")
 points, weights = ST.points_and_weights(N) 
 
 # Gauss-Chebyshev quadrature to compute rhs

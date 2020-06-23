@@ -19,8 +19,8 @@ K = array(meshgrid(ky, kz, indexing='ij'), dtype=float)
 K2 = sum(K*K, 0, dtype=float)
 K4 = K2**2
 
-ST = ShenDirichletBasis("GL")
-SB = ShenBiharmonicBasis("GL")
+ST = ShenDirichletFunctionSpace("GL")
+SB = ShenBiharmonicFunctionSpace("GL")
 
 t11 = 1
 t22 = 1

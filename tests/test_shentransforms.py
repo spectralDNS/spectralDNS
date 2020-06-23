@@ -4,23 +4,23 @@ from sympy import Symbol
 import numpy as np
 from spectralDNS.shen import LUsolve
 from shenfun.spectralbase import inner_product
-from shenfun.chebyshev.bases import Basis, ShenDirichletBasis, \
-    ShenNeumannBasis, ShenBiharmonicBasis
+from shenfun.chebyshev.bases import Orthogonal, ShenDirichlet, \
+    ShenNeumann, ShenBiharmonic
 
 comm = MPI.COMM_WORLD
 
 N = 32
 x = Symbol("x")
 
-Basis = (Basis, ShenDirichletBasis, ShenNeumannBasis,
-         ShenBiharmonicBasis)
+Basis = (Orthogonal, ShenDirichlet, ShenNeumann,
+         ShenBiharmonic)
 quads = ('GC', 'GL')
 
 
 def test_Mult_Div():
 
-    SD = ShenDirichletBasis(N, "GC")
-    SN = ShenNeumannBasis(N, "GC")
+    SD = ShenDirichlet(N, "GC")
+    SN = ShenNeumann(N, "GC")
     SD.plan(N, 0, np.complex, {})
     SN.plan(N, 0, np.complex, {})
 
@@ -77,7 +77,7 @@ def test_Mult_Div():
 
 @pytest.mark.parametrize('quad', quads)
 def test_Mult_CTD_3D(quad):
-    SD = ShenDirichletBasis(N, quad=quad)
+    SD = ShenDirichlet(N, quad=quad)
     SD.plan((N, 4, 4), 0, np.complex, {})
 
     C = inner_product((SD.CT, 0), (SD, 1))

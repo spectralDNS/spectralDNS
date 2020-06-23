@@ -52,7 +52,7 @@ for z in Z:
         vh = zeros(n)
         sh = zeros(n)
         alfa = sqrt(z**2+2.0/nu/dt)
-        basis = chebyshev.bases.ShenDirichletBasis(n, plan=True, quad='GC')
+        basis = chebyshev.bases.ShenDirichletFunctionSpace(n, plan=True, quad='GC')
         u = TrialFunction(basis)
         v = TestFunction(basis)
         A = inner(v, div(grad(u)))

@@ -29,7 +29,7 @@ f = u.diff(x, 2)
 
 N = 40
 banded = False
-ST = ShenNeumannBasis()
+ST = ShenNeumannFunctionSpace()
 points, weights = ST.points_and_weights(N)
 k = ST.wavenumbers(N)
 

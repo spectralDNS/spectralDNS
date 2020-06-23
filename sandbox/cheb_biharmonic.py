@@ -37,7 +37,7 @@ b = 1
 c = -nu*dt/2.*0
 f = a*u.diff(x, 4) + b*u.diff(x, 2) + c*u
 
-SD = ShenBiharmonicBasis("GC", True)
+SD = ShenBiharmonicFunctionSpace("GC", True)
 points, weights = SD.points_and_weights(N) 
 
 uj = np.array([u.subs(x, j) for j in points], dtype=float)

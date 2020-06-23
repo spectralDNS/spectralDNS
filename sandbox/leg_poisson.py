@@ -43,7 +43,7 @@ ul = lambdify(x, u, "numpy")
 
 n = 64
 
-ST = ShenLegendreDirichletBasis()
+ST = ShenLegendreDirichletFunctionSpace()
 
 # Legendre-Gauss nodes and weights
 points, w = ST.points_and_weights(n, 'LG')

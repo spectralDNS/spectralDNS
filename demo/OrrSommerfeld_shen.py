@@ -10,7 +10,7 @@ from scipy.linalg import eig
 #from numpy.linalg import inv
 import numpy as np
 import sympy as sp
-from shenfun import Basis, Function, Dx
+from shenfun import FunctionSpace, Function, Dx
 from shenfun.spectralbase import inner_product
 from shenfun.matrixbase import extract_diagonal_matrix
 
@@ -49,7 +49,7 @@ class OrrSommerfeld(object):
                 Print information or not
         """
         nx, eigval = self.get_eigval(eigval, eigvals, verbose)
-        SB = Basis(self.N, 'C', bc='Biharmonic', quad=self.quad, dtype='D')
+        SB = FunctionSpace(self.N, 'C', bc='Biharmonic', quad=self.quad, dtype='D')
         phi_hat = Function(SB)
         phi_hat[:-4] = np.squeeze(eigvectors[:, nx])
         phi = phi_hat.eval(y)
@@ -58,7 +58,7 @@ class OrrSommerfeld(object):
 
     def assemble(self):
         N = self.N
-        SB = Basis(N, 'C', bc='Biharmonic', quad=self.quad)
+        SB = FunctionSpace(N, 'C', bc='Biharmonic', quad=self.quad)
         SB.plan((N, N), 0, np.float, {})
 
         # (u'', v)

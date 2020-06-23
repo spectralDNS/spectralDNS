@@ -49,7 +49,7 @@ solver = "lu"
 N = 64
 
 quad = "GC"
-ST = ShenDirichletBasis(quad=quad, bc=(a, b))
+ST = ShenDirichletFunctionSpace(quad=quad, bc=(a, b))
 points, weights = ST.points_and_weights(N, quad)
 
 # Gauss-Chebyshev quadrature to compute rhs

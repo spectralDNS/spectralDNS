@@ -15,7 +15,7 @@ KMM_solve_linear = solve_linear
 def get_context():
     c = KMM_context()
 
-    c.RB = RB = Basis(config.params.N[0], 'C', bc=(1, 0))
+    c.RB = RB = FunctionSpace(config.params.N[0], 'C', bc=(1, 0))
     c.FRB = FRB = TensorProductSpace(comm, (RB, c.K0, c.K1), **c.kw0)
     c.FRBp = FRBp = TensorProductSpace(comm, (RB, c.K0p, c.K1p), **c.kw0)
 

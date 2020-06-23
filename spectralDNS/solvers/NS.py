@@ -5,7 +5,7 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 
 #pylint: disable=unused-variable,unused-argument,function-redefined
 
-from shenfun import Basis, TensorProductSpace, VectorTensorProductSpace, \
+from shenfun import FunctionSpace, TensorProductSpace, VectorTensorProductSpace, \
     Array, Function
 from .spectralinit import *
 
@@ -15,8 +15,8 @@ def get_context():
     collapse_fourier = False if params.dealias == '3/2-rule' else True
     dim = len(params.N)
     dtype = lambda d: float if d == dim-1 else complex
-    V = [Basis(params.N[i], 'F', domain=(0, params.L[i]),
-               dtype=dtype(i)) for i in range(dim)]
+    V = [FunctionSpace(params.N[i], 'F', domain=(0, params.L[i]),
+                       dtype=dtype(i)) for i in range(dim)]
 
     kw0 = {'threads': params.threads,
            'planner_effort': params.planner_effort['fft']}
@@ -29,8 +29,8 @@ def get_context():
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
 
-    Vp = [Basis(params.N[i], 'F', domain=(0, params.L[i]),
-                dtype=dtype(i), **kw) for i in range(dim)]
+    Vp = [FunctionSpace(params.N[i], 'F', domain=(0, params.L[i]),
+                        dtype=dtype(i), **kw) for i in range(dim)]
 
     Tp = TensorProductSpace(comm, Vp, dtype=float,
                             slab=(params.decomposition == 'slab'),

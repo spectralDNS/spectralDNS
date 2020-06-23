@@ -37,7 +37,7 @@ f = -u.diff(x, 2) + kx**2*u
 solver = "lu"
 N = 16
 
-ST = ShenDirichletBasis(quad="GL")
+ST = ShenDirichletFunctionSpace(quad="GL")
 points, weights = ST.points_and_weights(N) 
 
 # Gauss-Chebyshev quadrature to compute rhs

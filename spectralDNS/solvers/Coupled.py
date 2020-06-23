@@ -9,7 +9,7 @@ from shenfun.spectralbase import inner_product
 
 from .spectralinit import *
 from shenfun import TensorProductSpace, Array, TestFunction, TrialFunction, \
-    MixedTensorProductSpace, div, grad, Dx, curl, inner, Function, Basis, \
+    MixedTensorProductSpace, div, grad, Dx, curl, inner, Function, FunctionSpace, \
     VectorTensorProductSpace, BlockMatrix, project
 from ..shen.Matrices import HelmholtzCoeff
 
@@ -20,11 +20,11 @@ def get_context():
     # Get points and weights for Chebyshev weighted integrals
     assert params.Dquad == params.Bquad
     collapse_fourier = False if params.dealias == '3/2-rule' else True
-    ST = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
-    CT = Basis(params.N[0], 'C', quad=params.Dquad)
-    CP = Basis(params.N[0], 'C', quad=params.Dquad)
-    K0 = Basis(params.N[1], 'F', domain=(0, params.L[1]), dtype='D')
-    K1 = Basis(params.N[2], 'F', domain=(0, params.L[2]), dtype='d')
+    ST = FunctionSpace(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
+    CT = FunctionSpace(params.N[0], 'C', quad=params.Dquad)
+    CP = FunctionSpace(params.N[0], 'C', quad=params.Dquad)
+    K0 = FunctionSpace(params.N[1], 'F', domain=(0, params.L[1]), dtype='D')
+    K1 = FunctionSpace(params.N[2], 'F', domain=(0, params.L[2]), dtype='d')
     CP.slice = lambda: slice(0, CT.N)
 
     kw0 = {'threads': params.threads,
@@ -45,12 +45,12 @@ def get_context():
           'dealias_direct': params.dealias == '2/3-rule'}
     if params.dealias == '3/2-rule':
         # Requires new bases due to planning and transforms on different size arrays
-        STp = Basis(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
-        CTp = Basis(params.N[0], 'C', quad=params.Dquad)
+        STp = FunctionSpace(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
+        CTp = FunctionSpace(params.N[0], 'C', quad=params.Dquad)
     else:
         STp, CTp = ST, CT
-    K0p = Basis(params.N[1], 'F', dtype='D', domain=(0, params.L[1]), **kw)
-    K1p = Basis(params.N[2], 'F', dtype='d', domain=(0, params.L[2]), **kw)
+    K0p = FunctionSpace(params.N[1], 'F', dtype='D', domain=(0, params.L[1]), **kw)
+    K1p = FunctionSpace(params.N[2], 'F', dtype='d', domain=(0, params.L[2]), **kw)
     FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **kw0)
     FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **kw0)
     VFSp = VectorTensorProductSpace(FSTp)
