@@ -5,7 +5,7 @@ __date__ = "2014-11-07"
 __copyright__ = "Copyright (C) 2014-2018 " + __author__
 __license__ = "GNU Lesser GPL version 3 or any later version"
 
-from shenfun import MixedTensorProductSpace
+from shenfun import CompositeSpace
 from .NS2D import *
 
 def get_context():
@@ -22,8 +22,8 @@ def get_context():
     T = TensorProductSpace(comm, V, dtype=float,
                            slab=(params.decomposition == 'slab'),
                            collapse_fourier=collapse_fourier, **kw0)
-    VT = VectorTensorProductSpace(T)
-    VM = MixedTensorProductSpace([T]*(dim+1))
+    VT = VectorSpace(T)
+    VM = CompositeSpace([T]*(dim+1))
 
     mask = T.get_mask_nyquist() if params.mask_nyquist else None
 
@@ -36,8 +36,8 @@ def get_context():
     Tp = TensorProductSpace(comm, Vp, dtype=float,
                             slab=(params.decomposition == 'slab'),
                             collapse_fourier=collapse_fourier, **kw0)
-    VTp = VectorTensorProductSpace(Tp)
-    VMp = MixedTensorProductSpace([Tp]*(dim+1))
+    VTp = VectorSpace(Tp)
+    VMp = CompositeSpace([Tp]*(dim+1))
 
     # Mesh variables
     X = T.local_mesh(True)

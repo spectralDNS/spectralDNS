@@ -59,7 +59,6 @@ class OrrSommerfeld(object):
     def assemble(self):
         N = self.N
         SB = FunctionSpace(N, 'C', bc='Biharmonic', quad=self.quad)
-        SB.plan((N, N), 0, np.float, {})
 
         # (u'', v)
         K = inner_product((SB, 0), (SB, 2))

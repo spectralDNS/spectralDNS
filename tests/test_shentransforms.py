@@ -4,25 +4,24 @@ from sympy import Symbol
 import numpy as np
 from spectralDNS.shen import LUsolve
 from shenfun.spectralbase import inner_product
-from shenfun.chebyshev.bases import Orthogonal, ShenDirichlet, \
-    ShenNeumann, ShenBiharmonic
+from shenfun import FunctionSpace, TensorProductSpace, Function, Array
 
 comm = MPI.COMM_WORLD
 
 N = 32
 x = Symbol("x")
 
-Basis = (Orthogonal, ShenDirichlet, ShenNeumann,
-         ShenBiharmonic)
 quads = ('GC', 'GL')
 
 
 def test_Mult_Div():
 
-    SD = ShenDirichlet(N, "GC")
-    SN = ShenNeumann(N, "GC")
-    SD.plan(N, 0, np.complex, {})
-    SN.plan(N, 0, np.complex, {})
+    #SD = ShenDirichlet(N, "GC")
+    #SN = ShenNeumann(N, "GC")
+    #SD.plan(N, 0, np.complex, {})
+    #SN.plan(N, 0, np.complex, {})
+    SD = FunctionSpace(N, 'C', bc=(0, 0), dtype='D')
+    SN = FunctionSpace(N, 'C', bc='Neumann', dtype='D')
 
     Cm = inner_product((SN, 0), (SD, 1))
     Bm = inner_product((SN, 0), (SD, 0))
@@ -54,7 +53,6 @@ def test_Mult_Div():
     uu = Cm.matvec(uk0, uu)
     uu += 1j*7*Bm.matvec(vk0, v0) + 1j*7*Bm.matvec(wk0, w0)
 
-    #from IPython import embed; embed()
     assert np.allclose(uu, b)
 
     uk0 = uk0.repeat(4*4).reshape((N, 4, 4)) + 1j*uk0.repeat(4*4).reshape((N, 4, 4))
@@ -77,28 +75,29 @@ def test_Mult_Div():
 
 @pytest.mark.parametrize('quad', quads)
 def test_Mult_CTD_3D(quad):
-    SD = ShenDirichlet(N, quad=quad)
-    SD.plan((N, 4, 4), 0, np.complex, {})
+    SD = FunctionSpace(N, 'C', bc=(0, 0))
+    F0 = FunctionSpace(4, 'F', dtype='D')
+    F1 = FunctionSpace(4, 'F', dtype='d')
+    T = TensorProductSpace(comm, (SD, F0, F1))
 
-    C = inner_product((SD.CT, 0), (SD, 1))
-    B = inner_product((SD.CT, 0), (SD.CT, 0))
+    TO = T.get_orthogonal()
+    CT = TO.bases[0]
 
-    vk = np.random.random((N, 4, 4))+np.random.random((N, 4, 4))*1j
-    wk = np.random.random((N, 4, 4))+np.random.random((N, 4, 4))*1j
+    C = inner_product((CT, 0), (SD, 1))
+    B = inner_product((CT, 0), (CT, 0))
 
-    bv = np.zeros((N, 4, 4), dtype=np.complex)
-    bw = np.zeros((N, 4, 4), dtype=np.complex)
-    vk0 = np.zeros((N, 4, 4), dtype=np.complex)
-    wk0 = np.zeros((N, 4, 4), dtype=np.complex)
-    cv = np.zeros((N, 4, 4), dtype=np.complex)
-    cw = np.zeros((N, 4, 4), dtype=np.complex)
+    vk = Array(T)
+    wk = Array(T)
+    vk[:] = np.random.random(vk.shape)
+    wk[:] = np.random.random(vk.shape)
 
-    vk0 = SD.forward(vk, vk0)
-    vk = SD.backward(vk0, vk)
-    vk0 = SD.forward(vk, vk0)
-    wk0 = SD.forward(wk, wk0)
-    wk = SD.backward(wk0, wk)
-    wk0 = SD.forward(wk, wk0)
+    bv = Function(T)
+    bw = Function(T)
+
+    vk0 = vk.forward()
+    vk = vk0.backward()
+    wk0 = wk.forward()
+    wk = wk0.backward()
 
     LUsolve.Mult_CTD_3D_ptr(N, vk0, wk0, bv, bw, 0)
 

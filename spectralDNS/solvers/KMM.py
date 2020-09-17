@@ -8,8 +8,8 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 from shenfun.spectralbase import inner_product
 from shenfun.la import TDMA
 from shenfun import TensorProductSpace, Array, TestFunction, TrialFunction, \
-    MixedTensorProductSpace, div, grad, Dx, inner, Function, FunctionSpace, \
-    VectorTensorProductSpace
+    CompositeSpace, div, grad, Dx, inner, Function, FunctionSpace, \
+    VectorSpace
 from shenfun.chebyshev.la import Helmholtz, Biharmonic
 
 from .spectralinit import *
@@ -33,14 +33,15 @@ def get_context():
     kw0 = {'threads': params.threads,
            'planner_effort': params.planner_effort["dct"],
            'slab': (params.decomposition == 'slab'),
-           'collapse_fourier': collapse_fourier}
+           'collapse_fourier': collapse_fourier,
+           'modify_spaces_inplace': True}
     FST = TensorProductSpace(comm, (ST, K0, K1), **kw0)    # Dirichlet
     FSB = TensorProductSpace(comm, (SB, K0, K1), **kw0)    # Biharmonic
     FCT = TensorProductSpace(comm, (CT, K0, K1), **kw0)    # Regular Chebyshev
-    VFS = VectorTensorProductSpace([FSB, FST, FST])
-    VFST = VectorTensorProductSpace([FST, FST, FST])
-    VUG = MixedTensorProductSpace([FSB, FST])
-    VCT = VectorTensorProductSpace(FCT)
+    VFS = VectorSpace([FSB, FST, FST])
+    VFST = VectorSpace([FST, FST, FST])
+    VUG = CompositeSpace([FSB, FST])
+    VCT = VectorSpace(FCT)
 
     mask = FST.get_mask_nyquist() if params.mask_nyquist else None
 
@@ -59,7 +60,7 @@ def get_context():
     FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **kw0)
     FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **kw0)
     FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **kw0)
-    VFSp = VectorTensorProductSpace([FSBp, FSTp, FSTp])
+    VFSp = VectorSpace([FSBp, FSTp, FSTp])
 
     float, complex, mpitype = datatypes("double")
 
@@ -107,7 +108,8 @@ def get_context():
 
     nu, dt, N = params.nu, params.dt, params.N
 
-    alfa = K2[0] - 2.0/nu/dt
+    alfa = K2 - 2.0/nu/dt
+
     # Collect all matrices
     mat = config.AttributeDict(
         dict(CDD=inner_product((ST, 0), (ST, 1)),

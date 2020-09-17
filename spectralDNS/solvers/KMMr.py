@@ -8,7 +8,7 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 from shenfun.spectralbase import inner_product
 from shenfun.la import TDMA
 from shenfun import TensorProductSpace, Array, TestFunction, TrialFunction, \
-    MixedTensorProductSpace, div, grad, Dx, inner, Function, FunctionSpace
+    CompositeSpace, div, grad, Dx, inner, Function, FunctionSpace
 from shenfun.chebyshev.la import Helmholtz, Biharmonic
 
 from .spectralinit import *
@@ -31,13 +31,14 @@ def get_context():
     kw0 = {'threads':params.threads,
            'planner_effort':params.planner_effort["dct"],
            'slab': (params.decomposition == 'slab'),
-           'collapse_fourier': collapse_fourier}
+           'collapse_fourier': collapse_fourier,
+           'modify_spaces_inplace': True}
     FST = TensorProductSpace(comm, (K0, K1, ST), axes=(2, 0, 1), **kw0)    # Dirichlet
     FSB = TensorProductSpace(comm, (K0, K1, SB), axes=(2, 0, 1), **kw0)    # Biharmonic
     FCT = TensorProductSpace(comm, (K0, K1, CT), axes=(2, 0, 1), **kw0)    # Regular Chebyshev
-    VFS = MixedTensorProductSpace([FST, FST, FSB])
-    VFST = MixedTensorProductSpace([FST, FST, FST])
-    VUG = MixedTensorProductSpace([FST, FSB])
+    VFS = CompositeSpace([FST, FST, FSB])
+    VFST = CompositeSpace([FST, FST, FST])
+    VUG = CompositeSpace([FST, FSB])
 
     mask = FST.get_mask_nyquist() if params.mask_nyquist else None
 
@@ -56,7 +57,7 @@ def get_context():
     FSTp = TensorProductSpace(comm, (K0p, K1p, STp), axes=(2, 0, 1), **kw0)
     FSBp = TensorProductSpace(comm, (K0p, K1p, SBp), axes=(2, 0, 1), **kw0)
     FCTp = TensorProductSpace(comm, (K0p, K1p, CTp), axes=(2, 0, 1), **kw0)
-    VFSp = MixedTensorProductSpace([FSTp, FSTp, FSBp])
+    VFSp = CompositeSpace([FSTp, FSTp, FSBp])
 
     float, complex, mpitype = datatypes("double")
 

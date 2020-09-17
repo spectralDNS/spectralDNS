@@ -5,7 +5,7 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 
 #pylint: disable=unused-variable,unused-argument,function-redefined
 
-from shenfun import FunctionSpace, TensorProductSpace, VectorTensorProductSpace, \
+from shenfun import FunctionSpace, TensorProductSpace, VectorSpace, \
     Array, Function
 from .spectralinit import *
 
@@ -23,7 +23,7 @@ def get_context():
     T = TensorProductSpace(comm, V, dtype=float,
                            slab=(params.decomposition == 'slab'),
                            collapse_fourier=collapse_fourier, **kw0)
-    VT = VectorTensorProductSpace(T)
+    VT = VectorSpace(T)
 
     # Different bases for nonlinear term, either 2/3-rule or 3/2-rule
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
@@ -35,7 +35,7 @@ def get_context():
     Tp = TensorProductSpace(comm, Vp, dtype=float,
                             slab=(params.decomposition == 'slab'),
                             collapse_fourier=collapse_fourier, **kw0)
-    VTp = VectorTensorProductSpace(Tp)
+    VTp = VectorSpace(Tp)
 
     mask = T.get_mask_nyquist() if params.mask_nyquist else None
 
@@ -243,7 +243,7 @@ def ComputeRHS(rhs, u_hat, solver, work, Tp, VTp, P_hat, K, K2, u_dealias,
             Work arrays
         Tp : TensorProductSpace
             for padded transforms
-        VTp : VectorTensorProductSpace
+        VTp : VectorSpace
             for padded transforms
         P_hat : array
             Transformed pressure

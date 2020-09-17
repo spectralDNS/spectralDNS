@@ -5,8 +5,8 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 
 #pylint: disable=unused-variable,unused-argument
 
-from shenfun import FunctionSpace, TensorProductSpace, VectorTensorProductSpace, \
-    Array, Function, MixedTensorProductSpace
+from shenfun import FunctionSpace, TensorProductSpace, VectorSpace, \
+    Array, Function, CompositeSpace
 from .spectralinit import *
 from .NS import end_of_tstep
 
@@ -23,8 +23,8 @@ def get_context():
     T = TensorProductSpace(comm, V, dtype=float,
                            slab=(params.decomposition == 'slab'),
                            collapse_fourier=collapse_fourier, **kw0)
-    VT = VectorTensorProductSpace(T)
-    VM = MixedTensorProductSpace([T]*2*dim)
+    VT = VectorSpace(T)
+    VM = CompositeSpace([T]*2*dim)
 
     mask = T.get_mask_nyquist() if params.mask_nyquist else None
 
@@ -37,8 +37,8 @@ def get_context():
     Tp = TensorProductSpace(comm, Vp, dtype=float,
                             slab=(params.decomposition == 'slab'),
                             collapse_fourier=collapse_fourier, **kw0)
-    VTp = VectorTensorProductSpace(Tp)
-    VMp = MixedTensorProductSpace([Tp]*2*dim)
+    VTp = VectorSpace(Tp)
+    VMp = CompositeSpace([Tp]*2*dim)
 
     # Mesh variables
     X = T.local_mesh(True)

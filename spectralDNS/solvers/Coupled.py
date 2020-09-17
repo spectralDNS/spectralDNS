@@ -9,8 +9,8 @@ from shenfun.spectralbase import inner_product
 
 from .spectralinit import *
 from shenfun import TensorProductSpace, Array, TestFunction, TrialFunction, \
-    MixedTensorProductSpace, div, grad, Dx, curl, inner, Function, FunctionSpace, \
-    VectorTensorProductSpace, BlockMatrix, project
+    CompositeSpace, div, grad, Dx, curl, inner, Function, FunctionSpace, \
+    VectorSpace, BlockMatrix, project
 from ..shen.Matrices import HelmholtzCoeff
 
 
@@ -34,9 +34,9 @@ def get_context():
     FST = TensorProductSpace(comm, (ST, K0, K1), **kw0)    # Dirichlet
     FCT = TensorProductSpace(comm, (CT, K0, K1), **kw0)    # Regular Chebyshev N
     FCP = TensorProductSpace(comm, (CP, K0, K1), **kw0)    # Regular Chebyshev N-2
-    VFS = VectorTensorProductSpace(FST)
-    VCT = VectorTensorProductSpace(FCT)
-    VQ = MixedTensorProductSpace([VFS, FCP])
+    VFS = VectorSpace(FST)
+    VCT = VectorSpace(FCT)
+    VQ = CompositeSpace([VFS, FCP])
 
     mask = FST.get_mask_nyquist() if params.mask_nyquist else None
 
@@ -53,8 +53,8 @@ def get_context():
     K1p = FunctionSpace(params.N[2], 'F', dtype='d', domain=(0, params.L[2]), **kw)
     FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **kw0)
     FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **kw0)
-    VFSp = VectorTensorProductSpace(FSTp)
-    VCp = MixedTensorProductSpace([FSTp, FCTp, FCTp])
+    VFSp = VectorSpace(FSTp)
+    VCp = CompositeSpace([FSTp, FCTp, FCTp])
 
     float, complex, mpitype = datatypes("double")
 
