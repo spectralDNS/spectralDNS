@@ -118,3 +118,12 @@ def dx(u, FST, axis=0):
             return np.sum(c*w)*np.prod(np.take(config.params.L/config.params.N, sx))
 
     return 0
+
+def cleanup():
+    import glob
+    files = glob.glob('*.h5')+glob.glob('*.xdmf')
+    for f in files:
+        try:
+            glob.os.remove(f)
+        except:
+            pass
