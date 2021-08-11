@@ -78,7 +78,6 @@ if __name__ == '__main__':
               'Intended Audience :: Science/Research',
               'Intended Audience :: Education',
               'Programming Language :: Python',
-              'Programming Language :: Python :: 2',
               'Programming Language :: Python :: 3',
               'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)',
               'Topic :: Scientific/Engineering :: Mathematics',

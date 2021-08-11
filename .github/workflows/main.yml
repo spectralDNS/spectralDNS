@@ -14,9 +14,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    #- run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
+    - run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
     - name: setup-conda
-      uses: s-weigand/setup-conda@v1.0.2
+      uses: s-weigand/setup-conda@v1
       with:
           update-conda: true
           python-version: ${{ matrix.python-version }}
@@ -25,7 +25,7 @@ jobs:
     - run: which python
     - run: pwd
     - run: |
-        export GIT_DESCRIBE_TAG=1.2.2
-        conda create --name buildenv conda-build
-        source activate buildenv
-        conda build conf/conda
+        conda config --add channels conda-forge
+        conda config --set always_yes yes
+        conda install -n root conda-build numpy
+        conda build ./conf/conda

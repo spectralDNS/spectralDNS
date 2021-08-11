@@ -8,7 +8,7 @@ __author__ = 'Mikael Mortensen <mikaem@math.uio.no>'
 __date__ = '2015-04-09'
 __copyright__ = 'Copyright (C) 2015-2021 ' + __author__
 __license__ = 'GNU Lesser GPL version 3 or any later version'
-__version__ = '1.3.1'
+__version__ = '1.4.0'
 
 import importlib
 import cProfile

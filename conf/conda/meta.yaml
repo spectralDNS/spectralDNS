@@ -1,12 +1,14 @@
+{% set data = load_setup_py_data() %}
+
 package:
   name: spectraldns
-  version: "{{ GIT_DESCRIBE_TAG }}"
+  version: {{ data.get('version') }}
 
 source:
   git_url: ../../
 
 build:
-  number: 37
+  number: 0
 
 requirements:
 
@@ -17,7 +19,7 @@ requirements:
   host:
     - python
     - cython
-    - numpy >=1.14.*
+    - numpy
     - setuptools
     - {{ mpi }}
     - pytest-runner
@@ -29,7 +31,7 @@ requirements:
     - {{ mpi }}
     - hdf5 * mpi_{{ mpi }}_*
     - h5py * mpi_{{ mpi }}_*
-    - shenfun >=3.0.0
+    - shenfun >=3.2.0
     - mpi4py-fft >=2.0.3
     - mpi4py
     - scipy
