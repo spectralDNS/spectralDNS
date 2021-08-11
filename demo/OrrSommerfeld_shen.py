@@ -49,7 +49,7 @@ class OrrSommerfeld(object):
                 Print information or not
         """
         nx, eigval = self.get_eigval(eigval, eigvals, verbose)
-        SB = FunctionSpace(self.N, 'C', bc='Biharmonic', quad=self.quad, dtype='D')
+        SB = FunctionSpace(self.N, 'C', bc=(0, 0, 0, 0), quad=self.quad, dtype='D')
         phi_hat = Function(SB)
         phi_hat[:-4] = np.squeeze(eigvectors[:, nx])
         phi = phi_hat.eval(y)
@@ -58,7 +58,7 @@ class OrrSommerfeld(object):
 
     def assemble(self):
         N = self.N
-        SB = FunctionSpace(N, 'C', bc='Biharmonic', quad=self.quad)
+        SB = FunctionSpace(N, 'C', bc=(0, 0, 0, 0), quad=self.quad)
 
         # (u'', v)
         K = inner_product((SB, 0), (SB, 2))

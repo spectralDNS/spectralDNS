@@ -43,6 +43,6 @@ class HelmholtzCoeff(object):
 
     def matvec(self, v, c):
         c.fill(0)
-        Matvec.Helmholtz_matvec(v, c, self.alfa, self.beta, self.A[0],
-                                self.A[2], self.B[0], self.axis)
+        Matvec.Helmholtz_matvec(v, c, self.alfa, self.beta, self.A,
+                                self.B, self.axis)
         return c

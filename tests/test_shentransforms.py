@@ -21,7 +21,7 @@ def test_Mult_Div():
     #SD.plan(N, 0, np.complex, {})
     #SN.plan(N, 0, np.complex, {})
     SD = FunctionSpace(N, 'C', bc=(0, 0), dtype='D')
-    SN = FunctionSpace(N, 'C', bc='Neumann', dtype='D')
+    SN = FunctionSpace(N, 'C', basis='ShenNeumann', dtype='D')
 
     Cm = inner_product((SN, 0), (SD, 1))
     Bm = inner_product((SN, 0), (SD, 0))
@@ -53,7 +53,7 @@ def test_Mult_Div():
     uu = Cm.matvec(uk0, uu)
     uu += 1j*7*Bm.matvec(vk0, v0) + 1j*7*Bm.matvec(wk0, w0)
 
-    assert np.allclose(uu, b)
+    assert np.allclose(uu[1:], b[1:])
 
     uk0 = uk0.repeat(4*4).reshape((N, 4, 4)) + 1j*uk0.repeat(4*4).reshape((N, 4, 4))
     vk0 = vk0.repeat(4*4).reshape((N, 4, 4)) + 1j*vk0.repeat(4*4).reshape((N, 4, 4))
@@ -69,7 +69,7 @@ def test_Mult_Div():
     uu = Cm.matvec(uk0, uu)
     uu += 1j*7*Bm.matvec(vk0, v0) + 1j*7*Bm.matvec(wk0, w0)
 
-    assert np.allclose(uu, b)
+    assert np.allclose(uu[1:], b[1:])
 
 #test_Mult_Div()
 
@@ -111,4 +111,4 @@ def test_Mult_CTD_3D(quad):
     assert np.allclose(cv, bv)
     assert np.allclose(cw, bw)
 
-#test_Mult_CTD_3D("GL")
+test_Mult_Div()

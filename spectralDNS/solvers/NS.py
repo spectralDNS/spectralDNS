@@ -28,13 +28,7 @@ def get_context():
     # Different bases for nonlinear term, either 2/3-rule or 3/2-rule
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
-
-    Vp = [FunctionSpace(params.N[i], 'F', domain=(0, params.L[i]),
-                        dtype=dtype(i), **kw) for i in range(dim)]
-
-    Tp = TensorProductSpace(comm, Vp, dtype=float,
-                            slab=(params.decomposition == 'slab'),
-                            collapse_fourier=collapse_fourier, **kw0)
+    Tp = T.get_dealiased(**kw)
     VTp = VectorSpace(Tp)
 
     mask = T.get_mask_nyquist() if params.mask_nyquist else None

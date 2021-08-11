@@ -24,7 +24,7 @@ def get_context():
     assert params.Dquad == params.Bquad
     collapse_fourier = False if params.dealias == '3/2-rule' else True
     ST = FunctionSpace(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
-    SB = FunctionSpace(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
+    SB = FunctionSpace(params.N[0], 'C', bc=(0, 0, 0, 0), quad=params.Bquad)
     CT = FunctionSpace(params.N[0], 'C', quad=params.Dquad)
     ST0 = FunctionSpace(params.N[0], 'C', bc=(0, 0), quad=params.Dquad) # For 1D problem
     K0 = FunctionSpace(params.N[1], 'F', domain=(0, params.L[1]), dtype='D')
@@ -34,7 +34,7 @@ def get_context():
            'planner_effort': params.planner_effort["dct"],
            'slab': (params.decomposition == 'slab'),
            'collapse_fourier': collapse_fourier,
-           'modify_spaces_inplace': True}
+           'modify_spaces_inplace': True} # with this we use the same K0, K1 in all tensor product spaces
     FST = TensorProductSpace(comm, (ST, K0, K1), **kw0)    # Dirichlet
     FSB = TensorProductSpace(comm, (SB, K0, K1), **kw0)    # Biharmonic
     FCT = TensorProductSpace(comm, (CT, K0, K1), **kw0)    # Regular Chebyshev
@@ -48,18 +48,9 @@ def get_context():
     # Padded
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
-    if params.dealias == '3/2-rule':
-        # Requires new bases due to planning and transforms on different size arrays
-        STp = FunctionSpace(params.N[0], 'C', bc=(0, 0), quad=params.Dquad)
-        SBp = FunctionSpace(params.N[0], 'C', bc='Biharmonic', quad=params.Bquad)
-        CTp = FunctionSpace(params.N[0], 'C', quad=params.Dquad)
-    else:
-        STp, SBp, CTp = ST, SB, CT
-    K0p = FunctionSpace(params.N[1], 'F', dtype='D', domain=(0, params.L[1]), **kw)
-    K1p = FunctionSpace(params.N[2], 'F', dtype='d', domain=(0, params.L[2]), **kw)
-    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **kw0)
-    FSBp = TensorProductSpace(comm, (SBp, K0p, K1p), **kw0)
-    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **kw0)
+    FSTp = FST.get_dealiased(**kw)
+    FSBp = FSB.get_dealiased(**kw)
+    FCTp = FCT.get_dealiased(**kw)
     VFSp = VectorSpace([FSBp, FSTp, FSTp])
 
     float, complex, mpitype = datatypes("double")
@@ -484,8 +475,8 @@ def solve_linear(u_hat, g_hat, rhs,
     """Solve final linear algebra systems"""
     f_hat = work[(u_hat[0], 0, False)]
 
-    u_hat[0] = la.BiharmonicSolverU(u_hat[0], rhs[0])
-    g_hat = la.HelmholtzSolverG(g_hat, rhs[1])
+    u_hat[0] = la.BiharmonicSolverU(rhs[0], u_hat[0])
+    g_hat = la.HelmholtzSolverG(rhs[1], g_hat)
 
     # Compute v_hat and w_hat from u_hat and g_hat
     f_hat = mat.CDB.matvec(-u_hat[0], f_hat)
@@ -504,12 +495,12 @@ def solve_linear(u_hat, g_hat, rhs,
         w1 = mat.ADD0.matvec(u0_hat[0], w1)
         w += w1
         w += 2./params.nu/params.dt * mat.BDD0.matvec(u0_hat[0], w1)
-        u0_hat[0] = la.HelmholtzSolverU0(u0_hat[0], w)
+        u0_hat[0] = la.HelmholtzSolverU0(w, u0_hat[0])
 
         w = mat.BDD0.matvec(2./params.nu*h0_hat[1], w)
         w += mat.ADD0.matvec(u0_hat[1], w1)
         w += mat.BDD0.matvec(2./params.nu/params.dt*u0_hat[1], w1)
-        u0_hat[1] = la.HelmholtzSolverU0(u0_hat[1], w)
+        u0_hat[1] = la.HelmholtzSolverU0(w, u0_hat[1])
 
         u_hat[1, :, 0, 0] = u0_hat[0]
         u_hat[2, :, 0, 0] = u0_hat[1]

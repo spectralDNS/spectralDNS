@@ -16,7 +16,7 @@ except ImportError:
     plt = None
 
 def initOS(OS, eigvals, eigvectors, U, X, t=0.):
-    x = X[0][:, 0, 0]
+    x = X[0][:, 0, 0].copy()
     eigval, phi, dphidy = OS.interp(x, eigvals, eigvectors, eigval=1, verbose=False)
     OS.eigval = eigval
     for j in range(U.shape[2]):

@@ -8,7 +8,7 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 from shenfun.spectralbase import inner_product
 from shenfun.la import TDMA
 from shenfun import TensorProductSpace, Array, TestFunction, TrialFunction, \
-    CompositeSpace, div, grad, Dx, inner, Function, FunctionSpace
+    CompositeSpace, div, grad, Dx, inner, Function, FunctionSpace, VectorSpace
 from shenfun.chebyshev.la import Helmholtz, Biharmonic
 
 from .spectralinit import *
@@ -22,7 +22,7 @@ def get_context():
     assert params.Dquad == params.Bquad
     collapse_fourier = False if params.dealias == '3/2-rule' else True
     ST = FunctionSpace(params.N[2], 'C', bc=(0, 0), quad=params.Dquad)
-    SB = FunctionSpace(params.N[2], 'C', bc='Biharmonic', quad=params.Bquad)
+    SB = FunctionSpace(params.N[2], 'C', bc=(0, 0, 0, 0), quad=params.Bquad)
     CT = FunctionSpace(params.N[2], 'C', quad=params.Dquad)
     ST0 = FunctionSpace(params.N[2], 'C', bc=(0, 0), quad=params.Dquad) # For 1D problem
     K0 = FunctionSpace(params.N[0], 'F', domain=(0, params.L[0]), dtype='D')
@@ -36,8 +36,8 @@ def get_context():
     FST = TensorProductSpace(comm, (K0, K1, ST), axes=(2, 0, 1), **kw0)    # Dirichlet
     FSB = TensorProductSpace(comm, (K0, K1, SB), axes=(2, 0, 1), **kw0)    # Biharmonic
     FCT = TensorProductSpace(comm, (K0, K1, CT), axes=(2, 0, 1), **kw0)    # Regular Chebyshev
-    VFS = CompositeSpace([FST, FST, FSB])
-    VFST = CompositeSpace([FST, FST, FST])
+    VFS = VectorSpace([FST, FST, FSB])
+    VFST = VectorSpace([FST, FST, FST])
     VUG = CompositeSpace([FST, FSB])
 
     mask = FST.get_mask_nyquist() if params.mask_nyquist else None
@@ -45,19 +45,10 @@ def get_context():
     # Padded
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
-    if params.dealias == '3/2-rule':
-        # Requires new bases due to planning and transforms on different size arrays
-        STp = FunctionSpace(params.N[2], 'C', bc=(0, 0), quad=params.Dquad)
-        SBp = FunctionSpace(params.N[2], 'C', bc='Biharmonic', quad=params.Bquad)
-        CTp = FunctionSpace(params.N[2], 'C', quad=params.Dquad)
-    else:
-        STp, SBp, CTp = ST, SB, CT
-    K0p = FunctionSpace(params.N[0], 'F', dtype='D', domain=(0, params.L[0]), **kw)
-    K1p = FunctionSpace(params.N[1], 'F', dtype='d', domain=(0, params.L[1]), **kw)
-    FSTp = TensorProductSpace(comm, (K0p, K1p, STp), axes=(2, 0, 1), **kw0)
-    FSBp = TensorProductSpace(comm, (K0p, K1p, SBp), axes=(2, 0, 1), **kw0)
-    FCTp = TensorProductSpace(comm, (K0p, K1p, CTp), axes=(2, 0, 1), **kw0)
-    VFSp = CompositeSpace([FSTp, FSTp, FSBp])
+    FSTp = FST.get_dealiased(**kw)
+    FSBp = FSB.get_dealiased(**kw)
+    FCTp = FCT.get_dealiased(**kw)
+    VFSp = VectorSpace([FSBp, FSTp, FSTp])
 
     float, complex, mpitype = datatypes("double")
 
@@ -482,8 +473,8 @@ def solve_linear(u_hat, g_hat, rhs,
     f_hat = work[(u_hat[2], 0, True)]
     w0 = work[(u_hat[2], 1, False)]
 
-    u_hat[2] = la.BiharmonicSolverU(u_hat[2], rhs[0])
-    g_hat = la.HelmholtzSolverG(g_hat, rhs[1])
+    u_hat[2] = la.BiharmonicSolverU(rhs[0], u_hat[2])
+    g_hat = la.HelmholtzSolverG(rhs[1], g_hat)
 
     # Compute v_hat and w_hat from u_hat and g_hat
     f_hat -= mat.CDB.matvec(u_hat[2], w0, axis=2)
@@ -502,12 +493,12 @@ def solve_linear(u_hat, g_hat, rhs,
         w1 = mat.ADD0.matvec(u0_hat[0], w1)
         w += w1
         w += 2./params.nu/params.dt * mat.BDD0.matvec(u0_hat[0], w1)
-        u0_hat[0] = la.HelmholtzSolverU0(u0_hat[0], w)
+        u0_hat[0] = la.HelmholtzSolverU0(w, u0_hat[0])
 
         w = mat.BDD0.matvec(2./params.nu*h0_hat[1], w)
         w += mat.ADD0.matvec(u0_hat[1], w1)
         w += mat.BDD0.matvec(2./params.nu/params.dt*u0_hat[1], w1)
-        u0_hat[1] = la.HelmholtzSolverU0(u0_hat[1], w)
+        u0_hat[1] = la.HelmholtzSolverU0(w, u0_hat[1])
 
         u_hat[0, 0, 0] = u0_hat[0]
         u_hat[1, 0, 0] = u0_hat[1]

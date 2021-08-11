@@ -45,18 +45,10 @@ def get_context():
     # Padded
     kw = {'padding_factor': 1.5 if params.dealias == '3/2-rule' else 1,
           'dealias_direct': params.dealias == '2/3-rule'}
-    if params.dealias == '3/2-rule':
-        # Requires new bases due to planning and transforms on different size arrays
-        STp = FunctionSpace(params.N[0], family, bc=(0, 0), quad=params.Dquad)
-        CTp = FunctionSpace(params.N[0], family, quad=params.Dquad)
-    else:
-        STp, CTp = ST, CT
-    K0p = FunctionSpace(params.N[1], 'F', dtype='D', domain=(0, params.L[1]), **kw)
-    K1p = FunctionSpace(params.N[2], 'F', dtype='d', domain=(0, params.L[2]), **kw)
-    FSTp = TensorProductSpace(comm, (STp, K0p, K1p), **kw0)
-    FCTp = TensorProductSpace(comm, (CTp, K0p, K1p), **kw0)
+    FSTp = FST.get_dealiased(**kw)
+    FCTp = FCT.get_dealiased(**kw)
     VFSp = VectorSpace(FSTp)
-    VCp = CompositeSpace([FSTp, FCTp, FCTp])
+    VCp = VectorSpace([FSTp, FCTp, FCTp])
 
     float, complex, mpitype = datatypes("double")
 

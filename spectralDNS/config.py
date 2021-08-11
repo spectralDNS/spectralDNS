@@ -46,13 +46,14 @@ __copyright__ = "Copyright (C) 2015-2018 " + __author__
 __license__ = "GNU Lesser GPL version 3 or any later version"
 
 import argparse
-import collections
+from collections.abc import MutableMapping
+from collections import defaultdict
 import json
 from numpy import pi, array, float32, float64
 
 #pylint: disable=global-statement,redefined-outer-name,exec-used
 
-class AttributeDict(collections.MutableMapping, dict):
+class AttributeDict(MutableMapping, dict):
     """Dictionary class
 
     The values of this dictionary may be accessed as attributes:
@@ -146,8 +147,8 @@ class Params(AttributeDict):
         else:
             dict.__setitem__(self, key, val)
 
-fft_plans = collections.defaultdict(lambda: "FFTW_MEASURE",
-                                    {'dct': "FFTW_MEASURE"})
+fft_plans = defaultdict(lambda: "FFTW_MEASURE",
+                        {'dct': "FFTW_MEASURE"})
 
 class PlanAction(argparse.Action):
     """Action for planning FFT"""

@@ -121,8 +121,8 @@ def solve_linear(u_hat, g_hat, rhs, rk,
     f_hat = work[(u_hat[0], 0, True)]
     w0 = work[(u_hat[0], 1, False)]
 
-    u_hat[0] = la.BiharmonicSolverU[rk](u_hat[0], rhs[0])
-    g_hat = la.HelmholtzSolverG[rk](g_hat, rhs[1])
+    u_hat[0] = la.BiharmonicSolverU[rk](rhs[0], u_hat[0])
+    g_hat = la.HelmholtzSolverG[rk](rhs[1], g_hat)
 
     if rank == 0:
         #u0_hat = work[((2, params.N[0]), complex, 0)]
@@ -151,12 +151,12 @@ def solve_linear(u_hat, g_hat, rhs, rk,
         w[:] = beta*(a[rk]*h1[1, 0] + b[rk]*h1[0, 0])
         w += mat.ADD0.matvec(u0_hat[0], w1)
         w += beta/params.dt*mat.BDD0.matvec(u0_hat[0], w1)
-        u0_hat[0] = la.HelmholtzSolverU0[rk](u0_hat[0], w)
+        u0_hat[0] = la.HelmholtzSolverU0[rk](w, u0_hat[0])
 
         w[:] = beta*(a[rk]*h1[1, 1] + b[rk]*h1[0, 1])
         w += mat.ADD0.matvec(u0_hat[1], w1)
         w += beta/params.dt*mat.BDD0.matvec(u0_hat[1], w1)
-        u0_hat[1] = la.HelmholtzSolverU0[rk](u0_hat[1], w)
+        u0_hat[1] = la.HelmholtzSolverU0[rk](w, u0_hat[1])
 
         h1[0] = h1[1]
 
