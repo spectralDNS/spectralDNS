@@ -1,5 +1,5 @@
 import pytest
-from six.moves import reload_module
+import importlib
 from mpi4py import MPI
 from spectralDNS import config, get_solver, solve
 from TGMHD import initialize, regression_test, pi
@@ -54,7 +54,7 @@ def test_MHD(sol):
 
     config.params.dealias = '2/3-rule'
     config.params.optimization = 'cython'
-    reload_module(solver)
+    importlib.reload(solver)
     initialize(**context)
     solve(solver, context)
 

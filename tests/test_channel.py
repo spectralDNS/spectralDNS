@@ -1,5 +1,5 @@
 import pytest
-from six.moves import reload_module
+import importlib
 from spectralDNS import config, get_solver, solve
 from OrrSommerfeld import initialize, regression_test, set_Source, pi
 
@@ -31,7 +31,7 @@ def test_channel(sol):
 
     config.params.dealias = '3/2-rule'
     config.params.optimization = 'cython'
-    reload_module(solver) # Need to reload to enable optimization
+    importlib.reload(solver) # Need to reload to enable optimization
     initialize(solver, context)
     solve(solver, context)
 

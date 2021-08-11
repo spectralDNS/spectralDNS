@@ -48,7 +48,7 @@ def get_context():
     FSTp = FST.get_dealiased(**kw)
     FSBp = FSB.get_dealiased(**kw)
     FCTp = FCT.get_dealiased(**kw)
-    VFSp = VectorSpace([FSBp, FSTp, FSTp])
+    VFSp = VectorSpace([FSTp, FSTp, FSBp])
 
     float, complex, mpitype = datatypes("double")
 

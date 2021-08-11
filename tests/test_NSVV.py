@@ -1,5 +1,5 @@
 import pytest
-from six.moves import reload_module
+import importlib
 from mpi4py import MPI
 from spectralDNS import config, get_solver, solve
 from TG import initialize, regression_test
@@ -57,7 +57,7 @@ def test_solvers(sol):
     config.params.dealias = '2/3-rule'
     for opt in ('cython', 'numba', 'pythran'):
         config.params.optimization = opt
-        reload_module(solver)  # To load optimized methods
+        importlib.reload(solver)  # To load optimized methods
         initialize(solver, context)
         solve(solver, context)
 
