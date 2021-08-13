@@ -191,10 +191,21 @@ def getintegrator(rhs, u0, solver, context):
         return func
 
     elif params.integrator in ("BS5_adaptive", "BS5_fixed"):
-        import nodepy
-        A = nodepy.rk.loadRKM("BS5").A.astype(context.float)
-        b = nodepy.rk.loadRKM("BS5").b.astype(context.float)
-        bhat = nodepy.rk.loadRKM("BS5").bhat.astype(context.float)
+        # Remove nodepy dependency since it requires matplotlib and six
+        #import nodepy
+        #A = nodepy.rk.loadRKM("BS5").A.astype(context.float)
+        #b = nodepy.rk.loadRKM("BS5").b.astype(context.float)
+        #bhat = nodepy.rk.loadRKM("BS5").bhat.astype(context.float)
+        A = np.array([[0, 0, 0, 0, 0, 0, 0, 0],
+                      [1/6, 0, 0, 0, 0, 0, 0, 0],
+                      [2/27, 4/27, 0, 0, 0, 0, 0, 0],
+                      [183/1372, -162/343, 1053/1372, 0, 0, 0, 0, 0],
+                      [68/297, -4/11, 42/143, 1960/3861, 0, 0, 0, 0],
+                      [597/22528, 81/352, 63099/585728, 58653/366080, 4617/20480, 0, 0, 0],
+                      [174197/959244, -30942/79937, 8152137/19744439, 666106/1039181, -29421/29068, 482048/414219, 0, 0],
+                      [587/8064, 0, 4440339/15491840, 24353/124800, 387/44800, 2152/5985, 7267/94080, 0]], dtype=context.float)
+        b = np.array([587/8064, 0, 4440339/15491840, 24353/124800, 387/44800, 2152/5985, 7267/94080, 0], dtype=context.float)
+        bhat = np.array([2479/34992, 0, 123/416, 612941/3411720, 43/1440, 2272/6561, 79937/1113912, 3293/556956], dtype=context.float)
         err_order = 4
         errnorm = "2"
         fsal = True
