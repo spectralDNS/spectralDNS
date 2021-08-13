@@ -36,7 +36,6 @@ requirements:
     - mpi4py
     - scipy
     - sympy
-    - six
 
 test:
   source_files:
