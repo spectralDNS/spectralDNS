@@ -17,7 +17,7 @@ def get_context():
 
     c.RB = RB = FunctionSpace(config.params.N[0], 'C', bc=(1, 0))
     c.FRB = FRB = TensorProductSpace(comm, (RB, c.K0, c.K1), **c.kw0)
-    c.FRBp = FRBp = TensorProductSpace(comm, (RB, c.K0p, c.K1p), **c.kw0)
+    c.FRBp = FRBp = FRB.get_dealiased(**c.kw)
 
     c.dU = Function(c.VFS)  # rhs vector for integrator. Now three components, not two
     c.phi = Array(FRB)
@@ -67,8 +67,8 @@ def ComputeRHS(rhs, u_hat, g_hat, p_hat, rk, solver, context):
     w0[0] -= 0.5*c.BTT[0][0]*(p_hat[-2]+p_hat[-1])*c.K2[0]
     w0[1] -= 0.5*c.BTT[0][1]*(p_hat[-2]-p_hat[-1])*c.K2[0]
     rhs[0] += config.params.dt*(c.a[rk]+c.b[rk])*w0
-    c.N_hat = DivRBConvection(c.N_hat, u_hat, g_hat, p_hat, **context)
-    #c.N_hat = StandardRBConvection(c.N_hat, u_hat, g_hat, p_hat, **context)
+    #c.N_hat = DivRBConvection(c.N_hat, u_hat, g_hat, p_hat, **context)
+    c.N_hat = StandardRBConvection(c.N_hat, u_hat, g_hat, p_hat, **context)
     if context.mask is not None:
         c.N_hat.mask_nyquist(context.mask)
     rhs[2] = -2./params.kappa/(c.a[rk]+c.b[rk])*(c.N_hat*c.a[rk] + c.N_hat0*c.b[rk])

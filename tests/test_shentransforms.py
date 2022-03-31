@@ -18,8 +18,8 @@ def test_Mult_Div():
 
     #SD = ShenDirichlet(N, "GC")
     #SN = ShenNeumann(N, "GC")
-    #SD.plan(N, 0, np.complex, {})
-    #SN.plan(N, 0, np.complex, {})
+    #SD.plan(N, 0, complex, {})
+    #SN.plan(N, 0, complex, {})
     SD = FunctionSpace(N, 'C', bc=(0, 0), dtype='D')
     SN = FunctionSpace(N, 'C', basis='ShenNeumann', dtype='D')
 
@@ -30,10 +30,10 @@ def test_Mult_Div():
     vk = np.random.randn((N))+np.random.randn((N))*1j
     wk = np.random.randn((N))+np.random.randn((N))*1j
 
-    b = np.zeros(N, dtype=np.complex)
-    uk0 = np.zeros(N, dtype=np.complex)
-    vk0 = np.zeros(N, dtype=np.complex)
-    wk0 = np.zeros(N, dtype=np.complex)
+    b = np.zeros(N, dtype=complex)
+    uk0 = np.zeros(N, dtype=complex)
+    vk0 = np.zeros(N, dtype=complex)
+    wk0 = np.zeros(N, dtype=complex)
 
     uk0 = SD.forward(uk, uk0)
     uk = SD.backward(uk0, uk)
@@ -58,7 +58,7 @@ def test_Mult_Div():
     uk0 = uk0.repeat(4*4).reshape((N, 4, 4)) + 1j*uk0.repeat(4*4).reshape((N, 4, 4))
     vk0 = vk0.repeat(4*4).reshape((N, 4, 4)) + 1j*vk0.repeat(4*4).reshape((N, 4, 4))
     wk0 = wk0.repeat(4*4).reshape((N, 4, 4)) + 1j*wk0.repeat(4*4).reshape((N, 4, 4))
-    b = np.zeros((N, 4, 4), dtype=np.complex)
+    b = np.zeros((N, 4, 4), dtype=complex)
     m = np.zeros((4, 4))+7
     n = np.zeros((4, 4))+7
     LUsolve.Mult_Div_3D(N, m, n, uk0[:N-2], vk0[:N-2], wk0[:N-2], b[1:N-2])

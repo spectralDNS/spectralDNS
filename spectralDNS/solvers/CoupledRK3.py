@@ -78,7 +78,7 @@ def get_context():
     H_hat = Function(VFS)
 
     dU = Function(VQ)
-    hv = np.zeros((2,)+H_hat.shape, dtype=np.complex)
+    hv = np.zeros((2,)+H_hat.shape, dtype=complex)
 
     Source = Array(VFS) # Note - not using VQ. Only used for constant pressure gradient
     Sk = Function(VFS)

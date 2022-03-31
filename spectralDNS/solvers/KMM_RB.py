@@ -17,7 +17,7 @@ def get_context():
 
     c.RB = RB = FunctionSpace(config.params.N[0], 'C', bc=(1, 0))
     c.FRB = FRB = TensorProductSpace(comm, (RB, c.K0, c.K1), **c.kw0)
-    c.FRBp = FRBp = TensorProductSpace(comm, (RB, c.K0p, c.K1p), **c.kw0)
+    c.FRBp = FRBp = FRB.get_dealiased(**c.kw)
 
     c.dU = Function(c.VFS)  # rhs vector for integrator. Now three components, not two
     c.phi = Array(FRB)

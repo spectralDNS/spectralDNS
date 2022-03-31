@@ -17,7 +17,7 @@ def initialize(solver, context):
     phi = context.phi
 
     # Perturb temperature
-    phi[:] = 0.5*(1-X[0])+0.01*np.random.randn(*phi.shape)*(1-X[0])*(1+X[0])
+    phi[:] = 0.5*(1-X[0])+0.005*np.random.randn(*phi.shape)*(1-X[0])*(1+X[0])
     phi_hat = phi.forward(context.phi_hat)
     phi_hat.mask_nyquist()
     phi = phi_hat.backward(phi)
@@ -63,8 +63,8 @@ def update(context):
 
         plt.pause(1e-6)
         plt.figure(2)
-        im3.ax.clear()
-        im3.ax.contourf(X[1][0, :, 0], X[0][:, 0, 0], phi[:, :, 0], 100)
+        im3.axes.clear()
+        im3.axes.contourf(X[1][0, :, 0], X[0][:, 0, 0], phi[:, :, 0], 100)
         im3.autoscale()
         plt.pause(1e-6)
 
