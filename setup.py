@@ -83,7 +83,7 @@ if __name__ == '__main__':
               'Topic :: Scientific/Engineering :: Mathematics',
               'Topic :: Software Development :: Libraries :: Python Modules',
               ],
-          install_requires=['numpy', 'shenfun>=3.0.0', 'cython', 'mpi4py-fft', 'mpi4py'],
+          install_requires=['numpy', 'shenfun>=4.0.2', 'cython', 'mpi4py-fft', 'mpi4py'],
           setup_requires=['numpy', 'cython>=0.25', 'setuptools>=18.0'],
           packages=["spectralDNS",
                     "spectralDNS.h5io",
