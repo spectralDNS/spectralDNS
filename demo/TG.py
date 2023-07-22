@@ -1,6 +1,6 @@
 from __future__ import print_function
 import warnings
-from numpy import pi, zeros, sum, float64, sin, cos, prod
+from numpy import pi, zeros, sum, float64, sin, cos, prod, random
 from spectralDNS import config, get_solver, solve
 from shenfun.fourier import energy_fourier
 
@@ -61,8 +61,8 @@ def update(context):
                 plt.draw()
                 globals().update(im1=im1)
             else:
-                im1.ax.clear()
-                im1.ax.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], U[0, :, :, 10], 100)
+                im1.axes.clear()
+                im1.axes.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], U[0, :, :, 10], 100)
                 im1.autoscale()
             plt.pause(1e-6)
 
