@@ -1,6 +1,6 @@
 from __future__ import print_function
 import warnings
-from numpy import pi, zeros, sum, float64, sin, cos, prod
+from numpy import pi, zeros, sum, float64, sin, cos, prod, random
 from spectralDNS import config, get_solver, solve
 from shenfun.fourier import energy_fourier
 
