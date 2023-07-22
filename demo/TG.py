@@ -61,8 +61,8 @@ def update(context):
                 plt.draw()
                 globals().update(im1=im1)
             else:
-                im1.ax.clear()
-                im1.ax.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], U[0, :, :, 10], 100)
+                im1.axes.clear()
+                im1.axes.contourf(c.X[1][:, :, 0], c.X[0][:, :, 0], U[0, :, :, 10], 100)
                 im1.autoscale()
             plt.pause(1e-6)
 
